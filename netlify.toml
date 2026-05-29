@@ -1,0 +1,19 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+  functions = "netlify/functions"
+
+[[redirects]]
+  from = "/api/openrouter/chat"
+  to = "/.netlify/functions/openrouter-chat"
+  status = 200
+
+[[redirects]]
+  from = "/api/sync"
+  to = "/.netlify/functions/sync-log"
+  status = 200
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

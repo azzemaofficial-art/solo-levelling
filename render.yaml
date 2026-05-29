@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: shadow-sync-api
+    runtime: node
+    plan: free
+    region: frankfurt
+    buildCommand: npm install
+    startCommand: npm run sync:start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: SYNC_JWT_SECRET
+        generateValue: true
+      - key: SYNC_CORS_ORIGIN
+        value: "*"
+      - key: SYNC_DB_DIR
+        value: /var/data
+    disk:
+      name: shadow-sync-data
+      mountPath: /var/data
+      sizeGB: 1
