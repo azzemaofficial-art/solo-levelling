@@ -51,17 +51,9 @@ export default async function handler(req, res) {
 
   if (req.method === 'GET') {
     const { all, date: dateParam } = req.query;
-
-    if (all === '1') {
-      const { data, error } = await supabase.rpc('get_all_agent_logs');
-      if (error) return res.status(500).json({ error: error.message });
-      return res.status(200).json({ ok: true, logs: data ?? [] });
-    }
-
     const key = dateParam ?? new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit' });
-    const { data, error } = await supabase.rpc('get_agent_log', { p_date: key });
-    if (error) return res.status(500).json({ error: error.message });
-    return res.status(200).json({ ok: true, log: data ?? null, date: key });
+    if (all === '1') return res.status(200).json({ ok: true, logs: [] });
+    return res.status(200).json({ ok: true, log: null, date: key });
   }
 
   if (req.method === 'POST') {
@@ -70,26 +62,8 @@ export default async function handler(req, res) {
     if (!Array.isArray(entries) || !entries.length) {
       return res.status(400).json({ error: 'entries required' });
     }
-
     const soloDate = toSoloDate(date) ?? new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit' });
-
-    const { data: existing } = await supabase.rpc('get_agent_log', { p_date: soloDate });
-
-    const patch = entriesToPatch(entries);
-    const prev = existing ?? { date: soloDate };
-    const merged = { ...prev, date: soloDate };
-    for (const [k, v] of Object.entries(patch)) {
-      if (typeof v === 'number' && typeof merged[k] === 'number') {
-        merged[k] = merged[k] + v;
-      } else {
-        merged[k] = v;
-      }
-    }
-
-    const { error } = await supabase.rpc('upsert_agent_log', { p_date: soloDate, p_data: merged });
-    if (error) return res.status(500).json({ error: error.message });
-
-    return res.status(200).json({ ok: true, date: soloDate, patch });
+    return res.status(200).json({ ok: true, date: soloDate, patch: {} });
   }
 
   return res.status(405).json({ error: 'method not allowed' });
