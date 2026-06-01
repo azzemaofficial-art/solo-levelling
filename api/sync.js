@@ -53,21 +53,15 @@ export default async function handler(req, res) {
     const { all, date: dateParam } = req.query;
 
     if (all === '1') {
-      const { data, error } = await supabase
-        .from('personal_agent_logs')
-        .select('data');
+      const { data, error } = await supabase.rpc('get_all_agent_logs');
       if (error) return res.status(500).json({ error: error.message });
-      return res.status(200).json({ ok: true, logs: data.map((r) => r.data) });
+      return res.status(200).json({ ok: true, logs: data ?? [] });
     }
 
     const key = dateParam ?? new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit' });
-    const { data, error } = await supabase
-      .from('personal_agent_logs')
-      .select('data')
-      .eq('date', key)
-      .maybeSingle();
+    const { data, error } = await supabase.rpc('get_agent_log', { p_date: key });
     if (error) return res.status(500).json({ error: error.message });
-    return res.status(200).json({ ok: true, log: data?.data ?? null, date: key });
+    return res.status(200).json({ ok: true, log: data ?? null, date: key });
   }
 
   if (req.method === 'POST') {
@@ -79,14 +73,10 @@ export default async function handler(req, res) {
 
     const soloDate = toSoloDate(date) ?? new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit' });
 
-    const { data: existing } = await supabase
-      .from('personal_agent_logs')
-      .select('data')
-      .eq('date', soloDate)
-      .maybeSingle();
+    const { data: existing } = await supabase.rpc('get_agent_log', { p_date: soloDate });
 
     const patch = entriesToPatch(entries);
-    const prev = existing?.data ?? { date: soloDate };
+    const prev = existing ?? { date: soloDate };
     const merged = { ...prev, date: soloDate };
     for (const [k, v] of Object.entries(patch)) {
       if (typeof v === 'number' && typeof merged[k] === 'number') {
@@ -96,9 +86,7 @@ export default async function handler(req, res) {
       }
     }
 
-    const { error } = await supabase
-      .from('personal_agent_logs')
-      .upsert({ date: soloDate, data: merged, updated_at: new Date().toISOString() });
+    const { error } = await supabase.rpc('upsert_agent_log', { p_date: soloDate, p_data: merged });
     if (error) return res.status(500).json({ error: error.message });
 
     return res.status(200).json({ ok: true, date: soloDate, patch });
