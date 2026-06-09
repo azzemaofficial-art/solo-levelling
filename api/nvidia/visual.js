@@ -92,7 +92,13 @@ export default async function handler(req, res) {
 
   const systemPrompt = SYSTEM_PROMPTS[mode] || SYSTEM_PROMPTS.fitness;
 
+  // Ordine: Phi-4 Multimodal (vision HD) → Cosmos 3 (physical AI) → Nemotron Omni (fallback)
   const providers = [
+    {
+      key: process.env.PHI4_NVIDIA_API_KEY,
+      model: process.env.PHI4_NVIDIA_MODEL || 'microsoft/phi-4-multimodal-instruct',
+      name: 'phi4-multimodal',
+    },
     {
       key: process.env.COSMOS3_NVIDIA_API_KEY,
       model: process.env.COSMOS3_NVIDIA_MODEL || 'nvidia/cosmos3-nano-reasoner',

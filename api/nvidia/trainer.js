@@ -32,14 +32,19 @@ const PROVIDERS = [
     model: () => process.env.KIMI_NVIDIA_MODEL || 'moonshotai/kimi-k2.6',
   },
   {
+    name: 'nemotron-super-120b',
+    key: () => process.env.NEMOTRON_SUPER_API_KEY,
+    model: () => process.env.NEMOTRON_SUPER_MODEL || 'nvidia/nemotron-3-super-120b-a12b',
+  },
+  {
+    name: 'qwq-80b',
+    key: () => process.env.QWQ_NVIDIA_API_KEY,
+    model: () => process.env.QWQ_NVIDIA_MODEL || 'qwen/qwen3-next-80b-a3b-instruct',
+  },
+  {
     name: 'nemotron-550b',
     key: () => process.env.NVIDIA_550B_API_KEY,
     model: () => process.env.NVIDIA_550B_MODEL || 'nvidia/nemotron-3-ultra-550b-a55b',
-  },
-  {
-    name: 'qwen35',
-    key: () => process.env.QWEN35_NVIDIA_API_KEY,
-    model: () => process.env.QWEN35_NVIDIA_MODEL || 'qwen/qwen3-235b-a22b',
   },
   {
     name: 'mistral-medium3',
