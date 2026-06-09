@@ -42,6 +42,16 @@ const PROVIDERS = [
     model: () => process.env.QWQ_NVIDIA_MODEL || 'qwen/qwen3-next-80b-a3b-instruct',
   },
   {
+    name: 'mistral-small4',
+    key: () => process.env.MISTRAL_SMALL4_NVIDIA_API_KEY,
+    model: () => process.env.MISTRAL_SMALL4_NVIDIA_MODEL || 'mistralai/mistral-small-4-119b-2603',
+  },
+  {
+    name: 'step-3.7',
+    key: () => process.env.STEP37_NVIDIA_API_KEY,
+    model: () => process.env.STEP37_NVIDIA_MODEL || 'stepfun-ai/step-3.7-flash',
+  },
+  {
     name: 'nemotron-550b',
     key: () => process.env.NVIDIA_550B_API_KEY,
     model: () => process.env.NVIDIA_550B_MODEL || 'nvidia/nemotron-3-ultra-550b-a55b',

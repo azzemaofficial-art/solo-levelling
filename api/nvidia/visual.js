@@ -92,8 +92,13 @@ export default async function handler(req, res) {
 
   const systemPrompt = SYSTEM_PROMPTS[mode] || SYSTEM_PROMPTS.fitness;
 
-  // Ordine: Phi-4 Multimodal (vision HD) → Cosmos 3 (physical AI) → Nemotron Omni (fallback)
+  // Ordine: Llama Vision 90B → Phi-4 Multimodal → Cosmos 3 → Nemotron Omni (fallback)
   const providers = [
+    {
+      key: process.env.MISTRAL_SMALL4_NVIDIA_API_KEY,
+      model: process.env.LLAMA_VISION90B_NVIDIA_MODEL || 'meta/llama-3.2-90b-vision-instruct',
+      name: 'llama-vision-90b',
+    },
     {
       key: process.env.PHI4_NVIDIA_API_KEY,
       model: process.env.PHI4_NVIDIA_MODEL || 'microsoft/phi-4-multimodal-instruct',
