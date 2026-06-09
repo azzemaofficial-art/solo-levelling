@@ -8,3 +8,5 @@ server/data/*.json
 
 # Local Netlify folder
 .netlify
+.vercel
+.claude
