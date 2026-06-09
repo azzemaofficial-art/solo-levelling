@@ -17,6 +17,7 @@ const Training = lazy(() => import('./pages/Training'));
 const Recovery = lazy(() => import('./pages/Recovery'));
 const Help = lazy(() => import('./pages/Help'));
 const MixamoLab = lazy(() => import('./pages/MixamoLab'));
+const Coach = lazy(() => import('./pages/Coach'));
 runStorageMigrations();
 const isWorkoutLog = (log) => Number(log?.workoutBurn ?? log?.burned ?? 0) >= 180 || Number(log?.strength || 0) > 0;
 const getIsoWeekKey = (value = new Date()) => {
@@ -67,7 +68,7 @@ function App() {
   const [toastState, setToastState] = useState(null);
   const [toastDurationMs, setToastDurationMs] = useState(9000);
   const { fxPulseKey, fxBurstKey, surgeKey, comboProgress, triggerFxBurst } = useFxCombo();
-  const pagesOrder = ['system', 'systemplus', 'training', 'recovery', 'quests', 'boss', 'calendar', 'stats', 'help', 'lab'];
+  const pagesOrder = ['system', 'systemplus', 'training', 'recovery', 'quests', 'boss', 'calendar', 'stats', 'help', 'lab', 'coach'];
   const [soundEnabled, setSoundEnabled] = useState(() => {
     const saved = localStorage.getItem('shadow_monarch_sound');
     return saved ? saved === '1' : true;
@@ -1538,6 +1539,7 @@ useEffect(() => { localStorage.setItem('shadow_monarch_macros', JSON.stringify(m
             {activePage === 'stats' && <Stats systemLogs={systemLogs} dailyGoal={dailyGoal} hydrationGoal={hydrationGoal} macroGoals={macroGoals} playerStats={playerStats} />}
             {activePage === 'help' && <Help createBackupPayload={createBackupPayload} importBackupPayload={importBackupPayload} resetAppData={resetAppData} playerStats={playerStats} onNavigate={handleTabChange} />}
             {activePage === 'lab' && <MixamoLab />}
+            {activePage === 'coach' && <Coach />}
             </motion.div>
           </AnimatePresence>
         </Suspense>
@@ -1782,6 +1784,10 @@ useEffect(() => { localStorage.setItem('shadow_monarch_macros', JSON.stringify(m
 
         <button aria-label="Apri pagina Stats" onClick={() => handleTabChange('stats')} className={`nav-tab flex flex-col items-center transition-colors ${activePage === 'stats' ? 'nav-tab-active text-cursed-purple' : 'text-gray-600'}`}>
           <span className="text-[9px] font-bold tracking-widest system-font uppercase">Stats</span>
+        </button>
+        <button aria-label="Apri pagina Coach AI" onClick={() => handleTabChange('coach')} className={`nav-tab flex flex-col items-center transition-colors ${activePage === 'coach' ? 'nav-tab-active text-blue-400' : 'text-gray-600'}`}>
+          <span className="text-[18px]">🧠</span>
+          <span className="text-[9px] font-bold tracking-widest system-font uppercase">Coach</span>
         </button>
 
       </nav>
