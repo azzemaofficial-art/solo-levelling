@@ -3,11 +3,5 @@
   "outputDirectory": "dist",
   "rewrites": [
     { "source": "/((?!api/).*)", "destination": "/index.html" }
-  ],
-  "crons": [
-    {
-      "path": "/api/telegram/remind",
-      "schedule": "0 8,12,16,19,21 * * *"
-    }
   ]
 }

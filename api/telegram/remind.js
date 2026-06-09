@@ -1,4 +1,5 @@
-// Telegram meal reminder — chiamato da Vercel cron
+// Telegram meal reminder — chiamato da cron-job.org 5x/giorno
+// 5 job separati chiamano questo endpoint agli orari: 08:00 12:00 16:00 19:00 21:00 UTC
 // Invia il messaggio giusto in base all'ora italiana corrente
 
 const MEAL_SLOTS = [
