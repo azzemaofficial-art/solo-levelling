@@ -22,6 +22,11 @@ const PROVIDERS = [
     model: () => process.env.KIMI_NVIDIA_MODEL || 'moonshotai/kimi-k2.6',
   },
   {
+    name: 'mistral-large3',
+    key: () => process.env.MISTRAL_SMALL4_NVIDIA_API_KEY,
+    model: () => process.env.MISTRAL_LARGE3_NVIDIA_MODEL || 'mistralai/mistral-large-3-675b-instruct-2512',
+  },
+  {
     name: 'nemotron-super-120b',
     key: () => process.env.NEMOTRON_SUPER_API_KEY,
     model: () => process.env.NEMOTRON_SUPER_MODEL || 'nvidia/nemotron-3-super-120b-a12b',
