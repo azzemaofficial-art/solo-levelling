@@ -57,6 +57,70 @@ const DISCIPLINE_GROUPS = [
   },
 ];
 
+// ─── Curriculum dati per 10 discipline ────────────────────────────────────────
+const CURRICULUM = {
+  muaythai: { name: 'Muay Thai', emoji: '🥊', levels: [
+    { label: 'Fondamenta', weeks: '1-4',  color: 'emerald', topics: ['Guardia e stance', 'Jab e cross', 'Teep (calcio frontale)', 'Low kick', 'Shadowboxing 3×3min'], milestone: 'Esegui jab-cross-teep con forma corretta' },
+    { label: 'Tecnica',    weeks: '5-12', color: 'blue',    topics: ['Mid/high kick', 'Combo 3-5 colpi', 'Parry e difesa', 'Clinch entry', 'Counter jab'], milestone: 'Sparring leggero 3 round' },
+    { label: 'Avanzato',   weeks: '13-24',color: 'orange',  topics: ['Gomitate (6 tipi)', 'Ginocchiate in clinch', 'Sweeps', 'Teep come jab', 'Fight IQ base'], milestone: 'Match sparring completo con arbitro' },
+    { label: 'Pro',        weeks: '25+',  color: 'rose',    topics: ['Clinch avanzato', 'K1 ruleset', 'Footwork da ring', 'Diagonali + teep', 'Fight camp strategy'], milestone: 'Competizione amatoriale' },
+  ]},
+  boxing: { name: 'Boxe', emoji: '🥊', levels: [
+    { label: 'Fondamenta', weeks: '1-4',  color: 'emerald', topics: ['Guardia e stance', 'Jab', 'Cross', 'Gancio', 'Footwork base'], milestone: 'Combo 1-2 fluida × 50 ripetizioni' },
+    { label: 'Tecnica',    weeks: '5-12', color: 'blue',    topics: ['Uppercut', 'Slip e roll', 'Parry', 'Combo 1-2-3', 'Corpo e testa'], milestone: '3 round sparring leggero' },
+    { label: 'Avanzato',   weeks: '13-24',color: 'orange',  topics: ['Head movement', 'Counter-punching', 'Difesa nella corner', 'Feint', 'Jab multiplo'], milestone: 'Sparring 6 round con feedback' },
+    { label: 'Pro',        weeks: '25+',  color: 'rose',    topics: ['Ring generalship', 'Distance management', 'Body shot setup', 'Fight IQ', 'Competition strategy'], milestone: 'Torneo amatoriale' },
+  ]},
+  kickboxing: { name: 'Kickboxing', emoji: '🦵', levels: [
+    { label: 'Fondamenta', weeks: '1-4',  color: 'emerald', topics: ['Guardia e stance', 'Jab-cross', 'Roundhouse base', 'Front kick', 'Camera del calcio'], milestone: 'Roundhouse × 20 per lato con forma' },
+    { label: 'Tecnica',    weeks: '5-12', color: 'blue',    topics: ['Side kick', 'Back kick', 'Combo pugno+calcio', 'Teep difensivo', 'Parata calci'], milestone: '3 round sparring leggero' },
+    { label: 'Avanzato',   weeks: '13-24',color: 'orange',  topics: ['Spinning back kick', 'Flying knee', 'Switch kick', 'Catch and counter', 'Dutch combos'], milestone: 'K1 rules sparring' },
+    { label: 'Pro',        weeks: '25+',  color: 'rose',    topics: ['Timing avanzato', 'Sweep counter', 'Feint calci', 'Clinch KB', 'Competition prep'], milestone: 'Competizione K1/Kickboxing' },
+  ]},
+  karate: { name: 'Karate', emoji: '🥋', levels: [
+    { label: 'Fondamenta', weeks: '1-4',  color: 'emerald', topics: ['Zenkutsu-dachi', 'Oi-zuki', 'Age-uke / Gedan-barai', 'Kata Heian Shodan', 'Kiai e zanshin'], milestone: 'Heian Shodan da memoria' },
+    { label: 'Tecnica',    weeks: '5-12', color: 'blue',    topics: ['Mae-geri / Mawashi-geri', 'Kizami-zuki', 'Ippon kumite base', 'Heian Nidan-Sandan', 'Hikite'], milestone: 'Kumite base 1-step sparring' },
+    { label: 'Avanzato',   weeks: '13-24',color: 'orange',  topics: ['Yoko-geri / Ushiro-geri', 'Heian Yondan-Godan', 'Jiyu kumite', 'Bunkai applicazioni', 'Kime'], milestone: 'Jiyu kumite 3 minuti' },
+    { label: 'Pro',        weeks: '25+',  color: 'rose',    topics: ['Bassai-Dai kata', 'WKF competition rules', 'Sanbon kumite', 'Kata avanzate', 'Gara regionale'], milestone: 'Gara WKF/WKSA' },
+  ]},
+  taekwondo: { name: 'Taekwondo', emoji: '🦵', levels: [
+    { label: 'Fondamenta', weeks: '1-4',  color: 'emerald', topics: ['Ap-seogi / Ap-kubi', 'Ap-chagi (front kick)', 'Dollyo-chagi (roundhouse)', 'Naeryo-chagi (axe kick)', 'Poomsae Taeguk 1-2'], milestone: 'Taeguk 1 da memoria' },
+    { label: 'Tecnica',    weeks: '5-12', color: 'blue',    topics: ['Yeop-chagi (side kick)', 'Dwi-chagi (back kick)', 'Spinning roundhouse', 'Taeguk 3-4', 'Difese di base'], milestone: 'Test cintura gialla' },
+    { label: 'Avanzato',   weeks: '13-24',color: 'orange',  topics: ['Dwi-hurigi (spinning heel)', 'Flying side kick', 'Triple kick', 'Poomsae 5-6', 'Sparring WTF'], milestone: 'Sparring competition 3 round' },
+    { label: 'Pro',        weeks: '25+',  color: 'rose',    topics: ['540° kick', 'Olympic sparring strategy', 'Poomsae black belt', 'Electronic hogu', 'Gara nazionale'], milestone: 'Gara ITF/WTF' },
+  ]},
+  bjj: { name: 'BJJ', emoji: '🤼', levels: [
+    { label: 'Fondamenta', weeks: '1-4',  color: 'emerald', topics: ['Postura e base', 'Guard chiusa', 'Trap & roll (mount escape)', 'Hip escape (shrimping)', 'Rear naked choke'], milestone: 'Uscita da mount e guard 5 volte' },
+    { label: 'Tecnica',    weeks: '5-12', color: 'blue',    topics: ['Armbar da guard', 'Triangle choke', 'Single leg takedown', 'Guard pass base', 'Back take'], milestone: 'Rolling 5 round senza gas out' },
+    { label: 'Avanzato',   weeks: '13-24',color: 'orange',  topics: ['De La Riva guard', 'X-guard', 'Heel hook entry', 'Kimura trap', 'Berimbolo intro'], milestone: 'Submission competition bianca/blu' },
+    { label: 'Pro',        weeks: '25+',  color: 'rose',    topics: ['Worm guard', 'EBI overtime prep', 'Submission chains', 'No-gi specializzazione', 'Competition strategy'], milestone: 'Gara IBJJF/ADCC Trials' },
+  ]},
+  wrestling: { name: 'Wrestling', emoji: '🤼', levels: [
+    { label: 'Fondamenta', weeks: '1-4',  color: 'emerald', topics: ['Stance e movement', 'Penetration step', 'Double leg takedown', 'Single leg takedown', 'Sprawl'], milestone: 'Double leg da clinch 10 volte' },
+    { label: 'Tecnica',    weeks: '5-12', color: 'blue',    topics: ['Low single', 'High crotch', 'Head lock', 'Granby roll', 'Mat work base'], milestone: '5 round drilling con partner' },
+    { label: 'Avanzato',   weeks: '13-24',color: 'orange',  topics: ['Leg ride', 'Cradle (near/far)', 'Power half nelson', 'Throw by', 'Funk wrestling'], milestone: 'Match allenamento wrestling' },
+    { label: 'Pro',        weeks: '25+',  color: 'rose',    topics: ['Scrambles avanzati', 'Cement job', 'Shooting combination', 'Greco-Romano throws', 'Competition prep'], milestone: 'Gara regionale / torneo MMA' },
+  ]},
+  judo: { name: 'Judo', emoji: '🥋', levels: [
+    { label: 'Fondamenta', weeks: '1-4',  color: 'emerald', topics: ['Ukemi (cadute sicure)', 'Kumi-kata (grip)', 'O-soto-gari', 'O-goshi', 'Seoi-nage'], milestone: 'Caduta laterale/posteriore senza paura' },
+    { label: 'Tecnica',    weeks: '5-12', color: 'blue',    topics: ['Tai-otoshi', 'Uchi-mata', 'Kuzushi (sbilancio)', 'Kesa-gatame', 'Tate-shiho-gatame'], milestone: 'Randori 3 round cintura gialla' },
+    { label: 'Avanzato',   weeks: '13-24',color: 'orange',  topics: ['Ippon-seoi-nage', 'Ko-uchi/O-uchi-gari', 'Harai-goshi', 'Shime-waza', 'Kansetsu-waza'], milestone: 'Shiai (gara) locale' },
+    { label: 'Pro',        weeks: '25+',  color: 'rose',    topics: ['Grip fighting avanzato', 'Renraku-waza (combo)', 'Ashi-waza', 'Kata avanzate', 'IJF competition rules'], milestone: 'Gara IJF/FIJLKAM' },
+  ]},
+  mma: { name: 'MMA', emoji: '🏆', levels: [
+    { label: 'Fondamenta', weeks: '1-8',  color: 'emerald', topics: ['Striking base (boxe/MT)', 'Grappling base (wrestling/BJJ)', 'Clinch entry e exit', 'Takedown defense', 'Postura nel guard'], milestone: '2 sessioni/sett per 8 settimane' },
+    { label: 'Tecnica',    weeks: '9-20', color: 'blue',    topics: ['Transizioni striking→ground', 'Sprawl & brawl', 'Guard pass in MMA', 'Ground & pound', 'Cage work base'], milestone: 'MMA sparring leggero 3 round' },
+    { label: 'Avanzato',   weeks: '21-36',color: 'orange',  topics: ['Dirty boxing nel clinch', 'Standing submission', 'Knee from clinch', 'Scrambles', 'Conditioning MMA-specifico'], milestone: 'Sparring full (protections) 5 round' },
+    { label: 'Pro',        weeks: '37+',  color: 'rose',    topics: ['Game planning avversario', 'Weight cut basics', 'Fight camp periodization', 'Film study', 'Amateur MMA rules'], milestone: 'Match amatoriale MMA' },
+  ]},
+  kravmaga: { name: 'Krav Maga', emoji: '⚔️', levels: [
+    { label: 'Fondamenta', weeks: '1-4',  color: 'emerald', topics: ['Guardia naturale', 'Colpi base (palmo/gomito/ginocchio)', 'Caduta e rialzo', 'Difesa 360°', 'Choke release'], milestone: 'Difesa da choke in 1.5 secondi' },
+    { label: 'Tecnica',    weeks: '5-12', color: 'blue',    topics: ['Difesa da pugni diretti', 'Difesa da calci', 'Bear hug releases (4 varianti)', 'Headlock escape', 'Ground defense'], milestone: 'Scenario drill con stress' },
+    { label: 'Avanzato',   weeks: '13-24',color: 'orange',  topics: ['Difesa da coltello', 'Difesa da arma da fuoco', 'Aggressori multipli', 'Difesa in auto', 'Stress inoculation'], milestone: 'Scenario multiplo 3 minuti no-stop' },
+    { label: 'Pro',        weeks: '25+',  color: 'rose',    topics: ['Weapon retention', 'Force continuum', 'Mission-specific training', 'Istruttore P1 prep', 'Scenario avanzati notturni'], milestone: 'Certificazione istruttore P1/P2' },
+  ]},
+};
+
 // ─── Gong bell via Web Audio API ──────────────────────────────────────────────
 function playGong(freq = 523) {
   try {
@@ -728,11 +792,175 @@ function VisualCoach() {
   );
 }
 
+// ─── Curriculum coach ─────────────────────────────────────────────────────────
+const CURRICULUM_KEY = 'shadow_monarch_curriculum';
+const loadCurrProgress = () => { try { return JSON.parse(localStorage.getItem(CURRICULUM_KEY) || '{}'); } catch { return {}; } };
+const saveCurrProgress = (p) => { try { localStorage.setItem(CURRICULUM_KEY, JSON.stringify(p)); } catch {} };
+
+const LEVEL_STYLE = {
+  emerald: { label: 'text-emerald-400', border: 'border-emerald-700/40', bg: 'bg-emerald-900/10', bar: 'bg-emerald-500' },
+  blue:    { label: 'text-blue-400',    border: 'border-blue-700/40',    bg: 'bg-blue-900/10',    bar: 'bg-blue-500'    },
+  orange:  { label: 'text-orange-400',  border: 'border-orange-700/40',  bg: 'bg-orange-900/10',  bar: 'bg-orange-500'  },
+  rose:    { label: 'text-rose-400',    border: 'border-rose-700/40',    bg: 'bg-rose-900/10',    bar: 'bg-rose-500'    },
+};
+
+function CurriculumCoach() {
+  const [disc, setDisc] = useState('muaythai');
+  const [expandedLevel, setExpandedLevel] = useState(0);
+  const [progress, setProgress] = useState(() => loadCurrProgress());
+  const [loadingTopic, setLoadingTopic] = useState(null);
+  const [topicLesson, setTopicLesson] = useState(null);
+
+  const curriculum = CURRICULUM[disc];
+  const discProgress = progress[disc] || {};
+  const getCompleted = (li) => new Set(discProgress[`l${li}`] || []);
+  const totalDone = curriculum.levels.reduce((s, _, li) => s + getCompleted(li).size, 0);
+  const totalTopics = curriculum.levels.reduce((s, l) => s + l.topics.length, 0);
+
+  const toggleTopic = (li, ti) => {
+    setProgress((prev) => {
+      const dp = prev[disc] || {};
+      const set = new Set(dp[`l${li}`] || []);
+      if (set.has(ti)) set.delete(ti); else set.add(ti);
+      const next = { ...prev, [disc]: { ...dp, [`l${li}`]: [...set] } };
+      saveCurrProgress(next);
+      return next;
+    });
+  };
+
+  const learnTopic = async (topic, levelLabel) => {
+    setLoadingTopic(topic);
+    setTopicLesson(null);
+    try {
+      const prompt = `Insegnami la tecnica: "${topic}" — disciplina: ${curriculum.name}, livello ${levelLabel}.\nSpiega: 1) cos'è e perché è importante 2) come si esegue step-by-step 3) errori comuni 4) drill pratico per impararlo.\nRispondi in italiano, max 12 righe, tono da coach pratico e diretto.`;
+      const res = await fetch('/api/nvidia/trainer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: [{ role: 'user', content: prompt }] }),
+      });
+      const data = await res.json();
+      if (res.ok) setTopicLesson({ topic, content: data.content, provider: data.provider });
+    } catch {}
+    finally { setLoadingTopic(null); }
+  };
+
+  const SOLO_DISCS = DISCIPLINE_GROUPS[0].items;
+
+  return (
+    <div className="space-y-4">
+      {/* Header progress */}
+      <div className="px-4 py-3 bg-gradient-to-r from-indigo-900/40 to-purple-900/30 border border-indigo-700/40 rounded-xl">
+        <p className="text-xs text-indigo-300 font-semibold">📚 Curriculum Arti Marziali</p>
+        <p className="text-xs text-gray-400 mt-0.5">{curriculum.name}: {totalDone}/{totalTopics} argomenti completati</p>
+        <div className="mt-2 h-1.5 bg-gray-700 rounded-full overflow-hidden">
+          <div className="h-full bg-indigo-500 rounded-full transition-all"
+            style={{ width: `${totalTopics > 0 ? (totalDone / totalTopics) * 100 : 0}%` }} />
+        </div>
+      </div>
+
+      {/* Selector discipline */}
+      <div className="flex flex-wrap gap-1.5">
+        {SOLO_DISCS.map((d) => {
+          const dp = progress[d.id] || {};
+          const done = Object.values(dp).reduce((s, arr) => s + arr.length, 0);
+          const tot = CURRICULUM[d.id]?.levels.reduce((s, l) => s + l.topics.length, 0) || 0;
+          return (
+            <button key={d.id} onClick={() => { setDisc(d.id); setExpandedLevel(0); setTopicLesson(null); }}
+              className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors border ${
+                disc === d.id ? 'bg-indigo-700 border-indigo-500 text-white' : 'bg-gray-800/80 border-gray-700/60 text-gray-400 hover:text-white hover:border-gray-500'
+              }`}>
+              {d.emoji} {d.label}
+              {done > 0 && <span className={`ml-1 text-[10px] ${disc === d.id ? 'text-indigo-200' : 'text-gray-500'}`}>{done}/{tot}</span>}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Level cards */}
+      <div className="space-y-2">
+        {curriculum.levels.map((level, li) => {
+          const completed = getCompleted(li);
+          const prevDone = li === 0 || getCompleted(li - 1).size === curriculum.levels[li - 1].topics.length;
+          const pct = level.topics.length > 0 ? (completed.size / level.topics.length) * 100 : 0;
+          const isOpen = expandedLevel === li;
+          const style = LEVEL_STYLE[level.color] || LEVEL_STYLE.blue;
+
+          return (
+            <div key={li} className={`rounded-xl border overflow-hidden ${style.border} ${!prevDone ? 'opacity-50' : ''}`}>
+              <button onClick={() => { if (prevDone) { setExpandedLevel(isOpen ? -1 : li); setTopicLesson(null); } }}
+                disabled={!prevDone}
+                className={`w-full px-4 py-3 flex items-center gap-3 text-left ${style.bg} transition-all`}>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className={`text-xs font-bold ${style.label}`}>
+                      {!prevDone ? '🔒' : pct === 100 ? '✅' : '📖'} {level.label}
+                    </span>
+                    <span className="text-xs text-gray-500">Sett. {level.weeks}</span>
+                  </div>
+                  <div className="mt-1.5 h-1 bg-gray-700 rounded-full overflow-hidden">
+                    <div className={`h-full rounded-full transition-all ${style.bar}`} style={{ width: `${pct}%` }} />
+                  </div>
+                </div>
+                <span className={`text-xs font-mono ${style.label}`}>{completed.size}/{level.topics.length}</span>
+                <span className="text-gray-500 text-xs ml-1">{isOpen ? '▲' : '▼'}</span>
+              </button>
+
+              <AnimatePresence>
+                {isOpen && (
+                  <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }}>
+                    <div className="px-3 py-3 space-y-2">
+                      {level.topics.map((topic, ti) => {
+                        const isDone = completed.has(ti);
+                        const isLoading = loadingTopic === topic;
+                        const isShown = topicLesson?.topic === topic;
+                        return (
+                          <div key={ti}>
+                            <div className="flex items-center gap-2">
+                              <button onClick={() => toggleTopic(li, ti)}
+                                className={`w-5 h-5 rounded border flex items-center justify-center flex-shrink-0 transition-colors ${isDone ? 'bg-indigo-600 border-indigo-500' : 'border-gray-600 bg-gray-800 hover:border-gray-400'}`}>
+                                {isDone && <span className="text-white text-[10px] font-bold">✓</span>}
+                              </button>
+                              <span className={`flex-1 text-xs ${isDone ? 'text-gray-500 line-through' : 'text-gray-200'}`}>{topic}</span>
+                              <button onClick={() => isShown ? setTopicLesson(null) : learnTopic(topic, level.label)}
+                                disabled={isLoading}
+                                className={`px-2 py-1 rounded text-xs transition-colors flex-shrink-0 ${isShown ? 'bg-indigo-700 text-white' : 'bg-gray-700 hover:bg-indigo-700 text-gray-300 hover:text-white'} disabled:opacity-50`}>
+                                {isLoading ? '⏳' : '📖'}
+                              </button>
+                            </div>
+                            <AnimatePresence>
+                              {isShown && (
+                                <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+                                  className="mt-2 ml-7 p-3 bg-gray-800/80 border border-indigo-500/20 rounded-xl">
+                                  <p className="text-xs text-indigo-400 font-mono mb-1.5">🤖 {topicLesson.provider || 'AI'} — {topic}</p>
+                                  <p className="text-xs text-gray-200 leading-relaxed whitespace-pre-wrap">{topicLesson.content}</p>
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
+                          </div>
+                        );
+                      })}
+                      <div className={`mt-1 px-3 py-2 rounded-lg border ${pct === 100 ? 'bg-indigo-900/20 border-indigo-600/40' : 'bg-gray-800/30 border-gray-700/30'}`}>
+                        <p className="text-xs text-gray-400">🎯 <span className="font-semibold">Milestone:</span> {level.milestone}</p>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ─── Root ──────────────────────────────────────────────────────────────────────
 const TABS = [
-  { id: 'trainer', label: '🏅 PT', full: 'Personal Trainer' },
-  { id: 'chat',    label: '💬 Chat', full: 'Coach Chat' },
-  { id: 'visual',  label: '📷 Live', full: 'Visual Live' },
+  { id: 'trainer',    label: '🏅 PT',       full: 'Personal Trainer' },
+  { id: 'curriculum', label: '📚 Piano',    full: 'Curriculum' },
+  { id: 'chat',       label: '💬 Chat',     full: 'Coach Chat' },
+  { id: 'visual',     label: '📷 Live',     full: 'Visual Live' },
 ];
 
 export default function Coach() {
@@ -764,9 +992,10 @@ export default function Coach() {
         <AnimatePresence mode="wait">
           <motion.div key={tab} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
             transition={{ duration: 0.15 }}>
-            {tab === 'trainer' && <PersonalTrainer />}
-            {tab === 'chat'    && <CoachChat />}
-            {tab === 'visual'  && <VisualCoach />}
+            {tab === 'trainer'    && <PersonalTrainer />}
+            {tab === 'curriculum' && <CurriculumCoach />}
+            {tab === 'chat'       && <CoachChat />}
+            {tab === 'visual'     && <VisualCoach />}
           </motion.div>
         </AnimatePresence>
       </div>
