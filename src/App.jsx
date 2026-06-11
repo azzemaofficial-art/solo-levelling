@@ -1343,6 +1343,9 @@ useEffect(() => { localStorage.setItem('shadow_monarch_macros', JSON.stringify(m
               <button onClick={() => handleTabChange('help')} className="text-[10px] px-2 py-3 border border-cyan-300/40 text-cyan-200 uppercase tracking-widest flex items-center gap-1.5">
                 <span>❓</span> Help
               </button>
+              <button onClick={() => { handleTabChange('coach'); setMenuOpen(false); }} className="text-[10px] px-2 py-3 border border-blue-300/40 text-blue-200 uppercase tracking-widest col-span-2 flex items-center gap-1.5">
+                <span>🧠</span> Coach AI
+              </button>
               <button onClick={() => handleTabChange('lab')} className="text-[10px] px-2 py-3 border border-fuchsia-300/40 text-fuchsia-200 uppercase tracking-widest col-span-2 flex items-center gap-1.5">
                 <span>🧪</span> Lab
               </button>
