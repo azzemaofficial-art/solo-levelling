@@ -5,6 +5,6 @@
     { "source": "/((?!api/|assets/|favicon\\.ico|robots\\.txt).*)", "destination": "/index.html" }
   ],
   "functions": {
-    "api/nvidia/quiz.js": { "maxDuration": 30 }
+    "api/nvidia/quiz-ask.js": { "maxDuration": 30 }
   }
 }

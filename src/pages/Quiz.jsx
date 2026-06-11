@@ -391,9 +391,9 @@ export default function Quiz() {
   const question = QUESTIONS[qIndex];
   const totalQ   = QUESTIONS.length;
 
-  // ── Load contestants ──
+  // ── Load contestants from quiz-ask GET ──
   useEffect(() => {
-    fetch('/api/nvidia/quiz')
+    fetch('/api/nvidia/quiz-ask')
       .then(r => r.json())
       .then(d => {
         if (d.contestants) {
@@ -403,18 +403,22 @@ export default function Quiz() {
       })
       .catch(() => {
         const fb = [
-          { id:'kimi',         name:'Kimi K2.6',         emoji:'🌙', color:'#06b6d4', provider:'nvidia'     },
-          { id:'mistral-large',name:'Mistral Large 675B', emoji:'🌪️', color:'#3b82f6', provider:'nvidia'     },
-          { id:'qwq',          name:'QwQ 80B',            emoji:'🧩', color:'#8b5cf6', provider:'nvidia'     },
-          { id:'nemotron',     name:'Nemotron 120B',      emoji:'⚡', color:'#f59e0b', provider:'nvidia'     },
-          { id:'step',         name:'Step 3.7',           emoji:'🚀', color:'#10b981', provider:'nvidia'     },
-          { id:'medium',       name:'Mistral Medium 3',   emoji:'🔮', color:'#f43f5e', provider:'nvidia'     },
-          { id:'nemotron550',  name:'Nemotron 550B',      emoji:'🌀', color:'#a3e635', provider:'nvidia'     },
-          { id:'gpt4o-mini',   name:'GPT-4o Mini',        emoji:'🤖', color:'#e5e7eb', provider:'openrouter' },
-          { id:'gemini-flash', name:'Gemini Flash 1.5',   emoji:'💎', color:'#34d399', provider:'openrouter' },
-          { id:'claude-haiku', name:'Claude Haiku 3.5',   emoji:'🦋', color:'#fb923c', provider:'openrouter' },
-          { id:'deepseek-v3',  name:'DeepSeek V3',        emoji:'🐋', color:'#22d3ee', provider:'openrouter' },
-          { id:'deepseek-r1',  name:'DeepSeek R1',        emoji:'🧠', color:'#818cf8', provider:'openrouter' },
+          { id:'kimi',          name:'Kimi K2.6',         emoji:'🌙', color:'#06b6d4', provider:'nvidia'     },
+          { id:'mistral-large', name:'Mistral Large 675B', emoji:'🌪️', color:'#3b82f6', provider:'nvidia'     },
+          { id:'qwq',           name:'QwQ 80B',            emoji:'🧩', color:'#8b5cf6', provider:'nvidia'     },
+          { id:'nemotron',      name:'Nemotron 120B',      emoji:'⚡', color:'#f59e0b', provider:'nvidia'     },
+          { id:'step',          name:'Step 3.7',           emoji:'🚀', color:'#10b981', provider:'nvidia'     },
+          { id:'medium',        name:'Mistral Medium 3',   emoji:'🔮', color:'#f43f5e', provider:'nvidia'     },
+          { id:'gpt4o-mini',    name:'GPT-4o Mini',        emoji:'🤖', color:'#e5e7eb', provider:'openrouter' },
+          { id:'gemini-flash',  name:'Gemini Flash 1.5',   emoji:'💎', color:'#34d399', provider:'openrouter' },
+          { id:'claude-haiku',  name:'Claude Haiku 3.5',   emoji:'🦋', color:'#fb923c', provider:'openrouter' },
+          { id:'deepseek-v3',   name:'DeepSeek V3',        emoji:'🐋', color:'#22d3ee', provider:'openrouter' },
+          { id:'deepseek-r1',   name:'DeepSeek R1',        emoji:'🧠', color:'#818cf8', provider:'openrouter' },
+          { id:'llama33',       name:'Llama 3.3 70B',      emoji:'🦙', color:'#f97316', provider:'openrouter' },
+          { id:'qwen25',        name:'Qwen 2.5 72B',       emoji:'🐉', color:'#e879f9', provider:'openrouter' },
+          { id:'grok2',         name:'Grok 2',             emoji:'🤩', color:'#facc15', provider:'openrouter' },
+          { id:'gemini20',      name:'Gemini 2.0 Flash',   emoji:'🔵', color:'#60a5fa', provider:'openrouter' },
+          { id:'mixtral',       name:'Mixtral 8x22B',      emoji:'🎲', color:'#a3e635', provider:'openrouter' },
         ];
         setContestants(fb);
         const s = {}; fb.forEach(c => { s[c.id] = 0; }); setScores(s);
@@ -431,77 +435,63 @@ export default function Quiz() {
     return () => clearInterval(timerRef.current);
   }, [phase, qIndex]);
 
-  // ── SSE streaming ──
-  const callApi = useCallback(async () => {
+  // ── Parallel fetch — un endpoint per modello, indipendenti tra loro ──
+  const callApi = useCallback(() => {
     if (apiCalledRef.current) return;
     apiCalledRef.current = true;
     setLoading(true);
 
-    try {
-      const res = await fetch('/api/nvidia/quiz', {
+    const collected = [];
+    const total     = contestants.length;
+
+    const finalize = (results) => {
+      const enriched = results.map(r => ({ ...r, isCorrect: r.answer === question.correct }));
+      setRoundResults({ results: enriched, correct: question.correct });
+      setScores(prev => {
+        const next = { ...prev };
+        enriched.forEach(r => { if (r.isCorrect) next[r.id] = (next[r.id] || 0) + 100; });
+        return next;
+      });
+      setHistory(h => [...h, { qIndex, results: enriched }]);
+      setLoading(false);
+      clearInterval(timerRef.current);
+      setPhase('reveal');
+    };
+
+    const handleResult = (result) => {
+      // Live update — appare sull'opzione votata immediatamente
+      setLiveAnswers(prev => ({ ...prev, [result.id]: { answer: result.answer, latencyMs: result.latencyMs } }));
+      setAnswerOrder(prev => [...prev, result.id]);
+      if (result.answer && result.answer !== '?') {
+        setVotesPerOpt(prev => ({
+          ...prev,
+          [result.answer]: [...(prev[result.answer] || []), { id: result.id, emoji: result.emoji }],
+        }));
+      }
+      collected.push(result);
+      if (collected.length >= total) finalize(collected);
+    };
+
+    contestants.forEach(c => {
+      fetch('/api/nvidia/quiz-ask', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question: question.q, options: question.options, correct: question.correct }),
-      });
-
-      const reader  = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-      const allResults = [];
-
-      const finalize = (final) => {
-        const enriched = final.map(r => ({ ...r, isCorrect: r.answer === question.correct }));
-        setRoundResults({ results: enriched, correct: question.correct });
-        setScores(prev => {
-          const next = { ...prev };
-          enriched.forEach(r => { if (r.isCorrect) next[r.id] = (next[r.id] || 0) + 100; });
-          return next;
-        });
-        setHistory(h => [...h, { qIndex, results: enriched }]);
-        setLoading(false);
-        clearInterval(timerRef.current);
-        setPhase('reveal');
-      };
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) {
-          // Reader closed — funzione Vercel killata prima del done event
-          // Triggera reveal con i risultati parziali già ricevuti
-          if (allResults.length > 0) finalize(allResults);
-          else { setLoading(false); setPhase('reveal'); }
-          break;
-        }
-        buffer += decoder.decode(value, { stream: true });
-        const parts = buffer.split('\n\n');
-        buffer = parts.pop() ?? '';
-
-        for (const part of parts) {
-          const line = part.trim();
-          if (!line.startsWith('data: ')) continue;
-          try {
-            const data = JSON.parse(line.slice(6));
-            if (data.type === 'answer') {
-              setLiveAnswers(prev => ({ ...prev, [data.id]: { answer: data.answer, latencyMs: data.latencyMs } }));
-              setAnswerOrder(prev => [...prev, data.id]);
-              if (data.answer && data.answer !== '?') {
-                setVotesPerOpt(prev => ({
-                  ...prev,
-                  [data.answer]: [...(prev[data.answer] || []), { id: data.id, emoji: data.emoji }],
-                }));
-              }
-              allResults.push(data);
-            } else if (data.type === 'done') {
-              finalize(data.results || allResults);
-            }
-          } catch { /* skip malformed line */ }
-        }
-      }
-    } catch {
-      setLoading(false);
-      setPhase('reveal');
-    }
-  }, [question, qIndex]);
+        body: JSON.stringify({
+          modelId: c.id,
+          question: question.q,
+          options:  question.options,
+          correct:  question.correct,
+        }),
+        signal: AbortSignal.timeout(29000),
+      })
+        .then(r => r.json())
+        .then(result => handleResult(result))
+        .catch(() => handleResult({
+          id: c.id, name: c.name, emoji: c.emoji, color: c.color,
+          answer: '?', latencyMs: 0, isCorrect: false,
+        }));
+    });
+  }, [question, qIndex, contestants]);
 
   useEffect(() => {
     if (phase === 'question') {
