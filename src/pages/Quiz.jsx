@@ -413,6 +413,8 @@ export default function Quiz() {
           { id:'gpt4o-mini',   name:'GPT-4o Mini',        emoji:'🤖', color:'#e5e7eb', provider:'openrouter' },
           { id:'gemini-flash', name:'Gemini Flash 1.5',   emoji:'💎', color:'#34d399', provider:'openrouter' },
           { id:'claude-haiku', name:'Claude Haiku 3.5',   emoji:'🦋', color:'#fb923c', provider:'openrouter' },
+          { id:'deepseek-v3',  name:'DeepSeek V3',        emoji:'🐋', color:'#22d3ee', provider:'openrouter' },
+          { id:'deepseek-r1',  name:'DeepSeek R1',        emoji:'🧠', color:'#818cf8', provider:'openrouter' },
         ];
         setContestants(fb);
         const s = {}; fb.forEach(c => { s[c.id] = 0; }); setScores(s);
@@ -447,9 +449,29 @@ export default function Quiz() {
       let buffer = '';
       const allResults = [];
 
+      const finalize = (final) => {
+        const enriched = final.map(r => ({ ...r, isCorrect: r.answer === question.correct }));
+        setRoundResults({ results: enriched, correct: question.correct });
+        setScores(prev => {
+          const next = { ...prev };
+          enriched.forEach(r => { if (r.isCorrect) next[r.id] = (next[r.id] || 0) + 100; });
+          return next;
+        });
+        setHistory(h => [...h, { qIndex, results: enriched }]);
+        setLoading(false);
+        clearInterval(timerRef.current);
+        setPhase('reveal');
+      };
+
       while (true) {
         const { done, value } = await reader.read();
-        if (done) break;
+        if (done) {
+          // Reader closed — funzione Vercel killata prima del done event
+          // Triggera reveal con i risultati parziali già ricevuti
+          if (allResults.length > 0) finalize(allResults);
+          else { setLoading(false); setPhase('reveal'); }
+          break;
+        }
         buffer += decoder.decode(value, { stream: true });
         const parts = buffer.split('\n\n');
         buffer = parts.pop() ?? '';
@@ -460,7 +482,6 @@ export default function Quiz() {
           try {
             const data = JSON.parse(line.slice(6));
             if (data.type === 'answer') {
-              // Update live state — triggers pop animations
               setLiveAnswers(prev => ({ ...prev, [data.id]: { answer: data.answer, latencyMs: data.latencyMs } }));
               setAnswerOrder(prev => [...prev, data.id]);
               if (data.answer && data.answer !== '?') {
@@ -471,17 +492,7 @@ export default function Quiz() {
               }
               allResults.push(data);
             } else if (data.type === 'done') {
-              const final = data.results || allResults;
-              setRoundResults({ results: final, correct: question.correct });
-              setScores(prev => {
-                const next = { ...prev };
-                final.forEach(r => { if (r.isCorrect) next[r.id] = (next[r.id] || 0) + 100; });
-                return next;
-              });
-              setHistory(h => [...h, { qIndex, results: final }]);
-              setLoading(false);
-              clearInterval(timerRef.current);
-              setPhase('reveal');
+              finalize(data.results || allResults);
             }
           } catch { /* skip malformed line */ }
         }

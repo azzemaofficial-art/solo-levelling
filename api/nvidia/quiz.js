@@ -1,4 +1,4 @@
-// AI Quiz Arena — 10 modelli (7 NVIDIA NIM + 3 OpenRouter) in SSE streaming
+// AI Quiz Arena — 11 modelli (6 NVIDIA NIM + 5 OpenRouter) in SSE streaming
 // GET  → lista concorrenti
 // POST { question, options:[A,B,C,D], correct:'A'|'B'|'C'|'D' } → SSE stream
 
@@ -37,11 +37,6 @@ const CONTESTANTS = [
     model: 'mistralai/mistral-medium-3-instruct',
   },
   {
-    id: 'nemotron550', name: 'Nemotron 550B', emoji: '🌀', color: '#a3e635',
-    provider: 'nvidia', key: () => process.env.NVIDIA_550B_API_KEY,
-    model: 'nvidia/nemotron-3-ultra-550b-a55b',
-  },
-  {
     id: 'gpt4o-mini', name: 'GPT-4o Mini', emoji: '🤖', color: '#e5e7eb',
     provider: 'openrouter', key: () => process.env.OPENROUTER_API_KEY,
     model: 'openai/gpt-4o-mini',
@@ -55,6 +50,16 @@ const CONTESTANTS = [
     id: 'claude-haiku', name: 'Claude Haiku 3.5', emoji: '🦋', color: '#fb923c',
     provider: 'openrouter', key: () => process.env.OPENROUTER_API_KEY,
     model: 'anthropic/claude-3-5-haiku',
+  },
+  {
+    id: 'deepseek-v3', name: 'DeepSeek V3', emoji: '🐋', color: '#22d3ee',
+    provider: 'openrouter', key: () => process.env.OPENROUTER_API_KEY,
+    model: 'deepseek/deepseek-chat',
+  },
+  {
+    id: 'deepseek-r1', name: 'DeepSeek R1', emoji: '🧠', color: '#818cf8',
+    provider: 'openrouter', key: () => process.env.OPENROUTER_API_KEY,
+    model: 'deepseek/deepseek-r1',
   },
 ];
 
@@ -89,7 +94,7 @@ async function askModel(contestant, prompt) {
         max_tokens: 8,
         temperature: 0.0,
       }),
-      signal: AbortSignal.timeout(9000),
+      signal: AbortSignal.timeout(7000),
     });
 
     const data = await res.json();
