@@ -18,6 +18,7 @@ const Recovery = lazy(() => import('./pages/Recovery'));
 const Help = lazy(() => import('./pages/Help'));
 const MixamoLab = lazy(() => import('./pages/MixamoLab'));
 const Coach = lazy(() => import('./pages/Coach'));
+const Quiz = lazy(() => import('./pages/Quiz'));
 runStorageMigrations();
 const isWorkoutLog = (log) => Number(log?.workoutBurn ?? log?.burned ?? 0) >= 180 || Number(log?.strength || 0) > 0;
 const getIsoWeekKey = (value = new Date()) => {
@@ -1343,8 +1344,11 @@ useEffect(() => { localStorage.setItem('shadow_monarch_macros', JSON.stringify(m
               <button onClick={() => handleTabChange('help')} className="text-[10px] px-2 py-3 border border-cyan-300/40 text-cyan-200 uppercase tracking-widest flex items-center gap-1.5">
                 <span>❓</span> Help
               </button>
-              <button onClick={() => { handleTabChange('coach'); setMenuOpen(false); }} className="text-[10px] px-2 py-3 border border-blue-300/40 text-blue-200 uppercase tracking-widest col-span-2 flex items-center gap-1.5">
+              <button onClick={() => { handleTabChange('coach'); setMenuOpen(false); }} className="text-[10px] px-2 py-3 border border-blue-300/40 text-blue-200 uppercase tracking-widest flex items-center gap-1.5">
                 <span>🧠</span> Coach AI
+              </button>
+              <button onClick={() => { handleTabChange('quiz'); setMenuOpen(false); }} className="text-[10px] px-2 py-3 border border-violet-300/40 text-violet-200 uppercase tracking-widest flex items-center gap-1.5">
+                <span>🎯</span> AI Quiz
               </button>
               <button onClick={() => handleTabChange('lab')} className="text-[10px] px-2 py-3 border border-fuchsia-300/40 text-fuchsia-200 uppercase tracking-widest col-span-2 flex items-center gap-1.5">
                 <span>🧪</span> Lab
@@ -1554,6 +1558,7 @@ useEffect(() => { localStorage.setItem('shadow_monarch_macros', JSON.stringify(m
             {activePage === 'help' && <Help createBackupPayload={createBackupPayload} importBackupPayload={importBackupPayload} resetAppData={resetAppData} playerStats={playerStats} onNavigate={handleTabChange} />}
             {activePage === 'lab' && <MixamoLab />}
             {activePage === 'coach' && <Coach />}
+            {activePage === 'quiz' && <Quiz />}
             </motion.div>
           </AnimatePresence>
         </Suspense>
