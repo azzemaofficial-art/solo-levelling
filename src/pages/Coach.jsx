@@ -57,6 +57,214 @@ const DISCIPLINE_GROUPS = [
   },
 ];
 
+// ─── Gong bell via Web Audio API ──────────────────────────────────────────────
+function playGong(freq = 523) {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(freq, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(freq / 2, ctx.currentTime + 0.3);
+    gain.gain.setValueAtTime(0, ctx.currentTime);
+    gain.gain.linearRampToValueAtTime(0.9, ctx.currentTime + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 3);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 3);
+  } catch {}
+}
+
+// ─── Parsing punto assegnato dall'AI ──────────────────────────────────────────
+function parsePoint(text) {
+  const lines = text.split('\n');
+  for (const line of lines) {
+    if (!line.includes('🏆') && !/punto assegnato/i.test(line)) continue;
+    const l = line.toLowerCase();
+    if (l.includes('nessun punto') || l.includes('nessuno')) return null;
+    if (l.includes('atleta a') || l.includes('🔴')) return 'a';
+    if (l.includes('atleta b') || l.includes('🔵')) return 'b';
+  }
+  return null;
+}
+
+// ─── Hook round timer ──────────────────────────────────────────────────────────
+function useRoundTimer({ rounds = 3, roundDuration = 180, restDuration = 60 }) {
+  const timerRef = useRef({ phase: 'idle', currentRound: 1, timeLeft: roundDuration, intervalId: null });
+  const [, forceUpdate] = useState(0);
+  const configRef = useRef({ rounds, roundDuration, restDuration });
+  configRef.current = { rounds, roundDuration, restDuration };
+
+  const doTick = useCallback(() => {
+    const t = timerRef.current;
+    const { rounds: r, roundDuration: rd, restDuration: rest } = configRef.current;
+    t.timeLeft -= 1;
+    if (t.timeLeft <= 0) {
+      if (t.phase === 'round') {
+        if (t.currentRound >= r) {
+          clearInterval(t.intervalId); t.intervalId = null;
+          t.phase = 'finished'; t.timeLeft = 0;
+          playGong(); setTimeout(() => playGong(440), 700);
+        } else {
+          t.phase = 'rest'; t.timeLeft = rest; playGong();
+        }
+      } else if (t.phase === 'rest') {
+        t.currentRound += 1; t.phase = 'round'; t.timeLeft = rd; playGong();
+      }
+    }
+    forceUpdate((n) => n + 1);
+  }, []);
+
+  const start = useCallback(() => {
+    const t = timerRef.current;
+    clearInterval(t.intervalId);
+    t.phase = 'round'; t.currentRound = 1; t.timeLeft = configRef.current.roundDuration;
+    t.intervalId = setInterval(doTick, 1000);
+    playGong(); forceUpdate((n) => n + 1);
+  }, [doTick]);
+
+  const stop = useCallback(() => {
+    const t = timerRef.current;
+    clearInterval(t.intervalId); t.intervalId = null;
+    t.phase = 'idle'; t.currentRound = 1; t.timeLeft = configRef.current.roundDuration;
+    forceUpdate((n) => n + 1);
+  }, []);
+
+  useEffect(() => () => clearInterval(timerRef.current.intervalId), []);
+
+  const t = timerRef.current;
+  return { phase: t.phase, currentRound: t.currentRound, timeLeft: t.timeLeft, start, stop, totalRounds: rounds };
+}
+
+// ─── Configuratore match (setup screen) ───────────────────────────────────────
+function RoundConfig({ rounds, onRounds, roundDuration, onRoundDuration }) {
+  return (
+    <div className="p-3 bg-gray-800/60 border border-purple-700/30 rounded-xl space-y-3">
+      <p className="text-xs text-purple-300 font-semibold">⏱ Configura Match</p>
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-gray-400 w-14">Round:</span>
+        <div className="flex gap-1.5">
+          {[1, 2, 3, 5, 10].map((r) => (
+            <button key={r} onClick={() => onRounds(r)}
+              className={`w-8 h-8 rounded-lg text-xs font-bold transition-colors ${
+                rounds === r ? 'bg-purple-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+              }`}>
+              {r}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-gray-400 w-14">Durata:</span>
+        <div className="flex gap-1.5">
+          {[{ label: "2'", val: 120 }, { label: "3'", val: 180 }, { label: "5'", val: 300 }].map(({ label, val }) => (
+            <button key={val} onClick={() => onRoundDuration(val)}
+              className={`px-3 h-8 rounded-lg text-xs font-bold transition-colors ${
+                roundDuration === val ? 'bg-purple-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+              }`}>
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Timer display (live screen) ──────────────────────────────────────────────
+function RoundTimerDisplay({ timer }) {
+  const { phase, currentRound, timeLeft, totalRounds, start, stop } = timer;
+  if (phase === 'idle') return null;
+
+  const mins = String(Math.floor(timeLeft / 60)).padStart(2, '0');
+  const secs = String(timeLeft % 60).padStart(2, '0');
+  const isDone = phase === 'finished';
+  const isRest = phase === 'rest';
+
+  return (
+    <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
+      className={`p-3 rounded-xl border flex items-center gap-3 ${
+        isDone ? 'bg-green-900/20 border-green-700/30' :
+        isRest ? 'bg-yellow-900/20 border-yellow-700/30' :
+                 'bg-red-900/20 border-red-700/30'
+      }`}>
+      <div className="flex-1">
+        <p className={`text-xs font-bold ${isDone ? 'text-green-400' : isRest ? 'text-yellow-400' : 'text-red-400'}`}>
+          {isDone
+            ? '✅ MATCH FINITO'
+            : isRest
+            ? `💤 RIPOSO — Round ${currentRound + 1} in arrivo`
+            : `🥊 ROUND ${currentRound} / ${totalRounds}`}
+        </p>
+        <p className={`text-3xl font-mono font-bold leading-none mt-0.5 ${
+          isDone ? 'text-green-300' : isRest ? 'text-yellow-200' : 'text-white'
+        }`}>
+          {isDone ? '—' : `${mins}:${secs}`}
+        </p>
+      </div>
+      {!isDone && (
+        <button onClick={stop}
+          className="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded-lg text-xs text-white transition-colors">
+          ■ Stop
+        </button>
+      )}
+      {isDone && (
+        <button onClick={start}
+          className="px-3 py-1.5 bg-green-700 hover:bg-green-600 rounded-lg text-xs text-white font-bold transition-colors">
+          ↺ Rivincita
+        </button>
+      )}
+    </motion.div>
+  );
+}
+
+// ─── Score tracker ─────────────────────────────────────────────────────────────
+function ScoreTracker({ score, onScore, lastPoint }) {
+  return (
+    <div className="p-3 bg-gray-800/60 border border-gray-700/40 rounded-xl">
+      <p className="text-xs text-gray-400 font-semibold mb-3">🏆 Punteggio Match</p>
+      <div className="flex items-center justify-around">
+        <div className="text-center space-y-1">
+          <p className="text-xs text-red-400 font-bold">🔴 A</p>
+          <p className="text-5xl font-mono font-bold text-red-400">{score.a}</p>
+          <div className="flex gap-1 justify-center mt-1">
+            <button onClick={() => onScore('a', 1)}
+              className="w-8 h-8 bg-red-800 hover:bg-red-700 rounded-lg text-sm text-white font-bold transition-colors">+</button>
+            <button onClick={() => onScore('a', -1)}
+              className="w-8 h-8 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm text-white transition-colors">−</button>
+          </div>
+        </div>
+
+        <div className="text-center px-3">
+          <p className="text-3xl font-mono text-gray-500">:</p>
+          <AnimatePresence mode="wait">
+            {lastPoint && (
+              <motion.p key={Date.now()}
+                initial={{ scale: 1.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ opacity: 0 }}
+                transition={{ duration: 0.3 }}
+                className={`text-xs font-bold mt-1 ${lastPoint === 'a' ? 'text-red-400' : 'text-blue-400'}`}>
+                +1 {lastPoint === 'a' ? '🔴' : '🔵'}
+              </motion.p>
+            )}
+          </AnimatePresence>
+        </div>
+
+        <div className="text-center space-y-1">
+          <p className="text-xs text-blue-400 font-bold">🔵 B</p>
+          <p className="text-5xl font-mono font-bold text-blue-400">{score.b}</p>
+          <div className="flex gap-1 justify-center mt-1">
+            <button onClick={() => onScore('b', 1)}
+              className="w-8 h-8 bg-blue-800 hover:bg-blue-700 rounded-lg text-sm text-white font-bold transition-colors">+</button>
+            <button onClick={() => onScore('b', -1)}
+              className="w-8 h-8 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm text-white transition-colors">−</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Hook chat generica ────────────────────────────────────────────────────────
 function useChat(endpoint) {
   const [messages, setMessages] = useState([]);
@@ -249,12 +457,24 @@ function VisualCoach() {
   const [autoMode, setAutoMode] = useState(false);
   const [mode, setMode] = useState('muaythai');
   const [pastSessions, setPastSessions] = useState(() => loadSessions());
+  // Round timer config
+  const [rounds, setRounds] = useState(3);
+  const [roundDuration, setRoundDuration] = useState(180);
+  // Score
+  const [score, setScore] = useState({ a: 0, b: 0 });
+  const [lastPoint, setLastPoint] = useState(null);
+
   const autoTimerRef = useRef(null);
   const streamRef = useRef(null);
   const sessionStartRef = useRef(null);
 
+  const timer = useRoundTimer({ rounds, roundDuration, restDuration: 60 });
   const currentDisc = ALL_DISCIPLINES.find((d) => d.id === mode) || ALL_DISCIPLINES[0];
   const isPartnerMode = isSparring(mode);
+
+  const handleScore = useCallback((who, delta) => {
+    setScore((s) => ({ ...s, [who]: Math.max(0, s[who] + delta) }));
+  }, []);
 
   const startCamera = async () => {
     try {
@@ -276,6 +496,8 @@ function VisualCoach() {
 
   const startSession = async () => {
     sessionStartRef.current = Date.now();
+    setScore({ a: 0, b: 0 });
+    setLastPoint(null);
     setStep('live');
     setAnalysis(null);
     await startCamera();
@@ -283,6 +505,7 @@ function VisualCoach() {
 
   const stopCamera = () => {
     streamRef.current?.getTracks().forEach((t) => t.stop());
+    timer.stop();
     if (analysis?.content) {
       const duration = sessionStartRef.current ? Math.round((Date.now() - sessionStartRef.current) / 60000) : 0;
       const updated = [{ date: new Date().toLocaleDateString('it-IT'), mode, context: sessionContext, keyFeedback: analysis.content.slice(0, 200), duration }, ...pastSessions].slice(0, 10);
@@ -290,6 +513,7 @@ function VisualCoach() {
       setPastSessions(updated);
     }
     setStreaming(false); setAnalysis(null); setAutoMode(false);
+    setScore({ a: 0, b: 0 }); setLastPoint(null);
     setStep('setup');
     clearInterval(autoTimerRef.current);
   };
@@ -321,6 +545,15 @@ function VisualCoach() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Errore AI');
       setAnalysis({ content: data.content, provider: data.provider, time: new Date().toLocaleTimeString('it-IT') });
+      // auto-aggiorna punteggio in modalità sparring
+      if (isSparring(mode) && data.content) {
+        const point = parsePoint(data.content);
+        if (point) {
+          setScore((s) => ({ ...s, [point]: s[point] + 1 }));
+          setLastPoint(point);
+          setTimeout(() => setLastPoint(null), 2500);
+        }
+      }
     } catch (err) {
       setAnalysis({ content: '⚠️ ' + err.message, provider: null, time: new Date().toLocaleTimeString('it-IT') });
     } finally { setAnalyzing(false); }
@@ -364,12 +597,18 @@ function VisualCoach() {
           </div>
         ))}
 
-        {/* Badge sparring */}
+        {/* Badge sparring + configuratore match */}
         {isPartnerMode && (
-          <div className="px-3 py-2 bg-purple-900/30 border border-purple-600/40 rounded-lg">
-            <p className="text-xs text-purple-300 font-semibold">👥 Modalità partner attiva</p>
-            <p className="text-xs text-gray-400 mt-0.5">Inquadrate entrambi nella camera — l'AI arbitra e dà feedback a entrambi</p>
-          </div>
+          <>
+            <div className="px-3 py-2 bg-purple-900/30 border border-purple-600/40 rounded-lg">
+              <p className="text-xs text-purple-300 font-semibold">👥 Modalità partner attiva</p>
+              <p className="text-xs text-gray-400 mt-0.5">Inquadrate entrambi nella camera — l'AI arbitra e dà feedback a entrambi</p>
+            </div>
+            <RoundConfig
+              rounds={rounds} onRounds={setRounds}
+              roundDuration={roundDuration} onRoundDuration={setRoundDuration}
+            />
+          </>
         )}
 
         {/* Contesto sessione */}
@@ -402,7 +641,7 @@ function VisualCoach() {
           className={`w-full py-3 rounded-xl text-white font-bold text-sm transition-colors ${
             isPartnerMode ? 'bg-purple-700 hover:bg-purple-600' : 'bg-blue-600 hover:bg-blue-500'
           }`}>
-          {isPartnerMode ? '👥 Inizia Sessione con Partner' : '📷 Inizia Sessione Live'}
+          {isPartnerMode ? `👥 Inizia Match (${rounds}×${roundDuration/60}min)` : '📷 Inizia Sessione Live'}
         </button>
       </div>
     );
@@ -423,8 +662,25 @@ function VisualCoach() {
         {isPartnerMode && <span className="text-xs text-purple-300 font-semibold">👥 PARTNER</span>}
       </div>
 
+      {/* Round timer (solo sparring) */}
+      {isPartnerMode && (
+        <>
+          {timer.phase === 'idle' ? (
+            <button onClick={timer.start}
+              className="w-full py-2.5 bg-purple-700 hover:bg-purple-600 rounded-xl text-white text-sm font-bold transition-colors">
+              🔔 Inizia Round 1
+            </button>
+          ) : (
+            <RoundTimerDisplay timer={timer} />
+          )}
+        </>
+      )}
+
+      {/* Score tracker (solo sparring) */}
+      {isPartnerMode && <ScoreTracker score={score} onScore={handleScore} lastPoint={lastPoint} />}
+
       {/* Camera */}
-      <div className="relative rounded-xl overflow-hidden bg-black aspect-video max-h-64">
+      <div className="relative rounded-xl overflow-hidden bg-black aspect-video max-h-60">
         <video ref={videoRef} className="w-full h-full object-cover" playsInline muted />
         <canvas ref={canvasRef} className="hidden" />
         {streaming && (
