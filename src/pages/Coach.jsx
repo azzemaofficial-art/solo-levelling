@@ -21,11 +21,40 @@ const TRAINER_QUICK = [
   { label: '🍳 Ricetta post-workout', text: 'Dammi 3 ricette post-allenamento veloci, almeno 40g di proteine, con macro precisi.' },
 ];
 
-// ─── Modalità visual coach ─────────────────────────────────────────────────────
-const VISUAL_MODES = [
-  { id: 'martial', label: '🥊 Marziale', desc: 'Analisi tecnica arti marziali', prompt: 'Analizza la tecnica marziale — guardia, colpo, presa o movimento. Dammi feedback preciso.' },
-  { id: 'fitness', label: '🏋️ Fitness', desc: 'Forma esercizi palestra', prompt: 'Analizza la forma dell\'esercizio e dai correzioni immediate.' },
-  { id: 'general', label: '👁 Generale', desc: 'Analisi generica movimento', prompt: 'Analizza il movimento e il corpo. Descrivi cosa vedi e dai feedback.' },
+// ─── Discipline e modalità visual coach ───────────────────────────────────────
+const DISCIPLINE_GROUPS = [
+  {
+    label: '👤 Solo',
+    items: [
+      { id: 'muaythai',   emoji: '🥊', label: 'Muay Thai',   prompt: 'Guida la mia sessione di Muay Thai. Analizza tecnica, postura e di\' cosa fare.' },
+      { id: 'boxing',     emoji: '🥊', label: 'Boxe',        prompt: 'Guida la mia sessione di boxe. Analizza guardia, colpi e footwork.' },
+      { id: 'kickboxing', emoji: '🦵', label: 'Kickboxing',  prompt: 'Guida la mia sessione di kickboxing. Analizza pugni e calci.' },
+      { id: 'karate',     emoji: '🥋', label: 'Karate',      prompt: 'Guida la mia sessione di karate. Analizza kihon, kata o kumite.' },
+      { id: 'taekwondo',  emoji: '🦵', label: 'Taekwondo',   prompt: 'Guida la mia sessione di taekwondo. Analizza calci e poomsae.' },
+      { id: 'bjj',        emoji: '🤼', label: 'BJJ',         prompt: 'Guida la mia sessione di BJJ. Analizza posizioni, guard e submission.' },
+      { id: 'wrestling',  emoji: '🤼', label: 'Wrestling',   prompt: 'Guida la mia sessione di wrestling. Analizza stance, shot e mat work.' },
+      { id: 'judo',       emoji: '🥋', label: 'Judo',        prompt: 'Guida la mia sessione di judo. Analizza kumi-kata e proiezioni.' },
+      { id: 'mma',        emoji: '🏆', label: 'MMA',         prompt: 'Guida la mia sessione MMA. Analizza striking, grappling e transizioni.' },
+      { id: 'kravmaga',   emoji: '⚔️', label: 'Krav Maga',  prompt: 'Guida la mia sessione di Krav Maga. Analizza efficacia e reattività.' },
+    ],
+  },
+  {
+    label: '👥 Con partner',
+    items: [
+      { id: 'sparring_muaythai', emoji: '🥊', label: 'Sparring MT',   prompt: 'Siamo in due — arbitraci e dai feedback a entrambi. Muay Thai.' },
+      { id: 'sparring_boxing',   emoji: '🥊', label: 'Sparring Boxe', prompt: 'Siamo in due — arbitraci e dai feedback a entrambi. Boxe.' },
+      { id: 'sparring_mma',      emoji: '🏆', label: 'Sparring MMA',  prompt: 'Siamo in due — arbitraci e dai feedback a entrambi. MMA.' },
+      { id: 'partner_drills',    emoji: '🤝', label: 'Drill coppia',  prompt: 'Stiamo facendo drill di coppia — valuta entrambi e proponi il drill successivo.' },
+      { id: 'sparring_general',  emoji: '👥', label: 'Sparring free', prompt: 'Siamo in due — arbitraci liberamente e dai consigli a entrambi.' },
+    ],
+  },
+  {
+    label: '💪 Altro',
+    items: [
+      { id: 'fitness', emoji: '🏋️', label: 'Palestra',  prompt: 'Guida il mio allenamento in palestra. Analizza forma ed esercizi.' },
+      { id: 'general', emoji: '👁',  label: 'Generale',  prompt: 'Analizza il movimento e guidami. Feedback libero.' },
+    ],
+  },
 ];
 
 // ─── Hook chat generica ────────────────────────────────────────────────────────
@@ -206,20 +235,26 @@ const loadSessions = () => { try { return JSON.parse(localStorage.getItem(SESSIO
 const saveSessions = (sessions) => { try { localStorage.setItem(SESSIONS_KEY, JSON.stringify(sessions.slice(0, 10))); } catch {} };
 
 // ─── Tab: Visual Learning Live ─────────────────────────────────────────────────
+const ALL_DISCIPLINES = DISCIPLINE_GROUPS.flatMap((g) => g.items);
+const isSparring = (id) => id.startsWith('sparring_') || id === 'partner_drills';
+
 function VisualCoach() {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
-  const [step, setStep] = useState('setup'); // 'setup' | 'live'
+  const [step, setStep] = useState('setup');
   const [sessionContext, setSessionContext] = useState('');
   const [streaming, setStreaming] = useState(false);
   const [analysis, setAnalysis] = useState(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [autoMode, setAutoMode] = useState(false);
-  const [mode, setMode] = useState('martial');
+  const [mode, setMode] = useState('muaythai');
   const [pastSessions, setPastSessions] = useState(() => loadSessions());
   const autoTimerRef = useRef(null);
   const streamRef = useRef(null);
   const sessionStartRef = useRef(null);
+
+  const currentDisc = ALL_DISCIPLINES.find((d) => d.id === mode) || ALL_DISCIPLINES[0];
+  const isPartnerMode = isSparring(mode);
 
   const startCamera = async () => {
     try {
@@ -248,16 +283,9 @@ function VisualCoach() {
 
   const stopCamera = () => {
     streamRef.current?.getTracks().forEach((t) => t.stop());
-    if (analysis?.content && sessionContext) {
+    if (analysis?.content) {
       const duration = sessionStartRef.current ? Math.round((Date.now() - sessionStartRef.current) / 60000) : 0;
-      const newSession = {
-        date: new Date().toLocaleDateString('it-IT'),
-        mode,
-        context: sessionContext,
-        keyFeedback: analysis.content.slice(0, 200),
-        duration,
-      };
-      const updated = [newSession, ...pastSessions].slice(0, 10);
+      const updated = [{ date: new Date().toLocaleDateString('it-IT'), mode, context: sessionContext, keyFeedback: analysis.content.slice(0, 200), duration }, ...pastSessions].slice(0, 10);
       saveSessions(updated);
       setPastSessions(updated);
     }
@@ -266,19 +294,13 @@ function VisualCoach() {
     clearInterval(autoTimerRef.current);
   };
 
-  // Costruisce il prompt arricchito con contesto sessione + ultime sessioni
-  const buildPrompt = useCallback((baseModePrompt) => {
-    let prompt = baseModePrompt || '';
-    if (sessionContext.trim()) {
-      prompt += `\n\nSESSIONE ATTUALE: ${sessionContext.trim()}`;
-    }
+  const buildPrompt = useCallback((basePrompt) => {
+    let p = basePrompt || '';
+    if (sessionContext.trim()) p += `\n\nSESSIONE ATTUALE: ${sessionContext.trim()}`;
     if (pastSessions.length > 0) {
-      const recent = pastSessions.slice(0, 2).map((s) =>
-        `- ${s.date} (${s.mode}): ${s.context} → Feedback: ${s.keyFeedback}`
-      ).join('\n');
-      prompt += `\n\nSESSIONI PRECEDENTI:\n${recent}`;
+      p += `\n\nSESSIONI PRECEDENTI:\n` + pastSessions.slice(0, 2).map((s) => `- ${s.date} (${s.mode}): ${s.context} → ${s.keyFeedback}`).join('\n');
     }
-    return prompt;
+    return p;
   }, [sessionContext, pastSessions]);
 
   const captureAndAnalyze = useCallback(async () => {
@@ -288,95 +310,88 @@ function VisualCoach() {
     canvas.width = video.videoWidth || 640;
     canvas.height = video.videoHeight || 480;
     canvas.getContext('2d').drawImage(video, 0, 0);
-    const base64 = canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
-    const modeConfig = VISUAL_MODES.find((m) => m.id === mode);
-
+    const base64 = canvas.toDataURL('image/jpeg', 0.85).split(',')[1];
     setAnalyzing(true);
     try {
       const res = await fetch('/api/nvidia/visual', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          imageBase64: base64,
-          mimeType: 'image/jpeg',
-          mode,
-          prompt: buildPrompt(modeConfig?.prompt),
-        }),
+        body: JSON.stringify({ imageBase64: base64, mimeType: 'image/jpeg', mode, prompt: buildPrompt(currentDisc?.prompt) }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Errore visual AI');
+      if (!res.ok) throw new Error(data.error || 'Errore AI');
       setAnalysis({ content: data.content, provider: data.provider, time: new Date().toLocaleTimeString('it-IT') });
     } catch (err) {
       setAnalysis({ content: '⚠️ ' + err.message, provider: null, time: new Date().toLocaleTimeString('it-IT') });
-    } finally {
-      setAnalyzing(false);
-    }
-  }, [analyzing, mode, buildPrompt]);
+    } finally { setAnalyzing(false); }
+  }, [analyzing, mode, buildPrompt, currentDisc]);
 
   useEffect(() => {
     if (autoMode && streaming) {
       captureAndAnalyze();
       autoTimerRef.current = setInterval(captureAndAnalyze, 6000);
-    } else {
-      clearInterval(autoTimerRef.current);
-    }
+    } else { clearInterval(autoTimerRef.current); }
     return () => clearInterval(autoTimerRef.current);
   }, [autoMode, streaming]);
 
   useEffect(() => () => { streamRef.current?.getTracks().forEach((t) => t.stop()); }, []);
 
-  const currentMode = VISUAL_MODES.find((m) => m.id === mode);
-
-  // ── Setup screen (pre-camera) ───────────────────────────────────────────────
+  // ── Setup screen ────────────────────────────────────────────────────────────
   if (step === 'setup') {
     return (
       <div className="space-y-4">
         <div className="px-4 py-3 bg-gradient-to-r from-blue-900/40 to-purple-900/30 border border-blue-700/40 rounded-xl">
           <p className="text-xs text-blue-300 font-semibold">📷 Visual Live Coach — Llama Vision 90B</p>
-          <p className="text-xs text-gray-400 mt-0.5">L'AI analizza la camera in tempo reale e ti corregge</p>
+          <p className="text-xs text-gray-400 mt-0.5">Solo, sparring con partner, drill di coppia — 13 discipline</p>
         </div>
 
-        {/* Modalità */}
-        <div>
-          <p className="text-xs text-gray-400 mb-2">Modalità allenamento</p>
-          <div className="flex gap-2">
-            {VISUAL_MODES.map((m) => (
-              <button key={m.id} onClick={() => setMode(m.id)}
-                className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-colors ${
-                  mode === m.id ? 'bg-blue-700 text-white' : 'bg-gray-800 text-gray-400 hover:text-white'}`}>
-                {m.label}
-              </button>
-            ))}
+        {/* Selector discipline a gruppi */}
+        {DISCIPLINE_GROUPS.map((group) => (
+          <div key={group.label}>
+            <p className="text-xs text-gray-500 mb-2 font-semibold">{group.label}</p>
+            <div className="flex flex-wrap gap-1.5">
+              {group.items.map((d) => (
+                <button key={d.id} onClick={() => setMode(d.id)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors border ${
+                    mode === d.id
+                      ? 'bg-blue-700 border-blue-500 text-white'
+                      : 'bg-gray-800/80 border-gray-700/60 text-gray-400 hover:text-white hover:border-gray-500'
+                  }`}>
+                  {d.emoji} {d.label}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        ))}
+
+        {/* Badge sparring */}
+        {isPartnerMode && (
+          <div className="px-3 py-2 bg-purple-900/30 border border-purple-600/40 rounded-lg">
+            <p className="text-xs text-purple-300 font-semibold">👥 Modalità partner attiva</p>
+            <p className="text-xs text-gray-400 mt-0.5">Inquadrate entrambi nella camera — l'AI arbitra e dà feedback a entrambi</p>
+          </div>
+        )}
 
         {/* Contesto sessione */}
         <div>
-          <p className="text-xs text-gray-400 mb-2">Cosa stai allenando? <span className="text-gray-600">(opzionale)</span></p>
-          <textarea
-            value={sessionContext}
-            onChange={(e) => setSessionContext(e.target.value)}
-            placeholder={mode === 'martial'
-              ? 'Es. Muay Thai – colpi diretti, round ombra, combo 1-2-3...'
-              : mode === 'fitness'
-              ? 'Es. Stacco da terra, squat, press – focus sulla forma...'
-              : 'Es. Mobilità, stretching, movimento libero...'}
-            rows={3}
-            className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-500 resize-none focus:outline-none focus:border-blue-500 transition-colors"
-          />
+          <p className="text-xs text-gray-400 mb-1.5">Descrivi la sessione <span className="text-gray-600">(opzionale)</span></p>
+          <textarea value={sessionContext} onChange={(e) => setSessionContext(e.target.value)} rows={2}
+            placeholder={isPartnerMode ? 'Es. Io e mio fratello — round leggero, focus combo...' : `Es. ${currentDisc?.label} – tecnica base, lavoro guardia...`}
+            className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2.5 text-sm text-white placeholder-gray-500 resize-none focus:outline-none focus:border-blue-500 transition-colors" />
         </div>
 
         {/* Sessioni recenti */}
         {pastSessions.length > 0 && (
           <div>
-            <p className="text-xs text-gray-500 mb-2">Sessioni recenti</p>
-            <div className="space-y-1.5">
+            <p className="text-xs text-gray-500 mb-1.5">Sessioni recenti</p>
+            <div className="space-y-1">
               {pastSessions.slice(0, 3).map((s, i) => (
                 <button key={i} onClick={() => { setMode(s.mode); setSessionContext(s.context); }}
-                  className="w-full text-left px-3 py-2 bg-gray-800/60 hover:bg-gray-700/60 border border-gray-700/40 rounded-lg text-xs text-gray-300 transition-colors">
+                  className="w-full text-left px-3 py-2 bg-gray-800/50 hover:bg-gray-700/60 border border-gray-700/40 rounded-lg text-xs text-gray-300 transition-colors">
                   <span className="text-gray-500">{s.date} · {s.mode}</span>
+                  {s.duration > 0 && <span className="text-gray-600"> · {s.duration}min</span>}
                   <span className="mx-1 text-gray-600">·</span>
-                  {s.context.slice(0, 50)}{s.context.length > 50 ? '…' : ''}
+                  {s.context.slice(0, 45)}{s.context.length > 45 ? '…' : ''}
                 </button>
               ))}
             </div>
@@ -384,8 +399,10 @@ function VisualCoach() {
         )}
 
         <button onClick={startSession}
-          className="w-full py-3 bg-blue-600 hover:bg-blue-500 rounded-xl text-white font-bold text-sm transition-colors">
-          📷 Inizia Sessione Live
+          className={`w-full py-3 rounded-xl text-white font-bold text-sm transition-colors ${
+            isPartnerMode ? 'bg-purple-700 hover:bg-purple-600' : 'bg-blue-600 hover:bg-blue-500'
+          }`}>
+          {isPartnerMode ? '👥 Inizia Sessione con Partner' : '📷 Inizia Sessione Live'}
         </button>
       </div>
     );
@@ -393,15 +410,21 @@ function VisualCoach() {
 
   // ── Live screen ─────────────────────────────────────────────────────────────
   return (
-    <div className="space-y-4">
-      {sessionContext && (
-        <div className="px-3 py-2 bg-blue-900/30 border border-blue-700/30 rounded-lg">
-          <p className="text-xs text-blue-300 truncate">🎯 {sessionContext}</p>
+    <div className="space-y-3">
+      {/* Header sessione */}
+      <div className={`px-3 py-2 rounded-lg border flex items-center gap-2 ${
+        isPartnerMode ? 'bg-purple-900/30 border-purple-700/30' : 'bg-blue-900/30 border-blue-700/30'
+      }`}>
+        <span>{currentDisc?.emoji}</span>
+        <div className="flex-1 min-w-0">
+          <p className="text-xs font-semibold text-white">{currentDisc?.label}</p>
+          {sessionContext && <p className="text-xs text-gray-400 truncate">{sessionContext}</p>}
         </div>
-      )}
+        {isPartnerMode && <span className="text-xs text-purple-300 font-semibold">👥 PARTNER</span>}
+      </div>
 
       {/* Camera */}
-      <div className="relative rounded-xl overflow-hidden bg-black aspect-video max-h-72">
+      <div className="relative rounded-xl overflow-hidden bg-black aspect-video max-h-64">
         <video ref={videoRef} className="w-full h-full object-cover" playsInline muted />
         <canvas ref={canvasRef} className="hidden" />
         {streaming && (
@@ -412,35 +435,35 @@ function VisualCoach() {
         )}
         {analyzing && (
           <div className="absolute bottom-2 left-1/2 -translate-x-1/2 px-3 py-1 bg-black/80 rounded-full text-xs text-blue-300 animate-pulse">
-            Analisi AI in corso…
+            Analisi AI…
           </div>
         )}
       </div>
 
+      {/* Controlli */}
       <div className="flex gap-2">
         <button onClick={captureAndAnalyze} disabled={analyzing}
-          className="flex-1 px-4 py-2 bg-purple-700 hover:bg-purple-600 disabled:opacity-50 rounded-lg text-white text-sm font-semibold transition-colors">
-          🔍 Analizza Ora
+          className="flex-1 px-4 py-2.5 bg-purple-700 hover:bg-purple-600 disabled:opacity-50 rounded-lg text-white text-sm font-semibold transition-colors">
+          🔍 Analizza
         </button>
         <button onClick={() => setAutoMode((v) => !v)}
-          className={`flex-1 px-4 py-2 rounded-lg text-white text-sm font-semibold transition-colors ${autoMode ? 'bg-orange-600 hover:bg-orange-500' : 'bg-gray-700 hover:bg-gray-600'}`}>
-          {autoMode ? '⏸ Stop Auto' : '▶ Auto 6s'}
+          className={`flex-1 px-4 py-2.5 rounded-lg text-white text-sm font-semibold transition-colors ${autoMode ? 'bg-orange-600 hover:bg-orange-500' : 'bg-gray-700 hover:bg-gray-600'}`}>
+          {autoMode ? '⏸ Stop' : '▶ Auto 6s'}
         </button>
         <button onClick={stopCamera}
-          className="px-4 py-2 bg-red-800 hover:bg-red-700 rounded-lg text-white text-sm font-semibold transition-colors">
+          className="px-4 py-2.5 bg-red-900 hover:bg-red-800 rounded-lg text-white text-sm font-semibold transition-colors">
           ✕
         </button>
       </div>
 
+      {/* Risultato analisi */}
       <AnimatePresence>
         {analysis && (
-          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+          <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
             className="p-4 bg-gray-800/80 border border-blue-500/30 rounded-xl">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs text-blue-400 font-mono">
-                🤖 {analysis.provider || 'AI'} · {currentMode?.label} · {analysis.time}
-              </span>
-            </div>
+            <p className="text-xs text-blue-400 font-mono mb-2">
+              🤖 {analysis.provider || 'AI'} · {currentDisc?.label} · {analysis.time}
+            </p>
             <p className="text-sm text-gray-100 leading-relaxed whitespace-pre-wrap">{analysis.content}</p>
           </motion.div>
         )}
@@ -466,7 +489,7 @@ export default function Coach() {
           <div className="flex items-center justify-between mb-2">
             <div>
               <h1 className="text-lg font-bold text-white">🧠 AI Coach</h1>
-              <p className="text-xs text-gray-400">Kimi K2.6 · Cosmos 3 · NVIDIA NIM</p>
+              <p className="text-xs text-gray-400">Kimi K2.6 · Llama Vision 90B · NVIDIA NIM</p>
             </div>
           </div>
           <div className="flex gap-1">
