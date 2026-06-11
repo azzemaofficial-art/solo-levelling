@@ -1053,7 +1053,7 @@ export default function Coach() {
   const [tab, setTab] = useState('trainer');
 
   return (
-    <div className="min-h-screen text-white pb-8" style={{ background: '#030712' }}>
+    <div className="min-h-full text-white pb-8" style={{ background: '#030712' }}>
       {/* Header */}
       <div className="sticky top-0 z-10 px-4 py-3" style={{ background: 'rgba(3,7,18,0.92)', backdropFilter: 'blur(16px)', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
         <div className="max-w-2xl mx-auto">
