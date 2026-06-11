@@ -4573,8 +4573,8 @@ const SystemHub = ({ systemLogs, setSystemLogs, dailyGoal, setDailyGoal, hydrati
       <img src="/avatar8.png" alt="" className="pointer-events-none absolute -right-12 -top-8 w-44 opacity-15 grayscale blur-[1px]" />
       <img src="/boss2.png" alt="" className="pointer-events-none absolute -left-16 bottom-8 w-44 opacity-10 grayscale" />
       <div className="mb-8">
-        <p className="text-gray-400 text-[10px] tracking-[0.34em] font-bold system-font mb-1 uppercase">System Core</p>
-        <h1 className="epic-title text-4xl font-black italic tracking-tight text-white drop-shadow-[0_0_14px_rgba(34,211,238,0.16)]">COMMAND CENTER</h1>
+        <p className="text-[10px] tracking-[0.38em] font-bold system-font mb-1 uppercase" style={{ color: 'rgba(124,58,237,0.9)', letterSpacing: '0.36em' }}>⚡ System Core</p>
+        <h1 className="epic-title text-4xl font-black italic tracking-tight">COMMAND CENTER</h1>
         {tgSyncStatus ? (
           <p className="text-[9px] text-cyan-400 mt-1 tracking-widest uppercase">
             TG SYNC {tgSyncStatus.ok ? '✓' : '✗'} — oggi: {tgSyncStatus.kcal ?? 0} kcal · {tgSyncStatus.count ?? 0} giorni · {tgSyncStatus.ts ? new Date(tgSyncStatus.ts).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }) : '—'}
@@ -4588,29 +4588,36 @@ const SystemHub = ({ systemLogs, setSystemLogs, dailyGoal, setDailyGoal, hydrati
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.01 }}
-        whileHover={{ y: -2 }}
-        className="relative mb-6 overflow-hidden rounded-sm border border-cyan-300/35 bg-[linear-gradient(135deg,rgba(6,20,42,0.95),rgba(15,23,42,0.92),rgba(12,29,56,0.95))] p-5"
+        whileHover={{ y: -3, scale: 1.005 }}
+        transition={{ delay: 0.01, type: 'spring', stiffness: 300, damping: 20 }}
+        className="relative mb-6 overflow-hidden rounded-2xl p-5"
+        style={{
+          background: 'linear-gradient(145deg, rgba(8,16,40,0.96), rgba(14,22,50,0.93), rgba(10,26,56,0.96))',
+          border: '1px solid rgba(0,242,255,0.18)',
+          boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06), 0 12px 40px rgba(0,242,255,0.08), 0 4px 16px rgba(2,8,20,0.6)'
+        }}
       >
-        <div className="pointer-events-none absolute -top-10 -left-10 h-36 w-36 rounded-full bg-cyan-300/15 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-12 -right-10 h-40 w-40 rounded-full bg-fuchsia-400/12 blur-3xl" />
+        <div className="pointer-events-none absolute -top-12 -left-12 h-44 w-44 rounded-full blur-3xl" style={{ background: 'rgba(0,242,255,0.12)' }} />
+        <div className="pointer-events-none absolute -bottom-14 -right-12 h-48 w-48 rounded-full blur-3xl" style={{ background: 'rgba(124,58,237,0.12)' }} />
+        <div className="pointer-events-none absolute top-0 right-0 w-full h-px" style={{ background: 'linear-gradient(90deg, transparent, rgba(0,242,255,0.4), transparent)' }} />
         <div className="relative z-10">
-          <p className="text-[10px] uppercase tracking-[0.35em] text-cyan-300">Shadow Protocol Online</p>
-          <h2 className="mt-1 text-2xl font-black uppercase text-white">Hunter Dashboard</h2>
-          <p className="mt-2 text-xs text-gray-300">
-            Stato realtime: energia lifestyle, precision calorie engine e progressione evolutiva.
+          <p className="text-[9px] uppercase tracking-[0.42em] font-bold" style={{ color: '#00f2ff', letterSpacing: '0.4em' }}>◈ Shadow Protocol Online</p>
+          <h2 className="mt-1 text-2xl font-black uppercase text-white tracking-wide" style={{ fontFamily: 'Russo One, sans-serif' }}>Hunter Dashboard</h2>
+          <p className="mt-2 text-xs text-gray-400">
+            Stato realtime: energia, calorie engine e progressione evolutiva.
           </p>
           <div className="mt-4 grid grid-cols-3 gap-2">
-            <div className="rounded-sm border border-white/10 bg-black/35 p-2 text-center">
-              <p className="text-[9px] uppercase tracking-widest text-cyan-200">System Power</p>
-              <p className="text-lg font-black text-cyan-100">{systemPowerScore}</p>
+            <div className="hero-stat-box">
+              <p className="text-[9px] uppercase tracking-widest mb-1" style={{ color: '#67e8f9' }}>System Power</p>
+              <p className="text-xl font-black" style={{ color: '#cffafe', fontFamily: 'Russo One, sans-serif' }}>{systemPowerScore}</p>
             </div>
-            <div className="rounded-sm border border-white/10 bg-black/35 p-2 text-center">
-              <p className="text-[9px] uppercase tracking-widest text-fuchsia-200">Force Bonus</p>
-              <p className="text-lg font-black text-fuchsia-100">+{systemForceBonus}</p>
+            <div className="hero-stat-box">
+              <p className="text-[9px] uppercase tracking-widest mb-1" style={{ color: '#d8b4fe' }}>Force Bonus</p>
+              <p className="text-xl font-black" style={{ color: '#f0e6ff', fontFamily: 'Russo One, sans-serif' }}>+{systemForceBonus}</p>
             </div>
-            <div className="rounded-sm border border-white/10 bg-black/35 p-2 text-center">
-              <p className="text-[9px] uppercase tracking-widest text-emerald-200">Hydration</p>
-              <p className="text-lg font-black text-emerald-100">{Math.round(hydrationPct)}%</p>
+            <div className="hero-stat-box">
+              <p className="text-[9px] uppercase tracking-widest mb-1" style={{ color: '#6ee7b7' }}>Hydration</p>
+              <p className="text-xl font-black" style={{ color: '#d1fae5', fontFamily: 'Russo One, sans-serif' }}>{Math.round(hydrationPct)}%</p>
             </div>
           </div>
         </div>
@@ -4631,12 +4638,12 @@ const SystemHub = ({ systemLogs, setSystemLogs, dailyGoal, setDailyGoal, hydrati
           <motion.div initial={{ width: 0 }} animate={{ width: `${Math.max(0, Math.min(100, bossReadyScore))}%` }} className="h-full bg-[linear-gradient(90deg,#22d3ee,#d946ef,#f59e0b)]" />
         </div>
         <p className="text-xs text-white mb-2">Score: <span className="font-black text-fuchsia-200">{bossReadyScore}/100</span></p>
-        <div className="grid grid-cols-5 gap-2 text-center">
-          <div className="border border-white/10 bg-white/5 p-1"><p className="text-[10px] font-black text-cyan-200">{bossReadyBreakdown.nutrition}</p><p className="text-[8px] text-gray-500 uppercase">Nutri</p></div>
-          <div className="border border-white/10 bg-white/5 p-1"><p className="text-[10px] font-black text-emerald-200">{bossReadyBreakdown.hydration}</p><p className="text-[8px] text-gray-500 uppercase">H2O</p></div>
-          <div className="border border-white/10 bg-white/5 p-1"><p className="text-[10px] font-black text-amber-200">{bossReadyBreakdown.recovery}</p><p className="text-[8px] text-gray-500 uppercase">Rec</p></div>
-          <div className="border border-white/10 bg-white/5 p-1"><p className="text-[10px] font-black text-orange-200">{bossReadyBreakdown.training}</p><p className="text-[8px] text-gray-500 uppercase">Train</p></div>
-          <div className="border border-white/10 bg-white/5 p-1"><p className="text-[10px] font-black text-violet-200">{bossReadyBreakdown.consistency}</p><p className="text-[8px] text-gray-500 uppercase">Streak</p></div>
+        <div className="grid grid-cols-5 gap-1.5 text-center">
+          <div className="hero-stat-box py-2 px-1"><p className="text-[11px] font-black text-cyan-200 leading-none">{bossReadyBreakdown.nutrition}</p><p className="text-[8px] text-gray-500 uppercase mt-1">Nutri</p></div>
+          <div className="hero-stat-box py-2 px-1"><p className="text-[11px] font-black text-emerald-200 leading-none">{bossReadyBreakdown.hydration}</p><p className="text-[8px] text-gray-500 uppercase mt-1">H2O</p></div>
+          <div className="hero-stat-box py-2 px-1"><p className="text-[11px] font-black text-amber-200 leading-none">{bossReadyBreakdown.recovery}</p><p className="text-[8px] text-gray-500 uppercase mt-1">Rec</p></div>
+          <div className="hero-stat-box py-2 px-1"><p className="text-[11px] font-black text-orange-200 leading-none">{bossReadyBreakdown.training}</p><p className="text-[8px] text-gray-500 uppercase mt-1">Train</p></div>
+          <div className="hero-stat-box py-2 px-1"><p className="text-[11px] font-black text-violet-200 leading-none">{bossReadyBreakdown.consistency}</p><p className="text-[8px] text-gray-500 uppercase mt-1">Streak</p></div>
         </div>
       </motion.div>
       ) : null}
