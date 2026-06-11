@@ -200,17 +200,26 @@ function PersonalTrainer() {
   );
 }
 
+// ─── Sessioni live salvate in localStorage ────────────────────────────────────
+const SESSIONS_KEY = 'shadow_monarch_live_sessions';
+const loadSessions = () => { try { return JSON.parse(localStorage.getItem(SESSIONS_KEY) || '[]'); } catch { return []; } };
+const saveSessions = (sessions) => { try { localStorage.setItem(SESSIONS_KEY, JSON.stringify(sessions.slice(0, 10))); } catch {} };
+
 // ─── Tab: Visual Learning Live ─────────────────────────────────────────────────
 function VisualCoach() {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
+  const [step, setStep] = useState('setup'); // 'setup' | 'live'
+  const [sessionContext, setSessionContext] = useState('');
   const [streaming, setStreaming] = useState(false);
   const [analysis, setAnalysis] = useState(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [autoMode, setAutoMode] = useState(false);
   const [mode, setMode] = useState('martial');
+  const [pastSessions, setPastSessions] = useState(() => loadSessions());
   const autoTimerRef = useRef(null);
   const streamRef = useRef(null);
+  const sessionStartRef = useRef(null);
 
   const startCamera = async () => {
     try {
@@ -230,11 +239,47 @@ function VisualCoach() {
     }
   };
 
+  const startSession = async () => {
+    sessionStartRef.current = Date.now();
+    setStep('live');
+    setAnalysis(null);
+    await startCamera();
+  };
+
   const stopCamera = () => {
     streamRef.current?.getTracks().forEach((t) => t.stop());
+    if (analysis?.content && sessionContext) {
+      const duration = sessionStartRef.current ? Math.round((Date.now() - sessionStartRef.current) / 60000) : 0;
+      const newSession = {
+        date: new Date().toLocaleDateString('it-IT'),
+        mode,
+        context: sessionContext,
+        keyFeedback: analysis.content.slice(0, 200),
+        duration,
+      };
+      const updated = [newSession, ...pastSessions].slice(0, 10);
+      saveSessions(updated);
+      setPastSessions(updated);
+    }
     setStreaming(false); setAnalysis(null); setAutoMode(false);
+    setStep('setup');
     clearInterval(autoTimerRef.current);
   };
+
+  // Costruisce il prompt arricchito con contesto sessione + ultime sessioni
+  const buildPrompt = useCallback((baseModePrompt) => {
+    let prompt = baseModePrompt || '';
+    if (sessionContext.trim()) {
+      prompt += `\n\nSESSIONE ATTUALE: ${sessionContext.trim()}`;
+    }
+    if (pastSessions.length > 0) {
+      const recent = pastSessions.slice(0, 2).map((s) =>
+        `- ${s.date} (${s.mode}): ${s.context} → Feedback: ${s.keyFeedback}`
+      ).join('\n');
+      prompt += `\n\nSESSIONI PRECEDENTI:\n${recent}`;
+    }
+    return prompt;
+  }, [sessionContext, pastSessions]);
 
   const captureAndAnalyze = useCallback(async () => {
     if (!videoRef.current || !canvasRef.current || analyzing) return;
@@ -251,7 +296,12 @@ function VisualCoach() {
       const res = await fetch('/api/nvidia/visual', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageBase64: base64, mimeType: 'image/jpeg', mode, prompt: modeConfig?.prompt }),
+        body: JSON.stringify({
+          imageBase64: base64,
+          mimeType: 'image/jpeg',
+          mode,
+          prompt: buildPrompt(modeConfig?.prompt),
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Errore visual AI');
@@ -261,7 +311,7 @@ function VisualCoach() {
     } finally {
       setAnalyzing(false);
     }
-  }, [analyzing, mode]);
+  }, [analyzing, mode, buildPrompt]);
 
   useEffect(() => {
     if (autoMode && streaming) {
@@ -277,36 +327,83 @@ function VisualCoach() {
 
   const currentMode = VISUAL_MODES.find((m) => m.id === mode);
 
+  // ── Setup screen (pre-camera) ───────────────────────────────────────────────
+  if (step === 'setup') {
+    return (
+      <div className="space-y-4">
+        <div className="px-4 py-3 bg-gradient-to-r from-blue-900/40 to-purple-900/30 border border-blue-700/40 rounded-xl">
+          <p className="text-xs text-blue-300 font-semibold">📷 Visual Live Coach — Llama Vision 90B</p>
+          <p className="text-xs text-gray-400 mt-0.5">L'AI analizza la camera in tempo reale e ti corregge</p>
+        </div>
+
+        {/* Modalità */}
+        <div>
+          <p className="text-xs text-gray-400 mb-2">Modalità allenamento</p>
+          <div className="flex gap-2">
+            {VISUAL_MODES.map((m) => (
+              <button key={m.id} onClick={() => setMode(m.id)}
+                className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-colors ${
+                  mode === m.id ? 'bg-blue-700 text-white' : 'bg-gray-800 text-gray-400 hover:text-white'}`}>
+                {m.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Contesto sessione */}
+        <div>
+          <p className="text-xs text-gray-400 mb-2">Cosa stai allenando? <span className="text-gray-600">(opzionale)</span></p>
+          <textarea
+            value={sessionContext}
+            onChange={(e) => setSessionContext(e.target.value)}
+            placeholder={mode === 'martial'
+              ? 'Es. Muay Thai – colpi diretti, round ombra, combo 1-2-3...'
+              : mode === 'fitness'
+              ? 'Es. Stacco da terra, squat, press – focus sulla forma...'
+              : 'Es. Mobilità, stretching, movimento libero...'}
+            rows={3}
+            className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-500 resize-none focus:outline-none focus:border-blue-500 transition-colors"
+          />
+        </div>
+
+        {/* Sessioni recenti */}
+        {pastSessions.length > 0 && (
+          <div>
+            <p className="text-xs text-gray-500 mb-2">Sessioni recenti</p>
+            <div className="space-y-1.5">
+              {pastSessions.slice(0, 3).map((s, i) => (
+                <button key={i} onClick={() => { setMode(s.mode); setSessionContext(s.context); }}
+                  className="w-full text-left px-3 py-2 bg-gray-800/60 hover:bg-gray-700/60 border border-gray-700/40 rounded-lg text-xs text-gray-300 transition-colors">
+                  <span className="text-gray-500">{s.date} · {s.mode}</span>
+                  <span className="mx-1 text-gray-600">·</span>
+                  {s.context.slice(0, 50)}{s.context.length > 50 ? '…' : ''}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <button onClick={startSession}
+          className="w-full py-3 bg-blue-600 hover:bg-blue-500 rounded-xl text-white font-bold text-sm transition-colors">
+          📷 Inizia Sessione Live
+        </button>
+      </div>
+    );
+  }
+
+  // ── Live screen ─────────────────────────────────────────────────────────────
   return (
     <div className="space-y-4">
-      {/* Mode selector */}
-      <div className="flex gap-2">
-        {VISUAL_MODES.map((m) => (
-          <button key={m.id} onClick={() => { setMode(m.id); setAnalysis(null); }}
-            className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-colors ${
-              mode === m.id ? 'bg-blue-700 text-white' : 'bg-gray-800 text-gray-400 hover:text-white'}`}>
-            {m.label}
-          </button>
-        ))}
-      </div>
-
-      {currentMode && (
-        <p className="text-xs text-gray-500 text-center">{currentMode.desc}</p>
+      {sessionContext && (
+        <div className="px-3 py-2 bg-blue-900/30 border border-blue-700/30 rounded-lg">
+          <p className="text-xs text-blue-300 truncate">🎯 {sessionContext}</p>
+        </div>
       )}
 
       {/* Camera */}
       <div className="relative rounded-xl overflow-hidden bg-black aspect-video max-h-72">
         <video ref={videoRef} className="w-full h-full object-cover" playsInline muted />
         <canvas ref={canvasRef} className="hidden" />
-        {!streaming && (
-          <div className="absolute inset-0 flex items-center justify-center flex-col gap-3">
-            <div className="text-4xl">{currentMode?.label.split(' ')[0]}</div>
-            <button onClick={startCamera}
-              className="px-6 py-3 bg-blue-600 hover:bg-blue-500 rounded-xl text-white font-bold text-sm transition-colors">
-              📷 Attiva Camera
-            </button>
-          </div>
-        )}
         {streaming && (
           <div className="absolute top-2 right-2 flex gap-1">
             <span className="px-2 py-1 bg-green-600/80 rounded text-xs text-white font-mono">● LIVE</span>
@@ -315,27 +412,25 @@ function VisualCoach() {
         )}
         {analyzing && (
           <div className="absolute bottom-2 left-1/2 -translate-x-1/2 px-3 py-1 bg-black/80 rounded-full text-xs text-blue-300 animate-pulse">
-            Analisi Cosmos 3…
+            Analisi AI in corso…
           </div>
         )}
       </div>
 
-      {streaming && (
-        <div className="flex gap-2">
-          <button onClick={captureAndAnalyze} disabled={analyzing}
-            className="flex-1 px-4 py-2 bg-purple-700 hover:bg-purple-600 disabled:opacity-50 rounded-lg text-white text-sm font-semibold transition-colors">
-            🔍 Analizza Ora
-          </button>
-          <button onClick={() => setAutoMode((v) => !v)}
-            className={`flex-1 px-4 py-2 rounded-lg text-white text-sm font-semibold transition-colors ${autoMode ? 'bg-orange-600 hover:bg-orange-500' : 'bg-gray-700 hover:bg-gray-600'}`}>
-            {autoMode ? '⏸ Stop Auto' : '▶ Auto 6s'}
-          </button>
-          <button onClick={stopCamera}
-            className="px-4 py-2 bg-red-800 hover:bg-red-700 rounded-lg text-white text-sm font-semibold transition-colors">
-            ✕
-          </button>
-        </div>
-      )}
+      <div className="flex gap-2">
+        <button onClick={captureAndAnalyze} disabled={analyzing}
+          className="flex-1 px-4 py-2 bg-purple-700 hover:bg-purple-600 disabled:opacity-50 rounded-lg text-white text-sm font-semibold transition-colors">
+          🔍 Analizza Ora
+        </button>
+        <button onClick={() => setAutoMode((v) => !v)}
+          className={`flex-1 px-4 py-2 rounded-lg text-white text-sm font-semibold transition-colors ${autoMode ? 'bg-orange-600 hover:bg-orange-500' : 'bg-gray-700 hover:bg-gray-600'}`}>
+          {autoMode ? '⏸ Stop Auto' : '▶ Auto 6s'}
+        </button>
+        <button onClick={stopCamera}
+          className="px-4 py-2 bg-red-800 hover:bg-red-700 rounded-lg text-white text-sm font-semibold transition-colors">
+          ✕
+        </button>
+      </div>
 
       <AnimatePresence>
         {analysis && (
