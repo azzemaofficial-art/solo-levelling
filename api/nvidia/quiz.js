@@ -94,7 +94,7 @@ async function askModel(contestant, prompt) {
         max_tokens: 8,
         temperature: 0.0,
       }),
-      signal: AbortSignal.timeout(7000),
+      signal: AbortSignal.timeout(5000),
     });
 
     const data = await res.json();
