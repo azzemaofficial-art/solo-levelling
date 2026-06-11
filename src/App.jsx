@@ -1323,18 +1323,29 @@ useEffect(() => { localStorage.setItem('shadow_monarch_macros', JSON.stringify(m
               <button onClick={quickEveningCheckin} className="text-[10px] px-2 py-2 border border-amber-300/50 text-amber-200 uppercase tracking-widest">Check-in sera</button>
             </div>
 
-            <p className="text-[9px] uppercase tracking-widest text-gray-400 mb-2">Navigazione</p>
+            <p className="text-[9px] uppercase tracking-widest text-gray-400 mb-2">Altre sezioni</p>
             <div className="grid grid-cols-2 gap-2 mb-4">
-              <button onClick={() => handleTabChange('system')} className="text-[10px] px-2 py-2 border border-cyan-300/40 text-cyan-200 uppercase tracking-widest">System</button>
-              <button onClick={() => handleTabChange('systemplus')} className="text-[10px] px-2 py-2 border border-fuchsia-300/40 text-fuchsia-200 uppercase tracking-widest">System+</button>
-              <button onClick={() => handleTabChange('training')} className="text-[10px] px-2 py-2 border border-red-300/40 text-red-200 uppercase tracking-widest">Train</button>
-              <button onClick={() => handleTabChange('recovery')} className="text-[10px] px-2 py-2 border border-emerald-300/40 text-emerald-200 uppercase tracking-widest">Bio</button>
-              <button onClick={() => handleTabChange('quests')} className="text-[10px] px-2 py-2 border border-amber-300/40 text-amber-200 uppercase tracking-widest">Quest</button>
-              <button onClick={() => handleTabChange('boss')} className="text-[10px] px-2 py-2 border border-rose-300/40 text-rose-200 uppercase tracking-widest">Gate</button>
-              <button onClick={() => handleTabChange('calendar')} className="text-[10px] px-2 py-2 border border-indigo-300/40 text-indigo-200 uppercase tracking-widest">Calendar</button>
-              <button onClick={() => handleTabChange('stats')} className="text-[10px] px-2 py-2 border border-violet-300/40 text-violet-200 uppercase tracking-widest">Stats</button>
-              <button onClick={() => handleTabChange('help')} className="text-[10px] px-2 py-2 border border-cyan-300/40 text-cyan-200 uppercase tracking-widest">Help</button>
-              <button onClick={() => handleTabChange('lab')} className="text-[10px] px-2 py-2 border border-fuchsia-300/40 text-fuchsia-200 uppercase tracking-widest">Lab</button>
+              <button onClick={() => handleTabChange('recovery')} className="text-[10px] px-2 py-3 border border-emerald-300/40 text-emerald-200 uppercase tracking-widest flex items-center gap-1.5">
+                <span>🫀</span> Bio
+              </button>
+              <button onClick={() => handleTabChange('quests')} className="text-[10px] px-2 py-3 border border-amber-300/40 text-amber-200 uppercase tracking-widest flex items-center gap-1.5">
+                <span>📋</span> Quest
+              </button>
+              <button onClick={() => handleTabChange('boss')} className="text-[10px] px-2 py-3 border border-rose-300/40 text-rose-200 uppercase tracking-widest flex items-center gap-1.5">
+                <span>💀</span> Gate
+              </button>
+              <button onClick={() => handleTabChange('calendar')} className="text-[10px] px-2 py-3 border border-indigo-300/40 text-indigo-200 uppercase tracking-widest flex items-center gap-1.5">
+                <span>📅</span> Calendar
+              </button>
+              <button onClick={() => handleTabChange('systemplus')} className="text-[10px] px-2 py-3 border border-fuchsia-300/40 text-fuchsia-200 uppercase tracking-widest flex items-center gap-1.5">
+                <span>⚙️</span> System+
+              </button>
+              <button onClick={() => handleTabChange('help')} className="text-[10px] px-2 py-3 border border-cyan-300/40 text-cyan-200 uppercase tracking-widest flex items-center gap-1.5">
+                <span>❓</span> Help
+              </button>
+              <button onClick={() => handleTabChange('lab')} className="text-[10px] px-2 py-3 border border-fuchsia-300/40 text-fuchsia-200 uppercase tracking-widest col-span-2 flex items-center gap-1.5">
+                <span>🧪</span> Lab
+              </button>
             </div>
 
             <p className="text-[9px] uppercase tracking-widest text-gray-400 mb-2">Audio & Voice</p>
@@ -1756,40 +1767,31 @@ useEffect(() => { localStorage.setItem('shadow_monarch_macros', JSON.stringify(m
         ) : null}
       </AnimatePresence>
 
-      {/* MENU INFERIORE CON 4 TASTI */}
+      {/* BARRA NAVIGAZIONE — 4 tab principali */}
       <nav className="game-nav premium-nav w-full max-w-[390px] h-20 bg-black/90 backdrop-blur-xl border-t border-system-blue/20 flex justify-around items-center z-50 shrink-0 relative">
-        <button aria-label="Apri pagina System" onClick={() => handleTabChange('system')} className={`nav-tab flex flex-col items-center transition-colors ${activePage === 'system' ? 'nav-tab-active text-system-blue' : 'text-gray-600'}`}>
+        <button aria-label="Apri pagina System" onClick={() => handleTabChange('system')}
+          className={`nav-tab flex flex-col items-center gap-1 px-4 transition-colors ${activePage === 'system' ? 'nav-tab-active text-system-blue' : 'text-gray-600'}`}>
+          <span className="text-xl">⚡</span>
           <span className="text-[9px] font-bold tracking-widest system-font uppercase">System</span>
         </button>
 
-        <button aria-label="Apri pagina Train" onClick={() => handleTabChange('training')} className={`nav-tab flex flex-col items-center transition-colors ${activePage === 'training' ? 'nav-tab-active text-red-400' : 'text-gray-600'}`}>
+        <button aria-label="Apri pagina Train" onClick={() => handleTabChange('training')}
+          className={`nav-tab flex flex-col items-center gap-1 px-4 transition-colors ${activePage === 'training' ? 'nav-tab-active text-red-400' : 'text-gray-600'}`}>
+          <span className="text-xl">🥊</span>
           <span className="text-[9px] font-bold tracking-widest system-font uppercase">Train</span>
         </button>
 
-        <button aria-label="Apri pagina Bio" onClick={() => handleTabChange('recovery')} className={`nav-tab flex flex-col items-center transition-colors ${activePage === 'recovery' ? 'nav-tab-active text-emerald-400' : 'text-gray-600'}`}>
-          <span className="text-[9px] font-bold tracking-widest system-font uppercase">Bio</span>
-        </button>
-        
-        <button aria-label="Apri pagina Quest" onClick={() => handleTabChange('quests')} className={`nav-tab flex flex-col items-center transition-colors ${activePage === 'quests' ? 'nav-tab-active text-boss-red' : 'text-gray-600'}`}>
-          <span className="text-[9px] font-bold tracking-widest system-font uppercase">Quest</span>
-        </button>
-
-        <button aria-label="Apri pagina Gate" onClick={() => handleTabChange('boss')} className={`nav-tab flex flex-col items-center transition-colors ${activePage === 'boss' ? 'nav-tab-active text-red-500 drop-shadow-[0_0_5px_#ef4444]' : 'text-gray-600'}`}>
-          <span className="text-[9px] font-bold tracking-widest system-font uppercase">Gate</span>
-        </button>
-
-        <button aria-label="Apri pagina Calendar" onClick={() => handleTabChange('calendar')} className={`nav-tab flex flex-col items-center transition-colors ${activePage === 'calendar' ? 'nav-tab-active text-indigo-300' : 'text-gray-600'}`}>
-          <span className="text-[9px] font-bold tracking-widest system-font uppercase">Cal</span>
-        </button>
-
-        <button aria-label="Apri pagina Stats" onClick={() => handleTabChange('stats')} className={`nav-tab flex flex-col items-center transition-colors ${activePage === 'stats' ? 'nav-tab-active text-cursed-purple' : 'text-gray-600'}`}>
-          <span className="text-[9px] font-bold tracking-widest system-font uppercase">Stats</span>
-        </button>
-        <button aria-label="Apri pagina Coach AI" onClick={() => handleTabChange('coach')} className={`nav-tab flex flex-col items-center transition-colors ${activePage === 'coach' ? 'nav-tab-active text-blue-400' : 'text-gray-600'}`}>
-          <span className="text-[18px]">🧠</span>
+        <button aria-label="Apri pagina Coach AI" onClick={() => handleTabChange('coach')}
+          className={`nav-tab flex flex-col items-center gap-1 px-4 transition-colors ${activePage === 'coach' ? 'nav-tab-active text-blue-400' : 'text-gray-600'}`}>
+          <span className="text-xl">🧠</span>
           <span className="text-[9px] font-bold tracking-widest system-font uppercase">Coach</span>
         </button>
 
+        <button aria-label="Apri pagina Stats" onClick={() => handleTabChange('stats')}
+          className={`nav-tab flex flex-col items-center gap-1 px-4 transition-colors ${activePage === 'stats' ? 'nav-tab-active text-cursed-purple' : 'text-gray-600'}`}>
+          <span className="text-xl">📊</span>
+          <span className="text-[9px] font-bold tracking-widest system-font uppercase">Stats</span>
+        </button>
       </nav>
     </div>
   );
