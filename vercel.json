@@ -2,9 +2,9 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "rewrites": [
-    { "source": "/((?!api/|assets/|favicon\\.ico|robots\\.txt).*)", "destination": "/index.html" }
-  ],
-  "functions": {
-    "api/nvidia/quiz-ask.js": { "maxDuration": 30 }
-  }
+    {
+      "source": "/((?!api/|assets/|favicon\\.ico|robots\\.txt).*)",
+      "destination": "/index.html"
+    }
+  ]
 }
