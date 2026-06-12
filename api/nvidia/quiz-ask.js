@@ -55,20 +55,22 @@ export default async function handler(req, res) {
       headers['X-Title']      = 'Solo Levelling AI Quiz';
     }
 
-    const resp = await fetch(`${base}/chat/completions`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        model:       cfg.model,
-        messages: [
-          { role: 'system', content: 'You are in a multiple-choice quiz competition. You MUST reply with ONLY one letter: A, B, C, or D. Nothing else. No punctuation. No explanation. Just the single letter.' },
-          { role: 'user',   content: prompt },
-        ],
-        max_tokens:  cfg.maxTokens || 10,
-        temperature: 0.0,
-      }),
-      signal: AbortSignal.timeout(28000),
+    const body = JSON.stringify({
+      model:       cfg.model,
+      messages: [
+        { role: 'system', content: 'You are in a multiple-choice quiz competition. You MUST reply with ONLY one letter: A, B, C, or D. Nothing else. No punctuation. No explanation. Just the single letter.' },
+        { role: 'user',   content: prompt },
+      ],
+      max_tokens:  cfg.maxTokens || 10,
+      temperature: 0.0,
     });
+
+    // Single automatic retry on 429 (NVIDIA NIM rate limit)
+    let resp = await fetch(`${base}/chat/completions`, { method: 'POST', headers, body, signal: AbortSignal.timeout(28000) });
+    if (resp.status === 429) {
+      await new Promise(r => setTimeout(r, 3000));
+      resp = await fetch(`${base}/chat/completions`, { method: 'POST', headers, body, signal: AbortSignal.timeout(24000) });
+    }
 
     const data = await resp.json();
 
