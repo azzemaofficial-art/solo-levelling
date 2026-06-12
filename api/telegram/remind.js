@@ -11,11 +11,11 @@ const MEAL_SLOTS = [
 ];
 
 export default async function handler(req, res) {
-  const botToken = process.env.TELEGRAM_BOT_TOKEN;
-  const chatId = process.env.TELEGRAM_CHAT_ID;
+  const botToken = process.env.SHADOW_BOT_TOKEN;
+  const chatId = process.env.SHADOW_BOT_CHAT_ID;
 
   if (!botToken || !chatId) {
-    return res.status(500).json({ error: 'TELEGRAM_BOT_TOKEN o TELEGRAM_CHAT_ID mancante' });
+    return res.status(500).json({ error: 'SHADOW_BOT_TOKEN o SHADOW_BOT_CHAT_ID mancante' });
   }
 
   const now = new Date();
