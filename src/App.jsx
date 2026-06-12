@@ -1,5 +1,6 @@
 import React, { Suspense, lazy, useMemo, useState, useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
+import { Zap, Swords, BrainCircuit, Activity } from 'lucide-react';
 import { playSfx } from './utils/sfx';
 import { formatAiErrorDetail, requestSystemAI, subscribeAiStatus } from './utils/aiClient';
 import { runStorageMigrations } from './utils/storageMigrations';
@@ -1325,7 +1326,6 @@ useEffect(() => { localStorage.setItem('shadow_monarch_macros', JSON.stringify(m
 
             <p className="text-[9px] uppercase tracking-widest text-gray-400 mb-2">Altre sezioni</p>
             <div className="grid grid-cols-2 gap-2 mb-4">
-              </button>
               <button onClick={() => { handleTabChange('coach'); setMenuOpen(false); }} className="text-[10px] px-2 py-3 border border-blue-300/40 text-blue-200 uppercase tracking-widest flex items-center gap-1.5">
                 <span>🧠</span> Coach AI
               </button>
@@ -1772,30 +1772,35 @@ useEffect(() => { localStorage.setItem('shadow_monarch_macros', JSON.stringify(m
       </AnimatePresence>
 
       {/* BARRA NAVIGAZIONE — 4 tab principali */}
-      <nav className="game-nav premium-nav w-full max-w-[390px] h-20 bg-black/90 backdrop-blur-xl border-t border-system-blue/20 flex justify-around items-center z-50 shrink-0 relative">
-        <button aria-label="Apri pagina System" onClick={() => handleTabChange('system')}
-          className={`nav-tab flex flex-col items-center gap-1 px-4 transition-colors ${activePage === 'system' ? 'nav-tab-active text-system-blue' : 'text-gray-600'}`}>
-          <span className="text-xl">⚡</span>
-          <span className="text-[9px] font-bold tracking-widest system-font uppercase">System</span>
-        </button>
-
-        <button aria-label="Apri pagina Train" onClick={() => handleTabChange('training')}
-          className={`nav-tab flex flex-col items-center gap-1 px-4 transition-colors ${activePage === 'training' ? 'nav-tab-active text-red-400' : 'text-gray-600'}`}>
-          <span className="text-xl">🥊</span>
-          <span className="text-[9px] font-bold tracking-widest system-font uppercase">Train</span>
-        </button>
-
-        <button aria-label="Apri pagina Coach AI" onClick={() => handleTabChange('coach')}
-          className={`nav-tab flex flex-col items-center gap-1 px-4 transition-colors ${activePage === 'coach' ? 'nav-tab-active text-blue-400' : 'text-gray-600'}`}>
-          <span className="text-xl">🧠</span>
-          <span className="text-[9px] font-bold tracking-widest system-font uppercase">Coach</span>
-        </button>
-
-        <button aria-label="Apri pagina Stats" onClick={() => handleTabChange('stats')}
-          className={`nav-tab flex flex-col items-center gap-1 px-4 transition-colors ${activePage === 'stats' ? 'nav-tab-active text-cursed-purple' : 'text-gray-600'}`}>
-          <span className="text-xl">📊</span>
-          <span className="text-[9px] font-bold tracking-widest system-font uppercase">Stats</span>
-        </button>
+      <nav className="game-nav premium-nav w-full max-w-[390px] h-20 bg-black/95 backdrop-blur-xl border-t border-white/[0.06] flex justify-around items-center z-50 shrink-0 relative">
+        {[
+          { id: 'system',   label: 'System', Icon: Zap,         hex: '#38bdf8', glow: 'rgba(56,189,248,0.55)'   },
+          { id: 'training', label: 'Train',  Icon: Swords,      hex: '#f87171', glow: 'rgba(248,113,113,0.55)'  },
+          { id: 'coach',    label: 'Coach',  Icon: BrainCircuit, hex: '#818cf8', glow: 'rgba(129,140,248,0.55)' },
+          { id: 'stats',    label: 'Stats',  Icon: Activity,    hex: '#a78bfa', glow: 'rgba(167,139,250,0.55)'  },
+        ].map(({ id, label, Icon, hex, glow }) => {
+          const active = activePage === id;
+          return (
+            <button key={id} aria-label={`Apri pagina ${label}`} onClick={() => handleTabChange(id)}
+              className="relative flex flex-col items-center gap-1.5 px-5 py-2 transition-all duration-200"
+              style={{ color: active ? hex : 'rgba(255,255,255,0.22)' }}>
+              {/* active indicator line */}
+              {active && (
+                <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-[2px] rounded-full"
+                  style={{ background: `linear-gradient(90deg, transparent, ${hex}, transparent)` }} />
+              )}
+              <Icon
+                size={22}
+                strokeWidth={active ? 2 : 1.4}
+                style={{ filter: active ? `drop-shadow(0 0 7px ${glow})` : 'none', transition: 'filter 0.2s, stroke-width 0.2s' }}
+              />
+              <span className="text-[9px] font-bold tracking-widest uppercase system-font"
+                style={{ letterSpacing: '0.12em' }}>
+                {label}
+              </span>
+            </button>
+          );
+        })}
       </nav>
     </div>
   );
