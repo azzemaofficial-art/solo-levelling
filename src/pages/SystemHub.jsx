@@ -422,6 +422,14 @@ const SystemHub = ({ systemLogs, setSystemLogs, dailyGoal, setDailyGoal, hydrati
   const [timelineSearch, setTimelineSearch] = useState('');
   const [isGeneratingCoachPlan, setIsGeneratingCoachPlan] = useState(false);
   const [smartGoalDraft, setSmartGoalDraft] = useState(null);
+  const [dailyBriefing, setDailyBriefing] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('shadow_monarch_daily_briefing') || 'null'); } catch (_) { return null; }
+  });
+  const [isGeneratingBriefing, setIsGeneratingBriefing] = useState(false);
+  const [shadowChatMessages, setShadowChatMessages] = useState([]);
+  const [shadowChatInput, setShadowChatInput] = useState('');
+  const [isShadowChatLoading, setIsShadowChatLoading] = useState(false);
+  const shadowChatEndRef = useRef(null);
   const [featureFlags, setFeatureFlags] = useState(() => {
     try {
       const raw = localStorage.getItem('shadow_monarch_feature_flags');
@@ -1841,6 +1849,75 @@ const SystemHub = ({ systemLogs, setSystemLogs, dailyGoal, setDailyGoal, hydrati
       ]
     };
   };
+  const generateDailyBriefing = async () => {
+    if (isGeneratingBriefing) return;
+    setIsGeneratingBriefing(true);
+    const ctx = {
+      data: today,
+      kcalConsumed: Math.round(Number(todayData.consumed || 0)),
+      kcalTarget: Math.round(Number(effectiveDailyGoal || dailyGoal || 0)),
+      protein: Math.round(Number(todayData.protein || 0)),
+      proteinTarget: Math.round(Number(adaptiveMacroTargets?.protein || macroGoals?.protein || 0)),
+      carbs: Math.round(Number(todayData.carbs || 0)),
+      fat: Math.round(Number(todayData.fatMacros || 0)),
+      waterMl: Math.round(Number(todayData.waterMl || 0)),
+      waterTarget: Math.round(Number(hydrationGoal || 0)),
+      workoutBurn: Math.round(Number(todayData.workoutBurn ?? todayData.burned ?? 0)),
+      sleepHours: Number(todayData.sleepHours || 0),
+      systemPower: systemPowerScore,
+      streak: streak,
+      objective: String(playerStats.objective || 'recomp'),
+      supplementSuggestions: dailySupplementCore?.map((s) => s.name).join(', ') || '--',
+      weekScore: weeklyReview.kcalAdherencePct
+    };
+    try {
+      const data = await requestSystemAI({
+        temperature: 0.15,
+        max_tokens: 380,
+        timeoutMs: 22000,
+        messages: [
+          {
+            role: 'system',
+            content: 'Sei Nemotron, un coach AI di élite per un Shadow Hunter. Analizza il profilo giornaliero dell\'utente e fornisci un briefing operativo conciso: 1 assessment (3 righe max), 2-3 azioni prioritarie per il resto del giornata, 1 insight nutrizionale. Sii diretto, motivante, tecnico. Rispondi in italiano. MAX 120 parole totali.'
+          },
+          { role: 'user', content: `Profilo oggi: ${JSON.stringify(ctx)}` }
+        ]
+      });
+      const text = data?.choices?.[0]?.message?.content || 'Nessuna analisi disponibile.';
+      const briefing = { text, ts: Date.now() };
+      setDailyBriefing(briefing);
+      localStorage.setItem('shadow_monarch_daily_briefing', JSON.stringify(briefing));
+    } catch (_) {
+      setDailyBriefing({ text: 'Errore analisi — riprova.', ts: Date.now() });
+    } finally {
+      setIsGeneratingBriefing(false);
+    }
+  };
+  const sendShadowChatMessage = async (overrideText) => {
+    const text = String(overrideText || shadowChatInput || '').trim();
+    if (!text || isShadowChatLoading) return;
+    setShadowChatInput('');
+    const userMsg = { role: 'user', content: text, ts: Date.now() };
+    setShadowChatMessages((prev) => [...prev, userMsg]);
+    setIsShadowChatLoading(true);
+    const profileCtx = `Profilo Shadow Hunter: obiettivo=${playerStats.objective || 'recomp'}, livello=${playerStats.level || 1}, streak=${streak}. Oggi: kcal=${Math.round(Number(todayData.consumed || 0))}/${Math.round(effectiveDailyGoal || dailyGoal || 0)}, prot=${Math.round(Number(todayData.protein || 0))}g, burn=${Math.round(Number(todayData.workoutBurn ?? todayData.burned ?? 0))}kcal, h2o=${Math.round(Number(todayData.waterMl || 0))}ml. Integratori consigliati: ${dailySupplementCore?.map((s) => s.name).join(', ') || '--'}.`;
+    const systemPrompt = `Sei Nemotron, il coach AI del Shadow Hunter System. Sei un esperto di fitness, nutrizione, arti marziali e performance atletica. Rispondi in italiano, sii diretto e tecnico. Massimo 150 parole per risposta. ${profileCtx}`;
+    try {
+      const res = await fetch('/api/nvidia/coach', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: shadowChatMessages.concat(userMsg).map((m) => ({ role: m.role, content: m.content })), systemPrompt })
+      });
+      const data = await res.json();
+      const reply = data?.content || 'Errore risposta Nemotron.';
+      setShadowChatMessages((prev) => [...prev, { role: 'assistant', content: reply, ts: Date.now() }]);
+    } catch (_) {
+      setShadowChatMessages((prev) => [...prev, { role: 'assistant', content: 'Connessione fallita. Riprova.', ts: Date.now() }]);
+    } finally {
+      setIsShadowChatLoading(false);
+      setTimeout(() => shadowChatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 80);
+    }
+  };
   const generateCoachModePlan = async () => {
     if (isGeneratingCoachPlan) return;
     setIsGeneratingCoachPlan(true);
@@ -2537,7 +2614,7 @@ const SystemHub = ({ systemLogs, setSystemLogs, dailyGoal, setDailyGoal, hydrati
           },
           {
             role: 'user',
-            content: `Obiettivo utente: ${String(playerStats?.objective || metabolicProfile?.objective || 'recomp')}. Kcal target giorno: ${Math.round(Number(dailyGoal || 2400))}. Prompt ricetta: ${prompt}`
+            content: `Obiettivo utente: ${String(playerStats?.objective || metabolicProfile?.objective || 'recomp')}. Kcal target giorno: ${Math.round(Number(effectiveDailyGoal || dailyGoal || 2400))}. Macro residue oggi: Proteine ${Math.max(0, Math.round(Number(adaptiveMacroTargets?.protein || macroGoals?.protein || 0) - Number(todayData.protein || 0)))}g residui, Carbs ${Math.max(0, Math.round(Number(adaptiveMacroTargets?.carbs || macroGoals?.carbs || 0) - Number(todayData.carbs || 0)))}g residui, Grassi ${Math.max(0, Math.round(Number(adaptiveMacroTargets?.fats || macroGoals?.fats || 0) - Number(todayData.fatMacros || 0)))}g residui. Kcal residue: ${Math.max(0, Math.round(Number(effectiveDailyGoal || dailyGoal || 2400) - Number(todayData.consumed || 0)))}. Genera una ricetta che si adatta perfettamente a questi macro residui. Prompt ricetta: ${prompt}`
           }
         ]
       });
@@ -4570,18 +4647,9 @@ const SystemHub = ({ systemLogs, setSystemLogs, dailyGoal, setDailyGoal, hydrati
 
   return (
     <div className="system-hub-shell p-6 pt-10 pb-24 min-h-full bg-void-black relative overflow-hidden">
-      <img src="/avatar8.png" alt="" className="pointer-events-none absolute -right-12 -top-8 w-44 opacity-15 grayscale blur-[1px]" />
-      <img src="/boss2.png" alt="" className="pointer-events-none absolute -left-16 bottom-8 w-44 opacity-10 grayscale" />
       <div className="mb-8">
         <p className="text-[10px] tracking-[0.38em] font-bold system-font mb-1 uppercase" style={{ color: 'rgba(124,58,237,0.9)', letterSpacing: '0.36em' }}>⚡ System Core</p>
         <h1 className="epic-title text-4xl font-black italic tracking-tight">COMMAND CENTER</h1>
-        {tgSyncStatus ? (
-          <p className="text-[9px] text-cyan-400 mt-1 tracking-widest uppercase">
-            TG SYNC {tgSyncStatus.ok ? '✓' : '✗'} — oggi: {tgSyncStatus.kcal ?? 0} kcal · {tgSyncStatus.count ?? 0} giorni · {tgSyncStatus.ts ? new Date(tgSyncStatus.ts).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }) : '—'}
-          </p>
-        ) : (
-          <p className="text-[9px] text-gray-600 mt-1 tracking-widest uppercase">TG SYNC — in attesa...</p>
-        )}
       </div>
 
       <motion.div
@@ -4620,6 +4688,67 @@ const SystemHub = ({ systemLogs, setSystemLogs, dailyGoal, setDailyGoal, hydrati
               <p className="text-xl font-black" style={{ color: '#d1fae5', fontFamily: 'Russo One, sans-serif' }}>{Math.round(hydrationPct)}%</p>
             </div>
           </div>
+        </div>
+      </motion.div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.011 }}
+        className="mb-6 rounded-2xl p-4 relative overflow-hidden"
+        style={{
+          background: 'linear-gradient(145deg, rgba(10,10,20,0.96), rgba(18,12,32,0.93))',
+          border: '1px solid rgba(124,58,237,0.22)',
+          boxShadow: '0 8px 32px rgba(124,58,237,0.1), inset 0 1px 0 rgba(255,255,255,0.04)'
+        }}
+      >
+        <div className="pointer-events-none absolute -top-8 -right-8 h-36 w-36 rounded-full blur-3xl" style={{ background: 'rgba(124,58,237,0.14)' }} />
+        <div className="relative z-10">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <p className="text-[9px] uppercase tracking-[0.36em] font-bold" style={{ color: 'rgba(167,139,250,0.9)' }}>◈ Daily Integration</p>
+              <p className="text-sm font-black text-white tracking-wide" style={{ fontFamily: 'Russo One, sans-serif' }}>Briefing Giornaliero</p>
+            </div>
+            <button
+              onClick={generateDailyBriefing}
+              disabled={isGeneratingBriefing}
+              className={`text-[9px] px-3 py-1.5 border uppercase tracking-widest transition-colors ${isGeneratingBriefing ? 'border-gray-700 text-gray-500' : 'border-violet-300/50 text-violet-200 hover:bg-violet-300 hover:text-black'}`}
+            >
+              {isGeneratingBriefing ? 'Analisi...' : 'Analizza'}
+            </button>
+          </div>
+          <div className="grid grid-cols-4 gap-2 mb-3">
+            <div className="rounded-lg p-2 text-center" style={{ background: 'rgba(56,189,248,0.08)', border: '1px solid rgba(56,189,248,0.18)' }}>
+              <p className="text-[8px] uppercase tracking-widest text-cyan-400 mb-0.5">Kcal</p>
+              <p className="text-sm font-black text-white">{Math.round(Number(todayData.consumed || 0))}</p>
+              <p className="text-[8px] text-gray-500">/{Math.round(effectiveDailyGoal || dailyGoal || 0)}</p>
+            </div>
+            <div className="rounded-lg p-2 text-center" style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.18)' }}>
+              <p className="text-[8px] uppercase tracking-widest text-emerald-400 mb-0.5">Prot</p>
+              <p className="text-sm font-black text-white">{Math.round(Number(todayData.protein || 0))}g</p>
+              <p className="text-[8px] text-gray-500">/{Math.round(Number(adaptiveMacroTargets?.protein || macroGoals?.protein || 0))}g</p>
+            </div>
+            <div className="rounded-lg p-2 text-center" style={{ background: 'rgba(251,146,60,0.08)', border: '1px solid rgba(251,146,60,0.18)' }}>
+              <p className="text-[8px] uppercase tracking-widest text-orange-400 mb-0.5">Burn</p>
+              <p className="text-sm font-black text-white">{Math.round(Number(todayData.workoutBurn ?? todayData.burned ?? 0))}</p>
+              <p className="text-[8px] text-gray-500">kcal</p>
+            </div>
+            <div className="rounded-lg p-2 text-center" style={{ background: 'rgba(217,70,239,0.08)', border: '1px solid rgba(217,70,239,0.18)' }}>
+              <p className="text-[8px] uppercase tracking-widest text-fuchsia-400 mb-0.5">Score</p>
+              <p className="text-sm font-black text-white">{systemPowerScore}</p>
+              <p className="text-[8px] text-gray-500">/100</p>
+            </div>
+          </div>
+          {dailyBriefing ? (
+            <div className="rounded-lg p-3 mt-2" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(124,58,237,0.15)' }}>
+              <p className="text-[10px] text-gray-200 leading-relaxed whitespace-pre-wrap">{dailyBriefing.text}</p>
+              {dailyBriefing.ts ? (
+                <p className="text-[8px] text-gray-600 uppercase mt-2 tracking-widest">{new Date(dailyBriefing.ts).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}</p>
+              ) : null}
+            </div>
+          ) : (
+            <p className="text-[10px] text-gray-500 italic">Premi "Analizza" per il briefing Nemotron del giorno.</p>
+          )}
         </div>
       </motion.div>
 
@@ -4705,36 +4834,9 @@ const SystemHub = ({ systemLogs, setSystemLogs, dailyGoal, setDailyGoal, hydrati
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.012 }}
-        className="mb-6 rounded-sm border border-cyan-300/35 bg-[linear-gradient(145deg,rgba(4,16,28,0.92),rgba(8,18,36,0.9),rgba(16,10,30,0.86))] p-4"
-      >
-        <div className="flex items-center justify-between mb-2">
-          <p className="text-[10px] uppercase tracking-[0.32em] text-cyan-200">Coach Mode AI</p>
-          <button onClick={generateCoachModePlan} disabled={isGeneratingCoachPlan} className={`text-[9px] px-2 py-1 border uppercase tracking-widest ${isGeneratingCoachPlan ? 'border-gray-700 text-gray-500' : 'border-cyan-300/50 text-cyan-200 hover:bg-cyan-300 hover:text-black'}`}>
-            {isGeneratingCoachPlan ? 'Sync...' : 'Refresh'}
-          </button>
-        </div>
-        <p className="text-lg font-black text-white uppercase">{todayCoachPlan.headline}</p>
-        <p className="text-[10px] text-gray-300 mt-1">{todayCoachPlan.reason}</p>
-        <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-2">
-          {(todayCoachPlan.actions || []).map((action) => (
-            <button
-              key={`coach-card-${action.id}`}
-              onClick={() => runWeeklyOneTapAction(action.id)}
-              className="text-left border border-fuchsia-300/35 bg-fuchsia-500/10 p-2 hover:bg-fuchsia-300 hover:text-black"
-            >
-              <p className="text-[10px] font-black uppercase tracking-widest">{action.label}</p>
-              <p className="text-[10px] opacity-80">{action.desc}</p>
-            </button>
-          ))}
-        </div>
-      </motion.div>
-
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.014 }}
-        className={`weekly-crown-card ${weeklyCrownModeClass} mb-6 rounded-sm border border-amber-300/40 p-4`}
+        className={`weekly-crown-card ${weeklyCrownModeClass} mb-6 rounded-2xl p-5`}
+        style={{ background: 'linear-gradient(145deg, rgba(12,10,6,0.97), rgba(28,18,4,0.93), rgba(10,8,20,0.96))', border: '1px solid rgba(245,158,11,0.25)', boxShadow: '0 8px 32px rgba(245,158,11,0.08), inset 0 1px 0 rgba(255,255,255,0.04)' }}
       >
         {weeklyCrownUnlockFx ? (
           <motion.div
@@ -4858,6 +4960,86 @@ const SystemHub = ({ systemLogs, setSystemLogs, dailyGoal, setDailyGoal, hydrati
                 );
               })}
             </div>
+          </div>
+        </div>
+      </motion.div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.0165 }}
+        className="mb-6 rounded-2xl overflow-hidden"
+        style={{
+          background: 'linear-gradient(145deg, rgba(6,10,22,0.97), rgba(14,8,28,0.95))',
+          border: '1px solid rgba(99,102,241,0.25)',
+          boxShadow: '0 8px 32px rgba(99,102,241,0.1), inset 0 1px 0 rgba(255,255,255,0.04)'
+        }}
+      >
+        <div className="p-4 border-b border-white/[0.06]">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-[9px] uppercase tracking-[0.36em] font-bold" style={{ color: 'rgba(129,140,248,0.9)' }}>◈ Nemotron AI</p>
+              <p className="text-sm font-black text-white" style={{ fontFamily: 'Russo One, sans-serif' }}>Shadow Chat</p>
+            </div>
+            <button
+              onClick={() => setShadowChatMessages([])}
+              className="text-[8px] px-2 py-1 border border-white/15 text-gray-500 uppercase tracking-widest hover:border-rose-300/40 hover:text-rose-300"
+            >
+              Clear
+            </button>
+          </div>
+        </div>
+        <div className="h-52 overflow-y-auto p-4 space-y-3" style={{ scrollbarWidth: 'thin' }}>
+          {shadowChatMessages.length === 0 ? (
+            <p className="text-[10px] text-gray-500 italic text-center pt-8">Chiedimi qualsiasi cosa: nutrizione, allenamento, integratori, analisi del tuo profilo...</p>
+          ) : (
+            shadowChatMessages.map((msg, idx) => (
+              <div key={`schat-${idx}`} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                <div
+                  className={`max-w-[85%] rounded-xl px-3 py-2 text-[11px] leading-relaxed ${msg.role === 'user' ? 'text-white' : 'text-gray-200'}`}
+                  style={msg.role === 'user'
+                    ? { background: 'rgba(99,102,241,0.25)', border: '1px solid rgba(99,102,241,0.3)' }
+                    : { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }
+                  }
+                >
+                  {msg.content}
+                </div>
+              </div>
+            ))
+          )}
+          {isShadowChatLoading ? (
+            <div className="flex justify-start">
+              <div className="px-3 py-2 rounded-xl text-[11px] text-indigo-300" style={{ background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.2)' }}>
+                Nemotron sta analizzando...
+              </div>
+            </div>
+          ) : null}
+          <div ref={shadowChatEndRef} />
+        </div>
+        <div className="p-3 border-t border-white/[0.06]">
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={shadowChatInput}
+              onChange={(e) => setShadowChatInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendShadowChatMessage(); } }}
+              placeholder="Chiedi a Nemotron..."
+              className="flex-1 bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-[11px] text-white placeholder-gray-600 focus:outline-none focus:border-indigo-300/50"
+            />
+            <button
+              onClick={() => sendShadowChatMessage()}
+              disabled={isShadowChatLoading || !shadowChatInput.trim()}
+              className={`px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-colors ${isShadowChatLoading || !shadowChatInput.trim() ? 'bg-white/5 text-gray-600 border border-white/10' : 'border border-indigo-300/50 text-indigo-200 hover:bg-indigo-300 hover:text-black'}`}
+            >
+              Invia
+            </button>
+          </div>
+          <div className="mt-2 flex gap-2 flex-wrap">
+            {['Analizza il mio profilo oggi', 'Quali integratori devo prendere?', 'Ottimizza i miei macro', 'Workout consigliato'].map((q) => (
+              <button key={q} onClick={() => sendShadowChatMessage(q)} className="text-[9px] px-2 py-1 border border-indigo-300/20 text-indigo-400 rounded-full hover:bg-indigo-300/15 transition-colors">
+                {q}
+              </button>
+            ))}
           </div>
         </div>
       </motion.div>
@@ -5042,20 +5224,25 @@ const SystemHub = ({ systemLogs, setSystemLogs, dailyGoal, setDailyGoal, hydrati
           Applica bilanciamento (1 tap)
         </button>
       </motion.div>
-      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.0287 }} className="system-card mb-6 rounded-sm border border-indigo-300/30 bg-black/45 p-4">
-        <div className="flex items-center justify-between mb-2">
-          <p className="text-[10px] uppercase tracking-widest text-indigo-200">Daily Integrator Stack</p>
-          <p className="text-[9px] uppercase text-gray-500">{supplementAdvisor.moodTag}</p>
+      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.0287 }} className="mb-6 rounded-2xl overflow-hidden relative" style={{ background: 'linear-gradient(145deg, rgba(8,8,24,0.97), rgba(12,8,28,0.93))', border: '1px solid rgba(99,102,241,0.2)', boxShadow: '0 8px 32px rgba(99,102,241,0.08), inset 0 1px 0 rgba(255,255,255,0.04)' }}>
+        <div className="pointer-events-none absolute -top-10 -right-10 h-32 w-32 rounded-full blur-3xl" style={{ background: 'rgba(99,102,241,0.12)' }} />
+        <div className="p-4 relative z-10">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <p className="text-[9px] uppercase tracking-[0.36em] font-bold" style={{ color: 'rgba(129,140,248,0.9)' }}>◈ Smart Stack</p>
+            <p className="text-sm font-black text-white" style={{ fontFamily: 'Russo One, sans-serif' }}>Daily Integrators</p>
+          </div>
+          <span className="text-[8px] px-2 py-1 border border-indigo-300/30 text-indigo-300 uppercase tracking-widest">{supplementAdvisor.moodTag}</span>
         </div>
-        <div className="mb-2 grid grid-cols-2 gap-1">
+        <div className="mb-3 grid grid-cols-2 gap-1.5">
           {SUPPLEMENT_CATALOG.map((supp) => {
             const enabled = enabledSupplementIds.has(supp.id);
             return (
               <button
                 key={`supp-toggle-${supp.id}`}
                 onClick={() => toggleSupplementEnabled(supp.id)}
-                className={`text-[9px] px-2 py-1 border uppercase tracking-widest ${
-                  enabled ? 'border-indigo-300/55 text-indigo-100 bg-indigo-500/15' : 'border-white/15 text-gray-500'
+                className={`text-[9px] px-2 py-1.5 rounded-lg border uppercase tracking-widest transition-colors ${
+                  enabled ? 'border-indigo-300/55 text-indigo-100 bg-indigo-500/15' : 'border-white/10 text-gray-600 hover:border-white/20 hover:text-gray-400'
                 }`}
               >
                 {supp.name}
@@ -5065,27 +5252,36 @@ const SystemHub = ({ systemLogs, setSystemLogs, dailyGoal, setDailyGoal, hydrati
         </div>
         <div className="space-y-2">
           {filteredSupplementItems.length ? filteredSupplementItems.map((item) => (
-            <div key={item.id} className="border border-white/10 bg-white/5 p-2">
-              <p className="text-[10px] font-black uppercase tracking-widest text-white">{item.name}</p>
-              <p className="text-[10px] text-cyan-200">{item.dose} • {item.timing}</p>
-              <p className="text-[10px] text-gray-300">{item.why}</p>
+            <div key={item.id} className="rounded-xl p-3" style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.15)' }}>
+              <div className="flex items-center justify-between mb-1">
+                <p className="text-[10px] font-black uppercase tracking-widest text-white">{item.name}</p>
+                <span className="text-[8px] px-1.5 py-0.5 border border-cyan-300/25 text-cyan-300 rounded-full">{item.dose}</span>
+              </div>
+              <p className="text-[9px] text-indigo-300">{item.timing}</p>
+              <p className="text-[9px] text-gray-400 mt-0.5">{item.why}</p>
             </div>
           )) : (
-            <p className="text-[10px] text-gray-400">Nessun integratore prioritario oggi o filtri troppo stretti.</p>
+            <p className="text-[10px] text-gray-500 italic">Nessun integratore prioritario oggi.</p>
           )}
         </div>
         {dailySupplementCore.length ? (
-          <p className="mt-2 text-[9px] text-indigo-100">Stack personale attivo: {dailySupplementCore.map((x) => x.name).join(' • ')}</p>
+          <p className="mt-3 text-[9px] text-indigo-300">Stack attivo: {dailySupplementCore.map((x) => x.name).join(' • ')}</p>
         ) : null}
-        <p className="mt-2 text-[9px] text-gray-500 uppercase">Indicazioni generali, non mediche. Se hai condizioni cliniche, confronta il piano con un professionista.</p>
+        <p className="mt-2 text-[8px] text-gray-600 uppercase">Indicazioni generali, non mediche.</p>
+        </div>
       </motion.div>
-      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.0289 }} className="system-card mb-6 rounded-sm border border-violet-300/30 bg-black/45 p-4">
-        <div className="flex items-center justify-between mb-2">
-          <p className="text-[10px] uppercase tracking-widest text-violet-200">AI Recipe Forge</p>
+      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.0289 }} className="mb-6 rounded-2xl overflow-hidden relative" style={{ background: 'linear-gradient(145deg, rgba(10,6,22,0.97), rgba(20,8,36,0.93))', border: '1px solid rgba(167,139,250,0.22)', boxShadow: '0 8px 32px rgba(124,58,237,0.1), inset 0 1px 0 rgba(255,255,255,0.04)' }}>
+        <div className="pointer-events-none absolute -top-8 -right-8 h-32 w-32 rounded-full blur-3xl" style={{ background: 'rgba(124,58,237,0.16)' }} />
+        <div className="p-4 relative z-10">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <p className="text-[9px] uppercase tracking-[0.36em] font-bold" style={{ color: 'rgba(167,139,250,0.9)' }}>◈ AI Powered</p>
+            <p className="text-sm font-black text-white" style={{ fontFamily: 'Russo One, sans-serif' }}>Recipe Forge</p>
+          </div>
           <button
             onClick={generateRecipeFromPrompt}
             disabled={isGeneratingRecipe}
-            className={`text-[9px] px-2 py-1 border uppercase tracking-widest ${isGeneratingRecipe ? 'border-gray-700 text-gray-500' : 'border-violet-300/50 text-violet-200 hover:bg-violet-300 hover:text-black'}`}
+            className={`text-[9px] px-3 py-1.5 border uppercase tracking-widest transition-colors ${isGeneratingRecipe ? 'border-gray-700 text-gray-500' : 'border-violet-300/50 text-violet-200 hover:bg-violet-300 hover:text-black'}`}
           >
             {isGeneratingRecipe ? 'Genera...' : 'Genera Ricetta'}
           </button>
@@ -5111,6 +5307,7 @@ const SystemHub = ({ systemLogs, setSystemLogs, dailyGoal, setDailyGoal, hydrati
             {generatedRecipe.notes ? <p className="text-[9px] text-gray-400 mt-1">{generatedRecipe.notes}</p> : null}
           </div>
         ) : null}
+        </div>
       </motion.div>
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} whileHover={{ y: -2, scale: 1.005 }} transition={{ delay: 0.0832 }} className="bg-black/40 border border-fuchsia-300/30 p-5 rounded-sm mb-6">
         <div className="flex items-center justify-between mb-2">
@@ -6771,6 +6968,7 @@ const SystemHub = ({ systemLogs, setSystemLogs, dailyGoal, setDailyGoal, hydrati
         </div>
       </motion.div>
 
+      {showAdvanced ? (
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} whileHover={{ y: -2, scale: 1.005 }} transition={{ delay: 0.083 }} className="bg-black/40 border border-indigo-300/30 p-5 rounded-sm mb-6">
         <p className="text-indigo-200 text-[10px] uppercase tracking-widest mb-2">Electrolytes + Weekly Body Trend</p>
         <div className="grid grid-cols-3 gap-2 text-center mb-2">
@@ -6796,7 +6994,9 @@ const SystemHub = ({ systemLogs, setSystemLogs, dailyGoal, setDailyGoal, hydrati
           )) : <p className="text-[10px] text-emerald-200">Nessun alert nutrizionale critico questa settimana.</p>}
         </div>
       </motion.div>
+      ) : null}
 
+      {showAdvanced ? (
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} whileHover={{ y: -2, scale: 1.005 }} transition={{ delay: 0.0835 }} className="bg-black/40 border border-cyan-300/30 p-5 rounded-sm mb-6">
         <div className="flex items-center justify-between mb-2">
           <p className="text-cyan-200 text-[10px] uppercase tracking-widest">Goal Forecast 2 / 4 / 8 settimane</p>
@@ -6817,7 +7017,9 @@ const SystemHub = ({ systemLogs, setSystemLogs, dailyGoal, setDailyGoal, hydrati
           ))}
         </div>
       </motion.div>
+      ) : null}
 
+      {showAdvanced ? (
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} whileHover={{ y: -2, scale: 1.005 }} transition={{ delay: 0.084 }} className="bg-black/40 border border-emerald-300/30 p-5 rounded-sm mb-6">
         <div className="flex items-center justify-between mb-2">
           <p className="text-emerald-200 text-[10px] uppercase tracking-widest">Target Micronutrienti + Semaforo</p>
@@ -6862,7 +7064,9 @@ const SystemHub = ({ systemLogs, setSystemLogs, dailyGoal, setDailyGoal, hydrati
           <div className="border border-white/10 bg-white/5 p-2"><p className={`text-sm font-black ${semaforoClass(weeklySemaforo.omega3)}`}>Omega-3</p><p className="text-[9px] text-gray-400">{avgOmega37d} / {microTargets.omega3Min} mg</p></div>
         </div>
       </motion.div>
+      ) : null}
 
+      {showAdvanced ? (
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} whileHover={{ y: -2, scale: 1.005 }} transition={{ delay: 0.085 }} className="bg-black/40 border border-rose-300/30 p-5 rounded-sm mb-6">
         <p className="text-rose-200 text-[10px] uppercase tracking-widest mb-2">Readiness Test (30s)</p>
         <div className="grid grid-cols-2 gap-2 mb-3">
@@ -6888,6 +7092,7 @@ const SystemHub = ({ systemLogs, setSystemLogs, dailyGoal, setDailyGoal, hydrati
           Salva Readiness
         </button>
       </motion.div>
+      ) : null}
 
       {showAdvanced ? (
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} whileHover={{ y: -2, scale: 1.005 }} transition={{ delay: 0.09 }} className="relative overflow-hidden bg-gradient-to-br from-emerald-500/10 via-black/70 to-cyan-500/10 border border-emerald-300/35 p-5 rounded-xl mb-6 shadow-[0_0_24px_rgba(16,185,129,0.12)]">

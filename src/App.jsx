@@ -1239,16 +1239,6 @@ useEffect(() => { localStorage.setItem('shadow_monarch_macros', JSON.stringify(m
           {aiStatusDetail}
         </div>
       ) : null}
-      <div className="absolute top-16 left-2 z-[80] max-w-[240px] border border-cyan-300/35 bg-black/70 p-2 backdrop-blur-md">
-        <p className="text-[9px] uppercase tracking-widest text-cyan-200">{nextAction.title}</p>
-        <p className="text-[10px] text-cyan-100 mt-1">{nextAction.text}</p>
-        <button
-          onClick={() => handleTabChange(nextAction.page)}
-          className="mt-2 text-[9px] px-2 py-1 border border-cyan-300/40 text-cyan-100 hover:bg-cyan-300 hover:text-black"
-        >
-          Vai ora
-        </button>
-      </div>
       {contextualReminder ? (
         <div className="absolute top-10 right-2 z-[80] max-w-[230px] border border-amber-300/40 bg-black/70 p-2 backdrop-blur-md">
           <p className="text-[9px] uppercase tracking-widest text-amber-200">{contextualReminder.title}</p>
