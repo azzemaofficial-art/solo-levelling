@@ -1774,31 +1774,67 @@ useEffect(() => { localStorage.setItem('shadow_monarch_macros', JSON.stringify(m
       {/* BARRA NAVIGAZIONE — 4 tab principali */}
       <nav className="game-nav premium-nav w-full max-w-[390px] h-20 bg-black/95 backdrop-blur-xl border-t border-white/[0.06] flex justify-around items-center z-50 shrink-0 relative">
         {[
-          { id: 'system',   label: 'System', Icon: Zap,         hex: '#38bdf8', glow: 'rgba(56,189,248,0.55)'   },
-          { id: 'training', label: 'Train',  Icon: Swords,      hex: '#f87171', glow: 'rgba(248,113,113,0.55)'  },
-          { id: 'coach',    label: 'Coach',  Icon: BrainCircuit, hex: '#818cf8', glow: 'rgba(129,140,248,0.55)' },
-          { id: 'stats',    label: 'Stats',  Icon: Activity,    hex: '#a78bfa', glow: 'rgba(167,139,250,0.55)'  },
+          { id: 'system',   label: 'System', Icon: Zap,          hex: '#38bdf8', glow: 'rgba(56,189,248,0.6)'   },
+          { id: 'training', label: 'Train',  Icon: Swords,       hex: '#f87171', glow: 'rgba(248,113,113,0.6)'  },
+          { id: 'coach',    label: 'Coach',  Icon: BrainCircuit, hex: '#818cf8', glow: 'rgba(129,140,248,0.6)'  },
+          { id: 'stats',    label: 'Stats',  Icon: Activity,     hex: '#a78bfa', glow: 'rgba(167,139,250,0.6)'  },
         ].map(({ id, label, Icon, hex, glow }) => {
           const active = activePage === id;
           return (
-            <button key={id} aria-label={`Apri pagina ${label}`} onClick={() => handleTabChange(id)}
-              className="relative flex flex-col items-center gap-1.5 px-5 py-2 transition-all duration-200"
-              style={{ color: active ? hex : 'rgba(255,255,255,0.22)' }}>
-              {/* active indicator line */}
+            <motion.button key={id} aria-label={`Apri pagina ${label}`} onClick={() => handleTabChange(id)}
+              className="relative flex flex-col items-center gap-1.5 px-5 py-2"
+              whileTap={{ scale: 0.76 }}
+              transition={{ type: 'spring', stiffness: 700, damping: 30 }}>
+
+              {/* sliding background pill — layoutId shared across all tabs */}
               {active && (
-                <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-[2px] rounded-full"
-                  style={{ background: `linear-gradient(90deg, transparent, ${hex}, transparent)` }} />
+                <motion.div layoutId="navPill" className="absolute inset-x-1 inset-y-0 rounded-2xl"
+                  style={{ background: `radial-gradient(ellipse 80% 60% at 50% 20%, ${hex}1a, transparent 80%)` }}
+                  transition={{ type: 'spring', stiffness: 450, damping: 35 }} />
               )}
-              <Icon
-                size={22}
-                strokeWidth={active ? 2 : 1.4}
-                style={{ filter: active ? `drop-shadow(0 0 7px ${glow})` : 'none', transition: 'filter 0.2s, stroke-width 0.2s' }}
-              />
-              <span className="text-[9px] font-bold tracking-widest uppercase system-font"
+
+              {/* sliding top indicator line */}
+              {active && (
+                <motion.span layoutId="navLine"
+                  className="absolute top-0 left-1/2 -translate-x-1/2 h-[2px] rounded-full"
+                  style={{ width: 32, background: `linear-gradient(90deg, transparent, ${hex}, transparent)`,
+                           boxShadow: `0 0 8px 1px ${hex}99` }}
+                  transition={{ type: 'spring', stiffness: 450, damping: 35 }} />
+              )}
+
+              {/* burst ring on activation */}
+              <AnimatePresence>
+                {active && (
+                  <motion.span key={`burst-${id}`}
+                    className="absolute inset-0 rounded-2xl pointer-events-none"
+                    style={{ border: `1px solid ${hex}` }}
+                    initial={{ opacity: 0.7, scale: 0.7 }}
+                    animate={{ opacity: 0, scale: 1.6 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.45, ease: 'easeOut' }} />
+                )}
+              </AnimatePresence>
+
+              {/* icon */}
+              <motion.div
+                animate={{ scale: active ? 1.22 : 1, y: active ? -2 : 0 }}
+                transition={{ type: 'spring', stiffness: 550, damping: 22 }}
+                style={{
+                  color: active ? hex : 'rgba(255,255,255,0.2)',
+                  filter: active ? `drop-shadow(0 0 9px ${glow})` : 'none',
+                }}>
+                <Icon size={22} strokeWidth={active ? 2.2 : 1.4} />
+              </motion.div>
+
+              {/* label */}
+              <motion.span
+                className="text-[9px] font-bold tracking-widest uppercase system-font relative z-10"
+                animate={{ color: active ? hex : 'rgba(255,255,255,0.2)' }}
+                transition={{ duration: 0.18 }}
                 style={{ letterSpacing: '0.12em' }}>
                 {label}
-              </span>
-            </button>
+              </motion.span>
+            </motion.button>
           );
         })}
       </nav>
