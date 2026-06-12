@@ -77,8 +77,8 @@ async function sendTelegramMessage(token, chatId, text) {
 }
 
 export default async function handler(req, res) {
-  const botToken = process.env.TELEGRAM_BOT_TOKEN;
-  const chatId = process.env.TELEGRAM_CHAT_ID;
+  const botToken = process.env.SHADOW_BOT_TOKEN;
+  const chatId = process.env.SHADOW_BOT_CHAT_ID;
 
   if (!botToken) return res.status(500).json({ error: 'TELEGRAM_BOT_TOKEN mancante' });
 
