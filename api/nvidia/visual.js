@@ -1,8 +1,8 @@
-// NVIDIA NIM visual live coach — Llama Vision 90B primary
+// NVIDIA NIM visual live coach — Llama Vision 90B primary, Groq fallback
 // Discipline: muaythai, boxing, kickboxing, bjj, wrestling, karate, mma, kravmaga, general, fitness
-// Session types: solo | sparring (2 persone)
 
 const NVIDIA_BASE = 'https://integrate.api.nvidia.com/v1';
+const GROQ_BASE = 'https://api.groq.com/openai/v1';
 
 const BASE_SOLO = `Il tuo compito è GUIDARE l'allenamento attivamente, non solo analizzare.
 STRUTTURA RISPOSTA:
@@ -24,7 +24,6 @@ STRUTTURA RISPOSTA:
 Rispondi in italiano. Max 6 righe. Sii preciso come un arbitro professionista.`;
 
 const SYSTEM_PROMPTS = {
-  // ── DISCIPLINE SINGOLO ──────────────────────────────────────────────────────
   muaythai: `Sei un Kru di Muay Thai AI in sessione live.
 Conosci: guardia, jab/cross/gancio/uppercut, teep, low/mid/high kick, ginocchiate, gomitate, clinch, sweeps.
 ${BASE_SOLO}
@@ -75,7 +74,6 @@ Conosci: nage-waza (proiezioni), ne-waza (lavoro a terra), kumi-kata (grips), ku
 ${BASE_SOLO}
 Focus Judo: kuzushi (sbilancio avversario), posizione dei piedi nelle proiezioni, kake (esecuzione).`,
 
-  // ── SPARRING (2 persone) ─────────────────────────────────────────────────────
   sparring_muaythai: `Sei un arbitro e coach di Muay Thai AI. Ci sono due atleti nel frame.
 ${BASE_SPARRING}
 Regole Muay Thai: punti per teep, calci, ginocchiate, gomitate pulite. Detrazioni per clinch passivo.`,
@@ -92,7 +90,6 @@ Regole MMA: punti per striking efficace, takedown, controllo a terra, submission
 ${BASE_SPARRING}
 Valuta tecniche pulite, controllo, difesa e aggressività in modo equilibrato.`,
 
-  // ── PARTNER DRILLS (esercizi di coppia senza sparring) ───────────────────────
   partner_drills: `Sei un coach AI specializzato in esercizi di coppia per arti marziali.
 Vedi due atleti nel frame che stanno lavorando insieme (non sparring).
 STRUTTURA RISPOSTA:
@@ -103,7 +100,6 @@ STRUTTURA RISPOSTA:
 5. ➡️ **Prossimo drill di coppia**: proponi il drill successivo con istruzioni precise per entrambi
 Rispondi in italiano. Max 6 righe.`,
 
-  // ── FITNESS E GENERALE ───────────────────────────────────────────────────────
   fitness: `Sei un personal trainer visivo AI in tempo reale.
 ${BASE_SOLO.replace('bordo.', 'fianco.')}
 Focus: forma, range of motion, sicurezza articolare, progressione.`,
@@ -113,29 +109,50 @@ GUIDA attivamente: di' cosa vedi, cosa fare adesso (con reps), 1 correzione se n
 Rispondi in italiano, max 4 righe, tono diretto.`,
 };
 
-async function callVision(apiKey, model, imageBase64, mimeType, systemPrompt, userPrompt) {
+async function callVisionNvidia(apiKey, model, imageBase64, mimeType, systemPrompt, userPrompt) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 25000);
   const imageUrl = `data:${mimeType};base64,${imageBase64}`;
-
   try {
     const res = await fetch(`${NVIDIA_BASE}/chat/completions`, {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
+      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model,
         messages: [
           { role: 'system', content: systemPrompt },
-          {
-            role: 'user',
-            content: [
-              { type: 'image_url', image_url: { url: imageUrl } },
-              { type: 'text', text: userPrompt || 'Analizza questo frame e guida la sessione.' },
-            ],
-          },
+          { role: 'user', content: [
+            { type: 'image_url', image_url: { url: imageUrl } },
+            { type: 'text', text: userPrompt || 'Analizza questo frame e guida la sessione.' },
+          ]},
+        ],
+        max_tokens: 500,
+        temperature: 0.4,
+      }),
+      signal: controller.signal,
+    });
+    const data = await res.json();
+    return { ok: res.ok, status: res.status, data };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function callVisionGroq(apiKey, imageBase64, mimeType, systemPrompt, userPrompt) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 20000);
+  const imageUrl = `data:${mimeType};base64,${imageBase64}`;
+  try {
+    const res = await fetch(`${GROQ_BASE}/chat/completions`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'llama-3.2-90b-vision-preview',
+        messages: [
+          { role: 'user', content: [
+            { type: 'image_url', image_url: { url: imageUrl } },
+            { type: 'text', text: `${systemPrompt}\n\n${userPrompt || 'Analizza questo frame e guida la sessione.'}` },
+          ]},
         ],
         max_tokens: 500,
         temperature: 0.4,
@@ -155,7 +172,7 @@ export default async function handler(req, res) {
       ok: true,
       endpoint: '/api/nvidia/visual',
       disciplines: Object.keys(SYSTEM_PROMPTS),
-      primaryModel: 'meta/llama-3.2-90b-vision-instruct',
+      primaryModel: 'llama-3.2-90b-vision-preview (Groq) + NVIDIA fallback',
     });
   }
 
@@ -164,51 +181,42 @@ export default async function handler(req, res) {
   }
 
   const { imageBase64, mimeType = 'image/jpeg', prompt, mode = 'muaythai' } = req.body || {};
-  if (!imageBase64) {
-    return res.status(400).json({ error: 'imageBase64 obbligatorio' });
-  }
+  if (!imageBase64) return res.status(400).json({ error: 'imageBase64 obbligatorio' });
 
   const systemPrompt = SYSTEM_PROMPTS[mode] || SYSTEM_PROMPTS.general;
 
-  const providers = [
-    {
-      key: process.env.MISTRAL_SMALL4_NVIDIA_API_KEY,
-      model: process.env.LLAMA_VISION90B_NVIDIA_MODEL || 'meta/llama-3.2-90b-vision-instruct',
-      name: 'llama-vision-90b',
-    },
-    {
-      key: process.env.PHI4_NVIDIA_API_KEY,
-      model: process.env.PHI4_NVIDIA_MODEL || 'microsoft/phi-4-multimodal-instruct',
-      name: 'phi4-multimodal',
-    },
-    {
-      key: process.env.COSMOS3_NVIDIA_API_KEY,
-      model: process.env.COSMOS3_NVIDIA_MODEL || 'nvidia/cosmos3-nano-reasoner',
-      name: 'cosmos3',
-    },
-    {
-      key: process.env.NVIDIA_API_KEY,
-      model: process.env.NVIDIA_MODEL || 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning',
-      name: 'nemotron-omni',
-    },
-  ];
-
-  for (const p of providers) {
-    if (!p.key) continue;
+  // 1. Groq primary (free, generous limits, llama-3.2-90b-vision)
+  const groqKey = process.env.GROQ_API_KEY;
+  if (groqKey) {
     try {
-      const { ok, data } = await callVision(p.key, p.model, imageBase64, mimeType, systemPrompt, prompt);
+      const { ok, data } = await callVisionGroq(groqKey, imageBase64, mimeType, systemPrompt, prompt);
       if (ok && data?.choices?.[0]?.message?.content) {
-        res.setHeader('X-Visual-Provider', p.name);
+        res.setHeader('X-Visual-Provider', 'groq-llama-90b-vision');
         res.setHeader('X-Visual-Mode', mode);
-        return res.status(200).json({
-          content: data.choices[0].message.content,
-          provider: p.name,
-          model: p.model,
-          mode,
-        });
+        return res.status(200).json({ content: data.choices[0].message.content, provider: 'groq-llama-90b-vision', mode });
       }
     } catch (_) {}
   }
 
-  return res.status(503).json({ error: 'Visual AI non disponibile.' });
+  // 2. NVIDIA fallback chain
+  const nvidiaProviders = [
+    { key: process.env.MISTRAL_SMALL4_NVIDIA_API_KEY, model: process.env.LLAMA_VISION90B_NVIDIA_MODEL || 'meta/llama-3.2-90b-vision-instruct', name: 'llama-vision-90b' },
+    { key: process.env.PHI4_NVIDIA_API_KEY, model: process.env.PHI4_NVIDIA_MODEL || 'microsoft/phi-4-multimodal-instruct', name: 'phi4-multimodal' },
+    { key: process.env.COSMOS3_NVIDIA_API_KEY, model: process.env.COSMOS3_NVIDIA_MODEL || 'nvidia/cosmos3-nano-reasoner', name: 'cosmos3' },
+    { key: process.env.NVIDIA_API_KEY, model: process.env.NVIDIA_MODEL || 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning', name: 'nemotron-omni' },
+  ];
+
+  for (const p of nvidiaProviders) {
+    if (!p.key) continue;
+    try {
+      const { ok, data } = await callVisionNvidia(p.key, p.model, imageBase64, mimeType, systemPrompt, prompt);
+      if (ok && data?.choices?.[0]?.message?.content) {
+        res.setHeader('X-Visual-Provider', p.name);
+        res.setHeader('X-Visual-Mode', mode);
+        return res.status(200).json({ content: data.choices[0].message.content, provider: p.name, model: p.model, mode });
+      }
+    } catch (_) {}
+  }
+
+  return res.status(503).json({ error: 'Visual AI non disponibile. Controlla crediti API.' });
 }

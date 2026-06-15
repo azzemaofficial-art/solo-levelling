@@ -1,59 +1,62 @@
-// Telegram Webhook — riceve messaggi, analizza con Nemotron, risponde
-// Setup: GET /api/telegram/webhook?setup=1 per registrare il webhook su Telegram
+// Telegram Webhook — riceve messaggi, analizza con Nemotron 550B, risponde + deep link al sito
+// Setup: GET /api/telegram/webhook?setup=1
 
 const NVIDIA_BASE = 'https://integrate.api.nvidia.com/v1';
+const SITE_URL = 'https://solo-levelling-gold.vercel.app';
 
-const NEMOTRON_PROVIDERS = [
-  {
-    key: () => process.env.KIMI_NVIDIA_API_KEY,
-    model: 'moonshotai/kimi-k2.6',
-  },
-  {
-    key: () => process.env.MISTRAL_SMALL4_NVIDIA_API_KEY,
-    model: 'mistralai/mistral-large-3-675b-instruct-2512',
-  },
-  {
-    key: () => process.env.NEMOTRON_SUPER_API_KEY,
-    model: 'nvidia/nemotron-3-super-120b-a12b',
-  },
-  {
-    key: () => process.env.MISTRAL_SMALL4_NVIDIA_API_KEY,
-    model: 'mistralai/mistral-small-4-119b-2603',
-  },
-  {
-    key: () => process.env.NVIDIA_API_KEY,
-    model: 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning',
-  },
+// Provider chain: 550B per task complessi, cascata su modelli veloci
+const PROVIDERS = [
+  { key: () => process.env.NVIDIA_550B_API_KEY, model: 'nvidia/nemotron-3-ultra-550b-a55b', fast: false },
+  { key: () => process.env.KIMI_NVIDIA_API_KEY, model: 'moonshotai/kimi-k2.6', fast: true },
+  { key: () => process.env.MISTRAL_SMALL4_NVIDIA_API_KEY, model: 'mistralai/mistral-large-3-675b-instruct-2512', fast: true },
+  { key: () => process.env.NEMOTRON_SUPER_API_KEY, model: 'nvidia/nemotron-3-super-120b-a12b', fast: true },
+  { key: () => process.env.MISTRAL_MEDIUM3_NVIDIA_API_KEY, model: 'mistralai/mistral-medium-3-instruct', fast: true },
+  { key: () => process.env.NVIDIA_API_KEY, model: 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning', fast: true },
 ];
 
-const SYSTEM_PROMPT = `Sei Nemotron, il coach AI del Shadow Hunter System. Analizzi messaggi dell'utente su workout e pasti.
+const SYSTEM_PROMPT = `Sei Nemotron 550B, il coach AI del Shadow Hunter System.
 
 Quando l'utente descrive un WORKOUT:
-1. Stima le kcal bruciate (range realistico)
-2. Valuta l'intensità (1-10)
-3. Dai 1-2 consigli recovery/nutrizione post-workout
-4. Rispondi in formato: "⚡ Workout analizzato!\n💪 Burn stimato: X-Y kcal\n🔥 Intensità: Z/10\n💊 Post-workout: [consiglio]"
+Analizza e rispondi con questo JSON esatto (nessun testo fuori dal JSON):
+{
+  "type": "workout",
+  "text": "⚡ Workout analizzato!\\n💪 Burn stimato: X-Y kcal\\n🔥 Intensità: Z/10\\n💊 Post-workout: [consiglio recovery in 1 riga]",
+  "burn": <numero intero medio stimato>,
+  "intensity": <1-10>,
+  "name": "<descrizione breve del workout>"
+}
 
 Quando l'utente descrive un PASTO:
-1. Stima kcal e macro principali (proteine/carbs/grassi)
-2. Valuta qualità nutrizionale
-3. Dai 1 suggerimento miglioramento
-4. Rispondi in formato: "🍽️ Pasto analizzato!\n📊 Stima: ~X kcal | P:Xg C:Xg G:Xg\n✅ Qualità: [valutazione]\n💡 Suggerimento: [consiglio]"
+Analizza e rispondi con questo JSON esatto:
+{
+  "type": "meal",
+  "text": "🍽️ Pasto analizzato!\\n📊 Stima: ~X kcal | P:Xg C:Xg G:Xg\\n✅ Qualità: [valutazione in 3 parole]\\n💡 Suggerimento: [1 miglioramento]",
+  "kcal": <numero intero>,
+  "protein": <numero intero>,
+  "carbs": <numero intero>,
+  "fat": <numero intero>,
+  "name": "<nome del pasto>"
+}
 
-Per altri messaggi: rispondi come coach fitness esperto, max 150 parole.
-Rispondi SEMPRE in italiano.`;
+Per /integratori o altri comandi: rispondi con JSON { "type": "info", "text": "..." }
 
-async function callNemotron(messages) {
-  for (const provider of NEMOTRON_PROVIDERS) {
+IMPORTANTE: rispondi SOLO con JSON valido. Nessun testo prima o dopo. Sempre in italiano.`;
+
+async function callAI(messages, fast = false) {
+  const providers = fast
+    ? PROVIDERS.filter((p) => p.fast)
+    : PROVIDERS;
+
+  for (const provider of providers) {
     const apiKey = provider.key();
     if (!apiKey) continue;
     try {
       const ctrl = new AbortController();
-      const t = setTimeout(() => ctrl.abort(), 22000);
+      const t = setTimeout(() => ctrl.abort(), 28000);
       const res = await fetch(`${NVIDIA_BASE}/chat/completions`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: provider.model, messages, max_tokens: 280, temperature: 0.2 }),
+        body: JSON.stringify({ model: provider.model, messages, max_tokens: 400, temperature: 0.15 }),
         signal: ctrl.signal,
       });
       clearTimeout(t);
@@ -65,14 +68,47 @@ async function callNemotron(messages) {
       continue;
     }
   }
-  return 'Errore analisi AI. Riprova tra poco.';
+  return null;
 }
 
-async function sendTelegramMessage(token, chatId, text) {
+function isSimpleQuery(text) {
+  const words = text.trim().split(/\s+/).length;
+  return words < 15;
+}
+
+function parseAIResponse(raw) {
+  if (!raw) return null;
+  const jsonMatch = raw.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) return null;
+  try { return JSON.parse(jsonMatch[0]); } catch { return null; }
+}
+
+function buildDeepLink(parsed) {
+  if (!parsed || parsed.type === 'info') return null;
+  try {
+    const payload = { type: parsed.type, ts: Date.now() };
+    if (parsed.type === 'meal') {
+      payload.kcal = parsed.kcal || 0;
+      payload.protein = parsed.protein || 0;
+      payload.carbs = parsed.carbs || 0;
+      payload.fat = parsed.fat || 0;
+      payload.name = parsed.name || 'Pasto';
+    } else if (parsed.type === 'workout') {
+      payload.burn = parsed.burn || 0;
+      payload.name = parsed.name || 'Workout';
+    }
+    const encoded = Buffer.from(JSON.stringify(payload)).toString('base64');
+    return `${SITE_URL}?tg_import=${encoded}`;
+  } catch { return null; }
+}
+
+async function sendTelegramMessage(token, chatId, text, replyMarkup) {
+  const body = { chat_id: chatId, text, parse_mode: 'HTML' };
+  if (replyMarkup) body.reply_markup = replyMarkup;
   await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ chat_id: chatId, text, parse_mode: 'HTML' }),
+    body: JSON.stringify(body),
   });
 }
 
@@ -80,11 +116,10 @@ export default async function handler(req, res) {
   const botToken = process.env.SHADOW_BOT_TOKEN;
   const chatId = process.env.SHADOW_BOT_CHAT_ID;
 
-  if (!botToken) return res.status(500).json({ error: 'TELEGRAM_BOT_TOKEN mancante' });
+  if (!botToken) return res.status(500).json({ error: 'SHADOW_BOT_TOKEN mancante' });
 
-  // Setup webhook via GET ?setup=1
   if (req.method === 'GET' && req.query?.setup === '1') {
-    const webhookUrl = `https://solo-levelling-gold.vercel.app/api/telegram/webhook`;
+    const webhookUrl = `${SITE_URL}/api/telegram/webhook`;
     const r = await fetch(`https://api.telegram.org/bot${botToken}/setWebhook?url=${encodeURIComponent(webhookUrl)}`);
     const d = await r.json();
     return res.status(200).json({ ok: d.ok, description: d.description, webhookUrl });
@@ -99,7 +134,6 @@ export default async function handler(req, res) {
   const incomingChatId = message.chat?.id;
   const text = String(message.text || '').trim();
 
-  // Permetti solo dal chatId configurato (sicurezza base)
   if (chatId && String(incomingChatId) !== String(chatId)) {
     return res.status(200).json({ ok: true });
   }
@@ -107,41 +141,56 @@ export default async function handler(req, res) {
   // Comandi speciali
   if (text === '/start' || text === '/help') {
     await sendTelegramMessage(botToken, incomingChatId,
-      '⚡ <b>Shadow Monarch Bot</b>\n\n' +
-      'Posso analizzare i tuoi:\n' +
-      '🏋️ <b>Workout</b> — descrivimi l\'allenamento\n' +
-      '🍽️ <b>Pasti</b> — descrivimi cosa hai mangiato\n' +
-      '💊 /integratori — lista integratori di oggi\n' +
-      '📊 /status — stato giornaliero\n\n' +
-      'Esempio: "Ho fatto 60 min palestra, squat 100kg x5, bench 80kg x8"\n' +
-      'Esempio: "Pranzo: pollo 200g, riso 100g, insalata"'
+      '⚡ <b>Shadow Monarch Bot</b> — Nemotron 550B\n\n' +
+      'Dimmi cosa hai mangiato o che allenamento hai fatto:\n\n' +
+      '🏋️ <b>Workout</b> — es: "60 min palestra, squat 100kg×5, bench 80kg×8"\n' +
+      '🍽️ <b>Pasto</b> — es: "Pranzo: pollo 200g, riso 100g cotto, insalata"\n' +
+      '💊 /integratori — lista integratori consigliati\n\n' +
+      'Dopo l\'analisi ti mando un link per importare i dati nel sito 📲'
     );
     return res.status(200).json({ ok: true });
   }
 
   if (text === '/integratori') {
     const reply = '💊 <b>Integratori consigliati oggi</b>\n\n' +
-      '🔵 Creatina monoidrato — 5g ogni giorno\n' +
-      '🟡 Omega-3 (EPA+DHA) — 1000-2000mg a pranzo\n' +
-      '🟣 Magnesio — 200-350mg la sera\n' +
-      '🟢 Vitamina D3 — 1000-2000 IU a colazione\n' +
-      '⚪ Proteine whey — 25-35g post-workout\n' +
-      '🔴 Elettroliti — pre/durante/post workout\n\n' +
-      '<i>Basato sul tuo profilo recomp + allenamento frequente</i>';
+      '🌅 <b>Mattino (colazione)</b>\n' +
+      '☀️ Vitamina D3 — 2000 IU\n🔵 Creatina monoidrato — 5g\n⚪ Multivitaminico — 1 cps\n🟤 Probiotico — 1 cps a stomaco vuoto\n\n' +
+      '⚡ <b>Pre-workout</b>\n' +
+      '🔵 Creatina — 3-5g (se non presa mattino)\n🔴 Elettroliti — 1 serving\n🟠 Caffeina — 100-200mg (opzionale)\n\n' +
+      '💪 <b>Post-workout</b>\n' +
+      '🥛 Whey Protein — 25-35g entro 30 min\n🔴 Elettroliti — recupero\n\n' +
+      '🌙 <b>Sera</b>\n' +
+      '🟡 Omega-3 — 2g EPA+DHA con cena\n🟣 Magnesio glicin. — 300mg per il sonno\n🌙 Caseina — 25-30g opzionale pre-sonno\n\n' +
+      '<i>Profilo: recomp, allenamento frequente.</i>';
     await sendTelegramMessage(botToken, incomingChatId, reply);
     return res.status(200).json({ ok: true });
   }
 
-  // Analisi AI per tutto il resto
-  try {
-    const aiReply = await callNemotron([
-      { role: 'system', content: SYSTEM_PROMPT },
-      { role: 'user', content: text }
-    ]);
-    await sendTelegramMessage(botToken, incomingChatId, aiReply);
-  } catch (_) {
-    await sendTelegramMessage(botToken, incomingChatId, '⚠️ Errore analisi. Riprova.');
+  // Analisi AI
+  const useFast = isSimpleQuery(text);
+  const raw = await callAI([
+    { role: 'system', content: SYSTEM_PROMPT },
+    { role: 'user', content: text },
+  ], useFast);
+
+  if (!raw) {
+    await sendTelegramMessage(botToken, incomingChatId, '⚠️ Errore analisi AI. Riprova tra poco.');
+    return res.status(200).json({ ok: true });
   }
 
+  const parsed = parseAIResponse(raw);
+  const replyText = parsed?.text || raw;
+  const deepLink = buildDeepLink(parsed);
+
+  let replyMarkup = null;
+  if (deepLink) {
+    replyMarkup = {
+      inline_keyboard: [[
+        { text: '📲 Importa nel diario', url: deepLink },
+      ]],
+    };
+  }
+
+  await sendTelegramMessage(botToken, incomingChatId, replyText, replyMarkup);
   return res.status(200).json({ ok: true });
 }

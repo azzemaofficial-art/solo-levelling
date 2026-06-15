@@ -5,7 +5,7 @@ import { playSfx } from './utils/sfx';
 import { formatAiErrorDetail, requestSystemAI, subscribeAiStatus } from './utils/aiClient';
 import { runStorageMigrations } from './utils/storageMigrations';
 import { useFxCombo } from './hooks/useFxCombo';
-import { subscribeUiToast } from './utils/uiEvents';
+import { subscribeUiToast, emitUiToast } from './utils/uiEvents';
 import { cloudPush, getCloudSession, refreshCloudSession } from './utils/cloudSync';
 import { fetchTelegramLogs } from './utils/personalAgentSync';
 
@@ -359,6 +359,46 @@ useEffect(() => { localStorage.setItem('shadow_monarch_macros', JSON.stringify(m
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
+
+  // Importa dati da Telegram via deep link ?tg_import=<base64>
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const raw = params.get('tg_import');
+    if (!raw) return;
+    try {
+      const payload = JSON.parse(atob(raw));
+      const key = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit' });
+      setSystemLogs((prev) => {
+        const idx = prev.findIndex((l) => l.date === key);
+        const base = idx >= 0 ? prev[idx] : { date: key, consumed: 0, protein: 0, carbs: 0, fatMacros: 0, workoutBurn: 0, burned: 0, waterMl: 0 };
+        let patch = {};
+        if (payload.type === 'meal') {
+          patch = {
+            consumed: Number(base.consumed || 0) + Number(payload.kcal || 0),
+            protein: Number(base.protein || 0) + Number(payload.protein || 0),
+            carbs: Number(base.carbs || 0) + Number(payload.carbs || 0),
+            fatMacros: Number(base.fatMacros || 0) + Number(payload.fat || 0),
+          };
+        } else if (payload.type === 'workout') {
+          const burn = Number(base.workoutBurn ?? base.burned ?? 0) + Number(payload.burn || 0);
+          patch = { workoutBurn: burn, burned: burn };
+        }
+        const updated = { ...base, ...patch };
+        const next = [...prev];
+        if (idx >= 0) { next[idx] = updated; } else { next.push(updated); }
+        return next;
+      });
+      const label = payload.type === 'meal'
+        ? `📲 ${payload.name || 'Pasto'}: +${payload.kcal || 0} kcal aggiunto al diario`
+        : `📲 ${payload.name || 'Workout'}: +${payload.burn || 0} kcal burn aggiunto`;
+      emitUiToast({ message: label, tone: 'success', durationMs: 5000 });
+      triggerFxBurst('success');
+      // Pulisce il param dall'URL senza ricaricare la pagina
+      const clean = window.location.pathname;
+      window.history.replaceState({}, '', clean);
+    } catch (_) {}
+  }, []);
+
   useEffect(() => {
     if (!tapPulseTick) return undefined;
     const timer = setTimeout(() => setTapPulseTick(0), 320);

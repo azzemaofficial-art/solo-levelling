@@ -1901,12 +1901,17 @@ const SystemHub = ({ systemLogs, setSystemLogs, dailyGoal, setDailyGoal, hydrati
     setShadowChatMessages((prev) => [...prev, userMsg]);
     setIsShadowChatLoading(true);
     const profileCtx = `Profilo Shadow Hunter: obiettivo=${playerStats.objective || 'recomp'}, livello=${playerStats.level || 1}, streak=${streak}. Oggi: kcal=${Math.round(Number(todayData.consumed || 0))}/${Math.round(effectiveDailyGoal || dailyGoal || 0)}, prot=${Math.round(Number(todayData.protein || 0))}g, burn=${Math.round(Number(todayData.workoutBurn ?? todayData.burned ?? 0))}kcal, h2o=${Math.round(Number(todayData.waterMl || 0))}ml. Integratori consigliati: ${dailySupplementCore?.map((s) => s.name).join(', ') || '--'}.`;
-    const systemPrompt = `Sei Nemotron, il coach AI del Shadow Hunter System. Sei un esperto di fitness, nutrizione, arti marziali e performance atletica. Rispondi in italiano, sii diretto e tecnico. Massimo 150 parole per risposta. ${profileCtx}`;
+    const isHeavy = text.length > 80 || /piano|analisi|completo|settimana|ottimizza|spiega|confronta|perché|strategia|programma/i.test(text);
+    const systemPrompt = `Sei Nemotron${isHeavy ? ' 550B' : ''}, il coach AI del Shadow Hunter System. Sei un esperto di fitness, nutrizione, arti marziali e performance atletica. Rispondi in italiano, sii diretto e tecnico. ${isHeavy ? 'Puoi rispondere in modo approfondito.' : 'Massimo 150 parole per risposta.'} ${profileCtx}`;
     try {
       const res = await fetch('/api/nvidia/coach', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: shadowChatMessages.concat(userMsg).map((m) => ({ role: m.role, content: m.content })), systemPrompt })
+        body: JSON.stringify({
+          messages: shadowChatMessages.concat(userMsg).map((m) => ({ role: m.role, content: m.content })),
+          systemPrompt,
+          tier: isHeavy ? 'max' : undefined,
+        })
       });
       const data = await res.json();
       const reply = data?.content || 'Errore risposta Nemotron.';
