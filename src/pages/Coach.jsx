@@ -779,7 +779,8 @@ function VisualCoach() {
 
   const speakCoach = useCallback((text) => {
     if (!voiceOn || !window.speechSynthesis) return;
-    window.speechSynthesis.cancel();
+    // Non cancellare se sta ancora parlando — aspetta la fine
+    if (window.speechSynthesis.speaking) return;
     const clean = text
       .replace(/\*\*/g, '').replace(/[*#_~`]/g, '')
       .replace(/[🥊📐➡️⚠️⭐👁🔴🔵🏆💪🎯]/gu, '')
@@ -1048,22 +1049,21 @@ function VisualCoach() {
         </motion.button>
       </div>
 
-      {/* Analysis result */}
-      <AnimatePresence>
-        {analysis && (
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-            className="p-4 rounded-2xl"
-            style={{ background: 'rgba(17,24,39,0.85)', border: `1px solid ${C.blue.border}`, backdropFilter: 'blur(12px)' }}>
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-1.5 h-1.5 rounded-full" style={{ background: C.blue.hex }} />
-              <p className="text-xs font-mono" style={{ color: C.blue.hex, opacity: 0.7 }}>
-                {analysis.provider || 'AI'} · {currentDisc?.label} · {analysis.time}
-              </p>
-            </div>
-            <p className="text-sm text-gray-200 leading-relaxed whitespace-pre-wrap">{analysis.content}</p>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Analysis result — sempre visibile, non esce mai finché la sessione è attiva */}
+      <div className="p-4 rounded-2xl min-h-[80px] transition-all duration-300"
+        style={{ background: 'rgba(17,24,39,0.85)', border: `1px solid ${analyzing ? C.violet.border : C.blue.border}`, backdropFilter: 'blur(12px)' }}>
+        <div className="flex items-center gap-2 mb-2">
+          {analyzing
+            ? <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: C.violet.hex }} />
+            : <div className="w-1.5 h-1.5 rounded-full" style={{ background: C.blue.hex }} />}
+          <p className="text-xs font-mono" style={{ color: analyzing ? C.violet.hex : C.blue.hex, opacity: 0.7 }}>
+            {analyzing ? 'Analisi in corso…' : `${analysis?.provider || 'AI'} · ${currentDisc?.label} · ${analysis?.time || ''}`}
+          </p>
+        </div>
+        <p className="text-sm text-gray-200 leading-relaxed whitespace-pre-wrap">
+          {analysis?.content || (analyzing ? '' : 'Premi Analizza o attiva Auto per iniziare.')}
+        </p>
+      </div>
     </div>
   );
 }
