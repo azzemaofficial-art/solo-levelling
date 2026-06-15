@@ -4,24 +4,17 @@
 const NVIDIA_BASE = 'https://integrate.api.nvidia.com/v1';
 const GROQ_BASE = 'https://api.groq.com/openai/v1';
 
-const BASE_SOLO = `Il tuo compito è GUIDARE l'allenamento attivamente, non solo analizzare.
-STRUTTURA RISPOSTA:
-1. 🥊 **Tecnica/Posizione vista**
-2. 📐 **Postura**: descrivi piedi, baricentro, guardia in 1 riga
-3. ➡️ **Prossima istruzione**: di' esattamente cosa fare (esercizio + reps)
-4. ⚠️ **Correzione** (solo se vedi un errore chiaro): 1 istruzione precisa
-5. ⭐ **Punteggio**: X/10
-Se l'atleta è fermo: proponi il prossimo drill con postura di partenza e reps.
-Rispondi in italiano. Max 5 righe. Tono da coach a bordo.`;
+const BASE_SOLO = `Sei un coach AI visivo in tempo reale. Rispondi SEMPRE così, max 3 righe:
+RIGA 1 — COMANDO: inizia con un verbo imperativo (es: "Abbassa la guardia", "Ruota il fianco", "Fai 10 jab veloci"). Di' esattamente cosa fare ORA.
+RIGA 2 — VISTO: descrivi in 5 parole cosa vedi nel frame (postura, posizione, tecnica).
+RIGA 3 — NON VISTO (se non riesci a valutare qualcosa): "Non vedo: [cosa]" — oppure ometti.
+Tono secco, da bordo ring. NO markdown, NO emoji. Solo testo parlato.`;
 
-const BASE_SPARRING = `Ci sono DUE atleti nel frame — sei l'arbitro e il coach di entrambi.
-STRUTTURA RISPOSTA:
-1. 👁 **Situazione**: descrivi brevemente la posizione relativa dei due (distanza, chi attacca)
-2. 🔴 **Atleta A** (sinistro o in primo piano): tecnica vista + 1 correzione o istruzione
-3. 🔵 **Atleta B** (destro o in secondo piano): tecnica vista + 1 correzione o istruzione
-4. 🏆 **Punto assegnato**: chi ha eseguito meglio l'ultimo scambio e perché (o "nessun punto")
-5. ➡️ **Prossimo esercizio di coppia**: proponi 1 drill da fare insieme con istruzioni precise
-Rispondi in italiano. Max 6 righe. Sii preciso come un arbitro professionista.`;
+const BASE_SPARRING = `Sei un arbitro AI in tempo reale. Due atleti nel frame. Max 3 righe:
+RIGA 1 — SITUAZIONE: chi attacca, distanza (una frase).
+RIGA 2 — ISTRUZIONE: un comando per uno dei due atleti ("Rosso: vai in clinch", "Blu: sprawl").
+RIGA 3 — PUNTO: "Punto Rosso" / "Punto Blu" / "Nessun punto".
+Tono da arbitro professionista. NO markdown, NO emoji.`;
 
 const SYSTEM_PROMPTS = {
   muaythai: `Sei un Kru di Muay Thai AI in sessione live.
@@ -126,7 +119,7 @@ async function callVisionNvidia(apiKey, model, imageBase64, mimeType, systemProm
             { type: 'text', text: userPrompt || 'Analizza questo frame e guida la sessione.' },
           ]},
         ],
-        max_tokens: 500,
+        max_tokens: 220,
         temperature: 0.4,
       }),
       signal: controller.signal,
@@ -154,7 +147,7 @@ async function callVisionGroq(apiKey, imageBase64, mimeType, systemPrompt, userP
             { type: 'text', text: `${systemPrompt}\n\n${userPrompt || 'Analizza questo frame e guida la sessione.'}` },
           ]},
         ],
-        max_tokens: 500,
+        max_tokens: 220,
         temperature: 0.4,
       }),
       signal: controller.signal,

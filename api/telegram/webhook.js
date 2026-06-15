@@ -97,7 +97,9 @@ function buildDeepLink(parsed) {
       payload.burn = parsed.burn || 0;
       payload.name = parsed.name || 'Workout';
     }
-    const encoded = Buffer.from(JSON.stringify(payload)).toString('base64');
+    // base64url: nessun +/=/ che rompono i query param
+    const encoded = Buffer.from(JSON.stringify(payload)).toString('base64')
+      .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
     return `${SITE_URL}?tg_import=${encoded}`;
   } catch { return null; }
 }

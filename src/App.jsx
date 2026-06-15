@@ -366,7 +366,9 @@ useEffect(() => { localStorage.setItem('shadow_monarch_macros', JSON.stringify(m
     const raw = params.get('tg_import');
     if (!raw) return;
     try {
-      const payload = JSON.parse(atob(raw));
+      // base64url → base64 standard prima di atob
+      const b64 = raw.replace(/-/g, '+').replace(/_/g, '/');
+      const payload = JSON.parse(atob(b64));
       const key = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit' });
       setSystemLogs((prev) => {
         const idx = prev.findIndex((l) => l.date === key);

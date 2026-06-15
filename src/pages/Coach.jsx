@@ -772,9 +772,28 @@ function VisualCoach() {
   const [roundDuration, setRoundDuration] = useState(180);
   const [score, setScore] = useState({ a: 0, b: 0 });
   const [lastPoint, setLastPoint] = useState(null);
+  const [voiceOn, setVoiceOn] = useState(false);
   const autoTimerRef = useRef(null);
   const streamRef = useRef(null);
   const sessionStartRef = useRef(null);
+
+  const speakCoach = useCallback((text) => {
+    if (!voiceOn || !window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+    const clean = text
+      .replace(/\*\*/g, '').replace(/[*#_~`]/g, '')
+      .replace(/[🥊📐➡️⚠️⭐👁🔴🔵🏆💪🎯]/gu, '')
+      .replace(/\n+/g, '. ')
+      .trim();
+    const utt = new SpeechSynthesisUtterance(clean);
+    utt.lang = 'it-IT';
+    utt.rate = 1.15;
+    utt.pitch = 1;
+    const voices = window.speechSynthesis.getVoices();
+    const itVoice = voices.find((v) => v.lang === 'it-IT' || v.lang.startsWith('it'));
+    if (itVoice) utt.voice = itVoice;
+    window.speechSynthesis.speak(utt);
+  }, [voiceOn]);
 
   const timer = useRoundTimer({ rounds, roundDuration, restDuration: 60 });
   const currentDisc = ALL_DISCIPLINES.find((d) => d.id === mode) || ALL_DISCIPLINES[0];
@@ -835,7 +854,7 @@ function VisualCoach() {
     const video = videoRef.current;
     canvas.width = video.videoWidth || 640; canvas.height = video.videoHeight || 480;
     canvas.getContext('2d').drawImage(video, 0, 0);
-    const base64 = canvas.toDataURL('image/jpeg', 0.85).split(',')[1];
+    const base64 = canvas.toDataURL('image/jpeg', 0.65).split(',')[1];
     setAnalyzing(true);
     try {
       const res = await fetch('/api/nvidia/visual', {
@@ -845,6 +864,7 @@ function VisualCoach() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Errore AI');
       setAnalysis({ content: data.content, provider: data.provider, time: new Date().toLocaleTimeString('it-IT') });
+      speakCoach(data.content);
       if (isSparring(mode) && data.content) {
         const point = parsePoint(data.content);
         if (point) {
@@ -856,12 +876,12 @@ function VisualCoach() {
     } catch (err) {
       setAnalysis({ content: '⚠️ ' + err.message, provider: null, time: new Date().toLocaleTimeString('it-IT') });
     } finally { setAnalyzing(false); }
-  }, [analyzing, mode, buildPrompt, currentDisc]);
+  }, [analyzing, mode, buildPrompt, currentDisc, speakCoach]);
 
   useEffect(() => {
     if (autoMode && streaming) {
       captureAndAnalyze();
-      autoTimerRef.current = setInterval(captureAndAnalyze, 6000);
+      autoTimerRef.current = setInterval(captureAndAnalyze, 4000);
     } else { clearInterval(autoTimerRef.current); }
     return () => clearInterval(autoTimerRef.current);
   }, [autoMode, streaming]);
@@ -1012,7 +1032,14 @@ function VisualCoach() {
           style={autoMode
             ? { background: `linear-gradient(135deg, ${C.orange.hex}, #b45309)`, boxShadow: `0 4px 14px ${C.orange.glow}` }
             : { background: 'rgba(55,65,81,0.5)', border: '1px solid rgba(255,255,255,0.06)' }}>
-          {autoMode ? '⏸ Stop' : '▶ Auto 6s'}
+          {autoMode ? '⏸ Stop' : '▶ Auto'}
+        </motion.button>
+        <motion.button whileTap={{ scale: 0.96 }} onClick={() => { setVoiceOn((v) => !v); if (voiceOn) window.speechSynthesis?.cancel(); }}
+          className="px-3 py-2.5 rounded-xl text-white font-black transition-all"
+          style={voiceOn
+            ? { background: 'linear-gradient(135deg, #059669, #047857)', boxShadow: '0 4px 14px rgba(5,150,105,0.4)' }
+            : { background: 'rgba(55,65,81,0.5)', border: '1px solid rgba(255,255,255,0.06)' }}>
+          🔊
         </motion.button>
         <motion.button whileTap={{ scale: 0.96 }} onClick={stopCamera}
           className="px-4 py-2.5 rounded-xl text-white font-black transition-all"

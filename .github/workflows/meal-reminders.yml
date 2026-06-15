@@ -1,0 +1,63 @@
+name: Meal Reminders Telegram
+
+on:
+  schedule:
+    # Orari in UTC. Italia = UTC+2 (CEST estate) / UTC+1 (CET inverno)
+    # Estate: -2h | Inverno: -1h
+    # 10:00 IT → 08:00 UTC
+    - cron: '0 8 * * *'
+    # 14:00 IT → 12:00 UTC
+    - cron: '0 12 * * *'
+    # 18:00 IT → 16:00 UTC
+    - cron: '0 16 * * *'
+    # 21:00 IT → 19:00 UTC
+    - cron: '0 19 * * *'
+    # 23:00 IT → 21:00 UTC
+    - cron: '0 21 * * *'
+  workflow_dispatch:
+    inputs:
+      slot:
+        description: 'Slot manuale (colazione/pranzo/spuntino/cena/serata)'
+        required: false
+        default: 'test'
+
+jobs:
+  remind:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Determine meal slot
+        id: slot
+        run: |
+          HOUR=$(date -u +%H)
+          case $HOUR in
+            08) SLOT="🌅 Colazione" ; MSG="Hai fatto colazione? Logga calorie, proteine e macro! 🥣" ;;
+            12) SLOT="☀️ Pranzo" ;    MSG="Ora di pranzo! Ricordati di loggare il pasto 🍽️" ;;
+            16) SLOT="🍎 Spuntino" ;  MSG="Spuntino pomeridiano? Logga quello che mangi 🥤" ;;
+            19) SLOT="🌙 Cena" ;      MSG="Cena time! Logga il pasto serale 🍲" ;;
+            21) SLOT="🌃 Fine giornata" ; MSG="Fine giornata — hai loggato tutto? Controlla i macro di oggi 📊" ;;
+            *)  SLOT="📋 Pasto" ;     MSG="${{ github.event.inputs.slot || 'Test reminder' }} — Logga il pasto!" ;;
+          esac
+          echo "slot=$SLOT" >> $GITHUB_OUTPUT
+          echo "msg=$MSG" >> $GITHUB_OUTPUT
+
+      - name: Send Telegram reminder
+        env:
+          BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          SLOT="${{ steps.slot.outputs.slot }}"
+          MSG="${{ steps.slot.outputs.msg }}"
+          TEXT="$SLOT
+
+$MSG
+
+<a href='https://solo-levelling-gold.vercel.app'>📱 Apri Shadow Monarch System</a>"
+
+          curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"chat_id\": \"${CHAT_ID}\",
+              \"text\": $(echo "$TEXT" | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read()))'),
+              \"parse_mode\": \"HTML\",
+              \"disable_web_page_preview\": true
+            }" | python3 -c "import sys,json; d=json.load(sys.stdin); print('✓ Sent' if d.get('ok') else '✗ ' + str(d.get('description','')))"
