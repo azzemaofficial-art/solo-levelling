@@ -776,6 +776,7 @@ function VisualCoach() {
   const autoTimerRef = useRef(null);
   const streamRef = useRef(null);
   const sessionStartRef = useRef(null);
+  const analyzingRef = useRef(false);
 
   const speakCoach = useCallback((text) => {
     if (!voiceOn || !window.speechSynthesis) return;
@@ -850,7 +851,8 @@ function VisualCoach() {
   }, [sessionContext, pastSessions]);
 
   const captureAndAnalyze = useCallback(async () => {
-    if (!videoRef.current || !canvasRef.current || analyzing) return;
+    if (!videoRef.current || !canvasRef.current || analyzingRef.current) return;
+    analyzingRef.current = true;
     const canvas = canvasRef.current;
     const video = videoRef.current;
     canvas.width = video.videoWidth || 640; canvas.height = video.videoHeight || 480;
@@ -876,8 +878,8 @@ function VisualCoach() {
       }
     } catch (err) {
       setAnalysis({ content: '⚠️ ' + err.message, provider: null, time: new Date().toLocaleTimeString('it-IT') });
-    } finally { setAnalyzing(false); }
-  }, [analyzing, mode, buildPrompt, currentDisc, speakCoach]);
+    } finally { setAnalyzing(false); analyzingRef.current = false; }
+  }, [mode, buildPrompt, currentDisc, speakCoach]);
 
   useEffect(() => {
     if (autoMode && streaming) {
