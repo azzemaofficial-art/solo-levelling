@@ -773,10 +773,15 @@ function VisualCoach() {
   const [score, setScore] = useState({ a: 0, b: 0 });
   const [lastPoint, setLastPoint] = useState(null);
   const [voiceOn, setVoiceOn] = useState(false);
+  const [skeletonOn, setSkeletonOn] = useState(true);
+  const [centered, setCentered] = useState(null);
   const autoTimerRef = useRef(null);
   const streamRef = useRef(null);
   const sessionStartRef = useRef(null);
   const analyzingRef = useRef(false);
+  const overlayRef = useRef(null);
+  const rafRef = useRef(null);
+  const poseRef = useRef(null);
 
   const speakCoach = useCallback((text) => {
     if (!voiceOn || !window.speechSynthesis) return;
@@ -830,6 +835,9 @@ function VisualCoach() {
 
   const stopCamera = () => {
     streamRef.current?.getTracks().forEach((t) => t.stop());
+    cancelAnimationFrame(rafRef.current);
+    poseRef.current?.lm?.close();
+    poseRef.current = null;
     timer.stop();
     if (analysis?.content) {
       const duration = sessionStartRef.current ? Math.round((Date.now() - sessionStartRef.current) / 60000) : 0;
@@ -841,6 +849,74 @@ function VisualCoach() {
     setStep('setup');
     clearInterval(autoTimerRef.current);
   };
+
+  // ── Skeleton MediaPipe ─────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!streaming || !skeletonOn) {
+      cancelAnimationFrame(rafRef.current);
+      if (overlayRef.current) {
+        const ctx = overlayRef.current.getContext('2d');
+        ctx?.clearRect(0, 0, overlayRef.current.width, overlayRef.current.height);
+      }
+      setCentered(null);
+      return;
+    }
+    let active = true;
+    (async () => {
+      try {
+        const { PoseLandmarker, FilesetResolver, DrawingUtils } = await import(
+          'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.18/vision_bundle.mjs'
+        );
+        if (!active) return;
+        const vision = await FilesetResolver.forVisionTasks(
+          'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.18/wasm'
+        );
+        const lm = await PoseLandmarker.createFromOptions(vision, {
+          baseOptions: {
+            modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task',
+            delegate: 'GPU',
+          },
+          runningMode: 'VIDEO',
+          numPoses: 1,
+        });
+        if (!active) return;
+        poseRef.current = { lm, DrawingUtils, PoseLandmarker };
+        const loop = () => {
+          if (!active) return;
+          const video = videoRef.current;
+          const canvas = overlayRef.current;
+          if (!video || !canvas || video.readyState < 2) { rafRef.current = requestAnimationFrame(loop); return; }
+          canvas.width = video.videoWidth || 640;
+          canvas.height = video.videoHeight || 480;
+          const ctx = canvas.getContext('2d');
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          const result = lm.detectForVideo(video, performance.now());
+          if (result.landmarks.length > 0) {
+            const du = new DrawingUtils(ctx);
+            du.drawConnectors(result.landmarks[0], PoseLandmarker.POSE_CONNECTIONS,
+              { color: 'rgba(0,255,136,0.8)', lineWidth: 2 });
+            du.drawLandmarks(result.landmarks[0],
+              { color: '#FF6B35', lineWidth: 1, radius: 4 });
+            const nose = result.landmarks[0][0];
+            if (nose) setCentered(nose.x > 0.2 && nose.x < 0.8 && nose.y < 0.85 ? 'ok' : 'off');
+          } else {
+            setCentered('none');
+          }
+          rafRef.current = requestAnimationFrame(loop);
+        };
+        loop();
+      } catch {
+        // MediaPipe non disponibile su questo browser/dispositivo
+      }
+    })();
+    return () => {
+      active = false;
+      cancelAnimationFrame(rafRef.current);
+      poseRef.current?.lm?.close();
+      poseRef.current = null;
+      setCentered(null);
+    };
+  }, [streaming, skeletonOn]);
 
   const buildPrompt = useCallback((basePrompt) => {
     let p = basePrompt || '';
@@ -1004,6 +1080,20 @@ function VisualCoach() {
         style={{ border: analyzing ? `2px solid ${C.blue.hex}` : streaming ? `2px solid ${C.emerald.hex}` : '2px solid rgba(255,255,255,0.04)', boxShadow: analyzing ? `0 0 20px ${C.blue.glow}` : streaming ? `0 0 12px ${C.emerald.glow}` : 'none', transition: 'all 0.3s ease' }}>
         <video ref={videoRef} className="w-full h-full object-cover" playsInline muted />
         <canvas ref={canvasRef} className="hidden" />
+        {/* Skeleton overlay */}
+        <canvas ref={overlayRef} className="absolute inset-0 w-full h-full pointer-events-none" style={{ opacity: skeletonOn ? 1 : 0 }} />
+        {/* Centering badge */}
+        {skeletonOn && centered && streaming && (
+          <div className="absolute top-2 left-2 px-2 py-1 rounded-lg text-xs font-mono font-bold"
+            style={{
+              background: centered === 'ok' ? 'rgba(16,185,129,0.2)' : centered === 'off' ? 'rgba(249,115,22,0.2)' : 'rgba(107,114,128,0.2)',
+              color: centered === 'ok' ? '#10b981' : centered === 'off' ? '#f97316' : '#9ca3af',
+              border: `1px solid ${centered === 'ok' ? 'rgba(16,185,129,0.3)' : centered === 'off' ? 'rgba(249,115,22,0.3)' : 'rgba(107,114,128,0.3)'}`,
+              backdropFilter: 'blur(8px)',
+            }}>
+            {centered === 'ok' ? '✓ CENTRATO' : centered === 'off' ? '↔ FUORI FRAME' : '— NESSUNO'}
+          </div>
+        )}
         {streaming && (
           <div className="absolute top-2 right-2 flex gap-1">
             <span className="px-2 py-1 rounded-lg text-xs font-mono font-bold"
@@ -1043,6 +1133,14 @@ function VisualCoach() {
             ? { background: 'linear-gradient(135deg, #059669, #047857)', boxShadow: '0 4px 14px rgba(5,150,105,0.4)' }
             : { background: 'rgba(55,65,81,0.5)', border: '1px solid rgba(255,255,255,0.06)' }}>
           🔊
+        </motion.button>
+        <motion.button whileTap={{ scale: 0.96 }} onClick={() => setSkeletonOn((v) => !v)}
+          className="px-3 py-2.5 rounded-xl text-white font-black transition-all"
+          title="Skeleton pose overlay"
+          style={skeletonOn
+            ? { background: 'linear-gradient(135deg, #7c3aed, #4f46e5)', boxShadow: '0 4px 14px rgba(124,58,237,0.4)' }
+            : { background: 'rgba(55,65,81,0.5)', border: '1px solid rgba(255,255,255,0.06)' }}>
+          🦴
         </motion.button>
         <motion.button whileTap={{ scale: 0.96 }} onClick={stopCamera}
           className="px-4 py-2.5 rounded-xl text-white font-black transition-all"
