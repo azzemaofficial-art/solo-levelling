@@ -1915,7 +1915,7 @@ const SystemHub = ({ systemLogs, setSystemLogs, dailyGoal, setDailyGoal, hydrati
       });
       const data = await res.json();
       const reply = data?.content || 'Errore risposta Nemotron.';
-      setShadowChatMessages((prev) => [...prev, { role: 'assistant', content: reply, provider: data?.provider, ts: Date.now() }]);
+      setShadowChatMessages((prev) => [...prev, { role: 'assistant', content: reply, provider: data?.provider, web: data?.web, ts: Date.now() }]);
     } catch (_) {
       setShadowChatMessages((prev) => [...prev, { role: 'assistant', content: 'Connessione fallita. Riprova.', ts: Date.now() }]);
     } finally {
@@ -5008,8 +5008,9 @@ const SystemHub = ({ systemLogs, setSystemLogs, dailyGoal, setDailyGoal, hydrati
                   }
                 >
                   {msg.role === 'assistant' && msg.provider && (
-                    <div className="mb-1.5 text-[9px] font-mono font-bold uppercase tracking-wider opacity-60" style={{ color: '#818cf8' }}>
-                      ⚡ {msg.provider}
+                    <div className="mb-1.5 flex items-center gap-1.5 text-[9px] font-mono font-bold uppercase tracking-wider opacity-60" style={{ color: '#818cf8' }}>
+                      <span>⚡ {msg.provider}</span>
+                      {msg.web && <span style={{ color: '#34d399' }}>· 🌐 web</span>}
                     </div>
                   )}
                   {msg.content}

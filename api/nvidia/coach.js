@@ -1,7 +1,9 @@
 // NVIDIA NIM fitness/nutrition AI coach
 // tier: 'max' → tenta 550B prima; default → chain veloce
+// web: true → Tavily search iniettata nel contesto prima dell'LLM
 
 const NVIDIA_BASE = 'https://integrate.api.nvidia.com/v1';
+const TAVILY_BASE = 'https://api.tavily.com';
 
 const SYSTEM_PROMPT = `Sei un coach AI specializzato in fitness, nutrizione e salute.
 Hai accesso a conoscenze su:
@@ -14,6 +16,9 @@ Hai accesso a conoscenze su:
 Rispondi sempre in italiano. Sii preciso, pratico e conciso.
 Quando suggerisci ricette, includi sempre macro approssimativi (proteine/carb/grassi/kcal).
 Quando parli di integratori, cita dosaggi evidence-based.`;
+
+// Parole che suggeriscono bisogno di info aggiornate da web
+const WEB_TRIGGERS = /oggi|adesso|attual|recente|2025|2026|notizie|news|studio|ricerca|scopert|prezzo|costo|disponibil|ultimo|nuov|aggiornament|migliore.*2\d{3}|classifica|versus|vs\b/i;
 
 const PROVIDERS_FAST = [
   { name: 'kimi', key: () => process.env.KIMI_NVIDIA_API_KEY, model: () => process.env.KIMI_NVIDIA_MODEL || 'moonshotai/kimi-k2.6' },
@@ -32,6 +37,39 @@ const PROVIDERS_MAX = [
 ];
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+async function tavilySearch(query) {
+  const key = process.env.TAVILY_API_KEY;
+  if (!key) return null;
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 6000);
+    const res = await fetch(`${TAVILY_BASE}/search`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        api_key: key,
+        query,
+        search_depth: 'basic',
+        max_results: 4,
+        include_answer: true,
+      }),
+      signal: ctrl.signal,
+    });
+    clearTimeout(t);
+    if (!res.ok) return null;
+    const data = await res.json();
+    // Costruisce contesto: risposta diretta + snippet dei risultati
+    const parts = [];
+    if (data.answer) parts.push(`Risposta sintetica: ${data.answer}`);
+    (data.results || []).forEach((r, i) => {
+      parts.push(`[${i + 1}] ${r.title}\n${r.content?.slice(0, 300) || ''}`);
+    });
+    return parts.join('\n\n');
+  } catch {
+    return null;
+  }
+}
 
 async function callNvidia(apiKey, model, messages, maxTokens = 1024) {
   const controller = new AbortController();
@@ -52,7 +90,7 @@ async function callNvidia(apiKey, model, messages, maxTokens = 1024) {
 
 export default async function handler(req, res) {
   if (req.method === 'GET') {
-    return res.status(200).json({ ok: true, endpoint: '/api/nvidia/coach', tiers: ['fast', 'max'] });
+    return res.status(200).json({ ok: true, endpoint: '/api/nvidia/coach', tiers: ['fast', 'max'], web: !!process.env.TAVILY_API_KEY });
   }
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
@@ -64,8 +102,24 @@ export default async function handler(req, res) {
   const providers = tier === 'max' ? PROVIDERS_MAX : PROVIDERS_FAST;
   const maxTokens = tier === 'max' ? 2048 : 1024;
 
+  // Ultima query dell'utente per decidere se cercare su web
+  const lastUserMsg = [...messages].reverse().find((m) => m.role === 'user')?.content || '';
+  let webContext = null;
+  let usedWeb = false;
+
+  if (WEB_TRIGGERS.test(lastUserMsg)) {
+    webContext = await tavilySearch(lastUserMsg);
+    if (webContext) usedWeb = true;
+  }
+
+  // Costruisce system prompt finale, iniettando web context se disponibile
+  let finalSystem = systemPrompt || SYSTEM_PROMPT;
+  if (webContext) {
+    finalSystem += `\n\n---\nRISULTATI WEB AGGIORNATI (usa queste info per rispondere):\n${webContext}\n---\nCita la fonte solo se rilevante. Rispondi sempre in italiano.`;
+  }
+
   const fullMessages = [
-    { role: 'system', content: systemPrompt || SYSTEM_PROMPT },
+    { role: 'system', content: finalSystem },
     ...messages,
   ];
 
@@ -80,7 +134,13 @@ export default async function handler(req, res) {
         if (ok && data?.choices?.[0]?.message) {
           res.setHeader('X-Coach-Provider', provider.name);
           res.setHeader('X-Coach-Model', model);
-          return res.status(200).json({ content: data.choices[0].message.content, provider: provider.name, model });
+          res.setHeader('X-Coach-Web', usedWeb ? '1' : '0');
+          return res.status(200).json({
+            content: data.choices[0].message.content,
+            provider: provider.name,
+            model,
+            web: usedWeb,
+          });
         }
         if ([429, 500, 502, 503].includes(status) && attempt < 1) { await sleep(500); continue; }
         break;
