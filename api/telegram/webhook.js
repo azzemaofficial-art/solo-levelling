@@ -17,26 +17,29 @@ const PROVIDERS = [
 const SYSTEM_PROMPT = `Sei Nemotron 550B, il coach AI del Shadow Hunter System.
 
 Quando l'utente descrive un WORKOUT:
-Analizza e rispondi con questo JSON esatto (nessun testo fuori dal JSON):
+Analizza TUTTI gli esercizi/attività menzionati e rispondi con questo JSON esatto (nessun testo fuori dal JSON):
 {
   "type": "workout",
   "text": "⚡ Workout analizzato!\\n💪 Burn stimato: X-Y kcal\\n🔥 Intensità: Z/10\\n💊 Post-workout: [consiglio recovery in 1 riga]",
-  "burn": <numero intero medio stimato>,
+  "burn": <numero intero medio stimato TOTALE di tutti gli esercizi>,
   "intensity": <1-10>,
   "name": "<descrizione breve del workout>"
 }
 
-Quando l'utente descrive un PASTO:
-Analizza e rispondi con questo JSON esatto:
+Quando l'utente descrive un PASTO (anche con più alimenti):
+Stima i macro di OGNI alimento menzionato e sommali. Rispondi con questo JSON esatto:
 {
   "type": "meal",
-  "text": "🍽️ Pasto analizzato!\\n📊 Stima: ~X kcal | P:Xg C:Xg G:Xg\\n✅ Qualità: [valutazione in 3 parole]\\n💡 Suggerimento: [1 miglioramento]",
-  "kcal": <numero intero>,
-  "protein": <numero intero>,
-  "carbs": <numero intero>,
-  "fat": <numero intero>,
-  "name": "<nome del pasto>"
+  "slot": "<colazione|pranzo|cena|merenda>",
+  "text": "🍽️ [Nome pasto] analizzato!\\n📊 Stima: ~X kcal | P:Xg C:Xg G:Xg\\n✅ Qualità: [valutazione in 3 parole]\\n💡 Tip: [1 miglioramento]",
+  "kcal": <totale kcal intero di TUTTI gli alimenti>,
+  "protein": <totale proteine intero>,
+  "carbs": <totale carboidrati intero>,
+  "fat": <totale grassi intero>,
+  "name": "<nome descrittivo del pasto>"
 }
+
+Regole slot: se l'utente scrive "colazione" o "breakfast" o "mattina" → slot="colazione". "pranzo" o "lunch" o "mezzogiorno" → slot="pranzo". "cena" o "dinner" o "sera" → slot="cena". "merenda" o "spuntino" o "snack" → slot="merenda". Se non specificato, deduci dall'ora o usa "pranzo".
 
 Per /integratori o altri comandi: rispondi con JSON { "type": "info", "text": "..." }
 
@@ -93,6 +96,7 @@ function buildDeepLink(parsed) {
       payload.carbs = parsed.carbs || 0;
       payload.fat = parsed.fat || 0;
       payload.name = parsed.name || 'Pasto';
+      payload.slot = parsed.slot || 'pranzo';
     } else if (parsed.type === 'workout') {
       payload.burn = parsed.burn || 0;
       payload.name = parsed.name || 'Workout';

@@ -375,11 +375,14 @@ useEffect(() => { localStorage.setItem('shadow_monarch_macros', JSON.stringify(m
         const base = idx >= 0 ? prev[idx] : { date: key, consumed: 0, protein: 0, carbs: 0, fatMacros: 0, workoutBurn: 0, burned: 0, waterMl: 0 };
         let patch = {};
         if (payload.type === 'meal') {
+          const slotKeyMap = { colazione: 'mealBreakfastKcal', pranzo: 'mealLunchKcal', cena: 'mealDinnerKcal', merenda: 'mealSnackKcal' };
+          const slotKey = slotKeyMap[payload.slot] || null;
           patch = {
             consumed: Number(base.consumed || 0) + Number(payload.kcal || 0),
             protein: Number(base.protein || 0) + Number(payload.protein || 0),
             carbs: Number(base.carbs || 0) + Number(payload.carbs || 0),
             fatMacros: Number(base.fatMacros || 0) + Number(payload.fat || 0),
+            ...(slotKey ? { [slotKey]: Number(base[slotKey] || 0) + Number(payload.kcal || 0) } : {}),
           };
         } else if (payload.type === 'workout') {
           const burn = Number(base.workoutBurn ?? base.burned ?? 0) + Number(payload.burn || 0);

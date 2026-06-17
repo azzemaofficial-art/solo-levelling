@@ -26,7 +26,8 @@ const MEAL_TEMPLATES = [
 const MEAL_SLOT_META = {
   breakfast: { label: 'Colazione', key: 'mealBreakfastKcal' },
   lunch: { label: 'Pranzo', key: 'mealLunchKcal' },
-  dinner: { label: 'Cena', key: 'mealDinnerKcal' }
+  dinner: { label: 'Cena', key: 'mealDinnerKcal' },
+  snack: { label: 'Merenda', key: 'mealSnackKcal' },
 };
 const DEFAULT_MICRO_TARGETS = {
   fiberMin: 30,
@@ -430,6 +431,10 @@ const SystemHub = ({ systemLogs, setSystemLogs, dailyGoal, setDailyGoal, hydrati
   const [shadowChatInput, setShadowChatInput] = useState('');
   const [isShadowChatLoading, setIsShadowChatLoading] = useState(false);
   const shadowChatEndRef = useRef(null);
+  const [shadowInsights, setShadowInsights] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('shadow_monarch_insights') || 'null'); } catch { return null; }
+  });
+  const [isLoadingInsights, setIsLoadingInsights] = useState(false);
   const [featureFlags, setFeatureFlags] = useState(() => {
     try {
       const raw = localStorage.getItem('shadow_monarch_feature_flags');
@@ -1893,6 +1898,55 @@ const SystemHub = ({ systemLogs, setSystemLogs, dailyGoal, setDailyGoal, hydrati
       setIsGeneratingBriefing(false);
     }
   };
+  // ── Shadow Insights — suggerimenti personalizzati 1×/giorno ───────────────
+  const generateShadowInsights = async (force = false) => {
+    const todayKey = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit' });
+    if (!force && shadowInsights?.date === todayKey && shadowInsights?.items?.length > 0) return;
+    setIsLoadingInsights(true);
+    try {
+      const last7 = systemLogs.slice(-7);
+      const avgKcal = last7.length ? Math.round(last7.reduce((s, l) => s + Number(l.consumed || 0), 0) / last7.length) : 0;
+      const avgProt = last7.length ? Math.round(last7.reduce((s, l) => s + Number(l.protein || 0), 0) / last7.length) : 0;
+      const avgBurn = last7.length ? Math.round(last7.reduce((s, l) => s + Number(l.workoutBurn ?? l.burned ?? 0), 0) / last7.length) : 0;
+      const trainDays = last7.filter((l) => Number(l.workoutBurn ?? l.burned ?? 0) >= 150).length;
+      const ctx = {
+        obiettivo: playerStats.objective || 'recomp',
+        livello: playerStats.level || 1,
+        streak: playerStats.streak || 0,
+        ultimi7giorni: { mediaKcal: avgKcal, mediaProteine: avgProt, mediaBurn: avgBurn, giorniAllenamento: trainDays },
+        oggi: { kcal: Math.round(Number(todayData?.consumed || 0)), proteine: Math.round(Number(todayData?.protein || 0)), burn: Math.round(Number(todayData?.workoutBurn ?? todayData?.burned ?? 0)) },
+        targetKcal: dailyGoal || 2000,
+        targetProteine: macroGoals?.protein || 150,
+      };
+      const systemPrompt = `Sei il coach AI personale del Shadow Hunter System. Analizza i dati reali dell'utente e genera 3 suggerimenti ultra-specifici e azionabili per oggi/questa settimana. Basa i suggerimenti esclusivamente sui dati forniti — non essere generico. Rispondi SOLO con JSON valido: {"items":[{"icon":"emoji","title":"titolo breve","body":"1-2 frasi specifiche con numeri reali"}]} — esattamente 3 items. Sempre in italiano.`;
+      const res = await fetch('/api/nvidia/coach', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: [{ role: 'user', content: `Dati utente: ${JSON.stringify(ctx)}` }], systemPrompt, tier: 'max' }),
+      });
+      const data = await res.json();
+      const raw = data?.content || '';
+      const match = raw.match(/\{[\s\S]*\}/);
+      if (match) {
+        const parsed = JSON.parse(match[0]);
+        if (parsed?.items?.length > 0) {
+          const result = { date: todayKey, items: parsed.items, provider: data.provider };
+          setShadowInsights(result);
+          localStorage.setItem('shadow_monarch_insights', JSON.stringify(result));
+        }
+      }
+    } catch (_) {}
+    setIsLoadingInsights(false);
+  };
+
+  useEffect(() => {
+    const todayKey = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit' });
+    if (systemLogs.length > 0 && (!shadowInsights || shadowInsights.date !== todayKey)) {
+      const t = setTimeout(() => generateShadowInsights(), 3000);
+      return () => clearTimeout(t);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const sendShadowChatMessage = async (overrideText) => {
     const text = String(overrideText || shadowChatInput || '').trim();
     if (!text || isShadowChatLoading) return;
@@ -5053,6 +5107,49 @@ const SystemHub = ({ systemLogs, setSystemLogs, dailyGoal, setDailyGoal, hydrati
             ))}
           </div>
         </div>
+      </motion.div>
+
+      {/* Shadow Insights — suggerimenti personalizzati */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.017 }}
+        className="system-card mb-6 rounded-sm p-4"
+        style={{ background: 'linear-gradient(145deg, rgba(6,10,22,0.97), rgba(8,14,28,0.95))', border: '1px solid rgba(52,211,153,0.2)', boxShadow: '0 8px 32px rgba(52,211,153,0.06), inset 0 1px 0 rgba(255,255,255,0.03)' }}
+      >
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <p className="text-[9px] uppercase tracking-[0.36em] font-bold" style={{ color: 'rgba(52,211,153,0.9)' }}>◈ AI Personale</p>
+            <p className="text-sm font-black text-white" style={{ fontFamily: 'Russo One, sans-serif' }}>Shadow Insights</p>
+          </div>
+          <button onClick={() => generateShadowInsights(true)} disabled={isLoadingInsights}
+            className="text-[8px] px-2 py-1 border border-white/15 text-gray-500 uppercase tracking-widest hover:border-emerald-300/40 hover:text-emerald-300 transition-colors disabled:opacity-30">
+            {isLoadingInsights ? '...' : '↻ Aggiorna'}
+          </button>
+        </div>
+        {isLoadingInsights ? (
+          <div className="flex items-center gap-2 py-4 justify-center">
+            <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#34d399' }} />
+            <span className="text-[10px] text-emerald-400">Analisi dati in corso…</span>
+          </div>
+        ) : shadowInsights?.items?.length > 0 ? (
+          <div className="space-y-2">
+            {shadowInsights.items.map((item, i) => (
+              <div key={i} className="flex gap-3 p-2.5 rounded-xl" style={{ background: 'rgba(52,211,153,0.05)', border: '1px solid rgba(52,211,153,0.1)' }}>
+                <span className="text-lg flex-shrink-0 leading-none mt-0.5">{item.icon}</span>
+                <div>
+                  <p className="text-[11px] font-bold text-white mb-0.5">{item.title}</p>
+                  <p className="text-[10px] text-gray-400 leading-relaxed">{item.body}</p>
+                </div>
+              </div>
+            ))}
+            {shadowInsights.provider && (
+              <p className="text-[8px] font-mono text-gray-600 text-right mt-1">⚡ {shadowInsights.provider}</p>
+            )}
+          </div>
+        ) : (
+          <p className="text-[10px] text-gray-600 italic text-center py-4">Inizia a registrare pasti e workout per ricevere suggerimenti personalizzati</p>
+        )}
       </motion.div>
 
       <motion.div
