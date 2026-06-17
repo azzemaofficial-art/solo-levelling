@@ -33,6 +33,25 @@ const DISCIPLINE_GROUPS = [
     { id: 'judo',       emoji: '🥋', label: 'Judo',        prompt: 'Guida la mia sessione di judo. Analizza kumi-kata e proiezioni.' },
     { id: 'mma',        emoji: '🏆', label: 'MMA',         prompt: 'Guida la mia sessione MMA. Analizza striking, grappling e transizioni.' },
     { id: 'kravmaga',   emoji: '⚔️', label: 'Krav Maga',  prompt: 'Guida la mia sessione di Krav Maga. Analizza efficacia e reattività.' },
+    { id: 'capoeira',   emoji: '🌀', label: 'Capoeira',   prompt: 'Guida la mia sessione di Capoeira. Analizza ginga, movimenti e fluidità.' },
+    { id: 'sambo',      emoji: '🤼', label: 'Sambo',      prompt: 'Guida la mia sessione di Sambo. Analizza takedown, controllo e submission.' },
+    { id: 'hapkido',    emoji: '🔄', label: 'Hapkido',    prompt: 'Guida la mia sessione di Hapkido. Analizza leve articolari, proiezioni e calci.' },
+    { id: 'wingchun',   emoji: '✋', label: 'Wing Chun',  prompt: 'Guida la mia sessione di Wing Chun. Analizza centreline, chain punch e chi sao.' },
+    { id: 'kungfu',     emoji: '🐉', label: 'Kung Fu',    prompt: 'Guida la mia sessione di Kung Fu/Wushu. Analizza stance, forme e tecnica.' },
+    { id: 'silat',      emoji: '🗡️', label: 'Silat',      prompt: 'Guida la mia sessione di Pencak Silat. Analizza posture basse, attacchi e geometria del movimento.' },
+    { id: 'kendo',      emoji: '⚔️', label: 'Kendo',      prompt: 'Guida la mia sessione di Kendo. Analizza kamae, suburi e attacchi con shinai.' },
+    { id: 'sanda',      emoji: '🥊', label: 'Sanda',      prompt: 'Guida la mia sessione di Sanda/Sanshou. Analizza pugni, calci, takedown e clinch.' },
+    { id: 'pankration', emoji: '⚡', label: 'Pankration', prompt: 'Guida la mia sessione di Pankration. Analizza striking e grappling in stile antico greco.' },
+    { id: 'systema',    emoji: '🌊', label: 'Systema',    prompt: 'Guida la mia sessione di Systema. Analizza respirazione, tensione muscolare e movimenti naturali.' },
+    { id: 'lutalivre',  emoji: '🤼', label: 'Luta Livre', prompt: 'Guida la mia sessione di Luta Livre. Analizza clinch, takedown e submission a terra.' },
+    { id: 'muayboran',  emoji: '🏺', label: 'Muay Boran', prompt: 'Guida la mia sessione di Muay Boran. Analizza le tecniche tradizionali thailandesi pre-ring.' },
+  ]},
+  { label: '💪 Sport & Fitness', items: [
+    { id: 'calisthenics', emoji: '💪', label: 'Calistenia',  prompt: 'Guida il mio allenamento a corpo libero. Analizza forma, range of motion e progressione.' },
+    { id: 'crossfit',     emoji: '🏋️', label: 'CrossFit',    prompt: 'Guida il mio WOD. Analizza forma, sicurezza articolare e ritmo.' },
+    { id: 'yoga',         emoji: '🧘', label: 'Yoga',         prompt: 'Guida la mia sessione di yoga. Analizza allineamento, respiro e postura nelle asana.' },
+    { id: 'running',      emoji: '🏃', label: 'Corsa',        prompt: 'Analizza la mia tecnica di corsa. Controlla postura, cadenza e attacco del piede.' },
+    { id: 'stretching',   emoji: '🤸', label: 'Mobilità',     prompt: 'Guida il mio stretching/mobilità. Analizza range of motion e progressione degli allungamenti.' },
   ]},
   { label: '👥 Con partner', items: [
     { id: 'sparring_muaythai', emoji: '🥊', label: 'Sparring MT',   prompt: 'Siamo in due — arbitraci e dai feedback a entrambi. Muay Thai.' },
@@ -775,29 +794,39 @@ function VisualCoach() {
   const [voiceOn, setVoiceOn] = useState(false);
   const [skeletonOn, setSkeletonOn] = useState(true);
   const [centered, setCentered] = useState(null);
+  const [facingMode, setFacingMode] = useState('environment');
   const autoTimerRef = useRef(null);
   const streamRef = useRef(null);
+  const voicesRef = useRef([]);
   const sessionStartRef = useRef(null);
   const analyzingRef = useRef(false);
   const overlayRef = useRef(null);
   const rafRef = useRef(null);
   const poseRef = useRef(null);
 
+  // Precarica le voci appena disponibili (getVoices è asincrono su Chrome/Safari)
+  useEffect(() => {
+    const load = () => { voicesRef.current = window.speechSynthesis?.getVoices() || []; };
+    load();
+    window.speechSynthesis?.addEventListener('voiceschanged', load);
+    return () => window.speechSynthesis?.removeEventListener('voiceschanged', load);
+  }, []);
+
   const speakCoach = useCallback((text) => {
     if (!voiceOn || !window.speechSynthesis) return;
-    // Non cancellare se sta ancora parlando — aspetta la fine
     if (window.speechSynthesis.speaking) return;
     const clean = text
       .replace(/\*\*/g, '').replace(/[*#_~`]/g, '')
-      .replace(/[🥊📐➡️⚠️⭐👁🔴🔵🏆💪🎯]/gu, '')
+      .replace(/RIGA\s*\d+\s*[—-]/g, '')
+      .replace(/[^\x00-\x7F]/g, (c) => /\p{Emoji}/u.test(c) ? '' : c)
       .replace(/\n+/g, '. ')
       .trim();
+    if (!clean) return;
     const utt = new SpeechSynthesisUtterance(clean);
     utt.lang = 'it-IT';
-    utt.rate = 1.15;
+    utt.rate = 1.1;
     utt.pitch = 1;
-    const voices = window.speechSynthesis.getVoices();
-    const itVoice = voices.find((v) => v.lang === 'it-IT' || v.lang.startsWith('it'));
+    const itVoice = voicesRef.current.find((v) => v.lang === 'it-IT' || v.lang.startsWith('it'));
     if (itVoice) utt.voice = itVoice;
     window.speechSynthesis.speak(utt);
   }, [voiceOn]);
@@ -810,9 +839,9 @@ function VisualCoach() {
     setScore((s) => ({ ...s, [who]: Math.max(0, s[who] + delta) }));
   }, []);
 
-  const startCamera = async () => {
+  const startCamera = async (facing = facingMode) => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: 640, height: 480 } });
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: facing, width: 640, height: 480 } });
       streamRef.current = stream;
       if (videoRef.current) { videoRef.current.srcObject = stream; videoRef.current.play(); }
       setStreaming(true);
@@ -824,6 +853,17 @@ function VisualCoach() {
         setStreaming(true);
       } catch (err) { alert('Camera non accessibile: ' + err.message); }
     }
+  };
+
+  const flipCamera = async () => {
+    const next = facingMode === 'environment' ? 'user' : 'environment';
+    setFacingMode(next);
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    cancelAnimationFrame(rafRef.current);
+    poseRef.current?.lm?.close();
+    poseRef.current = null;
+    setStreaming(false);
+    await startCamera(next);
   };
 
   const startSession = async () => {
@@ -1141,6 +1181,12 @@ function VisualCoach() {
             ? { background: 'linear-gradient(135deg, #7c3aed, #4f46e5)', boxShadow: '0 4px 14px rgba(124,58,237,0.4)' }
             : { background: 'rgba(55,65,81,0.5)', border: '1px solid rgba(255,255,255,0.06)' }}>
           🦴
+        </motion.button>
+        <motion.button whileTap={{ scale: 0.96 }} onClick={flipCamera}
+          className="px-3 py-2.5 rounded-xl text-white font-black transition-all"
+          title={facingMode === 'environment' ? 'Passa a fotocamera frontale' : 'Passa a fotocamera posteriore'}
+          style={{ background: 'rgba(55,65,81,0.5)', border: '1px solid rgba(255,255,255,0.06)' }}>
+          🔄
         </motion.button>
         <motion.button whileTap={{ scale: 0.96 }} onClick={stopCamera}
           className="px-4 py-2.5 rounded-xl text-white font-black transition-all"
