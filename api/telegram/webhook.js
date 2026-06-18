@@ -28,6 +28,19 @@ const PROVIDERS = [
   { key: () => process.env.NVIDIA_API_KEY, model: 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning', fast: true },
 ];
 
+// Rileva misurazioni corporee nel testo
+function detectMeasurement(text) {
+  const t = text.toLowerCase();
+  const weightMatch = t.match(/(?:peso|pesо|weight|kg|chili)\s*[:=]?\s*(\d{2,3}(?:[.,]\d{1,2})?)\s*(?:kg|chili)?/i)
+    || t.match(/^(\d{2,3}(?:[.,]\d{1,2})?)\s*(?:kg|chili)$/i);
+  const fatMatch = t.match(/(?:grasso|body.?fat|bf|fat)\s*[:=]?\s*(\d{1,2}(?:[.,]\d)?)\s*%?/i);
+  if (!weightMatch && !fatMatch) return null;
+  return {
+    weight: weightMatch ? parseFloat(weightMatch[1].replace(',', '.')) : null,
+    bodyFat: fatMatch ? parseFloat(fatMatch[1].replace(',', '.')) : null,
+  };
+}
+
 const SYSTEM_PROMPT = `Sei Nemotron 550B, il coach AI del Shadow Hunter System.
 
 Quando l'utente descrive un WORKOUT:
@@ -182,6 +195,19 @@ export default async function handler(req, res) {
       '🌙 <b>Sera</b>\n' +
       '🟡 Omega-3 — 2g EPA+DHA con cena\n🟣 Magnesio glicin. — 300mg per il sonno\n🌙 Caseina — 25-30g opzionale pre-sonno\n\n' +
       '<i>Profilo: recomp, allenamento frequente.</i>';
+    await sendTelegramMessage(botToken, incomingChatId, reply);
+    return res.status(200).json({ ok: true });
+  }
+
+  // Rilevamento misurazioni corporee (peso, body fat) — bypass AI
+  const measurement = detectMeasurement(text);
+  if (measurement?.weight) {
+    const payload = { type: 'measurement', ts: Date.now(), weight: measurement.weight, bodyFat: measurement.bodyFat || null };
+    await kvSet(`tg_import:${incomingChatId}`, payload);
+    const bmiNote = ''; // BMI calcolato lato client con l\'altezza salvata
+    let reply = `⚖️ <b>Peso registrato: ${measurement.weight} kg</b>`;
+    if (measurement.bodyFat) reply += `\n💧 Body fat: ${measurement.bodyFat}%`;
+    reply += `\n\n📊 Aggiornato nel diario — apri il sito per vedere l'andamento.`;
     await sendTelegramMessage(botToken, incomingChatId, reply);
     return res.status(200).json({ ok: true });
   }

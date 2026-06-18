@@ -381,14 +381,27 @@ useEffect(() => { localStorage.setItem('shadow_monarch_macros', JSON.stringify(m
       } else if (payload.type === 'workout') {
         const burn = Number(base.workoutBurn ?? base.burned ?? 0) + Number(payload.burn || 0);
         patch = { workoutBurn: burn, burned: burn };
+      } else if (payload.type === 'measurement' && payload.weight) {
+        patch = { weight: Number(payload.weight) };
       }
       const updated = { ...base, ...patch };
       const next = [...prev];
       if (idx >= 0) { next[idx] = updated; } else { next.push(updated); }
       return next;
     });
+    // Per le misurazioni aggiorna anche playerStats
+    if (payload.type === 'measurement' && payload.weight) {
+      setPlayerStats?.((prev) => ({
+        ...prev,
+        currentWeightKg: Number(payload.weight),
+        ...(payload.bodyFat ? { bodyFatPct: Number(payload.bodyFat) } : {}),
+        lastWeightUpdateDate: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit' }),
+      }));
+    }
     const label = payload.type === 'meal'
       ? `📲 ${payload.name || 'Pasto'}: +${payload.kcal || 0} kcal aggiunto al diario`
+      : payload.type === 'measurement'
+      ? `⚖️ Peso ${payload.weight} kg salvato nel diario`
       : `📲 ${payload.name || 'Workout'}: +${payload.burn || 0} kcal burn aggiunto`;
     emitUiToast({ message: label, tone: 'success', durationMs: 5000 });
     triggerFxBurst('success');

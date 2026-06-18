@@ -2670,14 +2670,26 @@ const SystemHub = ({ systemLogs, setSystemLogs, dailyGoal, setDailyGoal, hydrati
       const mealMoment = hourNow < 10 ? 'colazione' : hourNow < 14 ? 'pranzo' : hourNow < 18 ? 'spuntino pomeridiano' : 'cena';
       const last7 = systemLogs.slice(-7);
       const avgProt7 = last7.length ? Math.round(last7.reduce((s, l) => s + Number(l.protein || 0), 0) / last7.length) : 0;
+      const avgKcal7 = last7.length ? Math.round(last7.reduce((s, l) => s + Number(l.consumed || 0), 0) / last7.length) : 0;
+      const trainDays7 = last7.filter((l) => Number(l.workoutBurn ?? l.burned ?? 0) > 100).length;
+      const pesoKg = Number(playerStats?.currentWeightKg || todayData?.weight || 0) || Number([...systemLogs].reverse().find((l) => l.weight > 0)?.weight || 70);
+      const altezzaCm = Number(playerStats?.heightCm || metabolicProfile?.heightCm || 178);
+      const bmi = altezzaCm > 0 ? (pesoKg / ((altezzaCm / 100) ** 2)).toFixed(1) : '?';
+      const eta = playerStats?.age || metabolicProfile?.age || 25;
+      const sesso = playerStats?.sex || metabolicProfile?.sex || 'male';
+      const pesoTarget = playerStats?.bodyGoal?.targetWeightKg;
+      const deltaKg = pesoTarget ? (pesoKg - pesoTarget).toFixed(1) : null;
 
-      const profileCtx = `PROFILO SHADOW HUNTER:
-- Obiettivo: ${playerStats?.objective || 'recomp'} | Livello: ${playerStats?.level || 1} | Streak: ${playerStats?.streak || 0} giorni
-- Giornata: ${isTrainingDay ? '🔥 GIORNO DI ALLENAMENTO' : '😴 giorno di riposo'}
-- Momento pasto: ${mealMoment}
-- Macro residue OGGI: ${kcalResidui} kcal | P: ${protResidui}g | C: ${carbResidui}g | G: ${fatResidui}g
-- Media proteine ultimi 7gg: ${avgProt7}g/die (target: ${Math.round(Number(adaptiveMacroTargets?.protein || macroGoals?.protein || 150))}g)
-- Peso: ${playerStats?.currentWeight || '?'} kg | Altezza: ${playerStats?.height || '?'} cm`;
+      const profileCtx = `PROFILO SHADOW HUNTER COMPLETO:
+- Obiettivo: ${playerStats?.objective || 'recomp'} | Livello ${playerStats?.level || 1} | Streak ${playerStats?.streak || 0}gg
+- Dati fisici: ${pesoKg}kg | ${altezzaCm}cm | BMI ${bmi} | ${eta} anni | ${sesso === 'male' ? 'uomo' : 'donna'}
+${deltaKg ? `- Obiettivo peso: ${pesoTarget}kg (${Number(deltaKg) > 0 ? '-' : '+'}${Math.abs(deltaKg)}kg da raggiungere)` : ''}
+- Attività: ${playerStats?.activityMode || metabolicProfile?.activityMode || 'moderate'} | Allenamenti ultimi 7gg: ${trainDays7}/7
+- Giornata: ${isTrainingDay ? '🔥 ALLENAMENTO — priorità a carb+proteine per performance/recovery' : '😴 RIPOSO — preferisci cibi sazianti e micronutrienti'}
+- Momento: ${mealMoment} (ore ${hourNow})
+- MACRO RESIDUE OGGI: ${kcalResidui} kcal | P: ${protResidui}g | C: ${carbResidui}g | G: ${fatResidui}g
+- Media 7gg: ${avgKcal7} kcal/die | ${avgProt7}g prot/die (target ${Math.round(Number(adaptiveMacroTargets?.protein || macroGoals?.protein || 150))}g)
+- Kcal target giornaliero: ${Math.round(Number(effectiveDailyGoal || dailyGoal || 2400))} kcal`;
 
       const systemPrompt = `Sei uno chef nutrizionale d'élite specializzato in FITPORN — cibo che è allo stesso tempo ESTETICAMENTE PERFETTO e ultra-ottimizzato per le performance atletiche. Le tue ricette devono far venire l'acquolina in bocca solo a leggerle.
 
