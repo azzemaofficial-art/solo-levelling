@@ -381,8 +381,8 @@ useEffect(() => { localStorage.setItem('shadow_monarch_macros', JSON.stringify(m
       } else if (payload.type === 'workout') {
         const burn = Number(base.workoutBurn ?? base.burned ?? 0) + Number(payload.burn || 0);
         patch = { workoutBurn: burn, burned: burn };
-      } else if (payload.type === 'measurement' && payload.weight) {
-        patch = { weight: Number(payload.weight) };
+      } else if (payload.type === 'measurement') {
+        patch = { ...(payload.weight ? { weight: Number(payload.weight) } : {}) };
       }
       const updated = { ...base, ...patch };
       const next = [...prev];
@@ -390,18 +390,30 @@ useEffect(() => { localStorage.setItem('shadow_monarch_macros', JSON.stringify(m
       return next;
     });
     // Per le misurazioni aggiorna anche playerStats
-    if (payload.type === 'measurement' && payload.weight) {
+    if (payload.type === 'measurement') {
       setPlayerStats?.((prev) => ({
         ...prev,
-        currentWeightKg: Number(payload.weight),
+        ...(payload.weight ? { currentWeightKg: Number(payload.weight), lastWeightUpdateDate: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit' }) } : {}),
         ...(payload.bodyFat ? { bodyFatPct: Number(payload.bodyFat) } : {}),
-        lastWeightUpdateDate: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit' }),
+        ...(payload.height ? { heightCm: Number(payload.height) } : {}),
+        ...(payload.age ? { age: Number(payload.age) } : {}),
+        ...(payload.sex ? { sex: payload.sex } : {}),
+        ...(payload.targetWeight ? { targetWeightKg: Number(payload.targetWeight) } : {}),
       }));
+    }
+    const parts = [];
+    if (payload.type === 'measurement') {
+      if (payload.weight) parts.push(`⚖️ Peso ${payload.weight} kg`);
+      if (payload.height) parts.push(`📏 Altezza ${payload.height} cm`);
+      if (payload.age) parts.push(`🎂 Età ${payload.age} anni`);
+      if (payload.sex) parts.push(`👤 Sesso ${payload.sex}`);
+      if (payload.bodyFat) parts.push(`💧 BF ${payload.bodyFat}%`);
+      if (payload.targetWeight) parts.push(`🎯 Target ${payload.targetWeight} kg`);
     }
     const label = payload.type === 'meal'
       ? `📲 ${payload.name || 'Pasto'}: +${payload.kcal || 0} kcal aggiunto al diario`
       : payload.type === 'measurement'
-      ? `⚖️ Peso ${payload.weight} kg salvato nel diario`
+      ? parts.join(' · ') + ' salvato nel profilo'
       : `📲 ${payload.name || 'Workout'}: +${payload.burn || 0} kcal burn aggiunto`;
     emitUiToast({ message: label, tone: 'success', durationMs: 5000 });
     triggerFxBurst('success');
