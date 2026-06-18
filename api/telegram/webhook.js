@@ -4,6 +4,16 @@
 const NVIDIA_BASE = 'https://integrate.api.nvidia.com/v1';
 const SITE_URL = 'https://solo-levelling-gold.vercel.app';
 
+// Upstash Redis REST — salva il payload lato server per 24h
+async function kvSet(key, value) {
+  const url = process.env.KV_REST_API_URL;
+  const token = process.env.KV_REST_API_TOKEN;
+  if (!url || !token) return;
+  await fetch(`${url}/set/${encodeURIComponent(key)}/${encodeURIComponent(JSON.stringify(value))}/ex/86400`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
 // Provider chain: 550B per task complessi, cascata su modelli veloci
 const PROVIDERS = [
   { key: () => process.env.NVIDIA_550B_API_KEY, model: 'nvidia/nemotron-3-ultra-550b-a55b', fast: false },
@@ -187,6 +197,21 @@ export default async function handler(req, res) {
   const parsed = parseAIResponse(raw);
   const replyText = parsed?.text || raw;
   const deepLink = buildDeepLink(parsed);
+
+  // Salva payload su Upstash Redis — il sito lo recupera al prossimo avvio (bypass WebView isolation)
+  if (parsed && parsed.type !== 'info') {
+    await kvSet(`tg_import:${incomingChatId}`, {
+      type: parsed.type,
+      ts: Date.now(),
+      ...(parsed.type === 'meal' ? {
+        kcal: parsed.kcal || 0, protein: parsed.protein || 0,
+        carbs: parsed.carbs || 0, fat: parsed.fat || 0,
+        name: parsed.name || 'Pasto', slot: parsed.slot || 'pranzo',
+      } : {
+        burn: parsed.burn || 0, name: parsed.name || 'Workout',
+      }),
+    });
+  }
 
   let replyMarkup = null;
   if (deepLink) {
