@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useMemo, useState, useEffect } from 'react';
+import React, { Suspense, lazy, useMemo, useState, useEffect, useCallback } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Zap, Swords, BrainCircuit, Activity } from 'lucide-react';
 import { playSfx } from './utils/sfx';
