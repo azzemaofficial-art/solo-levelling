@@ -200,9 +200,9 @@ export default async function handler(req, res) {
 
   const parsed = parseAIResponse(raw);
   const replyText = parsed?.text || raw;
-  const deepLink = buildDeepLink(parsed);
 
   // Salva payload su Upstash Redis — il sito lo recupera al prossimo avvio (bypass WebView isolation)
+  let savedToServer = false;
   if (parsed && parsed.type !== 'info') {
     await kvSet(`tg_import:${incomingChatId}`, {
       type: parsed.type,
@@ -215,17 +215,11 @@ export default async function handler(req, res) {
         burn: parsed.burn || 0, name: parsed.name || 'Workout',
       }),
     });
+    savedToServer = true;
   }
 
-  let replyMarkup = null;
-  if (deepLink) {
-    replyMarkup = {
-      inline_keyboard: [[
-        { text: '📲 Importa nel diario', url: deepLink },
-      ]],
-    };
-  }
-
-  await sendTelegramMessage(botToken, incomingChatId, replyText, replyMarkup);
+  // Nessun bottone — l'import è automatico quando apri il sito
+  const suffix = savedToServer ? '\n\n🔄 <i>Apri il sito per vedere i dati aggiornati.</i>' : '';
+  await sendTelegramMessage(botToken, incomingChatId, replyText + suffix);
   return res.status(200).json({ ok: true });
 }
