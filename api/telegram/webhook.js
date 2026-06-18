@@ -9,9 +9,13 @@ async function kvSet(key, value) {
   const url = process.env.KV_REST_API_URL;
   const token = process.env.KV_REST_API_TOKEN;
   if (!url || !token) return;
-  await fetch(`${url}/set/${encodeURIComponent(key)}/${encodeURIComponent(JSON.stringify(value))}/ex/86400`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
+  try {
+    await fetch(`${url}/pipeline`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify([['SET', key, JSON.stringify(value), 'EX', '86400']]),
+    });
+  } catch (_) {}
 }
 
 // Provider chain: 550B per task complessi, cascata su modelli veloci
