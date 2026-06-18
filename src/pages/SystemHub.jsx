@@ -2652,47 +2652,94 @@ const SystemHub = ({ systemLogs, setSystemLogs, dailyGoal, setDailyGoal, hydrati
       return { ...prev, enabledIds: nextIds };
     });
   };
-  const generateRecipeFromPrompt = async () => {
+  const generateRecipeFromPrompt = async (autoMode = false) => {
     if (isGeneratingRecipe) return;
     const prompt = String(recipePrompt || '').trim();
-    if (!prompt) {
-      emitUiToast({ message: 'Scrivi una descrizione ricetta', tone: 'warning', durationMs: 2400 });
+    if (!autoMode && !prompt) {
+      emitUiToast({ message: 'Scrivi cosa vuoi o premi "Sorprendimi"', tone: 'warning', durationMs: 2400 });
       return;
     }
     setIsGeneratingRecipe(true);
     try {
+      const kcalResidui = Math.max(0, Math.round(Number(effectiveDailyGoal || dailyGoal || 2400) - Number(todayData.consumed || 0)));
+      const protResidui = Math.max(0, Math.round(Number(adaptiveMacroTargets?.protein || macroGoals?.protein || 150) - Number(todayData.protein || 0)));
+      const carbResidui = Math.max(0, Math.round(Number(adaptiveMacroTargets?.carbs || macroGoals?.carbs || 200) - Number(todayData.carbs || 0)));
+      const fatResidui = Math.max(0, Math.round(Number(adaptiveMacroTargets?.fats || macroGoals?.fats || 60) - Number(todayData.fatMacros || 0)));
+      const isTrainingDay = playerStats?.lastWorkoutDate === new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit' }) || Number(todayData?.workoutBurn ?? todayData?.burned ?? 0) > 100;
+      const hourNow = new Date().getHours();
+      const mealMoment = hourNow < 10 ? 'colazione' : hourNow < 14 ? 'pranzo' : hourNow < 18 ? 'spuntino pomeridiano' : 'cena';
+      const last7 = systemLogs.slice(-7);
+      const avgProt7 = last7.length ? Math.round(last7.reduce((s, l) => s + Number(l.protein || 0), 0) / last7.length) : 0;
+
+      const profileCtx = `PROFILO SHADOW HUNTER:
+- Obiettivo: ${playerStats?.objective || 'recomp'} | Livello: ${playerStats?.level || 1} | Streak: ${playerStats?.streak || 0} giorni
+- Giornata: ${isTrainingDay ? '🔥 GIORNO DI ALLENAMENTO' : '😴 giorno di riposo'}
+- Momento pasto: ${mealMoment}
+- Macro residue OGGI: ${kcalResidui} kcal | P: ${protResidui}g | C: ${carbResidui}g | G: ${fatResidui}g
+- Media proteine ultimi 7gg: ${avgProt7}g/die (target: ${Math.round(Number(adaptiveMacroTargets?.protein || macroGoals?.protein || 150))}g)
+- Peso: ${playerStats?.currentWeight || '?'} kg | Altezza: ${playerStats?.height || '?'} cm`;
+
+      const systemPrompt = `Sei uno chef nutrizionale d'élite specializzato in FITPORN — cibo che è allo stesso tempo ESTETICAMENTE PERFETTO e ultra-ottimizzato per le performance atletiche. Le tue ricette devono far venire l'acquolina in bocca solo a leggerle.
+
+STILE OBBLIGATORIO:
+- Titolo epico e evocativo (es: "Salmon Inferno Bowl", "Thunder Chicken Wrap", "Zero Guilt Dark Choc Mousse")
+- Tagline che fa DESIDERARE il piatto (max 15 parole, molto visiva e appetitosa)
+- Ingredienti con grammature precise e piccoli trucchi da chef (es: "180g petto pollo — battuto sottile per cottura uniforme")
+- Steps concreti con tecniche vere (Maillard reaction, marinatura rapida, textura croccante)
+- Emoji pertinenti negli steps per renderli scansionabili
+- Note: 1 hack nutrizionale o variante fitporn
+
+VINCOLO FERRO: la ricetta DEVE rispettare i macro residui del profilo. Se le proteine residue sono basse, fai una ricetta low-protein. Se è giorno di allenamento, priorità a carbs + proteine.
+
+Rispondi SOLO JSON valido:
+{"title":"string","emoji":"emoji","tagline":"string appetitosa max 15 parole","prepMin":numero,"cookMin":numero,"difficulty":"facile|medio|avanzato","mood":"performance|recovery|comfort|light","ingredients":[{"item":"string","amount":"string"}],"steps":["string con emoji"],"kcal":numero,"protein":numero,"carbs":numero,"fat":numero,"fiber":numero,"fitScore":numero_1_10,"notes":"string hack nutrizionale"}`;
+
+      const userMsg = autoMode
+        ? `${profileCtx}\n\nCrea LA ricetta fitporn perfetta per questo momento. Sorprendimi con qualcosa di straordinario che non mi aspetto.`
+        : `${profileCtx}\n\nRichiesta specifica: ${prompt}\n\nCrea una versione fitporn di questa ricetta, adattata ai miei macro residui.`;
+
       const data = await requestSystemAI({
-        temperature: 0.25,
-        max_tokens: 420,
+        temperature: 0.82,
+        max_tokens: 700,
         timeoutMs: 28000,
         messages: [
-          {
-            role: 'system',
-            content:
-              'Sei uno chef nutrizionale sportivo. Genera una ricetta concreta e veloce. Rispondi SOLO JSON valido con schema: {"title":"string","prepMin":numero,"ingredients":["string"],"steps":["string"],"kcal":numero,"protein":numero,"carbs":numero,"fat":numero,"notes":"string"}.'
-          },
-          {
-            role: 'user',
-            content: `Obiettivo utente: ${String(playerStats?.objective || metabolicProfile?.objective || 'recomp')}. Kcal target giorno: ${Math.round(Number(effectiveDailyGoal || dailyGoal || 2400))}. Macro residue oggi: Proteine ${Math.max(0, Math.round(Number(adaptiveMacroTargets?.protein || macroGoals?.protein || 0) - Number(todayData.protein || 0)))}g residui, Carbs ${Math.max(0, Math.round(Number(adaptiveMacroTargets?.carbs || macroGoals?.carbs || 0) - Number(todayData.carbs || 0)))}g residui, Grassi ${Math.max(0, Math.round(Number(adaptiveMacroTargets?.fats || macroGoals?.fats || 0) - Number(todayData.fatMacros || 0)))}g residui. Kcal residue: ${Math.max(0, Math.round(Number(effectiveDailyGoal || dailyGoal || 2400) - Number(todayData.consumed || 0)))}. Genera una ricetta che si adatta perfettamente a questi macro residui. Prompt ricetta: ${prompt}`
-          }
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userMsg },
         ]
       });
       const parsed = parseModelJson(data);
       const nextRecipe = {
         title: String(parsed?.title || 'Ricetta AI').slice(0, 80),
-        prepMin: Math.max(5, Math.min(180, Math.round(Number(parsed?.prepMin || 20)))),
-        ingredients: Array.isArray(parsed?.ingredients) ? parsed.ingredients.map((x) => String(x || '').trim()).filter(Boolean).slice(0, 18) : [],
-        steps: Array.isArray(parsed?.steps) ? parsed.steps.map((x) => String(x || '').trim()).filter(Boolean).slice(0, 12) : [],
+        emoji: String(parsed?.emoji || '🍽️').slice(0, 8),
+        tagline: String(parsed?.tagline || '').slice(0, 120),
+        prepMin: Math.max(0, Math.min(120, Math.round(Number(parsed?.prepMin || 10)))),
+        cookMin: Math.max(0, Math.min(120, Math.round(Number(parsed?.cookMin || 10)))),
+        difficulty: ['facile','medio','avanzato'].includes(parsed?.difficulty) ? parsed.difficulty : 'facile',
+        mood: parsed?.mood || 'performance',
+        ingredients: Array.isArray(parsed?.ingredients)
+          ? parsed.ingredients.map((x) => typeof x === 'string' ? { item: x, amount: '' } : x).filter((x) => x?.item).slice(0, 16)
+          : [],
+        steps: Array.isArray(parsed?.steps) ? parsed.steps.map((x) => String(x || '').trim()).filter(Boolean).slice(0, 10) : [],
         kcal: Math.max(0, Math.round(Number(parsed?.kcal || 0))),
         protein: Math.max(0, Math.round(Number(parsed?.protein || 0))),
         carbs: Math.max(0, Math.round(Number(parsed?.carbs || 0))),
         fat: Math.max(0, Math.round(Number(parsed?.fat || 0))),
-        notes: String(parsed?.notes || '').slice(0, 220),
-        createdAt: new Date().toISOString()
+        fiber: Math.max(0, Math.round(Number(parsed?.fiber || 0))),
+        fitScore: Math.min(10, Math.max(1, Math.round(Number(parsed?.fitScore || 7)))),
+        notes: String(parsed?.notes || '').slice(0, 280),
+        createdAt: new Date().toISOString(),
+        auto: autoMode,
       };
       setGeneratedRecipe(nextRecipe);
+      // Salva in storico ricette (max 10)
+      const histKey = 'shadow_monarch_recipe_history';
+      try {
+        const hist = JSON.parse(localStorage.getItem(histKey) || '[]');
+        hist.unshift(nextRecipe);
+        localStorage.setItem(histKey, JSON.stringify(hist.slice(0, 10)));
+      } catch (_) {}
       playSfx('success', soundEnabled, soundTheme);
-      emitUiToast({ message: 'Ricetta generata', tone: 'success', durationMs: 2600 });
+      emitUiToast({ message: `🍽️ ${nextRecipe.title} — pronta!`, tone: 'success', durationMs: 3000 });
     } catch (error) {
       const detail = formatAiErrorDetail(error?.message || 'errore recipe').slice(0, 90);
       emitUiToast({ message: `Ricetta fallita (${detail})`, tone: 'warning', durationMs: 4200 });
@@ -5381,40 +5428,113 @@ const SystemHub = ({ systemLogs, setSystemLogs, dailyGoal, setDailyGoal, hydrati
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.0289 }} className="mb-6 rounded-2xl overflow-hidden relative" style={{ background: 'linear-gradient(145deg, rgba(10,6,22,0.97), rgba(20,8,36,0.93))', border: '1px solid rgba(167,139,250,0.22)', boxShadow: '0 8px 32px rgba(124,58,237,0.1), inset 0 1px 0 rgba(255,255,255,0.04)' }}>
         <div className="pointer-events-none absolute -top-8 -right-8 h-32 w-32 rounded-full blur-3xl" style={{ background: 'rgba(124,58,237,0.16)' }} />
         <div className="p-4 relative z-10">
-        <div className="flex items-center justify-between mb-3">
-          <div>
-            <p className="text-[9px] uppercase tracking-[0.36em] font-bold" style={{ color: 'rgba(167,139,250,0.9)' }}>◈ AI Powered</p>
-            <p className="text-sm font-black text-white" style={{ fontFamily: 'Russo One, sans-serif' }}>Recipe Forge</p>
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <p className="text-[9px] uppercase tracking-[0.36em] font-bold" style={{ color: 'rgba(167,139,250,0.9)' }}>◈ Fitporn AI</p>
+              <p className="text-sm font-black text-white" style={{ fontFamily: 'Russo One, sans-serif' }}>Recipe Forge</p>
+            </div>
+            <div className="flex gap-1.5">
+              <button onClick={() => generateRecipeFromPrompt(true)} disabled={isGeneratingRecipe}
+                className={`text-[9px] px-2.5 py-1.5 rounded-lg border transition-colors ${isGeneratingRecipe ? 'border-gray-700 text-gray-500' : 'border-violet-400/40 text-violet-300 hover:bg-violet-500/20'}`}>
+                ✨ Sorprendimi
+              </button>
+              <button onClick={() => generateRecipeFromPrompt(false)} disabled={isGeneratingRecipe}
+                className={`text-[9px] px-2.5 py-1.5 rounded-lg border transition-colors ${isGeneratingRecipe ? 'border-gray-700 text-gray-500' : 'border-violet-300/60 text-white hover:bg-violet-500/30'}`}>
+                {isGeneratingRecipe ? '⏳' : '⚡ Genera'}
+              </button>
+            </div>
           </div>
-          <button
-            onClick={generateRecipeFromPrompt}
-            disabled={isGeneratingRecipe}
-            className={`text-[9px] px-3 py-1.5 border uppercase tracking-widest transition-colors ${isGeneratingRecipe ? 'border-gray-700 text-gray-500' : 'border-violet-300/50 text-violet-200 hover:bg-violet-300 hover:text-black'}`}
-          >
-            {isGeneratingRecipe ? 'Genera...' : 'Genera Ricetta'}
-          </button>
-        </div>
-        <textarea
-          value={recipePrompt}
-          onChange={(e) => setRecipePrompt(e.target.value)}
-          placeholder="Es: voglio una ricetta high protein con pollo e riso, veloce, 700 kcal max..."
-          className="w-full bg-black/55 border border-white/15 rounded-md text-white text-xs p-2.5 h-20 focus:outline-none focus:border-violet-300"
-        />
-        {generatedRecipe ? (
-          <div className="mt-3 border border-white/10 bg-white/5 p-2">
-            <p className="text-[11px] font-black uppercase tracking-widest text-white">{generatedRecipe.title}</p>
-            <p className="text-[10px] text-violet-200 mt-1">{generatedRecipe.prepMin} min • {generatedRecipe.kcal} kcal • P {generatedRecipe.protein} • C {generatedRecipe.carbs} • F {generatedRecipe.fat}</p>
-            {generatedRecipe.ingredients?.length ? (
-              <p className="text-[10px] text-gray-300 mt-1">Ingredienti: {generatedRecipe.ingredients.join(' • ')}</p>
-            ) : null}
-            {generatedRecipe.steps?.length ? (
-              <ol className="mt-1 text-[10px] text-gray-300 list-decimal pl-4">
-                {generatedRecipe.steps.slice(0, 6).map((step, idx) => <li key={`recipe-step-${idx}`}>{step}</li>)}
-              </ol>
-            ) : null}
-            {generatedRecipe.notes ? <p className="text-[9px] text-gray-400 mt-1">{generatedRecipe.notes}</p> : null}
+          <textarea value={recipePrompt} onChange={(e) => setRecipePrompt(e.target.value)}
+            placeholder="Es: pollo e riso express, dessert proteico al cioccolato, bowl estiva leggera..."
+            className="w-full bg-black/55 border border-white/10 rounded-xl text-white text-[11px] p-3 h-14 focus:outline-none focus:border-violet-400/50 resize-none placeholder-gray-600" />
+          {/* Quick tags */}
+          <div className="flex gap-1.5 mt-2 flex-wrap">
+            {['🍗 High protein', '⚡ Pre-workout', '🌙 Cena leggera', '🍫 Dessert fit', '🥗 Bowl fresca'].map((tag) => (
+              <button key={tag} onClick={() => setRecipePrompt(tag.split(' ').slice(1).join(' '))}
+                className="text-[8px] px-2 py-0.5 rounded-full border border-violet-300/20 text-violet-400 hover:bg-violet-400/10 transition-colors">
+                {tag}
+              </button>
+            ))}
           </div>
-        ) : null}
+          {isGeneratingRecipe && (
+            <div className="mt-4 flex items-center gap-2">
+              <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#a78bfa' }} />
+              <span className="text-[10px] text-violet-300">Chef AI al lavoro...</span>
+            </div>
+          )}
+          {generatedRecipe && !isGeneratingRecipe && (
+            <div className="mt-4 rounded-xl overflow-hidden" style={{ border: '1px solid rgba(167,139,250,0.2)', background: 'rgba(0,0,0,0.4)' }}>
+              {/* Header fitporn */}
+              <div className="p-3 pb-2" style={{ background: 'linear-gradient(135deg, rgba(124,58,237,0.2), rgba(79,70,229,0.15))' }}>
+                <div className="flex items-start gap-2">
+                  <span className="text-3xl leading-none">{generatedRecipe.emoji}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-black text-white leading-tight" style={{ fontFamily: 'Russo One, sans-serif' }}>{generatedRecipe.title}</p>
+                    {generatedRecipe.tagline && <p className="text-[10px] text-violet-200 mt-0.5 italic leading-snug">"{generatedRecipe.tagline}"</p>}
+                  </div>
+                  <div className="flex-shrink-0 flex flex-col items-end gap-1">
+                    <div className="px-1.5 py-0.5 rounded text-[8px] font-bold" style={{ background: 'rgba(167,139,250,0.2)', color: '#c4b5fd' }}>
+                      FIT {generatedRecipe.fitScore}/10
+                    </div>
+                    <div className="text-[8px] text-gray-400">{generatedRecipe.difficulty}</div>
+                  </div>
+                </div>
+                <div className="flex gap-3 mt-2 text-[9px] text-gray-400">
+                  {generatedRecipe.prepMin > 0 && <span>⏱ prep {generatedRecipe.prepMin}min</span>}
+                  {generatedRecipe.cookMin > 0 && <span>🔥 cook {generatedRecipe.cookMin}min</span>}
+                  <span className="capitalize">{generatedRecipe.mood}</span>
+                </div>
+              </div>
+              {/* Macro bar */}
+              <div className="grid grid-cols-4 divide-x divide-white/5 border-b border-white/5">
+                {[
+                  { label: 'Kcal', val: generatedRecipe.kcal, color: '#f97316' },
+                  { label: 'Prot', val: `${generatedRecipe.protein}g`, color: '#10b981' },
+                  { label: 'Carb', val: `${generatedRecipe.carbs}g`, color: '#3b82f6' },
+                  { label: 'Grass', val: `${generatedRecipe.fat}g`, color: '#f59e0b' },
+                ].map((m) => (
+                  <div key={m.label} className="py-2 text-center">
+                    <p className="text-[11px] font-black" style={{ color: m.color }}>{m.val}</p>
+                    <p className="text-[8px] text-gray-500 uppercase">{m.label}</p>
+                  </div>
+                ))}
+              </div>
+              {/* Ingredienti */}
+              {generatedRecipe.ingredients?.length > 0 && (
+                <div className="p-3 border-b border-white/5">
+                  <p className="text-[8px] uppercase tracking-widest text-gray-500 mb-1.5">Ingredienti</p>
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-0.5">
+                    {generatedRecipe.ingredients.map((ing, i) => (
+                      <div key={i} className="flex justify-between text-[10px]">
+                        <span className="text-gray-300 truncate">{ing.item || ing}</span>
+                        {ing.amount && <span className="text-gray-500 ml-1 flex-shrink-0">{ing.amount}</span>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {/* Steps */}
+              {generatedRecipe.steps?.length > 0 && (
+                <div className="p-3 border-b border-white/5">
+                  <p className="text-[8px] uppercase tracking-widest text-gray-500 mb-1.5">Preparazione</p>
+                  <ol className="space-y-1.5">
+                    {generatedRecipe.steps.map((step, i) => (
+                      <li key={i} className="flex gap-2 text-[10px] text-gray-300 leading-snug">
+                        <span className="flex-shrink-0 w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-bold mt-0.5" style={{ background: 'rgba(167,139,250,0.2)', color: '#a78bfa' }}>{i + 1}</span>
+                        <span>{step}</span>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              )}
+              {/* Note hack */}
+              {generatedRecipe.notes && (
+                <div className="p-3">
+                  <p className="text-[9px] text-violet-300 leading-relaxed">💡 {generatedRecipe.notes}</p>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </motion.div>
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} whileHover={{ y: -2, scale: 1.005 }} transition={{ delay: 0.0832 }} className="bg-black/40 border border-fuchsia-300/30 p-5 rounded-sm mb-6">
