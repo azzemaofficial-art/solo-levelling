@@ -398,7 +398,7 @@ useEffect(() => { localStorage.setItem('shadow_monarch_macros', JSON.stringify(m
         ...(payload.height ? { heightCm: Number(payload.height) } : {}),
         ...(payload.age ? { age: Number(payload.age) } : {}),
         ...(payload.sex ? { sex: payload.sex } : {}),
-        ...(payload.targetWeight ? { targetWeightKg: Number(payload.targetWeight) } : {}),
+        ...(payload.targetWeight ? { bodyGoal: { ...(prev.bodyGoal || {}), targetWeightKg: Number(payload.targetWeight) } } : {}),
       }));
     }
     const parts = [];
