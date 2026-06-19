@@ -4818,44 +4818,126 @@ Rispondi SOLO JSON valido:
         </div>
       </motion.div>
 
-      {/* Profilo Fisico card */}
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.0105 }}
-        className="mb-6 rounded-xl p-4 relative overflow-hidden"
-        style={{
-          background: 'linear-gradient(145deg, rgba(6,20,36,0.97), rgba(10,28,46,0.93))',
-          border: '1px solid rgba(0,242,255,0.14)',
-          boxShadow: '0 6px 24px rgba(0,242,255,0.06)'
-        }}
-      >
-        <div className="pointer-events-none absolute -top-10 -left-10 h-32 w-32 rounded-full blur-3xl" style={{ background: 'rgba(0,242,255,0.08)' }} />
-        <div className="relative z-10">
-          <p className="text-[9px] uppercase tracking-[0.38em] font-bold mb-3" style={{ color: '#00f2ff' }}>◈ Profilo Fisico</p>
-          <div className="grid grid-cols-3 gap-2">
-            {[
-              { label: 'Peso', value: currentWeight ? `${currentWeight} kg` : '--', color: '#cffafe' },
-              { label: 'Altezza', value: (playerStats?.heightCm || metabolicProfile?.heightCm) ? `${playerStats?.heightCm || metabolicProfile?.heightCm} cm` : '--', color: '#cffafe' },
-              { label: 'BMI', value: profileHeightCm >= 120 && currentWeight ? (currentWeight / ((profileHeightCm / 100) ** 2)).toFixed(1) : '--', color: '#d8b4fe' },
-              { label: 'Età', value: (playerStats?.age || metabolicProfile?.age) ? `${playerStats?.age || metabolicProfile?.age} anni` : '--', color: '#cffafe' },
-              { label: 'Sesso', value: (() => { const s = playerStats?.sex || metabolicProfile?.sex; return s ? (s === 'M' || s === 'male' ? '♂ M' : '♀ F') : '--'; })(), color: '#cffafe' },
-              { label: 'Target', value: bodyGoal.targetWeightKg > 0 ? `${bodyGoal.targetWeightKg} kg` : '--', color: goalDeltaKg < 0 ? '#6ee7b7' : goalDeltaKg > 0 ? '#fca5a5' : '#cffafe' },
-              { label: 'Body Fat', value: bodyCompById.fat?.hasData ? `${bodyCompById.fat.current}%` : '--', color: '#f0e6ff' },
-              { label: 'Body Water', value: bodyCompById.bodyWaterPct?.hasData ? `${bodyCompById.bodyWaterPct.current}%` : '--', color: '#a5f3fc' },
-              { label: 'Viscerale', value: bodyCompById.visceralFat?.hasData ? `${bodyCompById.visceralFat.current}` : '--', color: '#fca5a5' },
-              { label: 'Lean Mass', value: bodyCompById.leanMass?.hasData ? `${bodyCompById.leanMass.current} kg` : '--', color: '#6ee7b7' },
-              { label: 'Muscolo', value: bodyCompById.muscleMassKg?.hasData ? `${bodyCompById.muscleMassKg.current} kg` : '--', color: '#6ee7b7' },
-              { label: 'BMR', value: profileBMR > 0 ? `${profileBMR} kcal` : '--', color: '#fde68a' },
-            ].map(({ label, value, color }) => (
-              <div key={label} className="bg-white/4 border border-white/8 rounded-lg p-2">
-                <p className="text-[8px] uppercase tracking-widest text-gray-500 mb-0.5">{label}</p>
-                <p className="text-sm font-black" style={{ color, fontFamily: 'Russo One, sans-serif' }}>{value}</p>
+      {/* ── Profilo Fisico — HUD Biometrico ── */}
+      {(() => {
+        const bmiVal = profileHeightCm >= 120 && currentWeight ? Number((currentWeight / ((profileHeightCm / 100) ** 2)).toFixed(1)) : null;
+        const bmiColor = !bmiVal ? '#6b7280' : bmiVal < 18.5 ? '#93c5fd' : bmiVal < 25 ? '#6ee7b7' : bmiVal < 30 ? '#fbbf24' : '#f87171';
+        const bmiLabel = !bmiVal ? '' : bmiVal < 18.5 ? 'Sottopeso' : bmiVal < 25 ? 'Ottimale' : bmiVal < 30 ? 'Sovrappeso' : 'Obesità';
+        const sexVal = playerStats?.sex || metabolicProfile?.sex;
+        const heightVal = playerStats?.heightCm || metabolicProfile?.heightCm;
+        const ageVal = playerStats?.age || metabolicProfile?.age;
+        const fatVal = bodyCompById.fat?.hasData ? bodyCompById.fat.current : null;
+        const isMale = sexVal === 'M' || sexVal === 'male';
+        const fatColor = !fatVal ? '#6b7280' : (isMale ? fatVal < 15 : fatVal < 22) ? '#6ee7b7' : (isMale ? fatVal < 25 : fatVal < 32) ? '#fbbf24' : '#f87171';
+        const waterColor = bodyCompById.bodyWaterPct?.hasData ? (bodyCompById.bodyWaterPct.current >= 50 ? '#67e8f9' : '#fbbf24') : '#6b7280';
+        const viscVal = bodyCompById.visceralFat?.hasData ? bodyCompById.visceralFat.current : null;
+        const viscColor = !viscVal ? '#6b7280' : viscVal <= 9 ? '#6ee7b7' : viscVal <= 14 ? '#fbbf24' : '#f87171';
+        const deltaColor = goalDeltaKg === 0 || !bodyGoal.targetWeightKg ? '#00f2ff' : Math.abs(goalDeltaKg) <= 2 ? '#6ee7b7' : goalDeltaKg < 0 ? '#6ee7b7' : '#fca5a5';
+        const metrics = [
+          { label: 'Peso', value: currentWeight ? `${currentWeight}` : '--', unit: 'kg', color: '#00f2ff', sub: bodyGoal.targetWeightKg > 0 ? `goal ${bodyGoal.targetWeightKg}kg` : null },
+          { label: 'Altezza', value: heightVal ? `${heightVal}` : '--', unit: 'cm', color: '#67e8f9', sub: null },
+          { label: 'BMI', value: bmiVal ? `${bmiVal}` : '--', unit: '', color: bmiColor, sub: bmiLabel },
+          { label: 'Età', value: ageVal ? `${ageVal}` : '--', unit: 'anni', color: '#c4b5fd', sub: null },
+          { label: 'Sesso', value: sexVal ? (isMale ? '♂' : '♀') : '--', unit: sexVal ? (isMale ? 'M' : 'F') : '', color: '#f0abfc', sub: null },
+          { label: 'Target', value: bodyGoal.targetWeightKg > 0 ? `${bodyGoal.targetWeightKg}` : '--', unit: 'kg', color: deltaColor, sub: goalDeltaKg !== 0 && bodyGoal.targetWeightKg > 0 ? `${goalDeltaKg > 0 ? '+' : ''}${goalDeltaKg}kg` : null },
+          { label: 'Body Fat', value: fatVal ? `${fatVal}` : '--', unit: '%', color: fatColor, sub: null },
+          { label: 'Body Water', value: bodyCompById.bodyWaterPct?.hasData ? `${bodyCompById.bodyWaterPct.current}` : '--', unit: '%', color: waterColor, sub: null },
+          { label: 'Viscerale', value: viscVal ? `${viscVal}` : '--', unit: '', color: viscColor, sub: viscVal ? (viscVal <= 9 ? 'Normale' : viscVal <= 14 ? 'Alto' : 'Critico') : null },
+          { label: 'Lean Mass', value: bodyCompById.leanMass?.hasData ? `${bodyCompById.leanMass.current}` : '--', unit: 'kg', color: '#6ee7b7', sub: null },
+          { label: 'Muscolo', value: bodyCompById.muscleMassKg?.hasData ? `${bodyCompById.muscleMassKg.current}` : '--', unit: 'kg', color: '#4ade80', sub: null },
+          { label: 'BMR', value: profileBMR > 0 ? `${profileBMR}` : '--', unit: 'kcal', color: '#fde68a', sub: profileBMR > 0 ? 'riposo' : null },
+        ];
+        return (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.0105, type: 'spring', stiffness: 220, damping: 26 }}
+            className="mb-6 relative overflow-hidden rounded-2xl"
+            style={{
+              background: 'linear-gradient(145deg, rgba(2,10,24,0.99) 0%, rgba(6,18,40,0.97) 50%, rgba(4,14,32,0.99) 100%)',
+              border: '1px solid rgba(0,242,255,0.2)',
+              boxShadow: '0 0 0 1px rgba(0,242,255,0.04), 0 24px 64px rgba(0,0,0,0.75), 0 8px 32px rgba(0,242,255,0.1)',
+            }}
+          >
+            {/* Ambient orbs */}
+            <div className="pointer-events-none absolute -top-20 -left-20 w-64 h-64 rounded-full blur-3xl" style={{ background: 'radial-gradient(circle, rgba(0,242,255,0.16), transparent 70%)', animation: 'drift-slow 14s ease-in-out infinite' }} />
+            <div className="pointer-events-none absolute -bottom-16 -right-16 w-56 h-56 rounded-full blur-3xl" style={{ background: 'radial-gradient(circle, rgba(124,58,237,0.16), transparent 70%)', animation: 'drift-reverse 18s ease-in-out infinite' }} />
+            <div className="pointer-events-none absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-20 rounded-full blur-3xl opacity-20" style={{ background: 'radial-gradient(ellipse, rgba(0,242,255,0.3), transparent 70%)' }} />
+            {/* HUD grid */}
+            <div className="pointer-events-none absolute inset-0 hud-grid opacity-40" />
+            {/* Scanlines */}
+            <div className="pointer-events-none absolute inset-0 system-scanlines opacity-30" />
+            {/* Top shimmer line */}
+            <div className="pointer-events-none absolute top-0 left-0 right-0 h-px" style={{ background: 'linear-gradient(90deg, transparent 0%, rgba(0,242,255,0.7) 30%, rgba(124,58,237,0.5) 70%, transparent 100%)', animation: 'frame-glow-shift 3.5s ease-in-out infinite' }} />
+            {/* Bottom accent */}
+            <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-px" style={{ background: 'linear-gradient(90deg, transparent 0%, rgba(124,58,237,0.4) 50%, transparent 100%)' }} />
+
+            <div className="relative z-10 p-5">
+              {/* Header */}
+              <div className="flex items-center justify-between mb-5">
+                <div>
+                  <p className="text-[8px] uppercase font-bold mb-1" style={{ color: '#00f2ff', fontFamily: 'Orbitron, sans-serif', letterSpacing: '0.45em' }}>◈ Profilo Fisico</p>
+                  <p className="text-[10px] text-gray-400 tracking-wider">Biometria · {metrics.filter(m => m.value !== '--').length}/{metrics.length} metriche attive</p>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" style={{ boxShadow: '0 0 8px #4ade80', animation: 'pulse-glow 2s ease-in-out infinite' }} />
+                  <span className="text-[8px] uppercase tracking-widest" style={{ color: '#4ade80', fontFamily: 'Orbitron, sans-serif' }}>Live</span>
+                </div>
               </div>
-            ))}
-          </div>
-        </div>
-      </motion.div>
+
+              {/* Metrics grid */}
+              <motion.div
+                className="grid grid-cols-3 gap-2"
+                initial="hidden"
+                animate="visible"
+                variants={{ visible: { transition: { staggerChildren: 0.045, delayChildren: 0.12 } } }}
+              >
+                {metrics.map(({ label, value, unit, color, sub }) => (
+                  <motion.div
+                    key={label}
+                    variants={{
+                      hidden: { opacity: 0, scale: 0.82, y: 10 },
+                      visible: { opacity: 1, scale: 1, y: 0, transition: { type: 'spring', stiffness: 340, damping: 22 } }
+                    }}
+                    whileHover={{ scale: 1.05, transition: { type: 'spring', stiffness: 400, damping: 18 } }}
+                    whileTap={{ scale: 0.96 }}
+                    className="hud-chip relative rounded-xl overflow-hidden"
+                    style={{
+                      background: `linear-gradient(145deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02))`,
+                      border: `1px solid ${value !== '--' ? color + '28' : 'rgba(255,255,255,0.06)'}`,
+                      boxShadow: value !== '--' ? `0 0 12px ${color}10, inset 0 1px 0 rgba(255,255,255,0.04)` : 'inset 0 1px 0 rgba(255,255,255,0.03)',
+                    }}
+                  >
+                    {/* Tile top glow when active */}
+                    {value !== '--' && (
+                      <div className="pointer-events-none absolute top-0 left-0 right-0 h-px" style={{ background: `linear-gradient(90deg, transparent, ${color}60, transparent)` }} />
+                    )}
+                    <div className="p-2.5">
+                      <p className="text-[7px] uppercase tracking-widest mb-1.5" style={{ color: 'rgba(156,163,175,0.7)', fontFamily: 'Orbitron, sans-serif' }}>{label}</p>
+                      <div className="flex items-baseline gap-1">
+                        <p className="text-lg font-black leading-none" style={{ color: value !== '--' ? color : 'rgba(107,114,128,0.6)', fontFamily: 'Russo One, sans-serif', filter: value !== '--' ? `drop-shadow(0 0 6px ${color}66)` : 'none' }}>
+                          {value}
+                        </p>
+                        {unit && value !== '--' && (
+                          <p className="text-[8px] font-bold" style={{ color: color + 'aa' }}>{unit}</p>
+                        )}
+                      </div>
+                      {sub && (
+                        <p className="text-[8px] mt-1 leading-none" style={{ color: color + 'bb', fontFamily: 'Chakra Petch, sans-serif' }}>{sub}</p>
+                      )}
+                    </div>
+                  </motion.div>
+                ))}
+              </motion.div>
+
+              {/* Bottom hint */}
+              <p className="text-[8px] text-center mt-4 tracking-widest" style={{ color: 'rgba(0,242,255,0.3)', fontFamily: 'Orbitron, sans-serif' }}>
+                INVIA DATI VIA TELEGRAM · AGGIORNAMENTO REAL-TIME
+              </p>
+            </div>
+          </motion.div>
+        );
+      })()}
 
       <motion.div
         initial={{ opacity: 0, y: 10 }}
