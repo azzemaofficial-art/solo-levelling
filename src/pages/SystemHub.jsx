@@ -1189,6 +1189,15 @@ const SystemHub = ({ systemLogs, setSystemLogs, dailyGoal, setDailyGoal, hydrati
   });
   const bodyGoal = playerStats.bodyGoal || { targetWeightKg: 0, targetFatPct: 0 };
   const currentWeight = Number(todayData.weight || 0) || Number(playerStats.currentWeightKg || 0);
+  const profileBMR = (() => {
+    const w = currentWeight || Number(playerStats?.currentWeightKg || 0);
+    const h = Number(playerStats?.heightCm || metabolicProfile?.heightCm || 0);
+    const age = Number(playerStats?.age || metabolicProfile?.age || 0);
+    const sex = playerStats?.sex || metabolicProfile?.sex || 'male';
+    if (w < 30 || h < 120 || age < 10) return 0;
+    const sexAdj = (sex === 'F' || sex === 'female') ? -161 : 5;
+    return Math.round((10 * w) + (6.25 * h) - (5 * age) + sexAdj);
+  })();
   const goalDeltaKg = bodyGoal.targetWeightKg > 0 && currentWeight > 0 ? Number((bodyGoal.targetWeightKg - currentWeight).toFixed(1)) : 0;
   const trendAbs = Math.abs(Number(weightTrend.weeklyDeltaKg || 0));
   const estimatedWeeksToGoal = bodyGoal.targetWeightKg > 0 && currentWeight > 0 && trendAbs > 0.05
@@ -4805,6 +4814,45 @@ Rispondi SOLO JSON valido:
               <p className="text-[9px] uppercase tracking-widest mb-1" style={{ color: '#6ee7b7' }}>Hydration</p>
               <p className="text-xl font-black" style={{ color: '#d1fae5', fontFamily: 'Russo One, sans-serif' }}>{Math.round(hydrationPct)}%</p>
             </div>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* Profilo Fisico card */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.0105 }}
+        className="mb-6 rounded-xl p-4 relative overflow-hidden"
+        style={{
+          background: 'linear-gradient(145deg, rgba(6,20,36,0.97), rgba(10,28,46,0.93))',
+          border: '1px solid rgba(0,242,255,0.14)',
+          boxShadow: '0 6px 24px rgba(0,242,255,0.06)'
+        }}
+      >
+        <div className="pointer-events-none absolute -top-10 -left-10 h-32 w-32 rounded-full blur-3xl" style={{ background: 'rgba(0,242,255,0.08)' }} />
+        <div className="relative z-10">
+          <p className="text-[9px] uppercase tracking-[0.38em] font-bold mb-3" style={{ color: '#00f2ff' }}>◈ Profilo Fisico</p>
+          <div className="grid grid-cols-3 gap-2">
+            {[
+              { label: 'Peso', value: currentWeight ? `${currentWeight} kg` : '--', color: '#cffafe' },
+              { label: 'Altezza', value: (playerStats?.heightCm || metabolicProfile?.heightCm) ? `${playerStats?.heightCm || metabolicProfile?.heightCm} cm` : '--', color: '#cffafe' },
+              { label: 'BMI', value: profileHeightCm >= 120 && currentWeight ? (currentWeight / ((profileHeightCm / 100) ** 2)).toFixed(1) : '--', color: '#d8b4fe' },
+              { label: 'Età', value: (playerStats?.age || metabolicProfile?.age) ? `${playerStats?.age || metabolicProfile?.age} anni` : '--', color: '#cffafe' },
+              { label: 'Sesso', value: (() => { const s = playerStats?.sex || metabolicProfile?.sex; return s ? (s === 'M' || s === 'male' ? '♂ M' : '♀ F') : '--'; })(), color: '#cffafe' },
+              { label: 'Target', value: bodyGoal.targetWeightKg > 0 ? `${bodyGoal.targetWeightKg} kg` : '--', color: goalDeltaKg < 0 ? '#6ee7b7' : goalDeltaKg > 0 ? '#fca5a5' : '#cffafe' },
+              { label: 'Body Fat', value: bodyCompById.fat?.hasData ? `${bodyCompById.fat.current}%` : '--', color: '#f0e6ff' },
+              { label: 'Body Water', value: bodyCompById.bodyWaterPct?.hasData ? `${bodyCompById.bodyWaterPct.current}%` : '--', color: '#a5f3fc' },
+              { label: 'Viscerale', value: bodyCompById.visceralFat?.hasData ? `${bodyCompById.visceralFat.current}` : '--', color: '#fca5a5' },
+              { label: 'Lean Mass', value: bodyCompById.leanMass?.hasData ? `${bodyCompById.leanMass.current} kg` : '--', color: '#6ee7b7' },
+              { label: 'Muscolo', value: bodyCompById.muscleMassKg?.hasData ? `${bodyCompById.muscleMassKg.current} kg` : '--', color: '#6ee7b7' },
+              { label: 'BMR', value: profileBMR > 0 ? `${profileBMR} kcal` : '--', color: '#fde68a' },
+            ].map(({ label, value, color }) => (
+              <div key={label} className="bg-white/4 border border-white/8 rounded-lg p-2">
+                <p className="text-[8px] uppercase tracking-widest text-gray-500 mb-0.5">{label}</p>
+                <p className="text-sm font-black" style={{ color, fontFamily: 'Russo One, sans-serif' }}>{value}</p>
+              </div>
+            ))}
           </div>
         </div>
       </motion.div>

@@ -382,7 +382,14 @@ useEffect(() => { localStorage.setItem('shadow_monarch_macros', JSON.stringify(m
         const burn = Number(base.workoutBurn ?? base.burned ?? 0) + Number(payload.burn || 0);
         patch = { workoutBurn: burn, burned: burn };
       } else if (payload.type === 'measurement') {
-        patch = { ...(payload.weight ? { weight: Number(payload.weight) } : {}) };
+        patch = {
+          ...(payload.weight ? { weight: Number(payload.weight) } : {}),
+          ...(payload.bodyFat ? { fat: Number(payload.bodyFat) } : {}),
+          ...(payload.bodyWater ? { bodyWaterPct: Number(payload.bodyWater) } : {}),
+          ...(payload.visceral ? { visceralFat: Number(payload.visceral) } : {}),
+          ...(payload.leanMass ? { leanMass: Number(payload.leanMass) } : {}),
+          ...(payload.muscleMass ? { muscleMassKg: Number(payload.muscleMass) } : {}),
+        };
       }
       const updated = { ...base, ...patch };
       const next = [...prev];

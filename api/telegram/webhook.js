@@ -40,7 +40,12 @@ function detectMeasurement(text) {
     || t.match(/^(\d{1,2})\s*anni$/i);
   const sexMatch = t.match(/(?:sesso|genere|sex|gender)\s*[:=]?\s*(m|f|maschio|femmina|male|female)/i);
   const targetMatch = t.match(/(?:target|obiettivo|goal)\s*(?:peso|weight)?\s*[:=]?\s*(\d{2,3}(?:[.,]\d{1,2})?)\s*(?:kg)?/i);
-  if (!weightMatch && !fatMatch && !heightMatch && !ageMatch && !sexMatch && !targetMatch) return null;
+  const bodyWaterMatch = t.match(/(?:acqua|body.?water|water)\s*[:=]?\s*(\d{1,2}(?:[.,]\d)?)\s*%?/i);
+  const visceralMatch = t.match(/(?:viscerale?|visceral)\s*[:=]?\s*(\d{1,2}(?:[.,]\d)?)/i);
+  const leanMatch = t.match(/(?:massa\s*magra|lean\s*mass|lean)\s*[:=]?\s*(\d{2,3}(?:[.,]\d{1,2})?)\s*(?:kg)?/i);
+  const muscleMatch = t.match(/(?:muscolo|massa\s*muscolare|muscle)\s*[:=]?\s*(\d{2,3}(?:[.,]\d{1,2})?)\s*(?:kg)?/i);
+  if (!weightMatch && !fatMatch && !heightMatch && !ageMatch && !sexMatch && !targetMatch
+      && !bodyWaterMatch && !visceralMatch && !leanMatch && !muscleMatch) return null;
   let sex = null;
   if (sexMatch) {
     const s = sexMatch[1].toLowerCase();
@@ -53,6 +58,10 @@ function detectMeasurement(text) {
     age: ageMatch ? parseInt(ageMatch[1], 10) : null,
     sex,
     targetWeight: targetMatch ? parseFloat(targetMatch[1].replace(',', '.')) : null,
+    bodyWater: bodyWaterMatch ? parseFloat(bodyWaterMatch[1].replace(',', '.')) : null,
+    visceral: visceralMatch ? parseFloat(visceralMatch[1].replace(',', '.')) : null,
+    leanMass: leanMatch ? parseFloat(leanMatch[1].replace(',', '.')) : null,
+    muscleMass: muscleMatch ? parseFloat(muscleMatch[1].replace(',', '.')) : null,
   };
 }
 
@@ -216,24 +225,21 @@ export default async function handler(req, res) {
 
   // Rilevamento misurazioni corporee — bypass AI
   const measurement = detectMeasurement(text);
-  if (measurement && (measurement.weight || measurement.height || measurement.age || measurement.sex || measurement.bodyFat || measurement.targetWeight)) {
-    const payload = {
-      type: 'measurement', ts: Date.now(),
-      weight: measurement.weight || null,
-      bodyFat: measurement.bodyFat || null,
-      height: measurement.height || null,
-      age: measurement.age || null,
-      sex: measurement.sex || null,
-      targetWeight: measurement.targetWeight || null,
-    };
+  if (measurement && Object.values(measurement).some(Boolean)) {
+    const payload = { type: 'measurement', ts: Date.now(), ...measurement };
     await kvSet(`tg_import:${incomingChatId}`, payload);
     let lines = [];
     if (measurement.weight) lines.push(`⚖️ Peso: <b>${measurement.weight} kg</b>`);
     if (measurement.bodyFat) lines.push(`💧 Body fat: <b>${measurement.bodyFat}%</b>`);
+    if (measurement.bodyWater) lines.push(`💦 Body water: <b>${measurement.bodyWater}%</b>`);
+    if (measurement.visceral) lines.push(`🔴 Grasso viscerale: <b>${measurement.visceral}</b>`);
+    if (measurement.leanMass) lines.push(`💪 Massa magra: <b>${measurement.leanMass} kg</b>`);
+    if (measurement.muscleMass) lines.push(`🏋️ Muscolo: <b>${measurement.muscleMass} kg</b>`);
     if (measurement.height) lines.push(`📏 Altezza: <b>${measurement.height} cm</b>`);
     if (measurement.age) lines.push(`🎂 Età: <b>${measurement.age} anni</b>`);
     if (measurement.sex) lines.push(`👤 Sesso: <b>${measurement.sex === 'M' ? 'Maschio' : 'Femmina'}</b>`);
     if (measurement.targetWeight) lines.push(`🎯 Target peso: <b>${measurement.targetWeight} kg</b>`);
+    if (!lines.length) return res.status(200).json({ ok: true });
     const reply = lines.join('\n') + '\n\n📊 Salvato nel profilo — apri il sito per vedere i dati aggiornati.';
     await sendTelegramMessage(botToken, incomingChatId, reply);
     return res.status(200).json({ ok: true });
