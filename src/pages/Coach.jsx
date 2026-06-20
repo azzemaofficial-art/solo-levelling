@@ -128,6 +128,125 @@ const CURRICULUM = {
     { label: 'Avanzato',   weeks: '13-24', color: 'orange',  topics: ['Difesa da coltello', 'Difesa da arma da fuoco', 'Aggressori multipli', 'Difesa in auto', 'Stress inoculation'], milestone: 'Scenario multiplo 3 minuti no-stop' },
     { label: 'Pro',        weeks: '25+',   color: 'rose',    topics: ['Weapon retention', 'Force continuum', 'Mission-specific training', 'Istruttore P1 prep', 'Scenario avanzati notturni'], milestone: 'Certificazione istruttore P1/P2' },
   ]},
+
+  capoeira: { name: 'Capoeira', emoji: '🌀', levels: [
+    { label: 'Fondamenta', weeks: '1-6',   color: 'emerald', topics: ['Ginga (dondolio base)', 'Au (cartwheel)', 'Galpão e role (spostamenti)', 'Meia-lua de frente (calcio frontale)', 'Ritmo del berimbau e canto'], milestone: 'Ginga fluida per 3 minuti senza fermarsi' },
+    { label: 'Tecnica',    weeks: '7-16',  color: 'blue',    topics: ['Armada (calcio rotante)', 'Queixada (calcio laterale)', 'Martelo (calcio col tallone)', 'Negativa e esquiva (schivate a terra)', 'Jogo (gioco dialogico con partner)'], milestone: 'Jogo base 5 minuti con partner' },
+    { label: 'Avanzato',   weeks: '17-32', color: 'orange',  topics: ['Macaco (acrobazia saltata)', 'Chapéu de couro (calcio invertito)', 'S-dobrado (sequenza acrobatica)', 'Rasteira (spazzata)', 'Malícia (inganno e lettura del partner)'], milestone: 'Batizado: presentazione nella roda ufficiale' },
+    { label: 'Pro',        weeks: '33+',   color: 'rose',    topics: ['Parafuso (calcio volante rotante)', 'Au batido (cartwheel con calcio)', 'Angola vs Regional: stili a confronto', 'Musica e strumenti (berimbau, atabaque)', 'Insegnamento e direzione della roda'], milestone: 'Grado superiore e conduzione della roda' },
+  ]},
+
+  sambo: { name: 'Sambo', emoji: '🤼', levels: [
+    { label: 'Fondamenta', weeks: '1-4',   color: 'emerald', topics: ['Stance e kuzushi (sbilancio)', 'Cadute sicure (ukemi SAMBO)', 'Presa al bavero e cintura', 'Sgambetto (podnozhka)', 'Hip throw di base (podsad)'], milestone: 'Hip throw da entrambi i lati × 10' },
+    { label: 'Tecnica',    weeks: '5-12',  color: 'blue',    topics: ['Zatsep (harai-goshi variante)', 'Presa alle gambe (double/single leg)', 'Controllo a terra (kesa/side)', 'Footlock base (achilles lock)', 'Grappling jacket sparring leggero'], milestone: 'Match Sport Sambo (no-strike) 3 round' },
+    { label: 'Avanzato',   weeks: '13-24', color: 'orange',  topics: ['Heel hook e knee bar', 'Arm bar da standing e ground', 'Sambo rolling (transizioni veloci)', 'Combat Sambo striking base', 'Counter takedown e sprawl'], milestone: 'Torneo regionale Sport Sambo' },
+    { label: 'Pro',        weeks: '25+',   color: 'rose',    topics: ['Combat Sambo (striking + grappling + weapon defense)', 'Analisi tattica avversario', 'Periodizzazione gara', 'Grip fighting avanzato', 'Preparazione atletica specifica'], milestone: 'Gara Combat Sambo o Campionato nazionale' },
+  ]},
+
+  hapkido: { name: 'Hapkido', emoji: '🔄', levels: [
+    { label: 'Fondamenta', weeks: '1-4',   color: 'emerald', topics: ['Principi: Hwa (armonia), Won (circolo), Yu (flusso)', 'Postura e cadute (ukemi)', 'Rotazione del polso (leve di base)', 'Calcio frontale e laterale basso', 'Deflettere invece di bloccare'], milestone: 'Tre leve articolari di polso da entrambi i lati' },
+    { label: 'Tecnica',    weeks: '5-14',  color: 'blue',    topics: ['Leve di gomito e spalla', 'Proiezioni da presa al polso', 'Calci a media e alta quota', 'Difesa da attacchi col pugno', 'Joint lock flow drill'], milestone: 'Sequenza di difesa da 5 attacchi diversi' },
+    { label: 'Avanzato',   weeks: '15-28', color: 'orange',  topics: ['Calci saltati (spinning, flying)', 'Difesa a terra e rialzo', 'Proiezioni a due mani', 'Hapkido vs Hapkido (randori)', 'Difesa da armi (bastone, coltello base)'], milestone: 'Cintura nera 1° Dan: esame tecnico completo' },
+    { label: 'Pro',        weeks: '29+',   color: 'rose',    topics: ['Difesa da armi da fuoco', 'Kyusho (punti vitali)', 'Hoshinsul (autodifesa avanzata)', 'Allenamento istruttori', 'Competizione internazionale IHF'], milestone: 'Dan superiore o certificazione istruttore IHF' },
+  ]},
+
+  wingchun: { name: 'Wing Chun', emoji: '✋', levels: [
+    { label: 'Fondamenta', weeks: '1-6',   color: 'emerald', topics: ['Yee Gee Kim Yeung Ma (stance a cavallo)', 'Centreline theory (linea centrale)', 'Chain punch × 100 ogni sessione', 'Pak Sao (deviazione palmo)', 'Tan Sao / Bong Sao / Fook Sao (tre mani base)'], milestone: 'Siu Nim Tao (prima forma) da memoria' },
+    { label: 'Tecnica',    weeks: '7-18',  color: 'blue',    topics: ['Chi Sao (mani appiccicose) base', 'Turning stance (Biu Ma)', 'Lap Sao (presa e tiro)', 'Pak Sao counter-punch combo', 'Chum Kiu (seconda forma)'], milestone: 'Chi Sao singola mano fluido 5 minuti' },
+    { label: 'Avanzato',   weeks: '19-36', color: 'orange',  topics: ['Chi Sao doppia mano rolling', 'Wooden dummy (Muk Yan Jong) base 10 sezioni', 'Biu Gee (terza forma)', 'Sparring a distanza ravvicinata', 'Trapping hands avanzate'], milestone: 'Wooden dummy 116 tecniche complete' },
+    { label: 'Pro',        weeks: '37+',   color: 'rose',    topics: ['Luk Dim Boon Kwan (palo lungo)', 'Bart Cham Dao (spade doppie)', 'Insegnamento e analisi concettuale', 'Seminari internazionali', 'Ricerca e confronto tra lignaggi (Ip Man, William Cheung, Wong Shun Leung)'], milestone: 'Certificazione Sifu nel proprio lignaggio' },
+  ]},
+
+  kungfu: { name: 'Kung Fu', emoji: '🐉', levels: [
+    { label: 'Fondamenta', weeks: '1-6',   color: 'emerald', topics: ['Stance fondamentali (ma bu, gong bu, pu bu)', 'Pugni base (chong quan, biao quan)', 'Calci base (zheng ti, ce ti)', 'Rotolamento e cadute', 'Qigong base (respirazione e radicamento)'], milestone: 'Forma corta di base (5 tecniche) da memoria' },
+    { label: 'Tecnica',    weeks: '7-20',  color: 'blue',    topics: ['Forma lunga (Chang Quan o Nan Quan)', 'Sparring a mani nude (San Shou base)', 'Uso del bastone (Gun)', 'Accelerazione e potenza nei colpi', 'Flessibilità e splits progressivi'], milestone: 'Gara di Wushu forme base (giudici)' },
+    { label: 'Avanzato',   weeks: '21-40', color: 'orange',  topics: ['Forma avanzata (Nanquan/Changquan)', 'San Shou (Sanda) competitivo', 'Bastone avanzato e spada (Jian)', 'Tecniche aeree (wuying jiao, xuan feng jiao)', 'Qigong di livello avanzato'], milestone: 'Competizione Wushu regionale / Cintura arancione Sanda' },
+    { label: 'Pro',        weeks: '41+',   color: 'rose',    topics: ['Specializzazione stile (Shaolin, Wing Chun, Tai Chi Chuan)', 'Armi multiple (dao, gun, jian, qiang)', 'Internal arts (Tai Chi, Ba Gua, Xing Yi)', 'Insegnamento e apertura scuola', 'Competizioni internazionali IWUF'], milestone: 'Medaglia in Wushu o Dan superiore nel proprio stile' },
+  ]},
+
+  silat: { name: 'Silat', emoji: '🗡️', levels: [
+    { label: 'Fondamenta', weeks: '1-5',   color: 'emerald', topics: ['Langkah (passi geometrici)', 'Kuda-kuda (stance basse)', 'Serangan tangan (colpi di mano)', 'Tendangan (calci base)', 'Elakan (schivate angolate)'], milestone: 'Bunga (sequenza di apertura) da memoria' },
+    { label: 'Tecnica',    weeks: '6-16',  color: 'blue',    topics: ['Jurus (forme di combattimento)', 'Kuncian (leve e blocchi articolari)', 'Sapuan (spazzate basse)', 'Combattimento a corta distanza', 'Silat con partner (buah)'], milestone: 'Jurus 1-5 con partner (buah pakai)' },
+    { label: 'Avanzato',   weeks: '17-32', color: 'orange',  topics: ['Silat con armi: parang (machete), tongkat (bastone)', 'Kerambit (coltello ad artiglio)', 'Multi-attaccante drill', 'Harimau style (stile tigre, combattimento a terra)', 'Silat Gayong / Cimande / Betawi: stili regionali'], milestone: 'Esibizione completa con arma tradizionale' },
+    { label: 'Pro',        weeks: '33+',   color: 'rose',    topics: ['Pesilat (guerriero) avanzato', 'Insegnamento del proprio perguruan', 'Competizione PERSILAT internazionale', 'Silat spettacolo vs Silat combattimento', 'Connessione con la tradizione (budaya)'], milestone: 'Guru (insegnante) riconosciuto nel perguruan' },
+  ]},
+
+  kendo: { name: 'Kendo', emoji: '⚔️', levels: [
+    { label: 'Fondamenta', weeks: '1-6',   color: 'emerald', topics: ['Seigan no kamae (guardia)', 'Fumikomi-ashi (passo sfondante)', 'Men-uchi (colpo alla testa)', 'Kote-uchi (colpo al polso)', 'Suburi × 200 ogni sessione'], milestone: 'Men e kote con forma corretta × 50 ripetizioni' },
+    { label: 'Tecnica',    weeks: '7-18',  color: 'blue',    topics: ['Do-uchi (colpo al ventre)', 'Tsuki (affondo alla gola)', 'Kirikaeshi (taglio alternato)', 'Oji-waza (tecniche di risposta)', 'Jigeiko (sparring libero) base'], milestone: '3 kyū: esame con arbitro ufficiale' },
+    { label: 'Avanzato',   weeks: '19-36', color: 'orange',  topics: ['Shikake-waza (attacco intenzionale)', 'Hiki-waza (colpi in arretramento)', 'Taiatari (corpo a corpo)', 'Nito-ryu (due shinai)', 'Shiai (torneo) regionale'], milestone: 'Shodan (1° Dan) — esame AJKF/IKEFI' },
+    { label: 'Pro',        weeks: '37+',   color: 'rose',    topics: ['Dan avanzati (2°–5°)', 'Kata (Nihon Kendo no Kata, 10 forme)', 'Arbitraggio ufficiale', 'Naginata e iaido (stili correlati)', 'Competizioni internazionali FIK'], milestone: '3° Dan o arbitro nazionale certificato' },
+  ]},
+
+  sanda: { name: 'Sanda', emoji: '🥊', levels: [
+    { label: 'Fondamenta', weeks: '1-4',   color: 'emerald', topics: ['Guardia e footwork Sanda', 'Jab-cross-gancio (tecnica pugilistica cinese)', 'Tui (calcio frontale spingente)', 'Bian tui (calcio circolare)', 'Zhai (take-down da clinch base)'], milestone: 'Combo jab-cross-tui × 20 per lato' },
+    { label: 'Tecnica',    weeks: '5-14',  color: 'blue',    topics: ['Shuai-jiao (grappling cinese)', 'Clinch e spinta fuori dalla pedana', 'Calcio laterale alto', 'Difese da takedown', 'Sanda pad work 3×3 min'], milestone: '3 round sparring Sanda con arbitro' },
+    { label: 'Avanzato',   weeks: '15-28', color: 'orange',  topics: ['Leg catch e counter', 'Spinning back kick', 'Takedown a doppia gamba', 'Combinazioni lunghe (5-7 colpi)', 'Tattica: scoring sul ring / pedana'], milestone: 'Torneo Sanda regionale (cintura base)' },
+    { label: 'Pro',        weeks: '29+',   color: 'rose',    topics: ['Campionati nazionali WAKO/WKF', 'Film study e analisi avversari', 'Periodizzazione fight camp', 'Weight management', 'Sanda vs K1/MMA: adattamento tattico'], milestone: 'Campionato nazionale Sanda o cintura WKF' },
+  ]},
+
+  pankration: { name: 'Pankration', emoji: '⚡', levels: [
+    { label: 'Fondamenta', weeks: '1-5',   color: 'emerald', topics: ['Stance antico greco (ortia stasis)', 'Pugni base (sferiamo)', 'Calci diretti e laterali', 'Cadute e prese a terra (pale)', 'Strangolamento posteriore base'], milestone: 'Sparring leggero no-gear 5 minuti' },
+    { label: 'Tecnica',    weeks: '6-16',  color: 'blue',    topics: ['Striking in clinch (ano kato)', 'Takedown greco-romano', 'Guard position a terra', 'Braccio di ferro (ankyle)', 'Transizioni strike → grappling'], milestone: 'Match Pankration amatoriale moderno (FILA rules)' },
+    { label: 'Avanzato',   weeks: '17-32', color: 'orange',  topics: ['Submission chain', 'Sprawl e counter takedown', 'Ground & pound controllato', 'Condizionamento antico (dumbells, corsa)', 'Analisi combattimenti storici e moderni'], milestone: 'Torneo FILA Pankration / Grappling open' },
+    { label: 'Pro',        weeks: '33+',   color: 'rose',    topics: ['Specializzazione striking o grappling', 'Competizioni internazionali UWW', 'Coaching e arbitraggio FILA', 'Connessione con le Olimpiadi antiche (studio)', 'Condizionamento atletico di alto livello'], milestone: 'Campionato mondiale UWW Pankration' },
+  ]},
+
+  systema: { name: 'Systema', emoji: '🌊', levels: [
+    { label: 'Fondamenta', weeks: '1-6',   color: 'emerald', topics: ['Quattro pilastri: respirazione, relax, postura, movimento', 'Cadute sicure in ogni direzione', 'Camminata e respirazione quadrata', 'Colpi morbidi (senza rigidità)', 'Sfuggire dalla presa senza forza'], milestone: 'Caduta da qualsiasi direzione senza paura' },
+    { label: 'Tecnica',    weeks: '7-18',  color: 'blue',    topics: ['Striking al sistema nervoso (bersagli specifici)', 'Leve articolari fluide', 'Movimento a spirale (sfera)', 'Difesa da più avversari (principio)', 'Knife defense intro (principi di movimento)'], milestone: 'Partner drill 20 minuti no-stop con respirazione controllata' },
+    { label: 'Avanzato',   weeks: '19-36', color: 'orange',  topics: ['Combattimento a terra da qualsiasi posizione', 'Stress inoculation (freddo, paura, fatica)', 'Armi: coltello, bastone, pistola', 'Combattimento in spazio ridotto', 'Allenamento psicologico (paura controllata)'], milestone: 'Scenario multi-attaccante 3 minuti con armi di gomma' },
+    { label: 'Pro',        weeks: '37+',   color: 'rose',    topics: ['Seminari con maestri certificati (Ryabko, Vasiliev)', 'Insegnamento Systema', 'Applicazioni militari/LE', 'Lavoro energetico (massa, struttura interna)', 'Integrazione con altre arti marziali'], milestone: 'Certificazione istruttore Systema HQ' },
+  ]},
+
+  lutalivre: { name: 'Luta Livre', emoji: '🤼', levels: [
+    { label: 'Fondamenta', weeks: '1-4',   color: 'emerald', topics: ['Stance e grip senza kimono', 'Clinch e collar tie', 'Double leg takedown', 'Single leg e running the pipe', 'Rear naked choke e guillotine base'], milestone: 'Double leg pulito × 10 su partner' },
+    { label: 'Tecnica',    weeks: '5-14',  color: 'blue',    topics: ['Achilles lock e toe hold', 'Kneebar base', 'Guard pass no-gi (torreando, over-under)', 'Back take da turtle', 'Rolling 5 round no-gi'], milestone: 'Submission competition no-gi principiante' },
+    { label: 'Avanzato',   weeks: '15-28', color: 'orange',  topics: ['Heel hook (inside/outside)', 'Kimura trap system', 'Leg entanglement (50/50, saddle)', 'Scrambles e inversioni', 'Luta Livre vs BJJ: differenze tattiche'], milestone: 'Gara no-gi open / ADCC qualifiers' },
+    { label: 'Pro',        weeks: '29+',   color: 'rose',    topics: ['EBI overtime prep', 'Submission chain avanzate', 'Specializzazione lower body o upper body', 'Coaching e analisi film', 'ADCC e competizioni mondiali no-gi'], milestone: 'ADCC Trials o campionato nazionale no-gi' },
+  ]},
+
+  muayboran: { name: 'Muay Boran', emoji: '🏺', levels: [
+    { label: 'Fondamenta', weeks: '1-6',   color: 'emerald', topics: ['Mae mai (tecnica madre, 15 tecniche base)', 'Guardia Boran (mani al petto)', 'Teep con il tallone', 'Gomitate a corta distanza', 'Ram Muay (rituale pre-combattimento)'], milestone: 'Mae mai 1-5 da memoria con forma corretta' },
+    { label: 'Tecnica',    weeks: '7-18',  color: 'blue',    topics: ['Luk mai (tecniche figlie, varianti avanzate)', 'Clinch tradizionale (chap ko)', 'Ginocchiate dal clinch (sapato kao)', 'Proiezioni e spazzate antiche', 'Calci saltati e volteggi'], milestone: 'Sequenza Mae mai completa (15 tecniche)' },
+    { label: 'Avanzato',   weeks: '19-36', color: 'orange',  topics: ['Armi del corpo: testa, denti, morsi (Boran)', 'Tecniche proibite nel ring moderno', 'Kard Chuek (bendaggio a mani nude)', 'Applicazioni Boran in Muay Thai moderno', 'Studio dei Kru tradizionali (maestri storici)'], milestone: 'Dimostrazione pubblica Muay Boran × 5 tecniche luk mai' },
+    { label: 'Pro',        weeks: '37+',   color: 'rose',    topics: ['Trasmissione della tradizione come Kru', 'Kard Chuek match (se disponibile)', 'Studio del Krabi Krabong (armi tradizionali thailandesi)', 'Ricerca storica e connessione culturale', 'Insegnamento certificato dalla Thailand Board of Muay Thai'], milestone: 'Certificazione Kru Muay Thai IFMA o WBMT' },
+  ]},
+
+  calisthenics: { name: 'Calistenia', emoji: '💪', levels: [
+    { label: 'Fondamenta', weeks: '1-6',   color: 'emerald', topics: ['Push-up (5×10 forma perfetta)', 'Pull-up australiano / pull-up assistito', 'Squat a corpo libero × 20', 'Plank 60 secondi', 'Hollow body hold 30 secondi'], milestone: '10 push-up + 5 pull-up + 20 squat senza fermarsi' },
+    { label: 'Tecnica',    weeks: '7-18',  color: 'blue',    topics: ['Dip su parallele', 'Pull-up strict × 10', 'Pike push-up (prep handstand)', 'L-sit 10 secondi su parallele', 'Muscle-up negativo'], milestone: 'Muscle-up su sbarra (1 ripetizione pulita)' },
+    { label: 'Avanzato',   weeks: '19-36', color: 'orange',  topics: ['Handstand push-up', 'Front lever progressioni (tucked → straddle → full)', 'Back lever', 'One-arm pull-up progressioni', 'Human flag base (obliquo)'], milestone: 'Front lever 5 secondi + Handstand 10 secondi' },
+    { label: 'Pro',        weeks: '37+',   color: 'rose',    topics: ['Planche (straddle → full)', 'One-arm push-up con rotazione', '90° push-up (handstand push-up avanzato)', 'Iron cross su anelli (progressioni)', 'Freestyle calistenia: flow e combinazioni'], milestone: 'Planche straddle 5 sec + Full front lever 5 sec' },
+  ]},
+
+  crossfit: { name: 'CrossFit', emoji: '🏋️', levels: [
+    { label: 'Fondamenta', weeks: '1-4',   color: 'emerald', topics: ['Squat, deadlift, press con forma (PVC)', 'Box jump basso', 'Rowing 500m a ritmo costante', 'Burpees × 10 senza pause', 'Air bike / skierg 5 minuti'], milestone: 'Murph scalato: 800m corsa + 50 pull-up assist + 100 push-up + 150 squat + 800m' },
+    { label: 'Tecnica',    weeks: '5-16',  color: 'blue',    topics: ['Clean & jerk con bilanciere (tecnica)', 'Snatch con bilanciere', 'Kipping pull-up', 'Double-under × 50 senza errori', 'Toes-to-bar'], milestone: 'Rx su 3 WOD diversi (Fran, Helen, Grace)' },
+    { label: 'Avanzato',   weeks: '17-32', color: 'orange',  topics: ['Muscle-up su sbarra e anelli', 'Heavy barbell cycling (squat clean, snatch)', 'Handstand walk 10 metri', 'GHD sit-up e back extension', 'CrossFit Open: partecipazione'], milestone: 'CrossFit Open top 50% della propria categoria' },
+    { label: 'Pro',        weeks: '33+',   color: 'rose',    topics: ['Pegboard, rope climb (no-legs)', 'Legless rope climb', 'Ring muscle-up × 10', 'Total carico Oly: >100% peso corporeo in snatch', 'CrossFit Quarterfinals/Semifinals qualificazione'], milestone: 'CrossFit Regionals qualification o Games athlete' },
+  ]},
+
+  yoga: { name: 'Yoga', emoji: '🧘', levels: [
+    { label: 'Fondamenta', weeks: '1-6',   color: 'emerald', topics: ['Respiro ujjayi (pranayama base)', 'Surya Namaskar A (saluto al sole)', 'Warrior I e II (Virabhadrasana)', 'Downward dog (Adho Mukha Svanasana)', 'Savasana e rilassamento guidato'], milestone: 'Saluto al sole × 5 ripetizioni senza guide' },
+    { label: 'Tecnica',    weeks: '7-20',  color: 'blue',    topics: ['Sequenza Ashtanga Primary Series (sezione in piedi)', 'Bilanciamenti: tree pose, warrior III, half moon', 'Backbend: cobra, upward dog, camel', 'Forward fold: paschimottanasana, janu sirsasana', 'Pranayama: nadi shodhana, kapalabhati'], milestone: 'Primary Series sezione in piedi + seduta fluida 45 min' },
+    { label: 'Avanzato',   weeks: '21-40', color: 'orange',  topics: ['Inversioni: headstand (sirsasana), shoulderstand', 'Handstand (adho mukha vrksasana)', 'Primary Series completa Ashtanga', 'Yin yoga e yoga del restauro', 'Meditazione 20 minuti quotidiani'], milestone: 'Primary Series Ashtanga completa 90 minuti autonoma' },
+    { label: 'Pro',        weeks: '41+',   color: 'rose',    topics: ['Secondary Series Ashtanga (backbend profondi)', 'Insegnamento 200h YTT (Yoga Teacher Training)', 'Specialty: Yin, Restorative, Hot Yoga, Kundalini', 'Adattamento yoga per atleti di arti marziali', 'Meditazione Vipassana o Vedanta avanzata'], milestone: 'Certificazione insegnante 200h RYT Yoga Alliance' },
+  ]},
+
+  running: { name: 'Corsa', emoji: '🏃', levels: [
+    { label: 'Fondamenta', weeks: '1-6',   color: 'emerald', topics: ['Postura di corsa (cadenza 170+ spm)', 'Attacco col mesopiede (non col tallone)', 'Run/walk intervals: 1 min corsa / 2 min camminata', 'Core running: plank, bird-dog, single-leg stance', 'Stretching dinamico pre-corsa'], milestone: '3 km continui sotto 7:30/km senza fermarsi' },
+    { label: 'Tecnica',    weeks: '7-16',  color: 'blue',    topics: ['5 km progressivi (obiettivo: sub 30 min)', 'Fartlek (variazioni di ritmo libere)', 'Interval training: 400m × 6 con recupero', 'Corsa in salita (forza + tecnica)', 'Foam rolling e recupero attivo'], milestone: '5 km in meno di 30 minuti' },
+    { label: 'Avanzato',   weeks: '17-32', color: 'orange',  topics: ['10 km training plan', 'Tempo run (ritmo soglia 20-30 min)', 'Long run progressiva (fino a 16 km)', 'VO2max intervals (1000m × 5)', 'Nutrizione per la corsa e idratazione'], milestone: '10 km in meno di 55 minuti (o Half Marathon completata)' },
+    { label: 'Pro',        weeks: '33+',   color: 'rose',    topics: ['Piano allenamento Maratona (16 settimane)', 'Marathon pace run (specifico)', 'Negative split strategy', 'Analisi biomeccanica (video e podoscopia)', 'Periodizzazione annuale con peaking'], milestone: 'Maratona completata (o 10 km sub 45 min / HM sub 2h)' },
+  ]},
+
+  stretching: { name: 'Mobilità', emoji: '🤸', levels: [
+    { label: 'Fondamenta', weeks: '1-4',   color: 'emerald', topics: ['Mobilità dell\'anca (90/90, frog stretch)', 'Mobilità delle spalle (band pull-apart, shoulder CARs)', 'Mobilità toracica (libro aperto, cat-cow)', 'Allungamento ischio-crurali (PNF base)', 'Routine mattutina 10 min (joint circles)'], milestone: 'Toccare le dita dei piedi a gambe tese' },
+    { label: 'Tecnica',    weeks: '5-14',  color: 'blue',    topics: ['Jefferson curl (flessione vertebra per vertebra)', 'Pike stretch progressivo', 'Squat profondo 3 minuti (goblet)', 'Straddle (apertura laterale) progressiva', 'Pancake stretch'], milestone: 'Straddle 90° con busto al pavimento' },
+    { label: 'Avanzato',   weeks: '15-30', color: 'orange',  topics: ['Splits frontali (sinistra e destra)', 'Straddle splits (centro)', 'Ponte completo (wheel pose)', 'Shoulder dislocates con bacchetta', 'Active flexibility (gambe sollevate attivamente)'], milestone: 'Splits completi su entrambi i lati' },
+    { label: 'Pro',        weeks: '31+',   color: 'rose',    topics: ['Oversplits (oltre 180°)', 'Contorsione controllata (back flexibility)', 'Mobilità integrata nel movimento atletico', 'FRC (Functional Range Conditioning)', 'Insegnamento mobilità ad altri atleti'], milestone: 'Oversplits + ponte con spalle aperte sopra le mani' },
+  ]},
 };
 
 // ─── Colori palette ────────────────────────────────────────────────────────────
@@ -634,7 +753,7 @@ function CurriculumCoach() {
     finally { setLoadingTopic(null); }
   };
 
-  const SOLO_DISCS = DISCIPLINE_GROUPS[0].items;
+  const SOLO_DISCS = [...DISCIPLINE_GROUPS[0].items, ...DISCIPLINE_GROUPS[1].items].filter((d) => CURRICULUM[d.id]);
   const overallPct = totalTopics > 0 ? totalDone / totalTopics : 0;
 
   return (
