@@ -573,16 +573,28 @@ function useChat(endpoint) {
 function ChatBubble({ msg }) {
   const isUser = msg.role === 'user';
   return (
-    <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
+    <motion.div initial={{ opacity: 0, y: 8, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ type: 'spring', stiffness: 320, damping: 24 }}
       className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
-      <div className="max-w-[88%] px-4 py-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap"
-        style={isUser
-          ? { background: 'linear-gradient(135deg, #2563eb, #1d4ed8)', color: '#fff', borderBottomRightRadius: 4, boxShadow: '0 4px 15px rgba(37,99,235,0.3)' }
-          : { background: 'rgba(17,24,39,0.8)', backdropFilter: 'blur(10px)', border: '1px solid rgba(59,130,246,0.12)', color: '#e5e7eb', borderBottomLeftRadius: 4 }}>
-        {!isUser && msg.provider && (
-          <div className="text-xs mb-1.5 font-mono" style={{ color: C.blue.hex, opacity: 0.7 }}>🤖 {msg.provider}</div>
+      {!isUser && (
+        <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 mr-2 mt-0.5 text-xs"
+          style={{ background: 'linear-gradient(135deg, rgba(0,242,255,0.2), rgba(168,85,247,0.2))', border: '1px solid rgba(0,242,255,0.25)' }}>
+          🤖
+        </div>
+      )}
+      <div className="max-w-[85%] relative">
+        {!isUser && (
+          <div className="absolute left-0 top-0 bottom-0 w-0.5 rounded-full" style={{ background: 'linear-gradient(180deg, #00f2ff, #a855f7)', opacity: 0.6 }} />
         )}
-        {msg.content}
+        <div className={`px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap ${!isUser ? 'pl-5' : ''}`}
+          style={isUser
+            ? { background: 'linear-gradient(135deg, #2563eb, #1d4ed8)', color: '#fff', borderRadius: '18px 18px 4px 18px', boxShadow: '0 4px 20px rgba(37,99,235,0.35)' }
+            : { background: 'rgba(17,24,39,0.85)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.06)', color: '#e5e7eb', borderRadius: '18px 18px 18px 4px', boxShadow: '0 4px 20px rgba(0,0,0,0.3)' }}>
+          {!isUser && msg.provider && (
+            <div className="text-[10px] mb-1.5 font-mono tracking-wider" style={{ color: '#00f2ff', opacity: 0.6 }}>{msg.provider}</div>
+          )}
+          {msg.content}
+        </div>
       </div>
     </motion.div>
   );
@@ -592,17 +604,19 @@ function ChatBubble({ msg }) {
 function ChatInput({ value, onChange, onSend, loading, placeholder }) {
   const handleKey = (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); onSend(); } };
   return (
-    <div className="flex gap-2">
-      <textarea value={value} onChange={onChange} onKeyDown={handleKey} placeholder={placeholder} rows={2}
-        className="flex-1 px-4 py-3 text-sm text-white placeholder-gray-600 resize-none focus:outline-none transition-all"
-        style={{ background: 'rgba(17,24,39,0.8)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 14, backdropFilter: 'blur(8px)' }}
-        onFocus={(e) => e.target.style.borderColor = 'rgba(59,130,246,0.4)'}
-        onBlur={(e) => e.target.style.borderColor = 'rgba(255,255,255,0.07)'} />
-      <button onClick={onSend} disabled={loading || !value.trim()}
-        className="px-4 py-2 rounded-2xl text-white font-black text-lg self-stretch transition-all disabled:opacity-30"
-        style={{ background: 'linear-gradient(135deg, #2563eb, #7c3aed)', boxShadow: '0 4px 15px rgba(37,99,235,0.3)' }}>
-        ↑
-      </button>
+    <div className="flex gap-2 relative">
+      <div className="flex-1 relative">
+        <textarea value={value} onChange={onChange} onKeyDown={handleKey} placeholder={placeholder} rows={2}
+          className="w-full px-4 py-3 text-sm text-white placeholder-gray-700 resize-none focus:outline-none transition-all"
+          style={{ background: 'rgba(17,24,39,0.85)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, backdropFilter: 'blur(12px)' }}
+          onFocus={(e) => { e.target.style.borderColor = 'rgba(0,242,255,0.3)'; e.target.style.boxShadow = '0 0 0 1px rgba(0,242,255,0.1)'; }}
+          onBlur={(e) => { e.target.style.borderColor = 'rgba(255,255,255,0.08)'; e.target.style.boxShadow = 'none'; }} />
+      </div>
+      <motion.button whileTap={{ scale: 0.9 }} whileHover={{ scale: 1.05 }} onClick={onSend} disabled={loading || !value.trim()}
+        className="px-4 rounded-2xl text-white font-black text-xl self-stretch transition-all disabled:opacity-30 flex items-center justify-center"
+        style={{ background: 'linear-gradient(135deg, #2563eb, #7c3aed)', boxShadow: '0 4px 20px rgba(37,99,235,0.4)', minWidth: 48 }}>
+        {loading ? <motion.span animate={{ rotate: 360 }} transition={{ duration: 0.8, repeat: Infinity, ease: 'linear' }}>◌</motion.span> : '↑'}
+      </motion.button>
     </div>
   );
 }
@@ -611,16 +625,21 @@ function ChatInput({ value, onChange, onSend, loading, placeholder }) {
 function QuickGrid({ prompts, onSend, accentColor }) {
   const col = C[accentColor] || C.blue;
   return (
-    <div className="grid grid-cols-2 gap-2">
+    <motion.div className="grid grid-cols-2 gap-2"
+      variants={{ show: { transition: { staggerChildren: 0.04 } } }}
+      initial="hidden" animate="show">
       {prompts.map((p) => (
-        <motion.button key={p.label} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+        <motion.button key={p.label}
+          variants={{ hidden: { opacity: 0, y: 8 }, show: { opacity: 1, y: 0 } }}
+          whileHover={{ scale: 1.03, y: -1 }} whileTap={{ scale: 0.96 }}
           onClick={() => onSend(p.text)}
-          className="text-left px-3 py-3 rounded-xl text-xs text-gray-200 transition-all"
-          style={{ background: 'rgba(17,24,39,0.6)', border: `1px solid ${col.border}`, backdropFilter: 'blur(8px)' }}>
-          <span className="font-bold">{p.label}</span>
+          className="hud-chip text-left px-3 py-3 rounded-xl text-xs text-gray-200 transition-all relative overflow-hidden"
+          style={{ background: 'rgba(17,24,39,0.75)', border: `1px solid ${col.border}`, backdropFilter: 'blur(10px)' }}>
+          <div className="absolute top-0 left-0 w-full h-px" style={{ background: `linear-gradient(90deg, transparent, ${col.hex}44, transparent)` }} />
+          <span className="font-bold text-[11px]">{p.label}</span>
         </motion.button>
       ))}
-    </div>
+    </motion.div>
   );
 }
 
@@ -634,16 +653,30 @@ function CoachChat() {
 
   return (
     <div className="space-y-4">
-      {messages.length === 0 && <QuickGrid prompts={COACH_QUICK} onSend={send} accentColor="blue" />}
+      {messages.length === 0 && (
+        <>
+          <div className="relative rounded-2xl overflow-hidden"
+            style={{ background: 'linear-gradient(135deg, rgba(59,130,246,0.1), rgba(99,102,241,0.05))', border: `1px solid ${C.blue.border}` }}>
+            <div className="h-px w-full" style={{ background: 'linear-gradient(90deg, transparent, #3b82f6 40%, #6366f1 70%, transparent)', animation: 'frame-glow-shift 4s linear infinite', backgroundSize: '200% 100%' }} />
+            <div className="relative px-4 py-3.5 overflow-hidden">
+              <div className="absolute -right-4 -top-4 w-20 h-20 rounded-full pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(59,130,246,0.12) 0%, transparent 70%)' }} />
+              <p className="text-xs font-black tracking-widest" style={{ color: C.blue.hex, fontFamily: 'Orbitron, sans-serif' }}>💬 AI COACH CHAT</p>
+              <p className="text-xs mt-0.5" style={{ color: '#6b7280' }}>Nutrizione · Allenamento · Recovery · Supplementi</p>
+            </div>
+          </div>
+          <QuickGrid prompts={COACH_QUICK} onSend={send} accentColor="blue" />
+        </>
+      )}
       <div className="space-y-3 min-h-[120px]">
         <AnimatePresence>{messages.map((msg, i) => <ChatBubble key={i} msg={msg} />)}</AnimatePresence>
         {loading && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-start">
-            <div className="px-4 py-3 rounded-2xl rounded-bl-sm" style={{ background: 'rgba(17,24,39,0.8)', border: '1px solid rgba(59,130,246,0.1)' }}>
-              <div className="flex gap-1">
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-start items-end gap-2">
+            <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs flex-shrink-0" style={{ background: 'rgba(59,130,246,0.15)', border: '1px solid rgba(59,130,246,0.25)' }}>🤖</div>
+            <div className="px-4 py-3 rounded-2xl rounded-bl-sm" style={{ background: 'rgba(17,24,39,0.8)', border: '1px solid rgba(59,130,246,0.15)' }}>
+              <div className="flex gap-1.5 items-center">
                 {[0,1,2].map((i) => (
-                  <motion.div key={i} className="w-2 h-2 rounded-full" style={{ background: C.blue.hex }}
-                    animate={{ y: [0,-6,0] }} transition={{ duration: 0.6, repeat: Infinity, delay: i * 0.15 }} />
+                  <motion.div key={i} className="w-1.5 h-1.5 rounded-full" style={{ background: C.blue.hex }}
+                    animate={{ y: [0,-5,0], opacity: [0.4, 1, 0.4] }} transition={{ duration: 0.7, repeat: Infinity, delay: i * 0.18 }} />
                 ))}
               </div>
             </div>
@@ -653,7 +686,7 @@ function CoachChat() {
         <div ref={endRef} />
       </div>
       {messages.length > 0 && (
-        <button onClick={clear} className="text-xs text-gray-600 hover:text-gray-400 transition-colors">🗑 Nuova conversazione</button>
+        <button onClick={clear} className="text-xs text-gray-700 hover:text-gray-500 transition-colors">🗑 Nuova conversazione</button>
       )}
       <ChatInput value={input} onChange={(e) => setInput(e.target.value)} onSend={handleSend} loading={loading} placeholder="Ricette, esercizi, integratori…" />
     </div>
@@ -672,9 +705,15 @@ function PersonalTrainer() {
     <div className="space-y-4">
       {messages.length === 0 && (
         <>
-          <div className="px-4 py-3 rounded-2xl" style={{ background: 'linear-gradient(135deg, rgba(217,119,6,0.12), rgba(180,83,9,0.08))', border: `1px solid ${C.amber.border}` }}>
-            <p className="text-xs font-black" style={{ color: C.amber.hex }}>⚡ SHADOW COACH — Kimi K2.6</p>
-            <p className="text-xs text-gray-500 mt-0.5">Personal trainer AI — calorie, macro, schede, arti marziali</p>
+          <div className="relative rounded-2xl overflow-hidden"
+            style={{ background: 'linear-gradient(135deg, rgba(245,158,11,0.1), rgba(217,119,6,0.05))', border: `1px solid ${C.amber.border}` }}>
+            <div className="h-px w-full" style={{ background: 'linear-gradient(90deg, transparent, #f59e0b 40%, #f97316 70%, transparent)', animation: 'frame-glow-shift 4s linear infinite', backgroundSize: '200% 100%' }} />
+            <div className="relative px-4 py-3.5 overflow-hidden">
+              <div className="absolute -right-4 -top-4 w-20 h-20 rounded-full pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(245,158,11,0.12) 0%, transparent 70%)' }} />
+              <p className="text-xs font-black tracking-widest" style={{ color: C.amber.hex, fontFamily: 'Orbitron, sans-serif' }}>⚡ SHADOW COACH</p>
+              <p className="text-sm font-bold text-white mt-0.5">Kimi K2.6 — Personal Trainer AI</p>
+              <p className="text-xs mt-0.5" style={{ color: '#6b7280' }}>Calorie · Macro · Schede · Arti Marziali</p>
+            </div>
           </div>
           <QuickGrid prompts={TRAINER_QUICK} onSend={send} accentColor="amber" />
         </>
@@ -682,12 +721,13 @@ function PersonalTrainer() {
       <div className="space-y-3 min-h-[120px]">
         <AnimatePresence>{messages.map((msg, i) => <ChatBubble key={i} msg={msg} />)}</AnimatePresence>
         {loading && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-start">
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-start items-end gap-2">
+            <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs flex-shrink-0" style={{ background: 'rgba(245,158,11,0.15)', border: '1px solid rgba(245,158,11,0.25)' }}>🤖</div>
             <div className="px-4 py-3 rounded-2xl rounded-bl-sm" style={{ background: 'rgba(17,24,39,0.8)', border: `1px solid ${C.amber.border}` }}>
-              <div className="flex gap-1">
+              <div className="flex gap-1.5 items-center">
                 {[0,1,2].map((i) => (
-                  <motion.div key={i} className="w-2 h-2 rounded-full" style={{ background: C.amber.hex }}
-                    animate={{ y: [0,-6,0] }} transition={{ duration: 0.6, repeat: Infinity, delay: i * 0.15 }} />
+                  <motion.div key={i} className="w-1.5 h-1.5 rounded-full" style={{ background: C.amber.hex }}
+                    animate={{ y: [0,-5,0], opacity: [0.4, 1, 0.4] }} transition={{ duration: 0.7, repeat: Infinity, delay: i * 0.18 }} />
                 ))}
               </div>
             </div>
@@ -697,7 +737,7 @@ function PersonalTrainer() {
         <div ref={endRef} />
       </div>
       {messages.length > 0 && (
-        <button onClick={clear} className="text-xs text-gray-600 hover:text-gray-400 transition-colors">🗑 Nuova sessione</button>
+        <button onClick={clear} className="text-xs text-gray-700 hover:text-gray-500 transition-colors">🗑 Nuova sessione</button>
       )}
       <ChatInput value={input} onChange={(e) => setInput(e.target.value)} onSend={handleSend} loading={loading} placeholder="Piano calorico, scheda, integratori…" />
     </div>
@@ -759,20 +799,25 @@ function CurriculumCoach() {
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="p-4 rounded-2xl" style={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.12), rgba(79,70,229,0.08))', border: `1px solid ${C.violet.border}` }}>
-        <div className="flex items-center justify-between mb-2">
-          <div>
-            <p className="text-xs font-black tracking-wide" style={{ color: C.violet.hex }}>📚 CURRICULUM</p>
-            <p className="text-sm font-bold text-white mt-0.5">{curriculum.name}</p>
+      <div className="relative rounded-2xl overflow-hidden"
+        style={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.12), rgba(79,70,229,0.06))', border: `1px solid ${C.violet.border}` }}>
+        <div className="h-px w-full" style={{ background: 'linear-gradient(90deg, transparent, #8b5cf6 40%, #4f46e5 70%, transparent)', animation: 'frame-glow-shift 4s linear infinite', backgroundSize: '200% 100%' }} />
+        <div className="relative p-4 overflow-hidden">
+          <div className="absolute -right-6 -top-6 w-28 h-28 rounded-full pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(139,92,246,0.12) 0%, transparent 70%)', animation: 'drift-slow 10s ease-in-out infinite' }} />
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <p className="text-xs font-black tracking-widest" style={{ color: C.violet.hex, fontFamily: 'Orbitron, sans-serif' }}>📚 CURRICULUM</p>
+              <p className="text-lg font-black text-white mt-0.5">{curriculum.name}</p>
+              <p className="text-xs mt-0.5" style={{ color: '#6b7280' }}>{totalDone}/{totalTopics} argomenti completati</p>
+            </div>
+            <Ring done={totalDone} total={totalTopics} color="violet" size={58} strokeW={4.5}
+              label={overallPct === 1 ? '✓' : `${Math.round(overallPct * 100)}%`} />
           </div>
-          <Ring done={totalDone} total={totalTopics} color="violet" size={52} strokeW={4}
-            label={overallPct === 1 ? '✓' : `${Math.round(overallPct * 100)}%`} />
+          <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(55,65,81,0.5)' }}>
+            <motion.div className="h-full rounded-full" style={{ background: `linear-gradient(90deg, ${C.violet.hex}, #4f46e5, #00f2ff)`, width: `${overallPct * 100}%`, boxShadow: overallPct > 0 ? `0 0 8px ${C.violet.glow}` : 'none' }}
+              layout transition={{ duration: 0.6 }} />
+          </div>
         </div>
-        <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(55,65,81,0.6)' }}>
-          <motion.div className="h-full rounded-full" style={{ background: `linear-gradient(90deg, ${C.violet.hex}, #4f46e5)`, width: `${overallPct * 100}%` }}
-            layout transition={{ duration: 0.5 }} />
-        </div>
-        <p className="text-xs text-gray-600 mt-1">{totalDone}/{totalTopics} argomenti completati</p>
       </div>
 
       {/* Selector */}
@@ -783,14 +828,15 @@ function CurriculumCoach() {
           const tot = CURRICULUM[d.id]?.levels.reduce((s, l) => s + l.topics.length, 0) || 0;
           const isActive = disc === d.id;
           return (
-            <motion.button key={d.id} whileTap={{ scale: 0.95 }}
+            <motion.button key={d.id} whileTap={{ scale: 0.93 }} whileHover={{ scale: 1.04 }}
               onClick={() => { setDisc(d.id); setExpandedLevel(0); setTopicLesson(null); }}
-              className="px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all"
+              className="px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all relative overflow-hidden"
               style={isActive
-                ? { background: C.violet.hex, color: '#fff', boxShadow: `0 4px 12px ${C.violet.glow}` }
-                : { background: 'rgba(55,65,81,0.4)', color: '#9ca3af', border: '1px solid rgba(255,255,255,0.05)' }}>
+                ? { background: `linear-gradient(135deg, ${C.violet.hex}33, ${C.violet.hex}11)`, color: C.violet.hex, boxShadow: `0 0 0 1px ${C.violet.border}, 0 4px 14px ${C.violet.glow}`, border: `1px solid ${C.violet.border}` }
+                : { background: 'rgba(55,65,81,0.35)', color: '#9ca3af', border: '1px solid rgba(255,255,255,0.05)' }}>
+              {isActive && <span className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent)', animation: 'chip-sheen 2s ease-in-out infinite', backgroundSize: '200% 100%' }} />}
               {d.emoji} {d.label}
-              {done > 0 && <span className="ml-1 opacity-70 text-[10px]">{done}/{tot}</span>}
+              {done > 0 && <span className="ml-1 opacity-60 text-[9px]">{done}/{tot}</span>}
             </motion.button>
           );
         })}
@@ -808,27 +854,30 @@ function CurriculumCoach() {
 
           return (
             <div key={li} className="rounded-2xl overflow-hidden transition-all"
-              style={{ border: `1px solid ${isOpen ? col.border : 'rgba(255,255,255,0.05)'}`, opacity: isUnlocked ? 1 : 0.45 }}>
+              style={{ border: `1px solid ${isOpen ? col.border : 'rgba(255,255,255,0.05)'}`, opacity: isUnlocked ? 1 : 0.4, boxShadow: isOpen ? `0 4px 20px ${col.glow}22` : 'none' }}>
+              {isOpen && <div className="h-px w-full" style={{ background: `linear-gradient(90deg, transparent, ${col.hex}88, transparent)` }} />}
               {/* Level header */}
               <motion.button whileTap={{ scale: 0.99 }}
                 onClick={() => { if (isUnlocked) { setExpandedLevel(isOpen ? -1 : li); setTopicLesson(null); } }}
                 disabled={!isUnlocked}
-                className="w-full px-4 py-3.5 flex items-center gap-3 text-left"
-                style={{ background: isOpen ? col.bg : 'rgba(17,24,39,0.6)' }}>
-                <Ring done={completed.size} total={level.topics.length} color={level.color} size={40} strokeW={3.5}
+                className="w-full px-4 py-3.5 flex items-center gap-3 text-left relative overflow-hidden"
+                style={{ background: isOpen ? `linear-gradient(135deg, ${col.bg}, rgba(17,24,39,0.9))` : 'rgba(17,24,39,0.7)' }}>
+                {isOpen && <div className="absolute left-0 top-0 bottom-0 w-0.5" style={{ background: `linear-gradient(180deg, transparent, ${col.hex}, transparent)` }} />}
+                <Ring done={completed.size} total={level.topics.length} color={level.color} size={42} strokeW={3.5}
                   label={isDone ? '✓' : `${Math.round(pct * 100)}%`} />
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-sm font-black text-white">
                       {!isUnlocked ? '🔒 ' : isDone ? '✅ ' : ''}{level.label}
                     </span>
-                    <span className="text-xs px-2 py-0.5 rounded-full font-bold" style={{ background: col.bg, color: col.hex, border: `1px solid ${col.border}` }}>
-                      Sett. {level.weeks}
+                    <span className="text-[10px] px-2 py-0.5 rounded-full font-bold font-mono" style={{ background: col.bg, color: col.hex, border: `1px solid ${col.border}` }}>
+                      SETT. {level.weeks}
                     </span>
                   </div>
-                  <p className="text-xs text-gray-600 mt-0.5">{completed.size}/{level.topics.length} completati</p>
+                  <p className="text-xs mt-0.5" style={{ color: '#4b5563' }}>{completed.size}/{level.topics.length} completati</p>
                 </div>
-                <span className="text-gray-600 text-xs">{isOpen ? '▲' : '▼'}</span>
+                <motion.span animate={{ rotate: isOpen ? 180 : 0 }} transition={{ duration: 0.2 }}
+                  className="text-gray-600 text-xs flex-shrink-0">▼</motion.span>
               </motion.button>
 
               {/* Topics */}
@@ -872,12 +921,16 @@ function CurriculumCoach() {
                         );
                       })}
                       {/* Milestone */}
-                      <div className="mt-2 px-3 py-2.5 rounded-xl flex items-center gap-2"
-                        style={isDone ? { background: col.bg, border: `1px solid ${col.border}` } : { background: 'rgba(17,24,39,0.4)', border: '1px solid rgba(255,255,255,0.04)' }}>
-                        <span className="text-sm">{isDone ? '🏆' : '🎯'}</span>
-                        <p className="text-xs" style={{ color: isDone ? col.hex : '#6b7280' }}>
-                          <span className="font-bold">Milestone: </span>{level.milestone}
-                        </p>
+                      <div className="mt-3 px-3 py-2.5 rounded-xl flex items-start gap-2.5 relative overflow-hidden"
+                        style={isDone
+                          ? { background: `linear-gradient(135deg, ${col.bg}, ${col.bg}88)`, border: `1px solid ${col.border}`, boxShadow: `0 0 16px ${col.glow}22` }
+                          : { background: 'rgba(17,24,39,0.5)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                        {isDone && <div className="absolute top-0 left-0 w-full h-px" style={{ background: `linear-gradient(90deg, transparent, ${col.hex}88, transparent)` }} />}
+                        <span className="text-base mt-0.5">{isDone ? '🏆' : '🎯'}</span>
+                        <div>
+                          <p className="text-[10px] font-black tracking-widest mb-0.5" style={{ color: isDone ? col.hex : '#374151', fontFamily: 'Orbitron, sans-serif' }}>MILESTONE</p>
+                          <p className="text-xs leading-relaxed" style={{ color: isDone ? col.hex : '#6b7280' }}>{level.milestone}</p>
+                        </div>
                       </div>
                     </div>
                   </motion.div>
@@ -1149,25 +1202,31 @@ function VisualCoach() {
   if (step === 'setup') {
     return (
       <div className="space-y-4">
-        <div className="p-4 rounded-2xl" style={{ background: 'linear-gradient(135deg, rgba(5,150,105,0.12), rgba(13,148,136,0.08))', border: `1px solid ${C.emerald.border}` }}>
-          <p className="text-xs font-black tracking-wide" style={{ color: C.emerald.hex }}>📷 VISUAL LIVE COACH</p>
-          <p className="text-xs text-gray-500 mt-0.5">Llama Vision 90B · 13 discipline · Solo / Sparring / Drill</p>
+        <div className="relative rounded-2xl overflow-hidden"
+          style={{ background: 'linear-gradient(135deg, rgba(5,150,105,0.12), rgba(13,148,136,0.06))', border: `1px solid ${C.emerald.border}` }}>
+          <div className="h-px w-full" style={{ background: 'linear-gradient(90deg, transparent, #10b981 40%, #0d9488 70%, transparent)', animation: 'frame-glow-shift 4s linear infinite', backgroundSize: '200% 100%' }} />
+          <div className="relative px-4 py-3.5 overflow-hidden">
+            <div className="absolute -right-4 -top-4 w-20 h-20 rounded-full pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(16,185,129,0.12) 0%, transparent 70%)', animation: 'drift-slow 8s ease-in-out infinite' }} />
+            <p className="text-xs font-black tracking-widest" style={{ color: C.emerald.hex, fontFamily: 'Orbitron, sans-serif' }}>📷 VISUAL LIVE COACH</p>
+            <p className="text-xs mt-0.5" style={{ color: '#6b7280' }}>Llama Vision 90B · 27 discipline · Solo / Sparring / Drill</p>
+          </div>
         </div>
 
         {DISCIPLINE_GROUPS.map((group) => (
           <div key={group.label}>
-            <p className="text-xs font-bold text-gray-600 mb-2">{group.label}</p>
+            <p className="text-[10px] font-black text-gray-600 mb-2 tracking-widest" style={{ fontFamily: 'Orbitron, sans-serif' }}>{group.label}</p>
             <div className="flex flex-wrap gap-1.5">
               {group.items.map((d) => {
                 const isActive = mode === d.id;
                 const isSpar = isSparring(d.id);
                 const col = isSpar ? C.violet : C.emerald;
                 return (
-                  <motion.button key={d.id} whileTap={{ scale: 0.93 }} onClick={() => setMode(d.id)}
-                    className="px-3 py-1.5 rounded-xl text-xs font-bold transition-all"
+                  <motion.button key={d.id} whileTap={{ scale: 0.91 }} whileHover={{ scale: 1.04 }} onClick={() => setMode(d.id)}
+                    className="px-3 py-1.5 rounded-xl text-xs font-bold transition-all relative overflow-hidden"
                     style={isActive
-                      ? { background: col.hex, color: '#fff', boxShadow: `0 4px 12px ${col.glow}` }
+                      ? { background: `linear-gradient(135deg, ${col.hex}33, ${col.hex}11)`, color: col.hex, boxShadow: `0 0 0 1px ${col.border}, 0 4px 14px ${col.glow}`, border: `1px solid ${col.border}` }
                       : { background: 'rgba(55,65,81,0.35)', color: '#9ca3af', border: '1px solid rgba(255,255,255,0.05)' }}>
+                    {isActive && <span className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.06), transparent)', animation: 'chip-sheen 2s ease-in-out infinite', backgroundSize: '200% 100%' }} />}
                     {d.emoji} {d.label}
                   </motion.button>
                 );
@@ -1188,37 +1247,43 @@ function VisualCoach() {
         )}
 
         <div>
-          <p className="text-xs text-gray-600 mb-1.5">Descrivi la sessione <span className="text-gray-700">(opzionale)</span></p>
+          <p className="text-[10px] text-gray-600 mb-1.5 font-mono tracking-widest">DESCRIVI LA SESSIONE <span className="text-gray-700">(OPZIONALE)</span></p>
           <textarea value={sessionContext} onChange={(e) => setSessionContext(e.target.value)} rows={2}
             placeholder={isPartnerMode ? 'Es. Io e mio fratello — focus combo leggero…' : `Es. ${currentDisc?.label} – tecnica base…`}
-            className="w-full px-3 py-2.5 text-sm text-white placeholder-gray-700 resize-none focus:outline-none transition-all"
-            style={{ background: 'rgba(17,24,39,0.7)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 14 }} />
+            className="w-full px-4 py-3 text-sm text-white placeholder-gray-700 resize-none focus:outline-none transition-all"
+            style={{ background: 'rgba(17,24,39,0.85)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 14, backdropFilter: 'blur(8px)' }}
+            onFocus={(e) => { e.target.style.borderColor = 'rgba(16,185,129,0.35)'; e.target.style.boxShadow = '0 0 0 1px rgba(16,185,129,0.1)'; }}
+            onBlur={(e) => { e.target.style.borderColor = 'rgba(255,255,255,0.07)'; e.target.style.boxShadow = 'none'; }} />
         </div>
 
         {pastSessions.length > 0 && (
           <div>
-            <p className="text-xs text-gray-600 mb-1.5">Sessioni recenti</p>
+            <p className="text-[10px] text-gray-600 mb-1.5 font-mono tracking-widest">SESSIONI RECENTI</p>
             <div className="space-y-1">
               {pastSessions.slice(0, 3).map((s, i) => (
-                <button key={i} onClick={() => { setMode(s.mode); setSessionContext(s.context); }}
-                  className="w-full text-left px-3 py-2.5 rounded-xl text-xs text-gray-400 transition-all hover:text-gray-200"
-                  style={{ background: 'rgba(17,24,39,0.5)', border: '1px solid rgba(255,255,255,0.04)' }}>
-                  <span className="text-gray-600">{s.date} · {s.mode}</span>
-                  {s.duration > 0 && <span className="text-gray-700"> · {s.duration}min</span>}
-                  <span className="mx-1 text-gray-700">·</span>
-                  {s.context.slice(0, 42)}{s.context.length > 42 ? '…' : ''}
-                </button>
+                <motion.button key={i} whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }}
+                  onClick={() => { setMode(s.mode); setSessionContext(s.context); }}
+                  className="w-full text-left px-3 py-2.5 rounded-xl text-xs transition-all"
+                  style={{ background: 'rgba(17,24,39,0.6)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                  <span style={{ color: '#4b5563' }}>{s.date} · {s.mode}</span>
+                  {s.duration > 0 && <span style={{ color: '#374151' }}> · {s.duration}min</span>}
+                  <span className="mx-1" style={{ color: '#374151' }}>·</span>
+                  <span style={{ color: '#6b7280' }}>{s.context.slice(0, 42)}{s.context.length > 42 ? '…' : ''}</span>
+                </motion.button>
               ))}
             </div>
           </div>
         )}
 
-        <motion.button whileTap={{ scale: 0.98 }} onClick={startSession}
-          className="w-full py-3.5 rounded-2xl text-white font-black text-sm transition-all"
+        <motion.button whileTap={{ scale: 0.97 }} whileHover={{ scale: 1.01 }} onClick={startSession}
+          className="w-full py-4 rounded-2xl text-white font-black text-sm transition-all relative overflow-hidden"
           style={isPartnerMode
-            ? { background: `linear-gradient(135deg, ${C.violet.hex}, #4f46e5)`, boxShadow: `0 6px 20px ${C.violet.glow}` }
-            : { background: `linear-gradient(135deg, ${C.emerald.hex}, #0d9488)`, boxShadow: `0 6px 20px ${C.emerald.glow}` }}>
-          {isPartnerMode ? `👥 Inizia Match (${rounds}×${roundDuration/60}min)` : '📷 Inizia Sessione Live'}
+            ? { background: `linear-gradient(135deg, ${C.violet.hex}, #4f46e5)`, boxShadow: `0 8px 28px ${C.violet.glow}` }
+            : { background: `linear-gradient(135deg, ${C.emerald.hex}, #0d9488)`, boxShadow: `0 8px 28px ${C.emerald.glow}` }}>
+          <span className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent)', animation: 'chip-sheen 2.5s ease-in-out infinite', backgroundSize: '200% 100%' }} />
+          <span className="relative" style={{ fontFamily: 'Orbitron, sans-serif', letterSpacing: '0.05em' }}>
+            {isPartnerMode ? `👥 INIZIA MATCH — ${rounds}×${roundDuration/60}MIN` : '📷 INIZIA SESSIONE LIVE'}
+          </span>
         </motion.button>
       </div>
     );
@@ -1228,23 +1293,26 @@ function VisualCoach() {
   return (
     <div className="fixed inset-0 z-50 bg-black flex flex-col" style={{ touchAction: 'none' }}>
       {/* Top bar */}
-      <div className="flex items-center gap-2 px-3 py-2 flex-shrink-0"
-        style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-        <span className="text-base">{currentDisc?.emoji}</span>
+      <div className="flex items-center gap-2.5 px-3 py-2.5 flex-shrink-0"
+        style={{ background: 'rgba(0,0,0,0.88)', backdropFilter: 'blur(16px)', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+        <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 text-base"
+          style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)' }}>
+          {currentDisc?.emoji}
+        </div>
         <div className="flex-1 min-w-0">
-          <p className="text-xs font-black text-white leading-tight">{currentDisc?.label}</p>
-          {sessionContext && <p className="text-[10px] text-gray-500 truncate">{sessionContext}</p>}
+          <p className="text-xs font-black text-white leading-tight" style={{ fontFamily: 'Orbitron, sans-serif' }}>{currentDisc?.label?.toUpperCase()}</p>
+          {sessionContext && <p className="text-[10px] truncate mt-0.5" style={{ color: '#4b5563' }}>{sessionContext}</p>}
         </div>
         {/* Badges */}
         <div className="flex items-center gap-1.5">
-          {streaming && <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold" style={{ background: 'rgba(16,185,129,0.18)', color: C.emerald.hex, border: `1px solid ${C.emerald.border}` }}>● LIVE</span>}
-          {autoMode && <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold animate-pulse" style={{ background: 'rgba(249,115,22,0.18)', color: C.orange.hex, border: `1px solid ${C.orange.border}` }}>AUTO</span>}
-          {skeletonOn && centered && <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold" style={{ background: centered === 'ok' ? 'rgba(16,185,129,0.15)' : 'rgba(249,115,22,0.15)', color: centered === 'ok' ? C.emerald.hex : C.orange.hex }}>
-            {centered === 'ok' ? '✓' : centered === 'off' ? '↔' : '—'}
+          {streaming && <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold" style={{ background: 'rgba(16,185,129,0.18)', color: C.emerald.hex, border: `1px solid ${C.emerald.border}`, animation: 'pulse-glow 2s ease-in-out infinite' }}>● LIVE</span>}
+          {autoMode && <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold" style={{ background: 'rgba(249,115,22,0.18)', color: C.orange.hex, border: `1px solid ${C.orange.border}`, animation: 'pulse-glow 1.2s ease-in-out infinite' }}>AUTO</span>}
+          {skeletonOn && centered && <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold" style={{ background: centered === 'ok' ? 'rgba(16,185,129,0.15)' : 'rgba(249,115,22,0.15)', color: centered === 'ok' ? C.emerald.hex : C.orange.hex, border: `1px solid ${centered === 'ok' ? C.emerald.border : C.orange.border}` }}>
+            {centered === 'ok' ? '✓ CTR' : centered === 'off' ? '↔ OFF' : '— —'}
           </span>}
-          <motion.button whileTap={{ scale: 0.92 }} onClick={stopCamera}
+          <motion.button whileTap={{ scale: 0.9 }} onClick={stopCamera}
             className="w-8 h-8 rounded-xl flex items-center justify-center font-black text-sm"
-            style={{ background: 'rgba(185,28,28,0.4)', border: `1px solid ${C.red.border}`, color: '#fca5a5' }}>
+            style={{ background: 'rgba(185,28,28,0.35)', border: `1px solid ${C.red.border}`, color: '#fca5a5' }}>
             ✕
           </motion.button>
         </div>
@@ -1277,19 +1345,28 @@ function VisualCoach() {
           {(analysis || analyzing) && (
             <motion.div
               key={analyzing ? 'analyzing' : analysis?.time}
-              initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-              className="absolute bottom-0 inset-x-0 px-3 pb-3 pt-6"
-              style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.88) 60%, transparent)' }}>
+              initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 6 }}
+              transition={{ type: 'spring', stiffness: 280, damping: 24 }}
+              className="absolute bottom-0 inset-x-0 px-3 pb-3 pt-12"
+              style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.95) 50%, rgba(0,0,0,0.7) 75%, transparent)' }}>
               {analyzing ? (
-                <div className="flex items-center gap-2">
-                  <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: C.violet.hex }} />
-                  <span className="text-xs font-bold" style={{ color: C.violet.hex }}>Analisi AI…</span>
+                <div className="flex items-center gap-2.5">
+                  <div className="flex gap-1">
+                    {[0,1,2].map((i) => (
+                      <motion.div key={i} className="w-1.5 h-1.5 rounded-full" style={{ background: C.violet.hex }}
+                        animate={{ y: [0,-4,0], opacity: [0.4,1,0.4] }} transition={{ duration: 0.65, repeat: Infinity, delay: i*0.16 }} />
+                    ))}
+                  </div>
+                  <span className="text-xs font-bold" style={{ color: C.violet.hex, fontFamily: 'Orbitron, sans-serif' }}>ANALISI IN CORSO…</span>
                 </div>
               ) : (
                 <>
-                  <p className="text-[9px] font-mono mb-1" style={{ color: C.blue.hex, opacity: 0.65 }}>
-                    {analysis.provider} · {currentDisc?.label} · {analysis.time}
-                  </p>
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <div className="h-px flex-1" style={{ background: `linear-gradient(90deg, ${C.violet.hex}66, transparent)` }} />
+                    <p className="text-[9px] font-mono" style={{ color: C.violet.hex, opacity: 0.7 }}>
+                      {analysis.provider} · {currentDisc?.label} · {analysis.time}
+                    </p>
+                  </div>
                   <p className="text-sm text-white leading-snug whitespace-pre-wrap font-medium">{analysis.content}</p>
                 </>
               )}
@@ -1300,36 +1377,37 @@ function VisualCoach() {
 
       {/* Bottom controls */}
       <div className="flex-shrink-0 px-3 py-3 flex gap-2"
-        style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(12px)', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-        <motion.button whileTap={{ scale: 0.95 }} onClick={captureAndAnalyze} disabled={analyzing}
-          className="flex-1 py-3 rounded-xl text-white text-sm font-black transition-all disabled:opacity-40"
-          style={{ background: `linear-gradient(135deg, ${C.violet.hex}, #4f46e5)`, boxShadow: `0 4px 14px ${C.violet.glow}` }}>
-          🔍 Analizza
+        style={{ background: 'rgba(0,0,0,0.9)', backdropFilter: 'blur(16px)', borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+        <motion.button whileTap={{ scale: 0.93 }} whileHover={{ scale: 1.03 }} onClick={captureAndAnalyze} disabled={analyzing}
+          className="flex-1 py-3 rounded-xl text-white text-sm font-black transition-all disabled:opacity-40 relative overflow-hidden"
+          style={{ background: `linear-gradient(135deg, ${C.violet.hex}, #4f46e5)`, boxShadow: `0 4px 18px ${C.violet.glow}` }}>
+          <span className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent)', animation: 'chip-sheen 2s ease-in-out infinite', backgroundSize: '200% 100%' }} />
+          <span className="relative">🔍 Analizza</span>
         </motion.button>
-        <motion.button whileTap={{ scale: 0.95 }} onClick={() => setAutoMode((v) => !v)}
-          className="flex-1 py-3 rounded-xl text-white text-sm font-black transition-all"
+        <motion.button whileTap={{ scale: 0.93 }} onClick={() => setAutoMode((v) => !v)}
+          className="flex-1 py-3 rounded-xl text-white text-sm font-black transition-all relative overflow-hidden"
           style={autoMode
-            ? { background: `linear-gradient(135deg, ${C.orange.hex}, #b45309)`, boxShadow: `0 4px 14px ${C.orange.glow}` }
-            : { background: 'rgba(55,65,81,0.6)', border: '1px solid rgba(255,255,255,0.08)' }}>
+            ? { background: `linear-gradient(135deg, ${C.orange.hex}, #b45309)`, boxShadow: `0 4px 18px ${C.orange.glow}` }
+            : { background: 'rgba(55,65,81,0.6)', border: '1px solid rgba(255,255,255,0.07)' }}>
           {autoMode ? '⏸ Stop' : '▶ Auto'}
         </motion.button>
-        <motion.button whileTap={{ scale: 0.95 }} onClick={() => { setVoiceOn((v) => !v); if (voiceOn) window.speechSynthesis?.cancel(); }}
+        <motion.button whileTap={{ scale: 0.9 }} onClick={() => { setVoiceOn((v) => !v); if (voiceOn) window.speechSynthesis?.cancel(); }}
           className="w-12 py-3 rounded-xl text-white font-black text-base transition-all"
           style={voiceOn
-            ? { background: 'linear-gradient(135deg, #059669, #047857)', boxShadow: '0 4px 14px rgba(5,150,105,0.4)' }
-            : { background: 'rgba(55,65,81,0.6)', border: '1px solid rgba(255,255,255,0.08)' }}>
+            ? { background: 'linear-gradient(135deg, #059669, #047857)', boxShadow: '0 4px 16px rgba(5,150,105,0.4)' }
+            : { background: 'rgba(55,65,81,0.5)', border: '1px solid rgba(255,255,255,0.06)' }}>
           🔊
         </motion.button>
-        <motion.button whileTap={{ scale: 0.95 }} onClick={() => setSkeletonOn((v) => !v)}
+        <motion.button whileTap={{ scale: 0.9 }} onClick={() => setSkeletonOn((v) => !v)}
           className="w-12 py-3 rounded-xl text-white font-black text-base transition-all"
           style={skeletonOn
-            ? { background: 'linear-gradient(135deg, #7c3aed, #4f46e5)', boxShadow: '0 4px 14px rgba(124,58,237,0.4)' }
-            : { background: 'rgba(55,65,81,0.6)', border: '1px solid rgba(255,255,255,0.08)' }}>
+            ? { background: 'linear-gradient(135deg, #7c3aed, #4f46e5)', boxShadow: '0 4px 16px rgba(124,58,237,0.45)' }
+            : { background: 'rgba(55,65,81,0.5)', border: '1px solid rgba(255,255,255,0.06)' }}>
           🦴
         </motion.button>
-        <motion.button whileTap={{ scale: 0.95 }} onClick={flipCamera}
+        <motion.button whileTap={{ scale: 0.9 }} onClick={flipCamera}
           className="w-12 py-3 rounded-xl text-white font-black text-base transition-all"
-          style={{ background: 'rgba(55,65,81,0.6)', border: '1px solid rgba(255,255,255,0.08)' }}>
+          style={{ background: 'rgba(55,65,81,0.5)', border: '1px solid rgba(255,255,255,0.06)' }}>
           🔄
         </motion.button>
       </div>
@@ -1339,10 +1417,10 @@ function VisualCoach() {
 
 // ─── Root ──────────────────────────────────────────────────────────────────────
 const TABS = [
-  { id: 'trainer',    label: '🏅 PT',    color: C.amber   },
-  { id: 'curriculum', label: '📚 Piano', color: C.violet  },
-  { id: 'chat',       label: '💬 Chat',  color: C.blue    },
-  { id: 'visual',     label: '📷 Live',  color: C.emerald },
+  { id: 'trainer',    label: 'PT',     icon: '🏅', color: C.amber   },
+  { id: 'curriculum', label: 'Piano',  icon: '📚', color: C.violet  },
+  { id: 'chat',       label: 'Chat',   icon: '💬', color: C.blue    },
+  { id: 'visual',     label: 'Live',   icon: '📷', color: C.emerald },
 ];
 
 export default function Coach() {
@@ -1351,23 +1429,42 @@ export default function Coach() {
   return (
     <div className="min-h-full text-white pb-8" style={{ background: '#030712' }}>
       {/* Header */}
-      <div className="sticky top-0 z-10 px-4 py-3" style={{ background: 'rgba(3,7,18,0.92)', backdropFilter: 'blur(16px)', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-        <div className="max-w-2xl mx-auto">
-          <div className="mb-3">
-            <h1 className="text-lg font-black" style={{ background: 'linear-gradient(135deg, #fff 30%, #9ca3af)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-              ⚡ AI Coach
-            </h1>
-            <p className="text-xs" style={{ color: '#4b5563' }}>Kimi K2.6 · Llama Vision 90B · NVIDIA NIM</p>
+      <div className="sticky top-0 z-10" style={{ background: 'rgba(3,7,18,0.94)', backdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+        {/* Animated top border */}
+        <div className="h-px w-full" style={{ background: 'linear-gradient(90deg, transparent, #00f2ff 30%, #a855f7 70%, transparent)', animation: 'frame-glow-shift 4s linear infinite', backgroundSize: '200% 100%' }} />
+
+        <div className="relative px-4 pt-3 pb-3 max-w-2xl mx-auto overflow-hidden">
+          {/* Ambient orbs */}
+          <div className="absolute -top-6 -left-8 w-32 h-32 rounded-full pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(0,242,255,0.06) 0%, transparent 70%)', animation: 'drift-slow 8s ease-in-out infinite' }} />
+          <div className="absolute -top-4 right-0 w-24 h-24 rounded-full pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(168,85,247,0.07) 0%, transparent 70%)', animation: 'drift-slow 12s ease-in-out infinite reverse' }} />
+
+          {/* Title row */}
+          <div className="flex items-center justify-between mb-3 relative">
+            <div>
+              <h1 className="text-xl font-black tracking-tight leading-none" style={{ fontFamily: 'Orbitron, sans-serif', background: 'linear-gradient(135deg, #ffffff 20%, #00f2ff 60%, #a855f7 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                ⚡ AI COACH
+              </h1>
+              <p className="text-[10px] mt-0.5 font-mono tracking-widest" style={{ color: '#374151' }}>KIMI K2.6 · LLAMA VISION 90B · NVIDIA NIM</p>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold" style={{ background: 'rgba(0,242,255,0.08)', color: '#00f2ff', border: '1px solid rgba(0,242,255,0.2)', animation: 'pulse-glow 2s ease-in-out infinite' }}>● SISTEMA ATTIVO</span>
+            </div>
           </div>
-          <div className="flex gap-1.5 p-1 rounded-2xl" style={{ background: 'rgba(17,24,39,0.6)', border: '1px solid rgba(255,255,255,0.05)' }}>
+
+          {/* Tab switcher */}
+          <div className="flex gap-1.5 p-1 rounded-2xl" style={{ background: 'rgba(17,24,39,0.7)', border: '1px solid rgba(255,255,255,0.06)' }}>
             {TABS.map((t) => (
               <motion.button key={t.id} onClick={() => setTab(t.id)}
-                whileTap={{ scale: 0.95 }}
-                className="flex-1 py-2 rounded-xl text-xs font-black transition-all"
+                whileTap={{ scale: 0.93 }}
+                className="flex-1 py-2.5 rounded-xl text-xs font-black transition-all relative overflow-hidden"
                 style={tab === t.id
-                  ? { background: `linear-gradient(135deg, ${t.color.hex}, ${t.color.hex}cc)`, color: '#fff', boxShadow: `0 4px 12px ${t.color.glow}` }
-                  : { color: '#6b7280' }}>
-                {t.label}
+                  ? { background: `linear-gradient(135deg, ${t.color.hex}22, ${t.color.hex}11)`, color: t.color.hex, boxShadow: `0 0 0 1px ${t.color.border}, 0 4px 16px ${t.color.glow}`, border: `1px solid ${t.color.border}` }
+                  : { color: '#4b5563', border: '1px solid transparent' }}>
+                {tab === t.id && (
+                  <span className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.06) 50%, transparent 100%)', animation: 'chip-sheen 2.5s ease-in-out infinite', backgroundSize: '200% 100%' }} />
+                )}
+                <span className="block text-base leading-none mb-0.5">{t.icon}</span>
+                <span className="block text-[10px] tracking-wide" style={{ fontFamily: 'Orbitron, sans-serif', fontSize: '9px' }}>{t.label}</span>
               </motion.button>
             ))}
           </div>
@@ -1376,8 +1473,8 @@ export default function Coach() {
 
       <div className="max-w-2xl mx-auto px-4 pt-4">
         <AnimatePresence mode="wait">
-          <motion.div key={tab} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}
-            transition={{ duration: 0.18 }}>
+          <motion.div key={tab} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.2, ease: [0.25, 0.46, 0.45, 0.94] }}>
             {tab === 'trainer'    && <PersonalTrainer />}
             {tab === 'curriculum' && <CurriculumCoach />}
             {tab === 'chat'       && <CoachChat />}
