@@ -803,6 +803,7 @@ function VisualCoach() {
   const overlayRef = useRef(null);
   const rafRef = useRef(null);
   const poseRef = useRef(null);
+  const feedbackHistoryRef = useRef([]);
 
   // Precarica le voci appena disponibili (getVoices è asincrono su Chrome/Safari)
   useEffect(() => {
@@ -926,8 +927,21 @@ function VisualCoach() {
           const video = videoRef.current;
           const canvas = overlayRef.current;
           if (!video || !canvas || video.readyState < 2) { rafRef.current = requestAnimationFrame(loop); return; }
-          canvas.width = video.videoWidth || 640;
-          canvas.height = video.videoHeight || 480;
+          // Align canvas to the actual displayed video area (object-contain letterbox)
+          const vW = video.videoWidth || 640, vH = video.videoHeight || 480;
+          const container = canvas.parentElement;
+          if (container && vW > 0 && vH > 0) {
+            const cW = container.clientWidth, cH = container.clientHeight;
+            const vRatio = vW / vH, cRatio = cW / cH;
+            let dW, dH, dX, dY;
+            if (vRatio > cRatio) { dW = cW; dH = Math.round(cW / vRatio); dX = 0; dY = Math.round((cH - dH) / 2); }
+            else { dH = cH; dW = Math.round(cH * vRatio); dX = Math.round((cW - dW) / 2); dY = 0; }
+            canvas.width = dW; canvas.height = dH;
+            canvas.style.left = dX + 'px'; canvas.style.top = dY + 'px';
+            canvas.style.width = dW + 'px'; canvas.style.height = dH + 'px';
+          } else {
+            canvas.width = vW; canvas.height = vH;
+          }
           const ctx = canvas.getContext('2d');
           ctx.clearRect(0, 0, canvas.width, canvas.height);
           const result = lm.detectForVideo(video, performance.now());
@@ -963,6 +977,9 @@ function VisualCoach() {
     if (sessionContext.trim()) p += `\n\nSESSIONE ATTUALE: ${sessionContext.trim()}`;
     if (pastSessions.length > 0)
       p += `\n\nSESSIONI PRECEDENTI:\n` + pastSessions.slice(0, 2).map((s) => `- ${s.date} (${s.mode}): ${s.context} → ${s.keyFeedback}`).join('\n');
+    const hist = feedbackHistoryRef.current;
+    if (hist.length > 0)
+      p += `\n\nFEEDBACK RECENTI (NON ripetere queste frasi, varia sempre il focus):\n` + hist.map((f, i) => `${i + 1}. ${f}`).join('\n');
     return p;
   }, [sessionContext, pastSessions]);
 
@@ -983,6 +1000,8 @@ function VisualCoach() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Errore AI');
       setAnalysis({ content: data.content, provider: data.provider, time: new Date().toLocaleTimeString('it-IT') });
+      // Store last 3 feedbacks to avoid repetition
+      feedbackHistoryRef.current = [data.content.split('\n')[0], ...feedbackHistoryRef.current].slice(0, 3);
       speakCoach(data.content);
       if (isSparring(mode) && data.content) {
         const point = parsePoint(data.content);
@@ -1086,129 +1105,114 @@ function VisualCoach() {
     );
   }
 
-  // ── Live ───────────────────────────────────────────────────────────────────
+  // ── Live — full screen overlay ─────────────────────────────────────────────
   return (
-    <div className="space-y-3">
-      {/* Session header */}
-      <div className="px-4 py-2.5 rounded-xl flex items-center gap-2"
-        style={{ background: isPartnerMode ? C.violet.bg : C.emerald.bg, border: `1px solid ${isPartnerMode ? C.violet.border : C.emerald.border}` }}>
-        <span className="text-lg">{currentDisc?.emoji}</span>
+    <div className="fixed inset-0 z-50 bg-black flex flex-col" style={{ touchAction: 'none' }}>
+      {/* Top bar */}
+      <div className="flex items-center gap-2 px-3 py-2 flex-shrink-0"
+        style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+        <span className="text-base">{currentDisc?.emoji}</span>
         <div className="flex-1 min-w-0">
-          <p className="text-xs font-black text-white">{currentDisc?.label}</p>
-          {sessionContext && <p className="text-xs text-gray-500 truncate">{sessionContext}</p>}
+          <p className="text-xs font-black text-white leading-tight">{currentDisc?.label}</p>
+          {sessionContext && <p className="text-[10px] text-gray-500 truncate">{sessionContext}</p>}
         </div>
-        {isPartnerMode && <span className="text-xs font-black px-2 py-0.5 rounded-full" style={{ background: C.violet.bg, color: C.violet.hex, border: `1px solid ${C.violet.border}` }}>👥 PARTNER</span>}
+        {/* Badges */}
+        <div className="flex items-center gap-1.5">
+          {streaming && <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold" style={{ background: 'rgba(16,185,129,0.18)', color: C.emerald.hex, border: `1px solid ${C.emerald.border}` }}>● LIVE</span>}
+          {autoMode && <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold animate-pulse" style={{ background: 'rgba(249,115,22,0.18)', color: C.orange.hex, border: `1px solid ${C.orange.border}` }}>AUTO</span>}
+          {skeletonOn && centered && <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold" style={{ background: centered === 'ok' ? 'rgba(16,185,129,0.15)' : 'rgba(249,115,22,0.15)', color: centered === 'ok' ? C.emerald.hex : C.orange.hex }}>
+            {centered === 'ok' ? '✓' : centered === 'off' ? '↔' : '—'}
+          </span>}
+          <motion.button whileTap={{ scale: 0.92 }} onClick={stopCamera}
+            className="w-8 h-8 rounded-xl flex items-center justify-center font-black text-sm"
+            style={{ background: 'rgba(185,28,28,0.4)', border: `1px solid ${C.red.border}`, color: '#fca5a5' }}>
+            ✕
+          </motion.button>
+        </div>
       </div>
 
-      {/* Timer + Score */}
+      {/* Sparring: timer + score */}
       {isPartnerMode && (
-        <>
+        <div className="flex-shrink-0 px-3 py-2 space-y-2" style={{ background: 'rgba(0,0,0,0.6)' }}>
           {timer.phase === 'idle'
             ? <motion.button whileTap={{ scale: 0.97 }} onClick={timer.start}
-                className="w-full py-3 rounded-2xl text-white font-black text-sm"
-                style={{ background: `linear-gradient(135deg, ${C.red.hex}, #b91c1c)`, boxShadow: `0 6px 20px ${C.red.glow}` }}>
+                className="w-full py-2.5 rounded-xl text-white font-black text-sm"
+                style={{ background: `linear-gradient(135deg, ${C.red.hex}, #b91c1c)`, boxShadow: `0 4px 16px ${C.red.glow}` }}>
                 🔔 Inizia Round 1
               </motion.button>
             : <RoundTimerDisplay timer={timer} roundDuration={roundDuration} restDuration={60} />
           }
           <ScoreTracker score={score} onScore={handleScore} lastPoint={lastPoint} />
-        </>
+        </div>
       )}
 
-      {/* Camera */}
-      <div className="relative rounded-2xl overflow-hidden bg-black aspect-video max-h-60"
-        style={{ border: analyzing ? `2px solid ${C.blue.hex}` : streaming ? `2px solid ${C.emerald.hex}` : '2px solid rgba(255,255,255,0.04)', boxShadow: analyzing ? `0 0 20px ${C.blue.glow}` : streaming ? `0 0 12px ${C.emerald.glow}` : 'none', transition: 'all 0.3s ease' }}>
-        <video ref={videoRef} className="w-full h-full object-cover" playsInline muted />
+      {/* Video — fills all remaining space */}
+      <div className="flex-1 relative overflow-hidden bg-black">
+        <video ref={videoRef} className="w-full h-full" style={{ objectFit: 'contain' }} playsInline muted />
         <canvas ref={canvasRef} className="hidden" />
-        {/* Skeleton overlay */}
-        <canvas ref={overlayRef} className="absolute inset-0 w-full h-full pointer-events-none" style={{ opacity: skeletonOn ? 1 : 0 }} />
-        {/* Centering badge */}
-        {skeletonOn && centered && streaming && (
-          <div className="absolute top-2 left-2 px-2 py-1 rounded-lg text-xs font-mono font-bold"
-            style={{
-              background: centered === 'ok' ? 'rgba(16,185,129,0.2)' : centered === 'off' ? 'rgba(249,115,22,0.2)' : 'rgba(107,114,128,0.2)',
-              color: centered === 'ok' ? '#10b981' : centered === 'off' ? '#f97316' : '#9ca3af',
-              border: `1px solid ${centered === 'ok' ? 'rgba(16,185,129,0.3)' : centered === 'off' ? 'rgba(249,115,22,0.3)' : 'rgba(107,114,128,0.3)'}`,
-              backdropFilter: 'blur(8px)',
-            }}>
-            {centered === 'ok' ? '✓ CENTRATO' : centered === 'off' ? '↔ FUORI FRAME' : '— NESSUNO'}
-          </div>
-        )}
-        {streaming && (
-          <div className="absolute top-2 right-2 flex gap-1">
-            <span className="px-2 py-1 rounded-lg text-xs font-mono font-bold"
-              style={{ background: 'rgba(16,185,129,0.2)', color: C.emerald.hex, border: `1px solid ${C.emerald.border}`, backdropFilter: 'blur(8px)' }}>● LIVE</span>
-            {autoMode && <span className="px-2 py-1 rounded-lg text-xs font-mono font-bold animate-pulse"
-              style={{ background: 'rgba(249,115,22,0.2)', color: C.orange.hex, border: `1px solid ${C.orange.border}` }}>AUTO</span>}
-          </div>
-        )}
-        {analyzing && (
-          <div className="absolute bottom-0 inset-x-0 flex items-center justify-center py-2"
-            style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.8), transparent)' }}>
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full" style={{ background: 'rgba(17,24,39,0.9)', border: `1px solid ${C.blue.border}` }}>
-              <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: C.blue.hex }} />
-              <span className="text-xs font-bold" style={{ color: C.blue.hex }}>Analisi AI in corso…</span>
-            </div>
-          </div>
-        )}
+        {/* Skeleton overlay — positioned by JS to match video display area */}
+        <canvas ref={overlayRef} className="absolute pointer-events-none" style={{ opacity: skeletonOn ? 1 : 0 }} />
+
+        {/* AI analysis overlay on video */}
+        <AnimatePresence>
+          {(analysis || analyzing) && (
+            <motion.div
+              key={analyzing ? 'analyzing' : analysis?.time}
+              initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+              className="absolute bottom-0 inset-x-0 px-3 pb-3 pt-6"
+              style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.88) 60%, transparent)' }}>
+              {analyzing ? (
+                <div className="flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: C.violet.hex }} />
+                  <span className="text-xs font-bold" style={{ color: C.violet.hex }}>Analisi AI…</span>
+                </div>
+              ) : (
+                <>
+                  <p className="text-[9px] font-mono mb-1" style={{ color: C.blue.hex, opacity: 0.65 }}>
+                    {analysis.provider} · {currentDisc?.label} · {analysis.time}
+                  </p>
+                  <p className="text-sm text-white leading-snug whitespace-pre-wrap font-medium">{analysis.content}</p>
+                </>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
-      {/* Controls */}
-      <div className="flex gap-2">
-        <motion.button whileTap={{ scale: 0.96 }} onClick={captureAndAnalyze} disabled={analyzing}
-          className="flex-1 py-2.5 rounded-xl text-white text-sm font-black transition-all disabled:opacity-40"
+      {/* Bottom controls */}
+      <div className="flex-shrink-0 px-3 py-3 flex gap-2"
+        style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(12px)', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+        <motion.button whileTap={{ scale: 0.95 }} onClick={captureAndAnalyze} disabled={analyzing}
+          className="flex-1 py-3 rounded-xl text-white text-sm font-black transition-all disabled:opacity-40"
           style={{ background: `linear-gradient(135deg, ${C.violet.hex}, #4f46e5)`, boxShadow: `0 4px 14px ${C.violet.glow}` }}>
           🔍 Analizza
         </motion.button>
-        <motion.button whileTap={{ scale: 0.96 }} onClick={() => setAutoMode((v) => !v)}
-          className="flex-1 py-2.5 rounded-xl text-white text-sm font-black transition-all"
+        <motion.button whileTap={{ scale: 0.95 }} onClick={() => setAutoMode((v) => !v)}
+          className="flex-1 py-3 rounded-xl text-white text-sm font-black transition-all"
           style={autoMode
             ? { background: `linear-gradient(135deg, ${C.orange.hex}, #b45309)`, boxShadow: `0 4px 14px ${C.orange.glow}` }
-            : { background: 'rgba(55,65,81,0.5)', border: '1px solid rgba(255,255,255,0.06)' }}>
+            : { background: 'rgba(55,65,81,0.6)', border: '1px solid rgba(255,255,255,0.08)' }}>
           {autoMode ? '⏸ Stop' : '▶ Auto'}
         </motion.button>
-        <motion.button whileTap={{ scale: 0.96 }} onClick={() => { setVoiceOn((v) => !v); if (voiceOn) window.speechSynthesis?.cancel(); }}
-          className="px-3 py-2.5 rounded-xl text-white font-black transition-all"
+        <motion.button whileTap={{ scale: 0.95 }} onClick={() => { setVoiceOn((v) => !v); if (voiceOn) window.speechSynthesis?.cancel(); }}
+          className="w-12 py-3 rounded-xl text-white font-black text-base transition-all"
           style={voiceOn
             ? { background: 'linear-gradient(135deg, #059669, #047857)', boxShadow: '0 4px 14px rgba(5,150,105,0.4)' }
-            : { background: 'rgba(55,65,81,0.5)', border: '1px solid rgba(255,255,255,0.06)' }}>
+            : { background: 'rgba(55,65,81,0.6)', border: '1px solid rgba(255,255,255,0.08)' }}>
           🔊
         </motion.button>
-        <motion.button whileTap={{ scale: 0.96 }} onClick={() => setSkeletonOn((v) => !v)}
-          className="px-3 py-2.5 rounded-xl text-white font-black transition-all"
-          title="Skeleton pose overlay"
+        <motion.button whileTap={{ scale: 0.95 }} onClick={() => setSkeletonOn((v) => !v)}
+          className="w-12 py-3 rounded-xl text-white font-black text-base transition-all"
           style={skeletonOn
             ? { background: 'linear-gradient(135deg, #7c3aed, #4f46e5)', boxShadow: '0 4px 14px rgba(124,58,237,0.4)' }
-            : { background: 'rgba(55,65,81,0.5)', border: '1px solid rgba(255,255,255,0.06)' }}>
+            : { background: 'rgba(55,65,81,0.6)', border: '1px solid rgba(255,255,255,0.08)' }}>
           🦴
         </motion.button>
-        <motion.button whileTap={{ scale: 0.96 }} onClick={flipCamera}
-          className="px-3 py-2.5 rounded-xl text-white font-black transition-all"
-          title={facingMode === 'environment' ? 'Passa a fotocamera frontale' : 'Passa a fotocamera posteriore'}
-          style={{ background: 'rgba(55,65,81,0.5)', border: '1px solid rgba(255,255,255,0.06)' }}>
+        <motion.button whileTap={{ scale: 0.95 }} onClick={flipCamera}
+          className="w-12 py-3 rounded-xl text-white font-black text-base transition-all"
+          style={{ background: 'rgba(55,65,81,0.6)', border: '1px solid rgba(255,255,255,0.08)' }}>
           🔄
         </motion.button>
-        <motion.button whileTap={{ scale: 0.96 }} onClick={stopCamera}
-          className="px-4 py-2.5 rounded-xl text-white font-black transition-all"
-          style={{ background: 'rgba(185,28,28,0.3)', border: `1px solid ${C.red.border}` }}>
-          ✕
-        </motion.button>
-      </div>
-
-      {/* Analysis result — sempre visibile, non esce mai finché la sessione è attiva */}
-      <div className="p-4 rounded-2xl min-h-[80px] transition-all duration-300"
-        style={{ background: 'rgba(17,24,39,0.85)', border: `1px solid ${analyzing ? C.violet.border : C.blue.border}`, backdropFilter: 'blur(12px)' }}>
-        <div className="flex items-center gap-2 mb-2">
-          {analyzing
-            ? <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: C.violet.hex }} />
-            : <div className="w-1.5 h-1.5 rounded-full" style={{ background: C.blue.hex }} />}
-          <p className="text-xs font-mono" style={{ color: analyzing ? C.violet.hex : C.blue.hex, opacity: 0.7 }}>
-            {analyzing ? 'Analisi in corso…' : `${analysis?.provider || 'AI'} · ${currentDisc?.label} · ${analysis?.time || ''}`}
-          </p>
-        </div>
-        <p className="text-sm text-gray-200 leading-relaxed whitespace-pre-wrap">
-          {analysis?.content || (analyzing ? '' : 'Premi Analizza o attiva Auto per iniziare.')}
-        </p>
       </div>
     </div>
   );
