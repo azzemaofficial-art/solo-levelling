@@ -4,8 +4,8 @@
 const NVIDIA_BASE = 'https://integrate.api.nvidia.com/v1';
 const SITE_URL = 'https://solo-levelling-gold.vercel.app';
 
-// Upstash Redis REST — salva il payload lato server per 24h
-async function kvSet(key, value) {
+// Upstash Redis REST — salva il payload lato server (TTL default 24h)
+async function kvSet(key, value, ttl = 86400) {
   const url = process.env.KV_REST_API_URL;
   const token = process.env.KV_REST_API_TOKEN;
   if (!url || !token) return;
@@ -13,9 +13,42 @@ async function kvSet(key, value) {
     await fetch(`${url}/pipeline`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify([['SET', key, JSON.stringify(value), 'EX', '86400']]),
+      body: JSON.stringify([['SET', key, JSON.stringify(value), 'EX', String(ttl)]]),
     });
   } catch (_) {}
+}
+
+async function kvGet(key) {
+  const url = process.env.KV_REST_API_URL;
+  const token = process.env.KV_REST_API_TOKEN;
+  if (!url || !token) return null;
+  try {
+    const r = await fetch(`${url}/get/${encodeURIComponent(key)}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const d = await r.json();
+    if (d?.result == null) return null;
+    try { return JSON.parse(d.result); } catch { return d.result; }
+  } catch { return null; }
+}
+
+// Totale nutrizionale del giorno (per il comando /oggi)
+const todayKey = (chatId) => `tg_day:${chatId}:${new Date().toISOString().slice(0, 10)}`;
+
+async function addDaily(chatId, m) {
+  const k = todayKey(chatId);
+  const cur = (await kvGet(k)) || { kcal: 0, protein: 0, carbs: 0, fat: 0, burn: 0, meals: 0, workouts: 0 };
+  const next = {
+    kcal: cur.kcal + (m.kcal || 0),
+    protein: cur.protein + (m.protein || 0),
+    carbs: cur.carbs + (m.carbs || 0),
+    fat: cur.fat + (m.fat || 0),
+    burn: cur.burn + (m.burn || 0),
+    meals: cur.meals + (m.kcal ? 1 : 0),
+    workouts: cur.workouts + (m.burn ? 1 : 0),
+  };
+  await kvSet(k, next, 172800); // 48h: sopravvive al cambio giorno
+  return next;
 }
 
 // Provider chain: 550B per task complessi, cascata su modelli veloci
@@ -68,14 +101,17 @@ function detectMeasurement(text) {
 const SYSTEM_PROMPT = `Sei Nemotron 550B, il coach AI del Shadow Hunter System.
 
 Quando l'utente descrive un WORKOUT:
-Analizza TUTTI gli esercizi/attività menzionati e rispondi con questo JSON esatto (nessun testo fuori dal JSON):
+NON calcolare tu le calorie bruciate. Estrai le attività con la durata. Rispondi con questo JSON esatto:
 {
   "type": "workout",
-  "text": "⚡ Workout analizzato!\\n💪 Burn stimato: X-Y kcal\\n🔥 Intensità: Z/10\\n💊 Post-workout: [consiglio recovery in 1 riga]",
-  "burn": <numero intero medio stimato TOTALE di tutti gli esercizi>,
+  "name": "<descrizione breve del workout>",
   "intensity": <1-10>,
-  "name": "<descrizione breve del workout>"
+  "activities": [
+    { "activity": "<nome attività, es. corsa / palestra / boxe>", "minutes": <durata in minuti>, "kcal": <stima di riserva delle calorie bruciate> }
+  ],
+  "post": "<consiglio recovery in 1 riga>"
 }
+Se la durata non è chiara, stimala. La "kcal" di riserva serve solo se l'attività non è in tabella.
 
 Quando l'utente descrive un PASTO:
 NON calcolare tu i totali. Il tuo compito è SOLO estrarre gli alimenti.
@@ -235,7 +271,32 @@ const FOOD_DB = [
   { kw: ['whey', 'proteine in polvere', 'proteine polvere'], v: { kcal: 380, p: 75, c: 8, f: 6 } },
   { kw: ['barretta proteica', 'barretta'], v: { kcal: 350, p: 30, c: 35, f: 12 } },
   { kw: ['ragù', 'ragu'], v: { kcal: 150, p: 10, c: 4, f: 10 } },
+  // Extra ad alta frequenza
+  { kw: ['quinoa'], v: { kcal: 120, p: 4.4, c: 21, f: 1.9 } },
+  { kw: ['polenta'], v: { kcal: 85, p: 2, c: 18, f: 0.4 } },
+  { kw: ['tofu'], v: { kcal: 76, p: 8, c: 1.9, f: 4.8 } },
+  { kw: ['seitan'], v: { kcal: 121, p: 24, c: 4, f: 0.5 } },
+  { kw: ['tempeh'], v: { kcal: 192, p: 20, c: 8, f: 11 } },
+  { kw: ['wurstel', 'wurstdel'], v: { kcal: 270, p: 12, c: 3, f: 24 } },
+  { kw: ['salsiccia'], v: { kcal: 304, p: 16, c: 1, f: 27 } },
+  { kw: ['salame'], v: { kcal: 384, p: 26, c: 1, f: 31 } },
+  { kw: ['mortadella'], v: { kcal: 311, p: 16, c: 1, f: 27 } },
+  { kw: ['pancetta', 'bacon'], v: { kcal: 458, p: 12, c: 0, f: 45 } },
+  { kw: ['sgombro'], v: { kcal: 205, p: 19, c: 0, f: 14 } },
+  { kw: ['hummus'], v: { kcal: 177, p: 8, c: 14, f: 10 } },
+  { kw: ['philadelphia', 'formaggio spalmabile'], v: { kcal: 253, p: 6, c: 4, f: 24 } },
+  { kw: ['piadina'], v: { kcal: 300, p: 8, c: 47, f: 9 } },
+  { kw: ['grissini'], v: { kcal: 433, p: 12, c: 71, f: 12 } },
+  { kw: ['pesto'], v: { kcal: 450, p: 5, c: 6, f: 45 } },
+  { kw: ['maionese'], v: { kcal: 680, p: 1, c: 1, f: 75 } },
+  { kw: ['marmellata', 'confettura'], v: { kcal: 250, p: 0.5, c: 60, f: 0.1 } },
+  { kw: ['birra'], v: { kcal: 43, p: 0.5, c: 3.6, f: 0 } },
+  { kw: ['vino'], v: { kcal: 83, p: 0.1, c: 2.6, f: 0 } },
+  { kw: ['cappuccino'], v: { kcal: 38, p: 2, c: 3, f: 1.8 } },
 ];
+
+// Cache in-memory (persiste finché la lambda è calda) per le query Open Food Facts
+const offCache = new Map();
 
 const normalize = (s) => String(s || '').toLowerCase()
   .normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
@@ -253,6 +314,9 @@ function lookupLocal(food) {
 
 // Fallback: Open Food Facts (gratis, no API key, buona copertura prodotti italiani)
 async function lookupOFF(food) {
+  const cacheKey = normalize(food);
+  if (offCache.has(cacheKey)) return offCache.get(cacheKey);
+  let result = null;
   try {
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), 3500);
@@ -263,16 +327,18 @@ async function lookupOFF(food) {
     clearTimeout(t);
     const data = await res.json();
     const nut = data?.products?.[0]?.nutriments;
-    if (!nut) return null;
-    const kcal = nut['energy-kcal_100g'];
-    if (kcal == null) return null;
-    return { v: {
-      kcal: Number(kcal) || 0,
-      p: Number(nut.proteins_100g) || 0,
-      c: Number(nut.carbohydrates_100g) || 0,
-      f: Number(nut.fat_100g) || 0,
-    }, source: 'off' };
-  } catch { return null; }
+    const kcal = nut?.['energy-kcal_100g'];
+    if (nut && kcal != null) {
+      result = { v: {
+        kcal: Number(kcal) || 0,
+        p: Number(nut.proteins_100g) || 0,
+        c: Number(nut.carbohydrates_100g) || 0,
+        f: Number(nut.fat_100g) || 0,
+      }, source: 'off' };
+    }
+  } catch { result = null; }
+  offCache.set(cacheKey, result);
+  return result;
 }
 
 // Calcola i macro reali del pasto: DB interno → Open Food Facts → stima LLM
@@ -311,6 +377,153 @@ async function computeMeal(items) {
     fat: Math.round(tot.f),
     breakdown,
   };
+}
+
+// ─── Download file da Telegram (voce / foto) ───
+async function getTelegramFile(token, fileId) {
+  try {
+    const r = await fetch(`https://api.telegram.org/bot${token}/getFile?file_id=${fileId}`);
+    const d = await r.json();
+    if (!d.ok) return null;
+    const fr = await fetch(`https://api.telegram.org/file/bot${token}/${d.result.file_path}`);
+    return Buffer.from(await fr.arrayBuffer());
+  } catch { return null; }
+}
+
+// ─── Trascrizione vocale — Groq Whisper ───
+async function transcribeVoice(buffer) {
+  const key = process.env.GROQ_API_KEY;
+  if (!key) return null;
+  try {
+    const form = new FormData();
+    form.append('file', new Blob([buffer], { type: 'audio/ogg' }), 'voice.ogg');
+    form.append('model', 'whisper-large-v3-turbo');
+    form.append('language', 'it');
+    const r = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+      method: 'POST', headers: { Authorization: `Bearer ${key}` }, body: form,
+    });
+    const d = await r.json();
+    return (d.text || '').trim() || null;
+  } catch { return null; }
+}
+
+// ─── Vision: estrai gli alimenti da una foto del piatto ───
+const VISION_MEAL_PROMPT = `Guarda la foto di un pasto. Identifica OGNI alimento visibile e stima i grammi nel piatto.
+Scomponi i piatti composti nei singoli ingredienti. Rispondi SOLO con questo JSON valido, niente altro:
+{"type":"meal","slot":"<colazione|pranzo|cena|merenda>","name":"<nome breve>","items":[{"food":"<alimento singolo>","grams":<numero>,"kcal":<stima>,"protein":<n>,"carbs":<n>,"fat":<n>}],"tip":"<1 consiglio>"}
+In italiano. Nessun testo o ragionamento fuori dal JSON.`;
+
+async function callVisionGemini(imageBase64, mimeType, prompt) {
+  const key = process.env.GEMINI_API_KEY;
+  if (!key) return null;
+  try {
+    const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: mimeType, data: imageBase64 } }] }],
+        generationConfig: { temperature: 0.2 },
+      }),
+    });
+    const d = await r.json();
+    return d?.candidates?.[0]?.content?.parts?.[0]?.text || null;
+  } catch { return null; }
+}
+
+async function callVisionGroqScout(imageBase64, mimeType, prompt) {
+  const key = process.env.GROQ_API_KEY;
+  if (!key) return null;
+  try {
+    const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'meta-llama/llama-4-scout-17b-16e-instruct',
+        messages: [{ role: 'user', content: [
+          { type: 'image_url', image_url: { url: `data:${mimeType};base64,${imageBase64}` } },
+          { type: 'text', text: prompt },
+        ]}],
+        max_tokens: 500, temperature: 0.2,
+      }),
+    });
+    const d = await r.json();
+    return d?.choices?.[0]?.message?.content || null;
+  } catch { return null; }
+}
+
+// Gemini Flash primario (più preciso sul cibo) se la key è presente, poi Groq llama-4-scout
+async function extractMealFromImage(imageBase64, mimeType) {
+  let raw = await callVisionGemini(imageBase64, mimeType, VISION_MEAL_PROMPT);
+  if (!raw) raw = await callVisionGroqScout(imageBase64, mimeType, VISION_MEAL_PROMPT);
+  return parseAIResponse(raw);
+}
+
+// ─── Burn workout via tabella MET (kcal = MET × peso × ore) ───
+const MET_TABLE = [
+  { kw: ['corsa', 'corro', 'running', 'jogging'], met: 9.8 },
+  { kw: ['camminata veloce', 'tapis', 'treadmill'], met: 5.0 },
+  { kw: ['camminata', 'cammino', 'walk', 'passeggiata'], met: 3.5 },
+  { kw: ['spinning'], met: 8.5 },
+  { kw: ['bici', 'ciclismo', 'cycling', 'bicicletta'], met: 7.5 },
+  { kw: ['nuoto', 'nuotata', 'swim'], met: 8.3 },
+  { kw: ['salto con la corda', 'corda', 'jump rope'], met: 11.0 },
+  { kw: ['crossfit', 'hiit', 'circuito', 'wod'], met: 8.0 },
+  { kw: ['muay', 'kickboxing', 'arti marziali', 'mma', 'sparring', 'thai'], met: 9.0 },
+  { kw: ['boxe', 'boxing', 'sacco', 'pugilato'], met: 7.8 },
+  { kw: ['bjj', 'grappling', 'lotta', 'wrestling', 'judo', 'jiu'], met: 8.5 },
+  { kw: ['calisthenics', 'corpo libero', 'calistenia'], met: 5.5 },
+  { kw: ['palestra', 'pesi', 'sala pesi', 'bodybuilding', 'panca', 'squat', 'stacco'], met: 5.0 },
+  { kw: ['yoga', 'stretching', 'mobilità', 'pilates'], met: 2.8 },
+  { kw: ['calcio', 'football', 'partita'], met: 7.0 },
+  { kw: ['tennis', 'padel'], met: 7.3 },
+  { kw: ['basket', 'pallacanestro'], met: 6.5 },
+];
+function metFor(activity) {
+  const n = normalize(activity);
+  for (const e of MET_TABLE) for (const kw of e.kw) if (n.includes(normalize(kw))) return e.met;
+  return null;
+}
+function computeBurn(activities, weightKg) {
+  const w = weightKg || 75;
+  const safe = Array.isArray(activities) ? activities : [];
+  let total = 0;
+  const lines = [];
+  for (const a of safe) {
+    const min = Math.max(0, Number(a.minutes) || 0);
+    const met = metFor(a.activity);
+    if (met && min > 0) {
+      const kcal = Math.round(met * w * (min / 60));
+      total += kcal;
+      lines.push(`• ${a.activity} ${min}min → ${kcal} kcal`);
+    } else {
+      const est = Math.round(Number(a.kcal) || 0);
+      total += est;
+      lines.push(`• ${a.activity}${min ? ` ${min}min` : ''} → ${est} kcal ~`);
+    }
+  }
+  return { burn: Math.round(total), lines };
+}
+
+// ─── Flusso pasto condiviso (testo / voce / foto) ───
+const SLOT_EMOJI = { colazione: '🌅', pranzo: '🍽️', cena: '🌙', merenda: '🍎' };
+
+async function processMeal(botToken, chatId, parsed) {
+  const slot = parsed.slot || 'pranzo';
+  const name = parsed.name || 'Pasto';
+  const m = await computeMeal(parsed.items);
+
+  await kvSet(`tg_import:${chatId}`, {
+    type: 'meal', ts: Date.now(),
+    kcal: m.kcal, protein: m.protein, carbs: m.carbs, fat: m.fat, name, slot,
+  });
+  const day = await addDaily(chatId, m);
+
+  let reply = `${SLOT_EMOJI[slot] || '🍽️'} <b>${name}</b> — ${slot}\n`;
+  if (m.breakdown.length) reply += '\n' + m.breakdown.join('\n') + '\n';
+  reply += '━━━━━━━━━━━\n';
+  reply += `📊 <b>~${m.kcal} kcal</b> · P ${m.protein}g · C ${m.carbs}g · G ${m.fat}g`;
+  if (parsed.tip) reply += `\n💡 ${parsed.tip}`;
+  reply += `\n\n📅 Oggi: <b>${day.kcal} kcal</b>${day.burn ? ` · 🔥 ${day.burn} bruciate` : ''} (netto ${day.kcal - day.burn})`;
+  reply += '\n🔄 <i>Apri il sito per i dati aggiornati.</i>';
+  await sendTelegramMessage(botToken, chatId, reply);
 }
 
 function buildDeepLink(parsed) {
@@ -362,25 +575,73 @@ export default async function handler(req, res) {
 
   const update = req.body;
   const message = update?.message;
-  if (!message?.text) return res.status(200).json({ ok: true });
+  if (!message) return res.status(200).json({ ok: true });
 
   const incomingChatId = message.chat?.id;
-  const text = String(message.text || '').trim();
-
   if (chatId && String(incomingChatId) !== String(chatId)) {
     return res.status(200).json({ ok: true });
   }
 
+  let text = String(message.text || '').trim();
+
+  // 🎤 Messaggio vocale → Whisper (Groq)
+  if (!text && (message.voice || message.audio)) {
+    const fileId = (message.voice || message.audio).file_id;
+    const buf = await getTelegramFile(botToken, fileId);
+    const transcript = buf ? await transcribeVoice(buf) : null;
+    if (!transcript) {
+      await sendTelegramMessage(botToken, incomingChatId, '⚠️ Non sono riuscito a trascrivere il vocale. Riprova o scrivi.');
+      return res.status(200).json({ ok: true });
+    }
+    await sendTelegramMessage(botToken, incomingChatId, `🎤 <i>"${transcript}"</i>`);
+    text = transcript.trim();
+  }
+
+  // 📷 Foto del piatto → Vision (Gemini Flash → Groq llama-4-scout) → pasto
+  if (!text && message.photo?.length) {
+    const ph = message.photo[message.photo.length - 1]; // risoluzione massima
+    const buf = await getTelegramFile(botToken, ph.file_id);
+    const parsed = buf ? await extractMealFromImage(buf.toString('base64'), 'image/jpeg') : null;
+    if (parsed?.type === 'meal' && parsed.items?.length) {
+      await processMeal(botToken, incomingChatId, parsed);
+    } else {
+      await sendTelegramMessage(botToken, incomingChatId, '⚠️ Non sono riuscito a leggere il piatto. Più luce e inquadratura dall\'alto, oppure scrivi gli alimenti.');
+    }
+    return res.status(200).json({ ok: true });
+  }
+
+  if (!text) return res.status(200).json({ ok: true });
+
   // Comandi speciali
   if (text === '/start' || text === '/help') {
     await sendTelegramMessage(botToken, incomingChatId,
-      '⚡ <b>Shadow Monarch Bot</b> — Nemotron 550B\n\n' +
-      'Dimmi cosa hai mangiato o che allenamento hai fatto:\n\n' +
-      '🏋️ <b>Workout</b> — es: "60 min palestra, squat 100kg×5, bench 80kg×8"\n' +
-      '🍽️ <b>Pasto</b> — es: "Pranzo: pollo 200g, riso 100g cotto, insalata"\n' +
+      '⚡ <b>Shadow Monarch Bot</b>\n\n' +
+      'Dimmi cosa hai mangiato o che allenamento hai fatto — anche con 🎤 <b>vocale</b> o 📷 <b>foto del piatto</b>:\n\n' +
+      '🍽️ <b>Pasto</b> — "Cena: pollo 200g, riso 100g cotto, insalata"\n' +
+      '🏋️ <b>Workout</b> — "45 min corsa + 30 min pesi"\n' +
+      '📷 <b>Foto</b> — manda la foto del piatto, stimo io gli alimenti\n' +
+      '🎤 <b>Vocale</b> — dimmi a voce cosa hai mangiato\n\n' +
+      '📅 /oggi — totale calorie e macro di oggi\n' +
       '💊 /integratori — lista integratori consigliati\n\n' +
-      'Dopo l\'analisi ti mando un link per importare i dati nel sito 📲'
+      'I macro sono calcolati su database nutrizionale reale, non stimati a caso 📊'
     );
+    return res.status(200).json({ ok: true });
+  }
+
+  if (text === '/oggi') {
+    const day = await kvGet(todayKey(incomingChatId));
+    if (!day || (!day.kcal && !day.burn)) {
+      await sendTelegramMessage(botToken, incomingChatId, '📅 <b>Oggi</b>\n\nNiente ancora registrato. Mandami un pasto o un allenamento!');
+      return res.status(200).json({ ok: true });
+    }
+    const net = day.kcal - day.burn;
+    let reply = '📅 <b>Riepilogo di oggi</b>\n\n';
+    reply += `🍽️ Pasti: <b>${day.meals}</b> · 🏋️ Workout: <b>${day.workouts}</b>\n\n`;
+    reply += `📊 Assunte: <b>${day.kcal} kcal</b>\n`;
+    reply += `   P ${day.protein}g · C ${day.carbs}g · G ${day.fat}g\n`;
+    if (day.burn) reply += `🔥 Bruciate: <b>${day.burn} kcal</b>\n`;
+    reply += `\n⚖️ Netto: <b>${net} kcal</b>`;
+    await sendTelegramMessage(botToken, incomingChatId, reply);
     return res.status(200).json({ ok: true });
   }
 
@@ -404,6 +665,8 @@ export default async function handler(req, res) {
   if (measurement && Object.values(measurement).some(Boolean)) {
     const payload = { type: 'measurement', ts: Date.now(), ...measurement };
     await kvSet(`tg_import:${incomingChatId}`, payload);
+    // Peso persistente per il calcolo MET dei workout (30 giorni)
+    if (measurement.weight) await kvSet(`tg_profile:${incomingChatId}`, { weightKg: measurement.weight }, 2592000);
     let lines = [];
     if (measurement.weight) lines.push(`⚖️ Peso: <b>${measurement.weight} kg</b>`);
     if (measurement.bodyFat) lines.push(`💧 Body fat: <b>${measurement.bodyFat}%</b>`);
@@ -435,43 +698,37 @@ export default async function handler(req, res) {
 
   const parsed = parseAIResponse(raw);
 
-  // ── PASTO: macro calcolati su database reale, non stimati dall'LLM ──
+  // ── PASTO: macro calcolati su database reale ──
   if (parsed && parsed.type === 'meal') {
-    const slot = parsed.slot || 'pranzo';
-    const name = parsed.name || 'Pasto';
-    const m = await computeMeal(parsed.items);
+    await processMeal(botToken, incomingChatId, parsed);
+    return res.status(200).json({ ok: true });
+  }
+
+  // ── WORKOUT: burn calcolato via tabella MET (peso reale dal profilo) ──
+  if (parsed && parsed.type === 'workout') {
+    const name = parsed.name || 'Workout';
+    const profile = await kvGet(`tg_profile:${incomingChatId}`);
+    const weightKg = Number(profile?.weightKg) || 75;
+    const b = computeBurn(parsed.activities, weightKg);
 
     await kvSet(`tg_import:${incomingChatId}`, {
-      type: 'meal', ts: Date.now(),
-      kcal: m.kcal, protein: m.protein, carbs: m.carbs, fat: m.fat,
-      name, slot,
+      type: 'workout', ts: Date.now(), burn: b.burn, name,
     });
+    const day = await addDaily(incomingChatId, { burn: b.burn });
 
-    const SLOT_EMOJI = { colazione: '🌅', pranzo: '🍽️', cena: '🌙', merenda: '🍎' };
-    let reply = `${SLOT_EMOJI[slot] || '🍽️'} <b>${name}</b> — ${slot}\n`;
-    if (m.breakdown.length) reply += '\n' + m.breakdown.join('\n') + '\n';
+    let reply = `🏋️ <b>${name}</b>\n`;
+    if (b.lines.length) reply += '\n' + b.lines.join('\n') + '\n';
     reply += '━━━━━━━━━━━\n';
-    reply += `📊 <b>~${m.kcal} kcal</b> · P ${m.protein}g · C ${m.carbs}g · G ${m.fat}g`;
-    if (parsed.tip) reply += `\n💡 ${parsed.tip}`;
-    reply += '\n\n🔄 <i>Apri il sito per vedere i dati aggiornati.</i>';
+    reply += `🔥 <b>~${b.burn} kcal bruciate</b>`;
+    if (parsed.intensity) reply += ` · intensità ${parsed.intensity}/10`;
+    if (parsed.post) reply += `\n💊 ${parsed.post}`;
+    reply += `\n\n📅 Oggi: 🔥 ${day.burn} bruciate · netto ${day.kcal - day.burn} kcal`;
+    reply += '\n🔄 <i>Apri il sito per i dati aggiornati.</i>';
     await sendTelegramMessage(botToken, incomingChatId, reply);
     return res.status(200).json({ ok: true });
   }
 
-  const replyText = parsed?.text || raw;
-
-  // ── WORKOUT / altro: salva e rispondi col testo dell'LLM ──
-  let savedToServer = false;
-  if (parsed && parsed.type === 'workout') {
-    await kvSet(`tg_import:${incomingChatId}`, {
-      type: 'workout', ts: Date.now(),
-      burn: parsed.burn || 0, name: parsed.name || 'Workout',
-    });
-    savedToServer = true;
-  }
-
-  // Nessun bottone — l'import è automatico quando apri il sito
-  const suffix = savedToServer ? '\n\n🔄 <i>Apri il sito per vedere i dati aggiornati.</i>' : '';
-  await sendTelegramMessage(botToken, incomingChatId, replyText + suffix);
+  // ── Altro (info / fallback): rispondi col testo dell'LLM ──
+  await sendTelegramMessage(botToken, incomingChatId, parsed?.text || raw);
   return res.status(200).json({ ok: true });
 }
