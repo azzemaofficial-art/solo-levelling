@@ -413,6 +413,31 @@ Scomponi i piatti composti nei singoli ingredienti. Rispondi SOLO con questo JSO
 {"type":"meal","slot":"<colazione|pranzo|cena|merenda>","name":"<nome breve>","items":[{"food":"<alimento singolo>","grams":<numero>,"kcal":<stima>,"protein":<n>,"carbs":<n>,"fat":<n>}],"tip":"<1 consiglio>"}
 In italiano. Nessun testo o ragionamento fuori dal JSON.`;
 
+// NVIDIA NIM vision (il tuo stack) — stesse key del Visual Coach
+async function callVisionNvidia(apiKey, model, imageBase64, mimeType, prompt) {
+  if (!apiKey) return null;
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 22000);
+    const r = await fetch(`${NVIDIA_BASE}/chat/completions`, {
+      method: 'POST', headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model,
+        messages: [{ role: 'user', content: [
+          { type: 'image_url', image_url: { url: `data:${mimeType};base64,${imageBase64}` } },
+          { type: 'text', text: prompt },
+        ]}],
+        max_tokens: 500, temperature: 0.2,
+      }),
+      signal: ctrl.signal,
+    });
+    clearTimeout(t);
+    const d = await r.json();
+    if (r.ok) return d?.choices?.[0]?.message?.content || null;
+    return null;
+  } catch { return null; }
+}
+
 async function callVisionGemini(imageBase64, mimeType, prompt) {
   const key = process.env.GEMINI_API_KEY;
   if (!key) return null;
@@ -449,10 +474,15 @@ async function callVisionGroqScout(imageBase64, mimeType, prompt) {
   } catch { return null; }
 }
 
-// Gemini Flash primario (più preciso sul cibo) se la key è presente, poi Groq llama-4-scout
+// Catena vision: prima il tuo stack NVIDIA NIM (usa i crediti se disponibili),
+// poi Groq llama-4-scout (gratis, sempre attivo), poi Gemini Flash (se key presente)
 async function extractMealFromImage(imageBase64, mimeType) {
-  let raw = await callVisionGemini(imageBase64, mimeType, VISION_MEAL_PROMPT);
-  if (!raw) raw = await callVisionGroqScout(imageBase64, mimeType, VISION_MEAL_PROMPT);
+  const P = VISION_MEAL_PROMPT;
+  let raw =
+    await callVisionNvidia(process.env.LLAMA_VISION2_API_KEY, 'meta/llama-3.2-90b-vision-instruct', imageBase64, mimeType, P)
+    || await callVisionNvidia(process.env.PHI4_NVIDIA_API_KEY, process.env.PHI4_NVIDIA_MODEL || 'microsoft/phi-4-multimodal-instruct', imageBase64, mimeType, P)
+    || await callVisionGroqScout(imageBase64, mimeType, P)
+    || await callVisionGemini(imageBase64, mimeType, P);
   return parseAIResponse(raw);
 }
 
