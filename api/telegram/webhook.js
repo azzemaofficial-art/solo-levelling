@@ -77,24 +77,28 @@ Analizza TUTTI gli esercizi/attività menzionati e rispondi con questo JSON esat
   "name": "<descrizione breve del workout>"
 }
 
-Quando l'utente descrive un PASTO (anche con più alimenti):
-Stima i macro di OGNI alimento menzionato e sommali. Rispondi con questo JSON esatto:
+Quando l'utente descrive un PASTO:
+NON calcolare tu i totali. Il tuo compito è SOLO estrarre gli alimenti.
+- Scomponi i piatti composti nei singoli ingredienti con grammi stimati (es. "pollo con verdure 250g" → pollo 200g + verdure 50g; "pasta al ragù 300g" → pasta cotta 220g + ragù di carne 80g).
+- Se l'utente dà un peso, usalo. Altrimenti stima una porzione realistica in grammi.
+- Includi "cotto"/"cotta" o "crudo"/"cruda" nel nome SOLO se l'utente lo specifica o è ovvio.
+- Per ogni alimento dai anche una stima di riserva dei macro (verrà usata solo se l'alimento non è nel database nutrizionale).
+Rispondi con questo JSON esatto:
 {
   "type": "meal",
   "slot": "<colazione|pranzo|cena|merenda>",
-  "text": "🍽️ [Nome pasto] analizzato!\\n📊 Stima: ~X kcal | P:Xg C:Xg G:Xg\\n✅ Qualità: [valutazione in 3 parole]\\n💡 Tip: [1 miglioramento]",
-  "kcal": <totale kcal intero di TUTTI gli alimenti>,
-  "protein": <totale proteine intero>,
-  "carbs": <totale carboidrati intero>,
-  "fat": <totale grassi intero>,
-  "name": "<nome descrittivo del pasto>"
+  "name": "<nome breve descrittivo del pasto>",
+  "items": [
+    { "food": "<nome alimento singolo>", "grams": <numero>, "kcal": <stima>, "protein": <stima>, "carbs": <stima>, "fat": <stima> }
+  ],
+  "tip": "<1 consiglio breve di miglioramento>"
 }
 
-Regole slot: se l'utente scrive "colazione" o "breakfast" o "mattina" → slot="colazione". "pranzo" o "lunch" o "mezzogiorno" → slot="pranzo". "cena" o "dinner" o "sera" → slot="cena". "merenda" o "spuntino" o "snack" → slot="merenda". Se non specificato, deduci dall'ora o usa "pranzo".
+Regole slot: "colazione"/"breakfast"/"mattina" → "colazione". "pranzo"/"lunch"/"mezzogiorno" → "pranzo". "cena"/"dinner"/"sera" → "cena". "merenda"/"spuntino"/"snack" → "merenda". Se non specificato usa "pranzo".
 
 Per /integratori o altri comandi: rispondi con JSON { "type": "info", "text": "..." }
 
-IMPORTANTE: rispondi SOLO con JSON valido. Nessun testo prima o dopo. Sempre in italiano.`;
+IMPORTANTE: rispondi SOLO con JSON valido. Nessun testo, nessun ragionamento, nessun tag <think> prima o dopo. Sempre in italiano.`;
 
 async function callAI(messages, fast = false) {
   const providers = fast
@@ -132,9 +136,181 @@ function isSimpleQuery(text) {
 
 function parseAIResponse(raw) {
   if (!raw) return null;
-  const jsonMatch = raw.match(/\{[\s\S]*\}/);
+  // Rimuove blocchi di ragionamento e code fence che sporcano il JSON
+  let cleaned = String(raw)
+    .replace(/<think>[\s\S]*?<\/think>/gi, '')
+    .replace(/```(?:json)?/gi, '')
+    .trim();
+  const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
   if (!jsonMatch) return null;
   try { return JSON.parse(jsonMatch[0]); } catch { return null; }
+}
+
+// ─── Database nutrizionale — valori per 100g (fonte CREA/USDA, forma comune loggata) ───
+// La pasta e il riso senza "cotto" si assumono a peso secco (convenzione italiana).
+const FOOD_DB = [
+  // Proteine animali
+  { kw: ['petto di pollo', 'pollo'], v: { kcal: 165, p: 31, c: 0, f: 3.6 } },
+  { kw: ['tacchino'], v: { kcal: 135, p: 29, c: 0, f: 1 } },
+  { kw: ['fesa'], v: { kcal: 110, p: 24, c: 0, f: 1 } },
+  { kw: ['manzo', 'bovino', 'bistecca'], v: { kcal: 250, p: 26, c: 0, f: 15 } },
+  { kw: ['vitello'], v: { kcal: 172, p: 24, c: 0, f: 8 } },
+  { kw: ['maiale', 'lonza'], v: { kcal: 242, p: 27, c: 0, f: 14 } },
+  { kw: ['salmone'], v: { kcal: 208, p: 20, c: 0, f: 13 } },
+  { kw: ['tonno al naturale', 'tonno naturale'], v: { kcal: 116, p: 26, c: 0, f: 1 } },
+  { kw: ['tonno'], v: { kcal: 184, p: 25, c: 0, f: 9 } },
+  { kw: ['merluzzo', 'pesce bianco', 'orata', 'branzino', 'platessa'], v: { kcal: 82, p: 18, c: 0, f: 0.7 } },
+  { kw: ['gamberi', 'gambero'], v: { kcal: 99, p: 24, c: 0, f: 0.3 } },
+  { kw: ['albume'], v: { kcal: 52, p: 11, c: 0.7, f: 0.2 } },
+  { kw: ['uovo', 'uova'], v: { kcal: 155, p: 13, c: 1.1, f: 11 } },
+  { kw: ['prosciutto crudo'], v: { kcal: 270, p: 26, c: 0, f: 18 } },
+  { kw: ['prosciutto cotto', 'prosciutto'], v: { kcal: 145, p: 20, c: 1, f: 6 } },
+  { kw: ['bresaola'], v: { kcal: 151, p: 32, c: 0, f: 2 } },
+  { kw: ['speck'], v: { kcal: 280, p: 28, c: 0, f: 18 } },
+  // Latticini
+  { kw: ['mozzarella'], v: { kcal: 253, p: 18, c: 2, f: 19 } },
+  { kw: ['parmigiano', 'grana'], v: { kcal: 392, p: 33, c: 0, f: 29 } },
+  { kw: ['ricotta'], v: { kcal: 146, p: 11, c: 3, f: 10 } },
+  { kw: ['yogurt greco 0', 'greco magro'], v: { kcal: 59, p: 10, c: 4, f: 0.4 } },
+  { kw: ['yogurt greco'], v: { kcal: 97, p: 9, c: 4, f: 5 } },
+  { kw: ['skyr'], v: { kcal: 63, p: 11, c: 4, f: 0.2 } },
+  { kw: ['yogurt'], v: { kcal: 61, p: 3.5, c: 5, f: 3.3 } },
+  { kw: ['latte scremato'], v: { kcal: 35, p: 3.4, c: 5, f: 0.1 } },
+  { kw: ['latte'], v: { kcal: 64, p: 3.3, c: 5, f: 3.6 } },
+  { kw: ['feta'], v: { kcal: 264, p: 14, c: 4, f: 21 } },
+  // Carboidrati
+  { kw: ['pasta cotta'], v: { kcal: 158, p: 6, c: 31, f: 0.9 } },
+  { kw: ['pasta'], v: { kcal: 360, p: 12, c: 72, f: 1.5 } },
+  { kw: ['riso cotto'], v: { kcal: 130, p: 2.7, c: 28, f: 0.3 } },
+  { kw: ['riso'], v: { kcal: 360, p: 7, c: 80, f: 0.6 } },
+  { kw: ['pane ai cereali', 'pane cereali', 'pane multicereali'], v: { kcal: 270, p: 10, c: 46, f: 4 } },
+  { kw: ['pane integrale'], v: { kcal: 247, p: 9, c: 41, f: 3.4 } },
+  { kw: ['pane'], v: { kcal: 265, p: 9, c: 49, f: 3.2 } },
+  { kw: ['patate dolci', 'patata dolce'], v: { kcal: 86, p: 1.6, c: 20, f: 0.1 } },
+  { kw: ['patate', 'patata'], v: { kcal: 77, p: 2, c: 17, f: 0.1 } },
+  { kw: ['avena', 'fiocchi'], v: { kcal: 389, p: 13, c: 66, f: 7 } },
+  { kw: ['fette biscottate'], v: { kcal: 408, p: 11, c: 75, f: 6 } },
+  { kw: ['couscous'], v: { kcal: 112, p: 3.8, c: 23, f: 0.2 } },
+  { kw: ['gnocchi'], v: { kcal: 130, p: 3, c: 27, f: 0.5 } },
+  { kw: ['farro cotto', 'farro'], v: { kcal: 130, p: 5, c: 26, f: 0.8 } },
+  { kw: ['pizza'], v: { kcal: 270, p: 11, c: 33, f: 10 } },
+  { kw: ['cornflakes', 'cereali'], v: { kcal: 357, p: 7, c: 84, f: 0.9 } },
+  // Legumi
+  { kw: ['fagioli'], v: { kcal: 127, p: 9, c: 22, f: 0.5 } },
+  { kw: ['ceci'], v: { kcal: 164, p: 9, c: 27, f: 2.6 } },
+  { kw: ['lenticchie'], v: { kcal: 116, p: 9, c: 20, f: 0.4 } },
+  { kw: ['piselli'], v: { kcal: 81, p: 5, c: 14, f: 0.4 } },
+  { kw: ['edamame'], v: { kcal: 121, p: 12, c: 9, f: 5 } },
+  // Verdure
+  { kw: ['insalata', 'lattuga'], v: { kcal: 15, p: 1.4, c: 2.9, f: 0.2 } },
+  { kw: ['pomodori', 'pomodoro'], v: { kcal: 18, p: 0.9, c: 3.9, f: 0.2 } },
+  { kw: ['zucchine', 'zucchina'], v: { kcal: 17, p: 1.2, c: 3, f: 0.3 } },
+  { kw: ['spinaci'], v: { kcal: 23, p: 2.9, c: 3.6, f: 0.4 } },
+  { kw: ['broccoli'], v: { kcal: 34, p: 2.8, c: 7, f: 0.4 } },
+  { kw: ['carote', 'carota'], v: { kcal: 41, p: 0.9, c: 10, f: 0.2 } },
+  { kw: ['melanzane', 'melanzana'], v: { kcal: 25, p: 1, c: 6, f: 0.2 } },
+  { kw: ['peperoni', 'peperone'], v: { kcal: 31, p: 1, c: 6, f: 0.3 } },
+  { kw: ['funghi'], v: { kcal: 22, p: 3.1, c: 3.3, f: 0.3 } },
+  { kw: ['verdure', 'verdura', 'contorno'], v: { kcal: 30, p: 2, c: 5, f: 0.3 } },
+  // Frutta
+  { kw: ['avocado'], v: { kcal: 160, p: 2, c: 9, f: 15 } },
+  { kw: ['banana'], v: { kcal: 89, p: 1.1, c: 23, f: 0.3 } },
+  { kw: ['mela'], v: { kcal: 52, p: 0.3, c: 14, f: 0.2 } },
+  { kw: ['arancia'], v: { kcal: 47, p: 0.9, c: 12, f: 0.1 } },
+  { kw: ['fragole'], v: { kcal: 32, p: 0.7, c: 8, f: 0.3 } },
+  { kw: ['frutti di bosco', 'mirtilli'], v: { kcal: 43, p: 1, c: 10, f: 0.3 } },
+  { kw: ['mandorle'], v: { kcal: 579, p: 21, c: 22, f: 50 } },
+  { kw: ['noci', 'frutta secca'], v: { kcal: 607, p: 15, c: 20, f: 54 } },
+  { kw: ['frutta'], v: { kcal: 55, p: 0.7, c: 14, f: 0.2 } },
+  // Grassi / condimenti
+  { kw: ['olio'], v: { kcal: 884, p: 0, c: 0, f: 100 } },
+  { kw: ['burro di arachidi', 'burro arachidi'], v: { kcal: 588, p: 25, c: 20, f: 50 } },
+  { kw: ['burro'], v: { kcal: 717, p: 0.9, c: 0.1, f: 81 } },
+  // Dolci / integratori
+  { kw: ['gelato'], v: { kcal: 207, p: 3.5, c: 24, f: 11 } },
+  { kw: ['cioccolato fondente'], v: { kcal: 546, p: 8, c: 46, f: 31 } },
+  { kw: ['cioccolato', 'nutella'], v: { kcal: 539, p: 6, c: 57, f: 31 } },
+  { kw: ['biscotti'], v: { kcal: 460, p: 7, c: 65, f: 18 } },
+  { kw: ['miele'], v: { kcal: 304, p: 0.3, c: 82, f: 0 } },
+  { kw: ['whey', 'proteine in polvere', 'proteine polvere'], v: { kcal: 380, p: 75, c: 8, f: 6 } },
+  { kw: ['barretta proteica', 'barretta'], v: { kcal: 350, p: 30, c: 35, f: 12 } },
+  { kw: ['ragù', 'ragu'], v: { kcal: 150, p: 10, c: 4, f: 10 } },
+];
+
+const normalize = (s) => String(s || '').toLowerCase()
+  .normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+
+// Cerca un alimento nel DB interno (match per parola chiave, dalla più specifica)
+function lookupLocal(food) {
+  const n = normalize(food);
+  for (const entry of FOOD_DB) {
+    for (const kw of entry.kw) {
+      if (n.includes(normalize(kw))) return { v: entry.v, source: 'db' };
+    }
+  }
+  return null;
+}
+
+// Fallback: Open Food Facts (gratis, no API key, buona copertura prodotti italiani)
+async function lookupOFF(food) {
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 3500);
+    const url = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(food)}`
+      + `&search_simple=1&action=process&json=1&page_size=1&lc=it`
+      + `&fields=product_name,nutriments`;
+    const res = await fetch(url, { signal: ctrl.signal, headers: { 'User-Agent': 'ShadowMonarchBot/1.0' } });
+    clearTimeout(t);
+    const data = await res.json();
+    const nut = data?.products?.[0]?.nutriments;
+    if (!nut) return null;
+    const kcal = nut['energy-kcal_100g'];
+    if (kcal == null) return null;
+    return { v: {
+      kcal: Number(kcal) || 0,
+      p: Number(nut.proteins_100g) || 0,
+      c: Number(nut.carbohydrates_100g) || 0,
+      f: Number(nut.fat_100g) || 0,
+    }, source: 'off' };
+  } catch { return null; }
+}
+
+// Calcola i macro reali del pasto: DB interno → Open Food Facts → stima LLM
+async function computeMeal(items) {
+  const safe = Array.isArray(items) ? items : [];
+  const results = await Promise.all(safe.map(async (it) => {
+    const grams = Math.max(0, Number(it.grams) || 0);
+    const factor = grams / 100;
+    let hit = lookupLocal(it.food);
+    if (!hit && grams > 0) hit = await lookupOFF(it.food);
+    let macro, source;
+    if (hit) {
+      macro = { kcal: hit.v.kcal * factor, p: hit.v.p * factor, c: hit.v.c * factor, f: hit.v.f * factor };
+      source = hit.source;
+    } else {
+      // stima di riserva fornita dall'LLM (valori già per la porzione indicata)
+      macro = { kcal: Number(it.kcal) || 0, p: Number(it.protein) || 0, c: Number(it.carbs) || 0, f: Number(it.fat) || 0 };
+      source = 'ai';
+    }
+    return { food: it.food, grams, ...macro, source };
+  }));
+
+  const tot = results.reduce((a, r) => ({
+    kcal: a.kcal + r.kcal, p: a.p + r.p, c: a.c + r.c, f: a.f + r.f,
+  }), { kcal: 0, p: 0, c: 0, f: 0 });
+
+  const SRC = { db: '', off: ' ⓘ', ai: ' ~' };
+  const breakdown = results.map((r) =>
+    `• ${r.food}${r.grams ? ` ${Math.round(r.grams)}g` : ''} → ${Math.round(r.kcal)} kcal${SRC[r.source] || ''}`
+  );
+
+  return {
+    kcal: Math.round(tot.kcal),
+    protein: Math.round(tot.p),
+    carbs: Math.round(tot.c),
+    fat: Math.round(tot.f),
+    breakdown,
+  };
 }
 
 function buildDeepLink(parsed) {
@@ -258,21 +434,38 @@ export default async function handler(req, res) {
   }
 
   const parsed = parseAIResponse(raw);
+
+  // ── PASTO: macro calcolati su database reale, non stimati dall'LLM ──
+  if (parsed && parsed.type === 'meal') {
+    const slot = parsed.slot || 'pranzo';
+    const name = parsed.name || 'Pasto';
+    const m = await computeMeal(parsed.items);
+
+    await kvSet(`tg_import:${incomingChatId}`, {
+      type: 'meal', ts: Date.now(),
+      kcal: m.kcal, protein: m.protein, carbs: m.carbs, fat: m.fat,
+      name, slot,
+    });
+
+    const SLOT_EMOJI = { colazione: '🌅', pranzo: '🍽️', cena: '🌙', merenda: '🍎' };
+    let reply = `${SLOT_EMOJI[slot] || '🍽️'} <b>${name}</b> — ${slot}\n`;
+    if (m.breakdown.length) reply += '\n' + m.breakdown.join('\n') + '\n';
+    reply += '━━━━━━━━━━━\n';
+    reply += `📊 <b>~${m.kcal} kcal</b> · P ${m.protein}g · C ${m.carbs}g · G ${m.fat}g`;
+    if (parsed.tip) reply += `\n💡 ${parsed.tip}`;
+    reply += '\n\n🔄 <i>Apri il sito per vedere i dati aggiornati.</i>';
+    await sendTelegramMessage(botToken, incomingChatId, reply);
+    return res.status(200).json({ ok: true });
+  }
+
   const replyText = parsed?.text || raw;
 
-  // Salva payload su Upstash Redis — il sito lo recupera al prossimo avvio (bypass WebView isolation)
+  // ── WORKOUT / altro: salva e rispondi col testo dell'LLM ──
   let savedToServer = false;
-  if (parsed && parsed.type !== 'info') {
+  if (parsed && parsed.type === 'workout') {
     await kvSet(`tg_import:${incomingChatId}`, {
-      type: parsed.type,
-      ts: Date.now(),
-      ...(parsed.type === 'meal' ? {
-        kcal: parsed.kcal || 0, protein: parsed.protein || 0,
-        carbs: parsed.carbs || 0, fat: parsed.fat || 0,
-        name: parsed.name || 'Pasto', slot: parsed.slot || 'pranzo',
-      } : {
-        burn: parsed.burn || 0, name: parsed.name || 'Workout',
-      }),
+      type: 'workout', ts: Date.now(),
+      burn: parsed.burn || 0, name: parsed.name || 'Workout',
     });
     savedToServer = true;
   }
