@@ -250,13 +250,47 @@ async function callVisionGroq(apiKey, imageBase64, mimeType, systemPrompt, userP
   }
 }
 
+const COSMOS_SYSTEM_PROMPT = `Sei un analista biomeccanico AI. Osservi un frame di allenamento/arti marziali.
+Analizza SOLO la fisica del movimento: postura, equilibrio, angoli articolari, centro di gravità, traiettorie.
+Rispondi in 1-2 frasi brevi, tecnico-precise. Nessun incoraggiamento, solo analisi fisica concreta.`;
+
+async function callVisionCosmos(apiKey, model, imageBase64, mimeType, userPrompt) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 6000);
+  try {
+    const res = await fetch(`${NVIDIA_BASE}/chat/completions`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: 'system', content: COSMOS_SYSTEM_PROMPT },
+          { role: 'user', content: [
+            { type: 'image_url', image_url: { url: `data:${mimeType};base64,${imageBase64}` } },
+            { type: 'text', text: userPrompt || 'Analizza postura ed equilibrio in questo frame.' },
+          ]},
+        ],
+        max_tokens: 120,
+        temperature: 0.3,
+      }),
+      signal: controller.signal,
+    });
+    const data = await res.json();
+    return { ok: res.ok, data };
+  } catch (_) {
+    return { ok: false, data: null };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 export default async function handler(req, res) {
   if (req.method === 'GET') {
     return res.status(200).json({
       ok: true,
       endpoint: '/api/nvidia/visual',
       disciplines: Object.keys(SYSTEM_PROMPTS),
-      primaryModel: 'llama-3.2-90b-vision-preview (Groq) + NVIDIA fallback',
+      primaryModel: 'Groq llama-4-scout + Cosmos Reason1 (parallel) → NVIDIA fallback',
     });
   }
 
@@ -268,23 +302,36 @@ export default async function handler(req, res) {
   if (!imageBase64) return res.status(400).json({ error: 'imageBase64 obbligatorio' });
 
   const systemPrompt = SYSTEM_PROMPTS[mode] || SYSTEM_PROMPTS.general;
-
-  // 1. Groq primary (free, generous limits, llama-3.2-90b-vision)
   const groqKey = process.env.GROQ_API_KEY;
-  if (groqKey) {
-    try {
-      const { ok, data } = await callVisionGroq(groqKey, imageBase64, mimeType, systemPrompt, prompt);
-      if (ok && data?.choices?.[0]?.message?.content) {
-        res.setHeader('X-Visual-Provider', 'groq-llama-90b');
-        res.setHeader('X-Visual-Mode', mode);
-        return res.status(200).json({ content: data.choices[0].message.content, provider: 'groq-llama-90b', mode });
-      }
-    } catch (_) {}
+  const cosmosKey = process.env.COSMOS3_NVIDIA_API_KEY;
+  const cosmosModel = process.env.COSMOS3_NVIDIA_MODEL || 'nvidia/cosmos-reason1-7b';
+
+  // 1. Groq + Cosmos in parallelo — timeout Cosmos 6s, Groq 5s
+  if (groqKey || cosmosKey) {
+    const [groqRes, cosmosRes] = await Promise.allSettled([
+      groqKey ? callVisionGroq(groqKey, imageBase64, mimeType, systemPrompt, prompt) : Promise.resolve({ ok: false }),
+      cosmosKey ? callVisionCosmos(cosmosKey, cosmosModel, imageBase64, mimeType, prompt) : Promise.resolve({ ok: false }),
+    ]);
+
+    const groqText = groqRes.status === 'fulfilled' && groqRes.value?.ok
+      ? groqRes.value.data?.choices?.[0]?.message?.content?.trim()
+      : null;
+    const cosmosText = cosmosRes.status === 'fulfilled' && cosmosRes.value?.ok
+      ? cosmosRes.value.data?.choices?.[0]?.message?.content?.trim()
+      : null;
+
+    if (groqText || cosmosText) {
+      let content = groqText || '';
+      if (cosmosText) content += (content ? '\n\n🔬 ' : '') + cosmosText;
+      const provider = groqText && cosmosText ? 'groq+cosmos' : (groqText ? 'groq' : 'cosmos');
+      res.setHeader('X-Visual-Provider', provider);
+      res.setHeader('X-Visual-Mode', mode);
+      return res.status(200).json({ content, provider, mode });
+    }
   }
 
-  // 2. NVIDIA fallback chain — Cosmos prima (vision+physics reasoning), poi multimodal
+  // 2. NVIDIA fallback chain
   const nvidiaProviders = [
-    { key: process.env.COSMOS3_NVIDIA_API_KEY, model: process.env.COSMOS3_NVIDIA_MODEL || 'nvidia/cosmos-reason1-7b', name: 'cosmos-reason1' },
     { key: process.env.PHI4_NVIDIA_API_KEY, model: process.env.PHI4_NVIDIA_MODEL || 'microsoft/phi-4-multimodal-instruct', name: 'phi4-multimodal' },
     { key: process.env.QWEN35_NVIDIA_API_KEY, model: process.env.QWEN35_NVIDIA_MODEL || 'google/diffusiongemma-26b-a4b-it', name: 'diffusiongemma-26b' },
     { key: process.env.LLAMA_VISION2_API_KEY, model: 'meta/llama-3.2-90b-vision-instruct', name: 'llama-vision-90b-v2' },
