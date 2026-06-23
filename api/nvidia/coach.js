@@ -28,6 +28,7 @@ const PROVIDERS_FAST = [
   { name: 'mistral-small4', key: () => process.env.MISTRAL_SMALL4_NVIDIA_API_KEY, model: () => process.env.MISTRAL_SMALL4_NVIDIA_MODEL || 'mistralai/mistral-small-4-119b-2603' },
   { name: 'step-3.7', key: () => process.env.STEP37_NVIDIA_API_KEY, model: () => process.env.STEP37_NVIDIA_MODEL || 'stepfun-ai/step-3.7-flash' },
   { name: 'mistral-medium3', key: () => process.env.MISTRAL_MEDIUM3_NVIDIA_API_KEY, model: () => process.env.MISTRAL_MEDIUM3_NVIDIA_MODEL || 'mistralai/mistral-medium-3-instruct' },
+  { name: 'diffusiongemma-26b', key: () => process.env.QWEN35_NVIDIA_API_KEY, model: () => process.env.QWEN35_NVIDIA_MODEL || 'google/diffusiongemma-26b-a4b-it' },
   { name: 'nemotron', key: () => process.env.NVIDIA_API_KEY, model: () => process.env.NVIDIA_MODEL || 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning' },
 ];
 

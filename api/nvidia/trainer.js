@@ -66,6 +66,11 @@ const PROVIDERS = [
     key: () => process.env.MISTRAL_MEDIUM3_NVIDIA_API_KEY,
     model: () => process.env.MISTRAL_MEDIUM3_NVIDIA_MODEL || 'mistralai/mistral-medium-3-instruct',
   },
+  {
+    name: 'diffusiongemma-26b',
+    key: () => process.env.QWEN35_NVIDIA_API_KEY,
+    model: () => process.env.QWEN35_NVIDIA_MODEL || 'google/diffusiongemma-26b-a4b-it',
+  },
 ];
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

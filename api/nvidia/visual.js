@@ -282,12 +282,13 @@ export default async function handler(req, res) {
     } catch (_) {}
   }
 
-  // 2. NVIDIA fallback chain
+  // 2. NVIDIA fallback chain — Cosmos prima (vision+physics reasoning), poi multimodal
   const nvidiaProviders = [
+    { key: process.env.COSMOS3_NVIDIA_API_KEY, model: process.env.COSMOS3_NVIDIA_MODEL || 'nvidia/cosmos-reason1-7b', name: 'cosmos-reason1' },
+    { key: process.env.PHI4_NVIDIA_API_KEY, model: process.env.PHI4_NVIDIA_MODEL || 'microsoft/phi-4-multimodal-instruct', name: 'phi4-multimodal' },
+    { key: process.env.QWEN35_NVIDIA_API_KEY, model: process.env.QWEN35_NVIDIA_MODEL || 'google/diffusiongemma-26b-a4b-it', name: 'diffusiongemma-26b' },
     { key: process.env.LLAMA_VISION2_API_KEY, model: 'meta/llama-3.2-90b-vision-instruct', name: 'llama-vision-90b-v2' },
     { key: process.env.MISTRAL_SMALL4_NVIDIA_API_KEY, model: 'meta/llama-3.2-90b-vision-instruct', name: 'llama-vision-90b' },
-    { key: process.env.PHI4_NVIDIA_API_KEY, model: process.env.PHI4_NVIDIA_MODEL || 'microsoft/phi-4-multimodal-instruct', name: 'phi4-multimodal' },
-    { key: process.env.COSMOS3_NVIDIA_API_KEY, model: process.env.COSMOS3_NVIDIA_MODEL || 'nvidia/cosmos3-nano-reasoner', name: 'cosmos3' },
     { key: process.env.NVIDIA_API_KEY, model: process.env.NVIDIA_MODEL || 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning', name: 'nemotron-omni' },
   ];
 
