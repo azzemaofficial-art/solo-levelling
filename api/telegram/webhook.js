@@ -2,6 +2,7 @@
 // Setup: GET /api/telegram/webhook?setup=1
 
 const NVIDIA_BASE = 'https://integrate.api.nvidia.com/v1';
+const GROQ_BASE   = 'https://api.groq.com/openai/v1';
 const SITE_URL = 'https://solo-levelling-gold.vercel.app';
 
 // Upstash Redis REST — salva il payload lato server (TTL default 24h)
@@ -58,6 +59,7 @@ const PROVIDERS = [
   { key: () => process.env.MISTRAL_SMALL4_NVIDIA_API_KEY, model: 'mistralai/mistral-large-3-675b-instruct-2512', fast: true },
   { key: () => process.env.NEMOTRON_SUPER_API_KEY, model: 'nvidia/nemotron-3-super-120b-a12b', fast: true },
   { key: () => process.env.MISTRAL_MEDIUM3_NVIDIA_API_KEY, model: 'mistralai/mistral-medium-3-instruct', fast: true },
+  { key: () => process.env.GROQ_API_KEY, model: 'llama-3.3-70b-versatile', fast: true, baseUrl: GROQ_BASE },
   { key: () => process.env.NVIDIA_API_KEY, model: 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning', fast: true },
 ];
 
@@ -147,10 +149,10 @@ async function callAI(messages, fast = false) {
     try {
       const ctrl = new AbortController();
       const t = setTimeout(() => ctrl.abort(), 28000);
-      const res = await fetch(`${NVIDIA_BASE}/chat/completions`, {
+      const res = await fetch(`${provider.baseUrl || NVIDIA_BASE}/chat/completions`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: provider.model, messages, max_tokens: 400, temperature: 0.15 }),
+        body: JSON.stringify({ model: provider.model, messages, max_tokens: 1200, temperature: 0.15 }),
         signal: ctrl.signal,
       });
       clearTimeout(t);
@@ -172,14 +174,22 @@ function isSimpleQuery(text) {
 
 function parseAIResponse(raw) {
   if (!raw) return null;
-  // Rimuove blocchi di ragionamento e code fence che sporcano il JSON
   let cleaned = String(raw)
     .replace(/<think>[\s\S]*?<\/think>/gi, '')
     .replace(/```(?:json)?/gi, '')
     .trim();
-  const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) return null;
-  try { return JSON.parse(jsonMatch[0]); } catch { return null; }
+  // Salta qualsiasi testo di ragionamento prima del primo {
+  const start = cleaned.indexOf('{');
+  if (start === -1) return null;
+  cleaned = cleaned.slice(start);
+  // Estrae solo fino alla chiusura del JSON radice
+  let depth = 0, end = -1;
+  for (let i = 0; i < cleaned.length; i++) {
+    if (cleaned[i] === '{') depth++;
+    else if (cleaned[i] === '}') { depth--; if (depth === 0) { end = i; break; } }
+  }
+  if (end === -1) return null;
+  try { return JSON.parse(cleaned.slice(0, end + 1)); } catch { return null; }
 }
 
 // ─── Database nutrizionale — valori per 100g (fonte CREA/USDA, forma comune loggata) ───
