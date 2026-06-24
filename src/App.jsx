@@ -1298,8 +1298,7 @@ useEffect(() => { localStorage.setItem('shadow_monarch_macros', JSON.stringify(m
 
   return (
     <div
-      style={{ height: '100dvh' }}
-      className={`gameframe-shell premium-shell system-scanlines neon-cinema theme-${activePage} ${shouldReduceFx ? 'fx-lite' : ''} max-w-[390px] mx-auto h-screen bg-void-black relative shadow-2xl overflow-hidden border-x border-white/5 flex flex-col`}>
+      className={`app-shell-fs gameframe-shell premium-shell system-scanlines neon-cinema theme-${activePage} ${shouldReduceFx ? 'fx-lite' : ''} max-w-[390px] mx-auto bg-void-black relative shadow-2xl overflow-hidden border-x border-white/5 flex flex-col`}>
       <div className="pointer-events-none absolute inset-0 cinematic-backdrop">
         <div className="absolute inset-0 aurora-layer"></div>
         <div className="absolute inset-0 hud-grid"></div>

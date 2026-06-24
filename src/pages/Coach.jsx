@@ -1320,8 +1320,8 @@ function VisualCoach() {
   // height:100dvh (non inset-0) così la barra comandi resta visibile sopra la
   // chrome di Safari iOS invece di finirci dietro.
   return (
-    <div className="fixed inset-x-0 top-0 z-50 bg-black flex flex-col"
-      style={{ touchAction: 'none', height: '100dvh', maxHeight: '100dvh', overscrollBehavior: 'none' }}>
+    <div className="coach-live-fs fixed inset-0 z-50 bg-black flex flex-col"
+      style={{ touchAction: 'none', overscrollBehavior: 'none' }}>
       {/* Top bar */}
       <div className="flex items-center gap-2.5 px-3 py-2.5 flex-shrink-0"
         style={{ background: 'rgba(0,0,0,0.88)', backdropFilter: 'blur(16px)', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>

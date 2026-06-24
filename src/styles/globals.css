@@ -1043,3 +1043,19 @@ body { overscroll-behavior: contain; }
 ::-webkit-scrollbar {
   display: none;
 }
+
+/* Fullscreen mobile robusto — barra comandi SEMPRE visibile.
+   Cascata: 100vh (fallback) → -webkit-fill-available (iOS Safari vecchio)
+   → 100svh (small viewport: la più stabile per barre fisse in basso). */
+.coach-live-fs {
+  height: 100vh;
+  height: -webkit-fill-available;
+  height: 100svh;
+  max-height: 100vh;
+  max-height: 100svh;
+}
+.app-shell-fs {
+  height: 100vh;
+  height: -webkit-fill-available;
+  height: 100svh;
+}
