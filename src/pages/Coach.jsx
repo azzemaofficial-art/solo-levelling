@@ -1235,7 +1235,7 @@ function VisualCoach() {
           <div className="relative px-4 py-3.5 overflow-hidden">
             <div className="absolute -right-4 -top-4 w-20 h-20 rounded-full pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(16,185,129,0.12) 0%, transparent 70%)', animation: 'drift-slow 8s ease-in-out infinite' }} />
             <p className="text-xs font-black tracking-widest" style={{ color: C.emerald.hex, fontFamily: 'Orbitron, sans-serif' }}>📷 VISUAL LIVE COACH</p>
-            <p className="text-xs mt-0.5" style={{ color: '#6b7280' }}>Llama Vision 90B · 27 discipline · Solo / Sparring / Drill</p>
+            <p className="text-xs mt-0.5" style={{ color: '#6b7280' }}>Groq Scout · Cosmos · Gemma Brain · 27 discipline</p>
           </div>
         </div>
 
@@ -1321,7 +1321,7 @@ function VisualCoach() {
   // chrome di Safari iOS invece di finirci dietro.
   return (
     <div className="fixed inset-x-0 top-0 z-50 bg-black flex flex-col"
-      style={{ touchAction: 'none', height: '100dvh', maxHeight: '100dvh' }}>
+      style={{ touchAction: 'none', height: '100dvh', maxHeight: '100dvh', overscrollBehavior: 'none' }}>
       {/* Top bar */}
       <div className="flex items-center gap-2.5 px-3 py-2.5 flex-shrink-0"
         style={{ background: 'rgba(0,0,0,0.88)', backdropFilter: 'blur(16px)', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
@@ -1519,7 +1519,7 @@ export default function Coach() {
               <h1 className="text-xl font-black tracking-tight leading-none" style={{ fontFamily: 'Orbitron, sans-serif', background: 'linear-gradient(135deg, #ffffff 20%, #00f2ff 60%, #a855f7 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
                 ⚡ AI COACH
               </h1>
-              <p className="text-[10px] mt-0.5 font-mono tracking-widest" style={{ color: '#374151' }}>KIMI K2.6 · LLAMA VISION 90B · NVIDIA NIM</p>
+              <p className="text-[10px] mt-0.5 font-mono tracking-widest" style={{ color: '#374151' }}>GROQ SCOUT · COSMOS · GEMMA BRAIN · NVIDIA NIM</p>
             </div>
             <div className="flex items-center gap-1.5">
               <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold" style={{ background: 'rgba(0,242,255,0.08)', color: '#00f2ff', border: '1px solid rgba(0,242,255,0.2)', animation: 'pulse-glow 2s ease-in-out infinite' }}>● SISTEMA ATTIVO</span>
