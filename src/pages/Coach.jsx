@@ -1109,10 +1109,10 @@ function VisualCoach() {
           const container = canvas.parentElement;
           if (container && vW > 0 && vH > 0) {
             const cW = container.clientWidth, cH = container.clientHeight;
-            const vRatio = vW / vH, cRatio = cW / cH;
-            let dW, dH, dX, dY;
-            if (vRatio > cRatio) { dW = cW; dH = Math.round(cW / vRatio); dX = 0; dY = Math.round((cH - dH) / 2); }
-            else { dH = cH; dW = Math.round(cH * vRatio); dX = Math.round((cW - dW) / 2); dY = 0; }
+            // object-cover: scala per RIEMPIRE, ritaglia l'eccesso (offset negativi)
+            const scale = Math.max(cW / vW, cH / vH);
+            const dW = Math.round(vW * scale), dH = Math.round(vH * scale);
+            const dX = Math.round((cW - dW) / 2), dY = Math.round((cH - dH) / 2);
             canvas.width = dW; canvas.height = dH;
             canvas.style.left = dX + 'px'; canvas.style.top = dY + 'px';
             canvas.style.width = dW + 'px'; canvas.style.height = dH + 'px';
@@ -1316,44 +1316,45 @@ function VisualCoach() {
     );
   }
 
-  // ── Live — full screen overlay ─────────────────────────────────────────────
-  // height:100dvh (non inset-0) così la barra comandi resta visibile sopra la
-  // chrome di Safari iOS invece di finirci dietro.
+  // ── Live — camera overlay (video a tutto schermo + comandi sovrapposti) ──────
+  // Pattern app-fotocamera: video in absolute inset-0 come sfondo, tutti i
+  // comandi in absolute ancorati top/bottom → non possono MAI essere spinti
+  // fuori schermo dalla distribuzione flex.
   return (
-    <div className="coach-live-fs fixed inset-0 z-50 bg-black flex flex-col"
-      style={{ touchAction: 'none', overscrollBehavior: 'none' }}>
-      {/* Top bar */}
-      <div className="flex items-center gap-2.5 px-3 py-2.5 flex-shrink-0"
-        style={{ background: 'rgba(0,0,0,0.88)', backdropFilter: 'blur(16px)', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+    <div className="coach-live-fs fixed inset-0 z-50 bg-black overflow-hidden" style={{ touchAction: 'none', overscrollBehavior: 'none' }}>
+      {/* VIDEO — sfondo a tutto schermo */}
+      <video ref={videoRef} className="absolute inset-0 w-full h-full" style={{ objectFit: 'cover' }} playsInline muted />
+      <canvas ref={canvasRef} className="hidden" />
+      <canvas ref={overlayRef} className="absolute pointer-events-none" style={{ opacity: skeletonOn ? 1 : 0 }} />
+
+      {/* TOP BAR — sovrapposta in alto */}
+      <div className="absolute top-0 inset-x-0 z-20 flex items-center gap-2.5 px-3 pb-3"
+        style={{ paddingTop: 'max(12px, env(safe-area-inset-top))', background: 'linear-gradient(to bottom, rgba(0,0,0,0.85) 30%, transparent)' }}>
         <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 text-base"
-          style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)' }}>
+          style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.12)' }}>
           {currentDisc?.emoji}
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-xs font-black text-white leading-tight" style={{ fontFamily: 'Orbitron, sans-serif' }}>{currentDisc?.label?.toUpperCase()}</p>
           {analysis?.provider
-            ? <p className="text-[10px] truncate mt-0.5 font-mono" style={{ color: C.violet.hex, opacity: 0.85 }}>🤖 {analysis.provider}</p>
-            : sessionContext && <p className="text-[10px] truncate mt-0.5" style={{ color: '#4b5563' }}>{sessionContext}</p>
+            ? <p className="text-[10px] truncate mt-0.5 font-mono" style={{ color: C.violet.hex, opacity: 0.9 }}>🤖 {analysis.provider}</p>
+            : sessionContext && <p className="text-[10px] truncate mt-0.5" style={{ color: '#9ca3af' }}>{sessionContext}</p>
           }
         </div>
-        {/* Badges */}
         <div className="flex items-center gap-1.5">
-          {streaming && <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold" style={{ background: 'rgba(16,185,129,0.18)', color: C.emerald.hex, border: `1px solid ${C.emerald.border}`, animation: 'pulse-glow 2s ease-in-out infinite' }}>● LIVE</span>}
-          {autoMode && <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold" style={{ background: 'rgba(249,115,22,0.18)', color: C.orange.hex, border: `1px solid ${C.orange.border}`, animation: 'pulse-glow 1.2s ease-in-out infinite' }}>AUTO</span>}
-          {skeletonOn && centered && <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold" style={{ background: centered === 'ok' ? 'rgba(16,185,129,0.15)' : 'rgba(249,115,22,0.15)', color: centered === 'ok' ? C.emerald.hex : C.orange.hex, border: `1px solid ${centered === 'ok' ? C.emerald.border : C.orange.border}` }}>
-            {centered === 'ok' ? '✓ CTR' : centered === 'off' ? '↔ OFF' : '— —'}
-          </span>}
+          {streaming && <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold" style={{ background: 'rgba(16,185,129,0.25)', color: C.emerald.hex, border: `1px solid ${C.emerald.border}`, animation: 'pulse-glow 2s ease-in-out infinite' }}>● LIVE</span>}
+          {autoMode && <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold" style={{ background: 'rgba(249,115,22,0.25)', color: C.orange.hex, border: `1px solid ${C.orange.border}`, animation: 'pulse-glow 1.2s ease-in-out infinite' }}>AUTO</span>}
           <motion.button whileTap={{ scale: 0.9 }} onClick={stopCamera}
-            className="w-8 h-8 rounded-xl flex items-center justify-center font-black text-sm"
-            style={{ background: 'rgba(185,28,28,0.35)', border: `1px solid ${C.red.border}`, color: '#fca5a5' }}>
+            className="w-9 h-9 rounded-xl flex items-center justify-center font-black text-sm"
+            style={{ background: 'rgba(185,28,28,0.55)', border: `1px solid ${C.red.border}`, color: '#fff' }}>
             ✕
           </motion.button>
         </div>
       </div>
 
-      {/* Sparring: timer + score */}
+      {/* SPARRING: timer + score — sotto la top bar */}
       {isPartnerMode && (
-        <div className="flex-shrink-0 px-3 py-2 space-y-2" style={{ background: 'rgba(0,0,0,0.6)' }}>
+        <div className="absolute inset-x-0 z-20 px-3 space-y-2" style={{ top: 'calc(max(12px, env(safe-area-inset-top)) + 52px)' }}>
           {timer.phase === 'idle'
             ? <motion.button whileTap={{ scale: 0.97 }} onClick={timer.start}
                 className="w-full py-2.5 rounded-xl text-white font-black text-sm"
@@ -1366,22 +1367,18 @@ function VisualCoach() {
         </div>
       )}
 
-      {/* Video — fills all remaining space (min-h-0 = può restringersi, bottom bar sempre visibile) */}
-      <div className="flex-1 min-h-0 relative overflow-hidden bg-black">
-        <video ref={videoRef} className="w-full h-full" style={{ objectFit: 'contain' }} playsInline muted />
-        <canvas ref={canvasRef} className="hidden" />
-        {/* Skeleton overlay — positioned by JS to match video display area */}
-        <canvas ref={overlayRef} className="absolute pointer-events-none" style={{ opacity: skeletonOn ? 1 : 0 }} />
+      {/* BLOCCO INFERIORE — feedback + comandi, ancorato in basso (sempre visibile) */}
+      <div className="absolute bottom-0 inset-x-0 z-30 flex flex-col"
+        style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.95) 65%, rgba(0,0,0,0.55) 88%, transparent)', paddingBottom: 'max(16px, env(safe-area-inset-bottom))' }}>
 
-        {/* AI analysis overlay on video */}
+        {/* SEZIONE COMMENTI AI — sopra i comandi */}
         <AnimatePresence>
           {(analysis || analyzing) && (
             <motion.div
               key={analyzing ? 'analyzing' : analysis?.time}
               initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 6 }}
               transition={{ type: 'spring', stiffness: 280, damping: 24 }}
-              className="absolute bottom-0 inset-x-0 px-3 pb-3 pt-12"
-              style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.95) 50%, rgba(0,0,0,0.7) 75%, transparent)' }}>
+              className="px-3 pt-4 pb-1 max-h-[38vh] overflow-y-auto">
               {analyzing ? (
                 <div className="flex items-center gap-2.5">
                   <div className="flex gap-1">
@@ -1395,10 +1392,9 @@ function VisualCoach() {
               ) : (
                 <>
                   <div className="flex items-center gap-2 mb-1.5">
+                    <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded" style={{ color: C.violet.hex, background: 'rgba(139,92,246,0.15)' }}>🤖 {analysis.provider}</span>
                     <div className="h-px flex-1" style={{ background: `linear-gradient(90deg, ${C.violet.hex}66, transparent)` }} />
-                    <p className="text-[9px] font-mono" style={{ color: C.violet.hex, opacity: 0.7 }}>
-                      {analysis.provider} · {currentDisc?.label} · {analysis.time}
-                    </p>
+                    <p className="text-[9px] font-mono" style={{ color: '#6b7280' }}>{analysis.time}</p>
                   </div>
                   <p className="text-sm text-white leading-snug whitespace-pre-wrap font-medium">{analysis.content}</p>
                 </>
@@ -1406,58 +1402,59 @@ function VisualCoach() {
             </motion.div>
           )}
         </AnimatePresence>
-      </div>
 
-      {/* Bottom controls */}
-      <div className="flex-shrink-0 px-3 pt-3 flex flex-col gap-2"
-        style={{ background: 'rgba(0,0,0,0.9)', backdropFilter: 'blur(16px)', borderTop: '1px solid rgba(255,255,255,0.07)', paddingBottom: 'max(20px, env(safe-area-inset-bottom, 20px))' }}>
-        <div className="flex gap-2">
-          <motion.button whileTap={{ scale: 0.93 }} whileHover={{ scale: 1.03 }} onClick={captureAndAnalyze} disabled={analyzing}
-            className="flex-1 py-3 rounded-xl text-white text-sm font-black transition-all disabled:opacity-40 relative overflow-hidden"
-            style={{ background: `linear-gradient(135deg, ${C.violet.hex}, #4f46e5)`, boxShadow: `0 4px 18px ${C.violet.glow}` }}>
-            <span className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent)', animation: 'chip-sheen 2s ease-in-out infinite', backgroundSize: '200% 100%' }} />
-            <span className="relative">🔍 Analizza</span>
-          </motion.button>
-          <motion.button whileTap={{ scale: 0.93 }} onClick={() => setAutoMode((v) => !v)}
-            className="flex-1 py-3 rounded-xl text-white text-sm font-black transition-all relative overflow-hidden"
-            style={autoMode
-              ? { background: `linear-gradient(135deg, ${C.orange.hex}, #b45309)`, boxShadow: `0 4px 18px ${C.orange.glow}` }
-              : { background: 'rgba(55,65,81,0.6)', border: '1px solid rgba(255,255,255,0.07)' }}>
-            {autoMode ? '⏸ Stop' : '▶ Auto'}
-          </motion.button>
-          <motion.button whileTap={{ scale: 0.9 }} onClick={() => { setVoiceOn((v) => !v); if (voiceOn) window.speechSynthesis?.cancel(); }}
-            className="w-12 py-3 rounded-xl text-white font-black text-base transition-all"
-            style={voiceOn
-              ? { background: 'linear-gradient(135deg, #059669, #047857)', boxShadow: '0 4px 16px rgba(5,150,105,0.4)' }
-              : { background: 'rgba(55,65,81,0.5)', border: '1px solid rgba(255,255,255,0.06)' }}>
-            🔊
-          </motion.button>
-          <motion.button whileTap={{ scale: 0.9 }} onClick={() => setSkeletonOn((v) => !v)}
-            className="w-12 py-3 rounded-xl text-white font-black text-base transition-all"
-            style={skeletonOn
-              ? { background: 'linear-gradient(135deg, #7c3aed, #4f46e5)', boxShadow: '0 4px 16px rgba(124,58,237,0.45)' }
-              : { background: 'rgba(55,65,81,0.5)', border: '1px solid rgba(255,255,255,0.06)' }}>
-            🦴
-          </motion.button>
-          <motion.button whileTap={{ scale: 0.9 }} onClick={flipCamera}
-            className="w-12 py-3 rounded-xl text-white font-black text-base transition-all"
-            style={{ background: 'rgba(55,65,81,0.5)', border: '1px solid rgba(255,255,255,0.06)' }}>
-            🔄
-          </motion.button>
-        </div>
-
-        {/* Session analysis button — appears after 3+ feedbacks */}
-        <AnimatePresence>
-          {sessionFeedbacksRef.current.length >= 3 && (
-            <motion.button
-              initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
-              whileTap={{ scale: 0.97 }} onClick={analyzeSession} disabled={analyzingSession}
-              className="w-full py-2.5 rounded-xl text-white text-xs font-black transition-all disabled:opacity-40 relative overflow-hidden"
-              style={{ background: 'linear-gradient(135deg, rgba(20,184,166,0.25), rgba(16,185,129,0.15))', border: `1px solid ${C.emerald.border}`, color: C.emerald.hex }}>
-              {analyzingSession ? '⏳ Analizzando sessione…' : `🧠 Analisi Sessione (${sessionFeedbacksRef.current.length} frame)`}
+        {/* COMANDI principali */}
+        <div className="px-3 pt-3 flex flex-col gap-2">
+          <div className="flex gap-2">
+            <motion.button whileTap={{ scale: 0.93 }} onClick={captureAndAnalyze} disabled={analyzing}
+              className="flex-1 py-3.5 rounded-xl text-white text-sm font-black transition-all disabled:opacity-40 relative overflow-hidden"
+              style={{ background: `linear-gradient(135deg, ${C.violet.hex}, #4f46e5)`, boxShadow: `0 4px 18px ${C.violet.glow}` }}>
+              <span className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent)', animation: 'chip-sheen 2s ease-in-out infinite', backgroundSize: '200% 100%' }} />
+              <span className="relative">🔍 Analizza</span>
             </motion.button>
-          )}
-        </AnimatePresence>
+            <motion.button whileTap={{ scale: 0.93 }} onClick={() => setAutoMode((v) => !v)}
+              className="flex-1 py-3.5 rounded-xl text-white text-sm font-black transition-all relative overflow-hidden"
+              style={autoMode
+                ? { background: `linear-gradient(135deg, ${C.orange.hex}, #b45309)`, boxShadow: `0 4px 18px ${C.orange.glow}` }
+                : { background: 'rgba(55,65,81,0.7)', border: '1px solid rgba(255,255,255,0.1)' }}>
+              {autoMode ? '⏸ Stop Auto' : '▶ Auto Analizza'}
+            </motion.button>
+          </div>
+          <div className="flex gap-2">
+            <motion.button whileTap={{ scale: 0.9 }} onClick={flipCamera}
+              className="flex-1 py-2.5 rounded-xl text-white font-bold text-xs transition-all flex items-center justify-center gap-1.5"
+              style={{ background: 'rgba(55,65,81,0.6)', border: '1px solid rgba(255,255,255,0.08)' }}>
+              🔄 Gira
+            </motion.button>
+            <motion.button whileTap={{ scale: 0.9 }} onClick={() => { setVoiceOn((v) => !v); if (voiceOn) window.speechSynthesis?.cancel(); }}
+              className="flex-1 py-2.5 rounded-xl text-white font-bold text-xs transition-all flex items-center justify-center gap-1.5"
+              style={voiceOn
+                ? { background: 'linear-gradient(135deg, #059669, #047857)', boxShadow: '0 4px 16px rgba(5,150,105,0.4)' }
+                : { background: 'rgba(55,65,81,0.6)', border: '1px solid rgba(255,255,255,0.08)' }}>
+              🔊 Voce {voiceOn ? 'ON' : 'OFF'}
+            </motion.button>
+            <motion.button whileTap={{ scale: 0.9 }} onClick={() => setSkeletonOn((v) => !v)}
+              className="flex-1 py-2.5 rounded-xl text-white font-bold text-xs transition-all flex items-center justify-center gap-1.5"
+              style={skeletonOn
+                ? { background: 'linear-gradient(135deg, #7c3aed, #4f46e5)', boxShadow: '0 4px 16px rgba(124,58,237,0.45)' }
+                : { background: 'rgba(55,65,81,0.6)', border: '1px solid rgba(255,255,255,0.08)' }}>
+              🦴 Scheletro
+            </motion.button>
+          </div>
+
+          {/* ANALISI PROFONDA — appare dopo 3+ feedback */}
+          <AnimatePresence>
+            {sessionFeedbacksRef.current.length >= 3 && (
+              <motion.button
+                initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
+                whileTap={{ scale: 0.97 }} onClick={analyzeSession} disabled={analyzingSession}
+                className="w-full py-3 rounded-xl text-white text-xs font-black transition-all disabled:opacity-40 relative overflow-hidden"
+                style={{ background: 'linear-gradient(135deg, rgba(20,184,166,0.35), rgba(16,185,129,0.2))', border: `1px solid ${C.emerald.border}`, color: C.emerald.hex }}>
+                {analyzingSession ? '⏳ Analisi profonda in corso…' : `🧠 Analisi Profonda — cosa migliorare (${sessionFeedbacksRef.current.length} frame)`}
+              </motion.button>
+            )}
+          </AnimatePresence>
+        </div>
       </div>
 
       {/* Session analysis modal */}
