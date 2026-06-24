@@ -1410,7 +1410,7 @@ function VisualCoach() {
 
       {/* Bottom controls */}
       <div className="flex-shrink-0 px-3 pt-3 flex flex-col gap-2"
-        style={{ background: 'rgba(0,0,0,0.9)', backdropFilter: 'blur(16px)', borderTop: '1px solid rgba(255,255,255,0.07)', paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>
+        style={{ background: 'rgba(0,0,0,0.9)', backdropFilter: 'blur(16px)', borderTop: '1px solid rgba(255,255,255,0.07)', paddingBottom: 'max(20px, env(safe-area-inset-bottom, 20px))' }}>
         <div className="flex gap-2">
           <motion.button whileTap={{ scale: 0.93 }} whileHover={{ scale: 1.03 }} onClick={captureAndAnalyze} disabled={analyzing}
             className="flex-1 py-3 rounded-xl text-white text-sm font-black transition-all disabled:opacity-40 relative overflow-hidden"
