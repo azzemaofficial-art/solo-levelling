@@ -224,7 +224,7 @@ async function callVisionNvidia2(apiKey, imageBase64, mimeType, systemPrompt, us
 
 async function callVisionGroq(apiKey, imageBase64, mimeType, systemPrompt, userPrompt) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 20000);
+  const timeout = setTimeout(() => controller.abort(), 8000);
   const imageUrl = `data:${mimeType};base64,${imageBase64}`;
   try {
     const res = await fetch(`${GROQ_BASE}/chat/completions`, {
@@ -233,13 +233,14 @@ async function callVisionGroq(apiKey, imageBase64, mimeType, systemPrompt, userP
       body: JSON.stringify({
         model: 'meta-llama/llama-4-scout-17b-16e-instruct',
         messages: [
+          { role: 'system', content: systemPrompt },
           { role: 'user', content: [
             { type: 'image_url', image_url: { url: imageUrl } },
-            { type: 'text', text: `${systemPrompt}\n\n${userPrompt || 'Analizza questo frame e guida la sessione.'}` },
+            { type: 'text', text: userPrompt || 'Analizza questo frame e guida la sessione.' },
           ]},
         ],
         max_tokens: 220,
-        temperature: 0.4,
+        temperature: 0.7,
       }),
       signal: controller.signal,
     });
