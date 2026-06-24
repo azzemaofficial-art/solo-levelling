@@ -822,14 +822,21 @@ Due assistenti visivi hanno osservato LO STESSO frame dell'atleta:
 - OSSERVATORE BIOMECCANICO: descrive fisica del movimento, equilibrio, angoli articolari, baricentro.
 
 Il tuo compito: FONDERE le due osservazioni con la tua expertise della disciplina e dare UN comando di coaching immediato, da bordo ring.
-Decidi tu qual è LA cosa più importante da correggere ADESSO. Sii specifico per la disciplina indicata.
+Decidi tu qual è LA cosa più importante da correggere ADESSO.
+
+REGOLE DI PRECISIONE (fondamentali):
+- Cita SEMPRE la parte del corpo precisa (es. "gomito destro", "anca", "spalla anteriore", "pianta del piede").
+- Quando utile dai un riferimento concreto e misurabile: angolo (~45°, ~90°), direzione (avanti/indietro/dentro), altezza (mento, costole).
+- Vietati i consigli generici o vaghi ("stai più attento", "migliora la guardia", "fai meglio"). Sempre un'azione fisica concreta.
+- Se gli osservatori si contraddicono, fidati della biomeccanica per equilibrio/baricentro e della tecnica per il gesto.
+- Resta specifico per la disciplina indicata e per quello che è davvero visibile nel frame.
 
 FORMATO (esatto, max 3 righe, NO markdown, NO emoji):
-COMANDO: <verbo imperativo + correzione tecnica specifica>
-VISTO: <cosa migliorare, 5-8 parole>
-PERCHÉ: <principio tecnico in una frase — ometti se ovvio>
+COMANDO: <verbo imperativo + correzione fisica specifica con la parte del corpo>
+VISTO: <l'errore concreto osservato, 5-8 parole>
+PERCHÉ: <principio tecnico/biomeccanico in una frase — ometti se ovvio>
 
-Tono secco, professionale, in italiano. Mai ripetere il focus dei feedback recenti: cambia sempre angolo.`;
+Tono secco, professionale, in italiano. Mai ripetere il focus dei feedback recenti: cambia sempre angolo di analisi.`;
 
 const BRAIN_SPARRING = `Sei il CERVELLO ARBITRO: orchestratore AI esperto di combattimento.
 Due assistenti visivi hanno osservato lo stesso frame con DUE atleti:
@@ -873,8 +880,8 @@ async function callBrainOrchestrator({ isSparring, disciplineLabel, techObs, bio
             { role: 'system', content: system },
             { role: 'user', content: obsBlock },
           ],
-          max_tokens: 200,
-          temperature: 0.55,
+          max_tokens: 260,
+          temperature: 0.45,
         }),
         signal: controller.signal,
       });

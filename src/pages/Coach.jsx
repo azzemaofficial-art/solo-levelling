@@ -1211,7 +1211,7 @@ function VisualCoach() {
     const video = videoRef.current;
     canvas.width = video.videoWidth || 640; canvas.height = video.videoHeight || 480;
     canvas.getContext('2d').drawImage(video, 0, 0);
-    const base64 = canvas.toDataURL('image/jpeg', 0.65).split(',')[1];
+    const base64 = canvas.toDataURL('image/jpeg', 0.72).split(',')[1];
     setAnalyzing(true);
     try {
       const res = await fetch('/api/nvidia/visual', {
@@ -1418,34 +1418,33 @@ function VisualCoach() {
       <div className="absolute bottom-0 inset-x-0 z-30 flex flex-col"
         style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.95) 65%, rgba(0,0,0,0.55) 88%, transparent)', paddingBottom: 'max(16px, env(safe-area-inset-bottom))' }}>
 
-        {/* SEZIONE COMMENTI AI — sopra i comandi */}
+        {/* SEZIONE COMMENTI AI — il comando RESTA visibile; l'analisi è solo un puntino */}
         <AnimatePresence>
           {(analysis || analyzing) && (
             <motion.div
-              key={analyzing ? 'analyzing' : analysis?.time}
               initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 6 }}
               transition={{ type: 'spring', stiffness: 280, damping: 24 }}
               className="px-3 pt-4 pb-1 max-h-[38vh] overflow-y-auto">
-              {analyzing ? (
-                <div className="flex items-center gap-2.5">
-                  <div className="flex gap-1">
+              <div className="flex items-center gap-2 mb-1.5">
+                {analysis?.provider && (
+                  <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded flex-shrink-0" style={{ color: C.violet.hex, background: 'rgba(139,92,246,0.15)' }}>🤖 {analysis.provider}</span>
+                )}
+                {/* Indicatore di analisi in corso — NON cancella il comando visibile */}
+                {analyzing && (
+                  <span className="flex items-center gap-1 flex-shrink-0">
                     {[0,1,2].map((i) => (
-                      <motion.div key={i} className="w-1.5 h-1.5 rounded-full" style={{ background: C.violet.hex }}
-                        animate={{ y: [0,-4,0], opacity: [0.4,1,0.4] }} transition={{ duration: 0.65, repeat: Infinity, delay: i*0.16 }} />
+                      <motion.span key={i} className="w-1 h-1 rounded-full inline-block" style={{ background: C.violet.hex }}
+                        animate={{ opacity: [0.3,1,0.3] }} transition={{ duration: 0.7, repeat: Infinity, delay: i*0.16 }} />
                     ))}
-                  </div>
-                  <span className="text-xs font-bold" style={{ color: C.violet.hex, fontFamily: 'Orbitron, sans-serif' }}>ANALISI IN CORSO…</span>
-                </div>
-              ) : (
-                <>
-                  <div className="flex items-center gap-2 mb-1.5">
-                    <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded" style={{ color: C.violet.hex, background: 'rgba(139,92,246,0.15)' }}>🤖 {analysis.provider}</span>
-                    <div className="h-px flex-1" style={{ background: `linear-gradient(90deg, ${C.violet.hex}66, transparent)` }} />
-                    <p className="text-[9px] font-mono" style={{ color: '#6b7280' }}>{analysis.time}</p>
-                  </div>
-                  <p className="text-sm text-white leading-snug whitespace-pre-wrap font-medium">{analysis.content}</p>
-                </>
-              )}
+                  </span>
+                )}
+                <div className="h-px flex-1" style={{ background: `linear-gradient(90deg, ${C.violet.hex}66, transparent)` }} />
+                {analysis?.time && <p className="text-[9px] font-mono flex-shrink-0" style={{ color: '#6b7280' }}>{analysis.time}</p>}
+              </div>
+              {analysis?.content
+                ? <p className="text-sm text-white leading-snug whitespace-pre-wrap font-medium">{analysis.content}</p>
+                : <p className="text-xs font-bold" style={{ color: C.violet.hex, fontFamily: 'Orbitron, sans-serif' }}>Primo comando in arrivo…</p>
+              }
             </motion.div>
           )}
         </AnimatePresence>
