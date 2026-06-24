@@ -978,6 +978,8 @@ function VisualCoach() {
   const poseRef = useRef(null);
   const feedbackHistoryRef = useRef([]);
   const sessionFeedbacksRef = useRef([]);
+  const speakQueueRef = useRef([]);   // coda comandi da mostrare/leggere uno alla volta
+  const presentingRef = useRef(false); // true mentre un comando è a schermo + in lettura
   const [sessionAnalysis, setSessionAnalysis] = useState(null);
   const [analyzingSession, setAnalyzingSession] = useState(false);
 
@@ -989,24 +991,62 @@ function VisualCoach() {
     return () => window.speechSynthesis?.removeEventListener('voiceschanged', load);
   }, []);
 
-  const speakCoach = useCallback((text) => {
-    if (!voiceOn || !window.speechSynthesis) return;
-    if (window.speechSynthesis.speaking) return;
-    const clean = text
+  // Tempo minimo di permanenza a schermo di un comando quando la voce è OFF (o non disponibile)
+  const COMMAND_VISIBLE_MS = 4000;
+
+  // Mostra e legge il prossimo comando in coda. NON interrompe mai quello in corso:
+  // attende la fine della lettura (o COMMAND_VISIBLE_MS) prima di passare al successivo.
+  const presentNext = useCallback(() => {
+    if (presentingRef.current) return;            // c'è già un comando in lettura → aspetta
+    const item = speakQueueRef.current.shift();
+    if (!item) return;
+    presentingRef.current = true;
+    setAnalysis(item);                            // display sincronizzato con la voce
+
+    let advanced = false;
+    const advance = () => {
+      if (advanced) return;                       // un solo avanzamento per comando
+      advanced = true;
+      presentingRef.current = false;
+      setTimeout(() => presentNext(), 200);       // breve pausa, poi il prossimo
+    };
+
+    const clean = (item.content || '')
       .replace(/\*\*/g, '').replace(/[*#_~`]/g, '')
       .replace(/RIGA\s*\d+\s*[—-]/g, '')
+      .replace(/(COMANDO|VISTO|PERCHÉ|SITUAZIONE|ISTRUZIONE|PUNTO)\s*:/gi, '')
       .replace(/[^\x00-\x7F]/g, (c) => /\p{Emoji}/u.test(c) ? '' : c)
       .replace(/\n+/g, '. ')
       .trim();
-    if (!clean) return;
-    const utt = new SpeechSynthesisUtterance(clean);
-    utt.lang = 'it-IT';
-    utt.rate = 1.1;
-    utt.pitch = 1;
-    const itVoice = voicesRef.current.find((v) => v.lang === 'it-IT' || v.lang.startsWith('it'));
-    if (itVoice) utt.voice = itVoice;
-    window.speechSynthesis.speak(utt);
+
+    if (voiceOn && window.speechSynthesis && clean) {
+      const utt = new SpeechSynthesisUtterance(clean);
+      utt.lang = 'it-IT';
+      utt.rate = 1.1;
+      utt.pitch = 1;
+      const itVoice = voicesRef.current.find((v) => v.lang === 'it-IT' || v.lang.startsWith('it'));
+      if (itVoice) utt.voice = itVoice;
+      utt.onend = advance;
+      utt.onerror = advance;
+      window.speechSynthesis.speak(utt);
+      // Watchdog: iOS Safari a volte non emette onend → stima durata e avanza comunque
+      const watchdogMs = Math.min(15000, Math.max(COMMAND_VISIBLE_MS, clean.length * 90));
+      setTimeout(advance, watchdogMs);
+    } else {
+      // voce OFF: tieni il comando visibile per COMMAND_VISIBLE_MS poi avanza
+      setTimeout(advance, COMMAND_VISIBLE_MS);
+    }
   }, [voiceOn]);
+
+  // Accoda un comando. Cap: tiene al massimo l'ultimo in attesa (evita backlog stantio
+  // quando l'auto-analisi è più veloce della lettura → resta sempre vicino al real-time).
+  const enqueueCommand = useCallback((item) => {
+    speakQueueRef.current.push(item);
+    if (speakQueueRef.current.length > 1) {
+      speakQueueRef.current = speakQueueRef.current.slice(-1);
+    }
+    presentNext();
+  }, [presentNext]);
 
   const timer = useRoundTimer({ rounds, roundDuration, restDuration: 60 });
   const currentDisc = ALL_DISCIPLINES.find((d) => d.id === mode) || ALL_DISCIPLINES[0];
@@ -1065,6 +1105,9 @@ function VisualCoach() {
     setScore({ a: 0, b: 0 }); setLastPoint(null);
     setStep('setup');
     sessionFeedbacksRef.current = [];
+    speakQueueRef.current = [];
+    presentingRef.current = false;
+    window.speechSynthesis?.cancel();
     setSessionAnalysis(null);
     clearInterval(autoTimerRef.current);
   };
@@ -1177,12 +1220,12 @@ function VisualCoach() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Errore AI');
-      setAnalysis({ content: data.content, provider: data.provider, time: new Date().toLocaleTimeString('it-IT') });
+      // Accoda: il comando verrà mostrato e letto per intero prima del successivo
+      enqueueCommand({ content: data.content, provider: data.provider, time: new Date().toLocaleTimeString('it-IT') });
       // Store last 3 feedbacks to avoid repetition
       feedbackHistoryRef.current = [data.content.split('\n')[0], ...feedbackHistoryRef.current].slice(0, 3);
       // Accumulate all feedbacks for session analysis
       sessionFeedbacksRef.current = [...sessionFeedbacksRef.current, data.content].slice(0, 30);
-      speakCoach(data.content);
       if (isSparring(mode) && data.content) {
         const point = parsePoint(data.content);
         if (point) {
@@ -1194,7 +1237,7 @@ function VisualCoach() {
     } catch (err) {
       setAnalysis({ content: '⚠️ ' + err.message, provider: null, time: new Date().toLocaleTimeString('it-IT') });
     } finally { setAnalyzing(false); analyzingRef.current = false; }
-  }, [mode, buildPrompt, currentDisc, speakCoach]);
+  }, [mode, buildPrompt, currentDisc, enqueueCommand]);
 
   const analyzeSession = useCallback(async () => {
     const feedbacks = sessionFeedbacksRef.current;
