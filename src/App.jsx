@@ -1297,7 +1297,9 @@ useEffect(() => { localStorage.setItem('shadow_monarch_macros', JSON.stringify(m
   };
 
   return (
-    <div className={`gameframe-shell premium-shell system-scanlines neon-cinema theme-${activePage} ${shouldReduceFx ? 'fx-lite' : ''} max-w-[390px] mx-auto h-screen bg-void-black relative shadow-2xl overflow-hidden border-x border-white/5 flex flex-col`}>
+    <div
+      style={{ height: '100dvh' }}
+      className={`gameframe-shell premium-shell system-scanlines neon-cinema theme-${activePage} ${shouldReduceFx ? 'fx-lite' : ''} max-w-[390px] mx-auto h-screen bg-void-black relative shadow-2xl overflow-hidden border-x border-white/5 flex flex-col`}>
       <div className="pointer-events-none absolute inset-0 cinematic-backdrop">
         <div className="absolute inset-0 aurora-layer"></div>
         <div className="absolute inset-0 hud-grid"></div>
@@ -1870,7 +1872,9 @@ useEffect(() => { localStorage.setItem('shadow_monarch_macros', JSON.stringify(m
       </AnimatePresence>
 
       {/* BARRA NAVIGAZIONE — 4 tab principali */}
-      <nav className="game-nav premium-nav w-full max-w-[390px] h-20 bg-black/95 backdrop-blur-xl border-t border-white/[0.06] flex justify-around items-center z-50 shrink-0 relative">
+      <nav
+        style={{ height: 'calc(5rem + env(safe-area-inset-bottom))', paddingBottom: 'env(safe-area-inset-bottom)' }}
+        className="game-nav premium-nav w-full max-w-[390px] h-20 bg-black/95 backdrop-blur-xl border-t border-white/[0.06] flex justify-around items-center z-50 shrink-0 relative">
         {[
           { id: 'system',   label: 'System', Icon: Zap,          hex: '#38bdf8', glow: 'rgba(56,189,248,0.6)'   },
           { id: 'training', label: 'Train',  Icon: Swords,       hex: '#f87171', glow: 'rgba(248,113,113,0.6)'  },
