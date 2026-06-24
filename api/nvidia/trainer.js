@@ -1,8 +1,9 @@
-// Personal Trainer AI — Kimi K2.6 come agente primario
+// Personal Trainer AI — Shadow Coach
 // Gestisce: calorie/macro, ricette, schede allenamento, integratori
 
 const NVIDIA_BASE = 'https://integrate.api.nvidia.com/v1';
 const GROQ_BASE   = 'https://api.groq.com/openai/v1';
+const TAVILY_BASE = 'https://api.tavily.com';
 
 const TRAINER_SYSTEM = `Sei un personal trainer e nutrizionista AI certificato. Il tuo nome è SHADOW COACH.
 Hai competenze in:
@@ -38,7 +39,42 @@ const PROVIDERS = [
   { name: 'nemotron-550b',   key: () => process.env.NVIDIA_550B_API_KEY,            base: NVIDIA_BASE, model: () => 'nvidia/nemotron-3-ultra-550b-a55b' },
 ];
 
+// Trigger per ricerche web legate a nutrizione, allenamento, integratori
+const WEB_TRIGGERS = /oggi|adesso|attual|recente|2025|2026|studio|ricerca|scopert|ultimo|nuov|aggiornament|migliore.*2\d{3}|classifica|versus|vs\b|prezzo|costo|disponibil|integratore.*miglior|miglior.*integratore|proteina.*2\d{3}|creatina.*studio|omega.*ricerca|bcaa.*2\d{3}/i;
+
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+async function tavilySearch(query) {
+  const key = process.env.TAVILY_API_KEY;
+  if (!key) return null;
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 6000);
+    const res = await fetch(`${TAVILY_BASE}/search`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        api_key: key,
+        query,
+        search_depth: 'basic',
+        max_results: 4,
+        include_answer: true,
+      }),
+      signal: ctrl.signal,
+    });
+    clearTimeout(t);
+    if (!res.ok) return null;
+    const data = await res.json();
+    const parts = [];
+    if (data.answer) parts.push(`Risposta sintetica: ${data.answer}`);
+    (data.results || []).forEach((r, i) => {
+      parts.push(`[${i + 1}] ${r.title}\n${r.content?.slice(0, 300) || ''}`);
+    });
+    return parts.join('\n\n');
+  } catch {
+    return null;
+  }
+}
 
 async function callProvider(apiKey, model, baseUrl, messages) {
   const controller = new AbortController();
@@ -94,6 +130,20 @@ export default async function handler(req, res) {
     systemContent += `\n\nPROFILO UTENTE ATTUALE: ${profileStr}`;
   }
 
+  // Web search Tavily se la query lo richiede
+  const lastUserMsg = [...messages].reverse().find((m) => m.role === 'user')?.content || '';
+  let webContext = null;
+  let usedWeb = false;
+
+  if (WEB_TRIGGERS.test(lastUserMsg)) {
+    webContext = await tavilySearch(lastUserMsg);
+    if (webContext) usedWeb = true;
+  }
+
+  if (webContext) {
+    systemContent += `\n\n---\nRISULTATI WEB AGGIORNATI (usa queste info per rispondere):\n${webContext}\n---\nCita la fonte solo se rilevante. Rispondi sempre in italiano.`;
+  }
+
   const fullMessages = [{ role: 'system', content: systemContent }, ...messages];
 
   for (const provider of PROVIDERS) {
@@ -109,7 +159,8 @@ export default async function handler(req, res) {
         if (ok && content) {
           res.setHeader('X-Trainer-Provider', provider.name);
           res.setHeader('X-Trainer-Model', model);
-          return res.status(200).json({ content, provider: provider.name, model });
+          res.setHeader('X-Trainer-Web', usedWeb ? '1' : '0');
+          return res.status(200).json({ content, provider: provider.name, model, web: usedWeb });
         }
         if ([429, 500, 502, 503].includes(status) && attempt < 1) { await sleep(600); continue; }
         break;
