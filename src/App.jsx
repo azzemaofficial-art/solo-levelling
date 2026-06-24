@@ -427,12 +427,32 @@ useEffect(() => { localStorage.setItem('shadow_monarch_macros', JSON.stringify(m
   }, []);
 
   // 1. Recupera import pendenti dal server (funziona da qualsiasi browser, bypassa WebView isolation)
+  //    Coda completa: applica TUTTI gli import accodati (più messaggi Telegram non si perdono).
+  //    Re-poll al focus/visibilità: il sito si aggiorna senza refresh manuale.
   useEffect(() => {
     const chatId = '264863579';
-    fetch(`/api/telegram/claim-import?chat_id=${chatId}`)
-      .then((r) => r.json())
-      .then(({ data }) => { if (data) applyTgImport(data); })
-      .catch(() => {});
+    let polling = false;
+    const claim = () => {
+      if (polling) return;
+      polling = true;
+      fetch(`/api/telegram/claim-import?chat_id=${chatId}`)
+        .then((r) => r.json())
+        .then(({ items, data }) => {
+          const list = Array.isArray(items) && items.length ? items : (data ? [data] : []);
+          list.forEach((p) => applyTgImport(p));
+        })
+        .catch(() => {})
+        .finally(() => { polling = false; });
+    };
+    claim();
+    const onFocus = () => claim();
+    const onVisible = () => { if (document.visibilityState === 'visible') claim(); };
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
   }, [applyTgImport]);
 
   // 2. Fallback: legge ?tg_import= dall'URL (per desktop o link diretti)

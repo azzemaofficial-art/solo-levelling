@@ -1317,8 +1317,11 @@ function VisualCoach() {
   }
 
   // ── Live — full screen overlay ─────────────────────────────────────────────
+  // height:100dvh (non inset-0) così la barra comandi resta visibile sopra la
+  // chrome di Safari iOS invece di finirci dietro.
   return (
-    <div className="fixed inset-0 z-50 bg-black flex flex-col" style={{ touchAction: 'none' }}>
+    <div className="fixed inset-x-0 top-0 z-50 bg-black flex flex-col"
+      style={{ touchAction: 'none', height: '100dvh', maxHeight: '100dvh' }}>
       {/* Top bar */}
       <div className="flex items-center gap-2.5 px-3 py-2.5 flex-shrink-0"
         style={{ background: 'rgba(0,0,0,0.88)', backdropFilter: 'blur(16px)', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
@@ -1363,8 +1366,8 @@ function VisualCoach() {
         </div>
       )}
 
-      {/* Video — fills all remaining space */}
-      <div className="flex-1 relative overflow-hidden bg-black">
+      {/* Video — fills all remaining space (min-h-0 = può restringersi, bottom bar sempre visibile) */}
+      <div className="flex-1 min-h-0 relative overflow-hidden bg-black">
         <video ref={videoRef} className="w-full h-full" style={{ objectFit: 'contain' }} playsInline muted />
         <canvas ref={canvasRef} className="hidden" />
         {/* Skeleton overlay — positioned by JS to match video display area */}

@@ -800,6 +800,107 @@ async function callVisionCosmos(apiKey, model, imageBase64, mimeType, userPrompt
   }
 }
 
+// Nomi leggibili disciplina per l'orchestratore (id frontend → label)
+const DISCIPLINE_LABELS = {
+  muaythai: 'Muay Thai', boxing: 'Boxe', kickboxing: 'Kickboxing', karate: 'Karate',
+  taekwondo: 'Taekwondo', bjj: 'Brazilian Jiu-Jitsu', wrestling: 'Wrestling', judo: 'Judo',
+  mma: 'MMA', kravmaga: 'Krav Maga', capoeira: 'Capoeira', sambo: 'Sambo', hapkido: 'Hapkido',
+  wingchun: 'Wing Chun', kungfu: 'Kung Fu / Wushu', silat: 'Pencak Silat', kendo: 'Kendo',
+  sanda: 'Sanda / Sanshou', pankration: 'Pankration', systema: 'Systema', lutalivre: 'Luta Livre',
+  muayboran: 'Muay Boran', calisthenics: 'Calistenia', crossfit: 'CrossFit', yoga: 'Yoga',
+  running: 'Corsa', stretching: 'Mobilità / Stretching', fitness: 'Palestra', general: 'Allenamento generale',
+  sparring_muaythai: 'Sparring Muay Thai', sparring_boxing: 'Sparring Boxe', sparring_mma: 'Sparring MMA',
+  partner_drills: 'Drill di coppia', sparring_general: 'Sparring libero',
+};
+
+// ─── CERVELLO GEMMA — orchestratore ──────────────────────────────────────────
+// Riceve le osservazioni dei due coach visivi (tecnico + biomeccanico) e, con la
+// conoscenza profonda della disciplina, le fonde in UN comando di coaching azionabile.
+const BRAIN_SOLO = `Sei il CERVELLO COACH: orchestratore AI con conoscenza profonda di arti marziali, biomeccanica e sport.
+Due assistenti visivi hanno osservato LO STESSO frame dell'atleta:
+- OSSERVATORE TECNICO: descrive tecnica, postura, esecuzione del gesto.
+- OSSERVATORE BIOMECCANICO: descrive fisica del movimento, equilibrio, angoli articolari, baricentro.
+
+Il tuo compito: FONDERE le due osservazioni con la tua expertise della disciplina e dare UN comando di coaching immediato, da bordo ring.
+Decidi tu qual è LA cosa più importante da correggere ADESSO. Sii specifico per la disciplina indicata.
+
+FORMATO (esatto, max 3 righe, NO markdown, NO emoji):
+COMANDO: <verbo imperativo + correzione tecnica specifica>
+VISTO: <cosa migliorare, 5-8 parole>
+PERCHÉ: <principio tecnico in una frase — ometti se ovvio>
+
+Tono secco, professionale, in italiano. Mai ripetere il focus dei feedback recenti: cambia sempre angolo.`;
+
+const BRAIN_SPARRING = `Sei il CERVELLO ARBITRO: orchestratore AI esperto di combattimento.
+Due assistenti visivi hanno osservato lo stesso frame con DUE atleti:
+- OSSERVATORE TECNICO: descrive azioni, attacchi, distanza.
+- OSSERVATORE BIOMECCANICO: descrive equilibrio, postura, baricentro dei due.
+
+Fondi le osservazioni e arbitra. FORMATO (max 3 righe, NO markdown, NO emoji):
+SITUAZIONE: <chi attacca, distanza, in una frase>
+ISTRUZIONE: <un comando a uno dei due — "Rosso: ...", "Blu: ...">
+PUNTO: <"Punto Rosso" / "Punto Blu" / "Nessun punto">
+Tono da arbitro professionista, in italiano.`;
+
+const BRAIN_PROVIDERS = [
+  { key: () => process.env.QWEN35_NVIDIA_API_KEY, base: NVIDIA_BASE, model: 'google/diffusiongemma-26b-a4b-it', name: 'gemma-brain' },
+  { key: () => process.env.GROQ_API_KEY,          base: GROQ_BASE,   model: 'llama-3.3-70b-versatile',          name: 'gemma-brain(groq-fallback)' },
+];
+
+async function callBrainOrchestrator({ isSparring, disciplineLabel, techObs, biomechObs, antiRepeatContext }) {
+  if (!techObs && !biomechObs) return null;
+  const system = isSparring ? BRAIN_SPARRING : BRAIN_SOLO;
+  const obsBlock = [
+    `DISCIPLINA: ${disciplineLabel}`,
+    techObs ? `\nOSSERVATORE TECNICO:\n${techObs}` : '',
+    biomechObs ? `\nOSSERVATORE BIOMECCANICO:\n${biomechObs}` : '',
+    antiRepeatContext ? `\n${antiRepeatContext}` : '',
+    `\nFondi e restituisci il comando di coaching nel formato richiesto.`,
+  ].filter(Boolean).join('\n');
+
+  for (const p of BRAIN_PROVIDERS) {
+    const apiKey = p.key();
+    if (!apiKey) continue;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 9000);
+    try {
+      const res = await fetch(`${p.base}/chat/completions`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: p.model,
+          messages: [
+            { role: 'system', content: system },
+            { role: 'user', content: obsBlock },
+          ],
+          max_tokens: 200,
+          temperature: 0.55,
+        }),
+        signal: controller.signal,
+      });
+      const text = await res.text();
+      let data;
+      try { data = JSON.parse(text); } catch {
+        const lines = text.split('\n').filter((l) => l.startsWith('data: ') && !l.includes('[DONE]'));
+        for (let i = lines.length - 1; i >= 0; i--) {
+          try { const c = JSON.parse(lines[i].slice(6)); if (c.choices) { data = c; break; } } catch {}
+        }
+      }
+      const msg = data?.choices?.[0]?.message;
+      const raw = msg?.content || msg?.reasoning;
+      if (res.ok && raw) {
+        const content = raw.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+        if (content) return { content, brain: p.name };
+      }
+    } catch (_) {
+      // prova il provider successivo
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+  return null;
+}
+
 export default async function handler(req, res) {
   if (req.method === 'GET') {
     return res.status(200).json({
@@ -821,8 +922,10 @@ export default async function handler(req, res) {
   const groqKey = process.env.GROQ_API_KEY;
   const cosmosKey = process.env.COSMOS3_NVIDIA_API_KEY;
   const cosmosModel = process.env.COSMOS3_NVIDIA_MODEL || 'nvidia/cosmos-reason1-7b';
+  const sparring = /sparring|partner|drill/.test(mode);
+  const disciplineLabel = DISCIPLINE_LABELS[mode] || mode;
 
-  // 1. Groq + Cosmos in parallelo — timeout Cosmos 6s, Groq 5s
+  // 1. I DUE COACH VISIVI in parallelo — Groq (tecnica) + Cosmos (biomeccanica)
   if (groqKey || cosmosKey) {
     const [groqRes, cosmosRes] = await Promise.allSettled([
       groqKey ? callVisionGroq(groqKey, imageBase64, mimeType, systemPrompt, prompt) : Promise.resolve({ ok: false }),
@@ -837,6 +940,27 @@ export default async function handler(req, res) {
       : null;
 
     if (groqText || cosmosText) {
+      // 2. CERVELLO GEMMA — fonde le due osservazioni con la conoscenza della disciplina
+      // Estrae il blocco anti-ripetizione dal prompt (FEEDBACK RECENTI ...) se presente
+      const antiRepeat = (prompt && /FEEDBACK RECENTI/i.test(prompt))
+        ? 'FEEDBACK RECENTI (NON ripetere questi focus, cambia angolo):\n' + prompt.split(/FEEDBACK RECENTI[^\n]*\n/i)[1]
+        : '';
+
+      const brain = await callBrainOrchestrator({
+        isSparring: sparring,
+        disciplineLabel,
+        techObs: groqText,
+        biomechObs: cosmosText,
+        antiRepeatContext: antiRepeat,
+      });
+
+      if (brain) {
+        res.setHeader('X-Visual-Provider', brain.brain);
+        res.setHeader('X-Visual-Mode', mode);
+        return res.status(200).json({ content: brain.content, provider: brain.brain, mode });
+      }
+
+      // Fallback: se il cervello non risponde, concatena le osservazioni grezze
       let content = groqText || '';
       if (cosmosText) content += (content ? '\n\n🔬 ' : '') + cosmosText;
       const provider = groqText && cosmosText ? 'groq+cosmos' : (groqText ? 'groq' : 'cosmos');

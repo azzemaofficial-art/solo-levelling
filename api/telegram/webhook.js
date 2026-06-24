@@ -33,6 +33,24 @@ async function kvGet(key) {
   } catch { return null; }
 }
 
+// Accoda un import in una LIST Redis (RPUSH) + TTL: più messaggi non si sovrascrivono
+async function kvPush(key, value, ttl = 86400) {
+  const url = process.env.KV_REST_API_URL;
+  const token = process.env.KV_REST_API_TOKEN;
+  if (!url || !token) return;
+  try {
+    await fetch(`${url}/pipeline`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify([
+        ['RPUSH', key, JSON.stringify(value)],
+        ['LTRIM', key, '-50', '-1'],
+        ['EXPIRE', key, String(ttl)],
+      ]),
+    });
+  } catch (_) {}
+}
+
 // Totale nutrizionale del giorno (per il comando /oggi)
 const todayKey = (chatId) => `tg_day:${chatId}:${new Date().toISOString().slice(0, 10)}`;
 
@@ -561,7 +579,7 @@ async function processMeal(botToken, chatId, parsed) {
   const name = parsed.name || 'Pasto';
   const m = await computeMeal(parsed.items);
 
-  await kvSet(`tg_import:${chatId}`, {
+  await kvPush(`tg_queue:${chatId}`, {
     type: 'meal', ts: Date.now(),
     kcal: m.kcal, protein: m.protein, carbs: m.carbs, fat: m.fat, name, slot,
   });
@@ -715,9 +733,23 @@ export default async function handler(req, res) {
   const measurement = detectMeasurement(text);
   if (measurement && Object.values(measurement).some(Boolean)) {
     const payload = { type: 'measurement', ts: Date.now(), ...measurement };
-    await kvSet(`tg_import:${incomingChatId}`, payload);
-    // Peso persistente per il calcolo MET dei workout (30 giorni)
-    if (measurement.weight) await kvSet(`tg_profile:${incomingChatId}`, { weightKg: measurement.weight }, 2592000);
+    await kvPush(`tg_queue:${incomingChatId}`, payload);
+    // Profilo persistente completo (30 giorni) — MERGE: non sovrascrive i campi mancanti
+    const prevProfile = (await kvGet(`tg_profile:${incomingChatId}`)) || {};
+    const profile = {
+      ...prevProfile,
+      ...(measurement.weight      != null ? { weightKg: measurement.weight } : {}),
+      ...(measurement.height      != null ? { heightCm: measurement.height } : {}),
+      ...(measurement.bodyFat     != null ? { bodyFatPct: measurement.bodyFat } : {}),
+      ...(measurement.bodyWater   != null ? { bodyWaterPct: measurement.bodyWater } : {}),
+      ...(measurement.visceral    != null ? { visceralFat: measurement.visceral } : {}),
+      ...(measurement.leanMass    != null ? { leanMassKg: measurement.leanMass } : {}),
+      ...(measurement.muscleMass  != null ? { muscleMassKg: measurement.muscleMass } : {}),
+      ...(measurement.age         != null ? { age: measurement.age } : {}),
+      ...(measurement.sex         != null ? { sex: measurement.sex } : {}),
+      ...(measurement.targetWeight!= null ? { targetWeightKg: measurement.targetWeight } : {}),
+    };
+    await kvSet(`tg_profile:${incomingChatId}`, profile, 2592000);
     let lines = [];
     if (measurement.weight) lines.push(`⚖️ Peso: <b>${measurement.weight} kg</b>`);
     if (measurement.bodyFat) lines.push(`💧 Body fat: <b>${measurement.bodyFat}%</b>`);
@@ -762,7 +794,7 @@ export default async function handler(req, res) {
     const weightKg = Number(profile?.weightKg) || 75;
     const b = computeBurn(parsed.activities, weightKg);
 
-    await kvSet(`tg_import:${incomingChatId}`, {
+    await kvPush(`tg_queue:${incomingChatId}`, {
       type: 'workout', ts: Date.now(), burn: b.burn, name,
     });
     const day = await addDaily(incomingChatId, { burn: b.burn });
