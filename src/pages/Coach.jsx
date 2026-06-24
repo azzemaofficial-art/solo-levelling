@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 
 // ─── Quick prompts ─────────────────────────────────────────────────────────────
@@ -1318,10 +1319,13 @@ function VisualCoach() {
 
   // ── Live — camera overlay (video a tutto schermo + comandi sovrapposti) ──────
   // Pattern app-fotocamera: video in absolute inset-0 come sfondo, tutti i
-  // comandi in absolute ancorati top/bottom → non possono MAI essere spinti
-  // fuori schermo dalla distribuzione flex.
-  return (
-    <div className="coach-live-fs fixed inset-0 z-50 bg-black overflow-hidden" style={{ touchAction: 'none', overscrollBehavior: 'none' }}>
+  // comandi in absolute ancorati top/bottom.
+  // PORTAL su document.body: indispensabile perché un ancestor con transform
+  // (il <motion.div> di framer-motion che anima i tab) renderebbe altrimenti
+  // `position: fixed` relativo a sé, spingendo i comandi in fondo alla pagina
+  // invece che al viewport. Il portal li àncora al viewport reale.
+  return createPortal(
+    <div className="coach-live-fs fixed inset-0 z-[100] bg-black overflow-hidden" style={{ touchAction: 'none', overscrollBehavior: 'none' }}>
       {/* VIDEO — sfondo a tutto schermo */}
       <video ref={videoRef} className="absolute inset-0 w-full h-full" style={{ objectFit: 'cover' }} playsInline muted />
       <canvas ref={canvasRef} className="hidden" />
@@ -1483,7 +1487,8 @@ function VisualCoach() {
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
+    </div>,
+    document.body
   );
 }
 
