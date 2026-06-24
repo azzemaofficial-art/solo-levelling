@@ -976,6 +976,9 @@ function VisualCoach() {
   const rafRef = useRef(null);
   const poseRef = useRef(null);
   const feedbackHistoryRef = useRef([]);
+  const sessionFeedbacksRef = useRef([]);
+  const [sessionAnalysis, setSessionAnalysis] = useState(null);
+  const [analyzingSession, setAnalyzingSession] = useState(false);
 
   // Precarica le voci appena disponibili (getVoices è asincrono su Chrome/Safari)
   useEffect(() => {
@@ -1060,6 +1063,8 @@ function VisualCoach() {
     setStreaming(false); setAnalysis(null); setAutoMode(false);
     setScore({ a: 0, b: 0 }); setLastPoint(null);
     setStep('setup');
+    sessionFeedbacksRef.current = [];
+    setSessionAnalysis(null);
     clearInterval(autoTimerRef.current);
   };
 
@@ -1174,6 +1179,8 @@ function VisualCoach() {
       setAnalysis({ content: data.content, provider: data.provider, time: new Date().toLocaleTimeString('it-IT') });
       // Store last 3 feedbacks to avoid repetition
       feedbackHistoryRef.current = [data.content.split('\n')[0], ...feedbackHistoryRef.current].slice(0, 3);
+      // Accumulate all feedbacks for session analysis
+      sessionFeedbacksRef.current = [...sessionFeedbacksRef.current, data.content].slice(0, 30);
       speakCoach(data.content);
       if (isSparring(mode) && data.content) {
         const point = parsePoint(data.content);
@@ -1187,6 +1194,26 @@ function VisualCoach() {
       setAnalysis({ content: '⚠️ ' + err.message, provider: null, time: new Date().toLocaleTimeString('it-IT') });
     } finally { setAnalyzing(false); analyzingRef.current = false; }
   }, [mode, buildPrompt, currentDisc, speakCoach]);
+
+  const analyzeSession = useCallback(async () => {
+    const feedbacks = sessionFeedbacksRef.current;
+    if (feedbacks.length === 0) return;
+    setAnalyzingSession(true);
+    try {
+      const res = await fetch('/api/nvidia/visual-analysis', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ feedbacks, discipline: currentDisc?.label, mode }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Errore analisi sessione');
+      setSessionAnalysis({ content: data.content, provider: data.provider });
+    } catch (err) {
+      setSessionAnalysis({ content: '⚠️ ' + err.message, provider: null });
+    } finally {
+      setAnalyzingSession(false);
+    }
+  }, [mode, currentDisc]);
 
   useEffect(() => {
     if (autoMode && streaming) {
@@ -1301,7 +1328,10 @@ function VisualCoach() {
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-xs font-black text-white leading-tight" style={{ fontFamily: 'Orbitron, sans-serif' }}>{currentDisc?.label?.toUpperCase()}</p>
-          {sessionContext && <p className="text-[10px] truncate mt-0.5" style={{ color: '#4b5563' }}>{sessionContext}</p>}
+          {analysis?.provider
+            ? <p className="text-[10px] truncate mt-0.5 font-mono" style={{ color: C.violet.hex, opacity: 0.85 }}>🤖 {analysis.provider}</p>
+            : sessionContext && <p className="text-[10px] truncate mt-0.5" style={{ color: '#4b5563' }}>{sessionContext}</p>
+          }
         </div>
         {/* Badges */}
         <div className="flex items-center gap-1.5">
@@ -1376,41 +1406,83 @@ function VisualCoach() {
       </div>
 
       {/* Bottom controls */}
-      <div className="flex-shrink-0 px-3 py-3 flex gap-2"
-        style={{ background: 'rgba(0,0,0,0.9)', backdropFilter: 'blur(16px)', borderTop: '1px solid rgba(255,255,255,0.07)' }}>
-        <motion.button whileTap={{ scale: 0.93 }} whileHover={{ scale: 1.03 }} onClick={captureAndAnalyze} disabled={analyzing}
-          className="flex-1 py-3 rounded-xl text-white text-sm font-black transition-all disabled:opacity-40 relative overflow-hidden"
-          style={{ background: `linear-gradient(135deg, ${C.violet.hex}, #4f46e5)`, boxShadow: `0 4px 18px ${C.violet.glow}` }}>
-          <span className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent)', animation: 'chip-sheen 2s ease-in-out infinite', backgroundSize: '200% 100%' }} />
-          <span className="relative">🔍 Analizza</span>
-        </motion.button>
-        <motion.button whileTap={{ scale: 0.93 }} onClick={() => setAutoMode((v) => !v)}
-          className="flex-1 py-3 rounded-xl text-white text-sm font-black transition-all relative overflow-hidden"
-          style={autoMode
-            ? { background: `linear-gradient(135deg, ${C.orange.hex}, #b45309)`, boxShadow: `0 4px 18px ${C.orange.glow}` }
-            : { background: 'rgba(55,65,81,0.6)', border: '1px solid rgba(255,255,255,0.07)' }}>
-          {autoMode ? '⏸ Stop' : '▶ Auto'}
-        </motion.button>
-        <motion.button whileTap={{ scale: 0.9 }} onClick={() => { setVoiceOn((v) => !v); if (voiceOn) window.speechSynthesis?.cancel(); }}
-          className="w-12 py-3 rounded-xl text-white font-black text-base transition-all"
-          style={voiceOn
-            ? { background: 'linear-gradient(135deg, #059669, #047857)', boxShadow: '0 4px 16px rgba(5,150,105,0.4)' }
-            : { background: 'rgba(55,65,81,0.5)', border: '1px solid rgba(255,255,255,0.06)' }}>
-          🔊
-        </motion.button>
-        <motion.button whileTap={{ scale: 0.9 }} onClick={() => setSkeletonOn((v) => !v)}
-          className="w-12 py-3 rounded-xl text-white font-black text-base transition-all"
-          style={skeletonOn
-            ? { background: 'linear-gradient(135deg, #7c3aed, #4f46e5)', boxShadow: '0 4px 16px rgba(124,58,237,0.45)' }
-            : { background: 'rgba(55,65,81,0.5)', border: '1px solid rgba(255,255,255,0.06)' }}>
-          🦴
-        </motion.button>
-        <motion.button whileTap={{ scale: 0.9 }} onClick={flipCamera}
-          className="w-12 py-3 rounded-xl text-white font-black text-base transition-all"
-          style={{ background: 'rgba(55,65,81,0.5)', border: '1px solid rgba(255,255,255,0.06)' }}>
-          🔄
-        </motion.button>
+      <div className="flex-shrink-0 px-3 pt-3 flex flex-col gap-2"
+        style={{ background: 'rgba(0,0,0,0.9)', backdropFilter: 'blur(16px)', borderTop: '1px solid rgba(255,255,255,0.07)', paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>
+        <div className="flex gap-2">
+          <motion.button whileTap={{ scale: 0.93 }} whileHover={{ scale: 1.03 }} onClick={captureAndAnalyze} disabled={analyzing}
+            className="flex-1 py-3 rounded-xl text-white text-sm font-black transition-all disabled:opacity-40 relative overflow-hidden"
+            style={{ background: `linear-gradient(135deg, ${C.violet.hex}, #4f46e5)`, boxShadow: `0 4px 18px ${C.violet.glow}` }}>
+            <span className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent)', animation: 'chip-sheen 2s ease-in-out infinite', backgroundSize: '200% 100%' }} />
+            <span className="relative">🔍 Analizza</span>
+          </motion.button>
+          <motion.button whileTap={{ scale: 0.93 }} onClick={() => setAutoMode((v) => !v)}
+            className="flex-1 py-3 rounded-xl text-white text-sm font-black transition-all relative overflow-hidden"
+            style={autoMode
+              ? { background: `linear-gradient(135deg, ${C.orange.hex}, #b45309)`, boxShadow: `0 4px 18px ${C.orange.glow}` }
+              : { background: 'rgba(55,65,81,0.6)', border: '1px solid rgba(255,255,255,0.07)' }}>
+            {autoMode ? '⏸ Stop' : '▶ Auto'}
+          </motion.button>
+          <motion.button whileTap={{ scale: 0.9 }} onClick={() => { setVoiceOn((v) => !v); if (voiceOn) window.speechSynthesis?.cancel(); }}
+            className="w-12 py-3 rounded-xl text-white font-black text-base transition-all"
+            style={voiceOn
+              ? { background: 'linear-gradient(135deg, #059669, #047857)', boxShadow: '0 4px 16px rgba(5,150,105,0.4)' }
+              : { background: 'rgba(55,65,81,0.5)', border: '1px solid rgba(255,255,255,0.06)' }}>
+            🔊
+          </motion.button>
+          <motion.button whileTap={{ scale: 0.9 }} onClick={() => setSkeletonOn((v) => !v)}
+            className="w-12 py-3 rounded-xl text-white font-black text-base transition-all"
+            style={skeletonOn
+              ? { background: 'linear-gradient(135deg, #7c3aed, #4f46e5)', boxShadow: '0 4px 16px rgba(124,58,237,0.45)' }
+              : { background: 'rgba(55,65,81,0.5)', border: '1px solid rgba(255,255,255,0.06)' }}>
+            🦴
+          </motion.button>
+          <motion.button whileTap={{ scale: 0.9 }} onClick={flipCamera}
+            className="w-12 py-3 rounded-xl text-white font-black text-base transition-all"
+            style={{ background: 'rgba(55,65,81,0.5)', border: '1px solid rgba(255,255,255,0.06)' }}>
+            🔄
+          </motion.button>
+        </div>
+
+        {/* Session analysis button — appears after 3+ feedbacks */}
+        <AnimatePresence>
+          {sessionFeedbacksRef.current.length >= 3 && (
+            <motion.button
+              initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
+              whileTap={{ scale: 0.97 }} onClick={analyzeSession} disabled={analyzingSession}
+              className="w-full py-2.5 rounded-xl text-white text-xs font-black transition-all disabled:opacity-40 relative overflow-hidden"
+              style={{ background: 'linear-gradient(135deg, rgba(20,184,166,0.25), rgba(16,185,129,0.15))', border: `1px solid ${C.emerald.border}`, color: C.emerald.hex }}>
+              {analyzingSession ? '⏳ Analizzando sessione…' : `🧠 Analisi Sessione (${sessionFeedbacksRef.current.length} frame)`}
+            </motion.button>
+          )}
+        </AnimatePresence>
       </div>
+
+      {/* Session analysis modal */}
+      <AnimatePresence>
+        {sessionAnalysis && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[60] flex items-end"
+            style={{ background: 'rgba(0,0,0,0.85)' }}
+            onClick={() => setSessionAnalysis(null)}>
+            <motion.div
+              initial={{ y: 80 }} animate={{ y: 0 }} exit={{ y: 80 }}
+              transition={{ type: 'spring', stiffness: 320, damping: 28 }}
+              className="w-full max-h-[80vh] overflow-y-auto rounded-t-3xl p-5"
+              style={{ background: '#08090f', border: '1px solid rgba(20,184,166,0.25)', borderBottom: 'none' }}
+              onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-sm font-black" style={{ color: C.emerald.hex, fontFamily: 'Orbitron, sans-serif', letterSpacing: '0.06em' }}>🧠 ANALISI SESSIONE</p>
+                <button onClick={() => setSessionAnalysis(null)} className="text-gray-500 font-black text-lg leading-none">✕</button>
+              </div>
+              <p className="text-sm text-white/90 whitespace-pre-wrap leading-relaxed">{sessionAnalysis.content}</p>
+              {sessionAnalysis.provider && (
+                <p className="text-[10px] font-mono mt-4" style={{ color: C.violet.hex, opacity: 0.6 }}>via {sessionAnalysis.provider} · {currentDisc?.label}</p>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
