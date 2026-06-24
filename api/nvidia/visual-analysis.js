@@ -26,17 +26,19 @@ Rispondi sempre in italiano. Sii preciso e tecnico come un coach professionista.
 NON ripetere i feedback originali per intero — analizza i pattern, non elencare.`;
 
 const PROVIDERS = [
-  { name: 'kimi-k2', key: () => process.env.KIMI_NVIDIA_API_KEY, model: 'moonshotai/kimi-k2.6', base: NVIDIA_BASE },
-  { name: 'groq-llama', key: () => process.env.GROQ_API_KEY, model: 'llama-3.3-70b-versatile', base: GROQ_BASE },
-  { name: 'diffusiongemma', key: () => process.env.QWEN35_NVIDIA_API_KEY, model: 'google/diffusiongemma-26b-a4b-it', base: NVIDIA_BASE },
-  { name: 'nvidia-nano', key: () => process.env.NVIDIA_API_KEY, model: 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning', base: NVIDIA_BASE },
+  { name: 'groq-70b',       key: () => process.env.GROQ_API_KEY,                   model: 'llama-3.3-70b-versatile',                       base: GROQ_BASE },
+  { name: 'groq-8b',        key: () => process.env.GROQ_API_KEY,                   model: 'llama-3.1-8b-instant',                          base: GROQ_BASE },
+  { name: 'diffusiongemma', key: () => process.env.QWEN35_NVIDIA_API_KEY,          model: 'google/diffusiongemma-26b-a4b-it',              base: NVIDIA_BASE },
+  { name: 'phi4-mini',      key: () => process.env.PHI_NVIDIA_API_KEY,             model: 'microsoft/phi-4-mini-instruct',                 base: NVIDIA_BASE },
+  { name: 'mistral-large3', key: () => process.env.MISTRAL_NVIDIA_API_KEY,         model: 'mistralai/mistral-large-3-675b-instruct-2512',  base: NVIDIA_BASE },
+  { name: 'nemotron-nano',  key: () => process.env.NVIDIA_API_KEY,                 model: 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning', base: NVIDIA_BASE },
 ];
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function callAI(apiKey, model, base, messages) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 30000);
+  const timeout = setTimeout(() => controller.abort(), 25000);
   try {
     const res = await fetch(`${base}/chat/completions`, {
       method: 'POST',
@@ -44,7 +46,17 @@ async function callAI(apiKey, model, base, messages) {
       body: JSON.stringify({ model, messages, max_tokens: 1200, temperature: 0.6 }),
       signal: controller.signal,
     });
-    const data = await res.json();
+    const text = await res.text();
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      const lines = text.split('\n').filter((l) => l.startsWith('data: ') && !l.includes('[DONE]'));
+      for (let i = lines.length - 1; i >= 0; i--) {
+        try { const c = JSON.parse(lines[i].slice(6)); if (c.choices) { data = c; break; } } catch {}
+      }
+      if (!data) return { ok: false, status: res.status, data: {} };
+    }
     return { ok: res.ok, status: res.status, data };
   } finally {
     clearTimeout(timeout);
@@ -82,10 +94,10 @@ export default async function handler(req, res) {
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
         const { ok, status, data } = await callAI(apiKey, provider.model, provider.base, messages);
-        if (ok && data?.choices?.[0]?.message?.content) {
-          const content = data.choices[0].message.content
-            .replace(/<think>[\s\S]*?<\/think>/gi, '')
-            .trim();
+        const msg = data?.choices?.[0]?.message;
+        const raw = msg?.content || msg?.reasoning;
+        if (ok && raw) {
+          const content = raw.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
           return res.status(200).json({ content, provider: provider.name, model: provider.model });
         }
         if ([429, 500, 502, 503].includes(status) && attempt < 1) { await sleep(800); continue; }

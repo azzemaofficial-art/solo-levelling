@@ -54,13 +54,15 @@ async function addDaily(chatId, m) {
 
 // Provider chain — Groq primo per i fast (no reasoning, JSON pulito), 550B per task lenti
 const PROVIDERS = [
-  { key: () => process.env.GROQ_API_KEY, model: 'llama-3.3-70b-versatile', fast: true, baseUrl: GROQ_BASE },
-  { key: () => process.env.NVIDIA_550B_API_KEY, model: 'nvidia/nemotron-3-ultra-550b-a55b', fast: false },
-  { key: () => process.env.MISTRAL_MEDIUM3_NVIDIA_API_KEY, model: 'mistralai/mistral-medium-3-instruct', fast: true },
-  { key: () => process.env.NEMOTRON_SUPER_API_KEY, model: 'nvidia/nemotron-3-super-120b-a12b', fast: true },
-  { key: () => process.env.MISTRAL_SMALL4_NVIDIA_API_KEY, model: 'mistralai/mistral-large-3-675b-instruct-2512', fast: true },
-  { key: () => process.env.KIMI_NVIDIA_API_KEY, model: 'moonshotai/kimi-k2.6', fast: true },
-  { key: () => process.env.NVIDIA_API_KEY, model: 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning', fast: true },
+  { key: () => process.env.GROQ_API_KEY,                  model: 'llama-3.3-70b-versatile',                      fast: true,  baseUrl: GROQ_BASE },
+  { key: () => process.env.GROQ_API_KEY,                  model: 'llama-3.1-8b-instant',                         fast: true,  baseUrl: GROQ_BASE },
+  { key: () => process.env.QWEN35_NVIDIA_API_KEY,         model: 'google/diffusiongemma-26b-a4b-it',             fast: true,  baseUrl: NVIDIA_BASE },
+  { key: () => process.env.PHI_NVIDIA_API_KEY,            model: 'microsoft/phi-4-mini-instruct',                fast: true,  baseUrl: NVIDIA_BASE },
+  { key: () => process.env.MISTRAL_NVIDIA_API_KEY,        model: 'mistralai/mistral-large-3-675b-instruct-2512', fast: true,  baseUrl: NVIDIA_BASE },
+  { key: () => process.env.STEP37_NVIDIA_API_KEY,         model: 'stepfun-ai/step-3.7-flash',                    fast: true,  baseUrl: NVIDIA_BASE },
+  { key: () => process.env.MISTRAL_MEDIUM3_NVIDIA_API_KEY,model: 'mistralai/mistral-medium-3-instruct',          fast: true,  baseUrl: NVIDIA_BASE },
+  { key: () => process.env.NVIDIA_API_KEY,                model: 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning', fast: true,  baseUrl: NVIDIA_BASE },
+  { key: () => process.env.NVIDIA_550B_API_KEY,           model: 'nvidia/nemotron-3-ultra-550b-a55b',            fast: false, baseUrl: NVIDIA_BASE },
 ];
 
 // Rileva misurazioni corporee nel testo
@@ -156,10 +158,19 @@ async function callAI(messages, fast = false) {
         signal: ctrl.signal,
       });
       clearTimeout(t);
-      const data = await res.json();
-      if (res.ok && data?.choices?.[0]?.message?.content) {
-        return data.choices[0].message.content;
+      const text = await res.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        const lines = text.split('\n').filter((l) => l.startsWith('data: ') && !l.includes('[DONE]'));
+        for (let i = lines.length - 1; i >= 0; i--) {
+          try { const c = JSON.parse(lines[i].slice(6)); if (c.choices) { data = c; break; } } catch {}
+        }
       }
+      const msg = data?.choices?.[0]?.message;
+      const content = msg?.content || msg?.reasoning;
+      if (res.ok && content) return content;
     } catch (_) {
       continue;
     }
