@@ -90,6 +90,11 @@ export default async function handler(req, res) {
       const r = await callProvider(prov, rest);
       tried.push(`${cand}:${r.status}`);
       if (r.ok && r.data?.choices?.[0]?.message) {
+        // Pulisci il ragionamento dei modelli reasoning (es. Nemotron): <think>…</think>
+        const msg = r.data.choices[0].message;
+        if (typeof msg.content === 'string') {
+          msg.content = msg.content.replace(/<think>[\s\S]*?<\/think>/gi, '').replace(/^\s*<\/?think>\s*/gi, '').trim();
+        }
         res.setHeader('X-Shadow-Model', cand);
         return res.status(200).json({ ...r.data, _shadowMeta: { model: cand, fallbackUsed: cand !== model, tried } });
       }

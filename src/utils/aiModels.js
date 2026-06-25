@@ -4,23 +4,21 @@
 //  di fallback automatica del proxy. Persistito in localStorage.
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Modelli GRATIS via Groq + NVIDIA NIM (proxy /api/ai/chat). Prefisso groq:/nvidia:.
-// (Lista provvisoria, verificata sull'endpoint reale dopo il deploy.)
+// Modelli GRATIS via Groq + NVIDIA NIM (proxy /api/ai/chat) — VERIFICATI funzionanti
+// sull'endpoint reale di produzione. Prefisso groq:/nvidia:.
 export const AI_MODELS = [
   { id: '', label: 'Automatico (fallback)' },
-  { id: 'groq:llama-3.3-70b-versatile', label: 'Groq Llama 3.3 70B — veloce' },
-  { id: 'groq:meta-llama/llama-4-scout-17b-16e-instruct', label: 'Groq Llama 4 Scout' },
-  { id: 'nvidia:qwen/qwen3.5-397b-a17b', label: 'NVIDIA Qwen 3.5 397B — potente' },
+  { id: 'groq:llama-3.3-70b-versatile', label: 'Groq Llama 3.3 70B — veloce, JSON pulito' },
+  { id: 'groq:meta-llama/llama-4-scout-17b-16e-instruct', label: 'Groq Llama 4 Scout — creativo' },
   { id: 'nvidia:google/diffusiongemma-26b-a4b-it', label: 'NVIDIA Gemma 26B' },
-  { id: 'nvidia:nvidia/nemotron-3-ultra-550b-a55b', label: 'NVIDIA Nemotron Ultra 550B — top' },
-  { id: 'nvidia:deepseek-ai/deepseek-v4-pro', label: 'NVIDIA DeepSeek V4 Pro' },
+  { id: 'nvidia:nvidia/nemotron-3-ultra-550b-a55b', label: 'NVIDIA Nemotron Ultra 550B — il più potente' },
 ];
 
 // Default consigliati per funzione quando l'utente non ha scelto nulla.
 const TASK_DEFAULT = {
-  meal: 'groq:llama-3.3-70b-versatile',              // veloce e affidabile su JSON
-  recipe: 'nvidia:qwen/qwen3.5-397b-a17b',           // creativo e potente
-  profile: 'nvidia:nvidia/nemotron-3-ultra-550b-a55b', // analisi profonda (Nemotron, come volevi)
+  meal: 'groq:llama-3.3-70b-versatile',                 // veloce e JSON pulito (no reasoning)
+  recipe: 'groq:meta-llama/llama-4-scout-17b-16e-instruct', // creativo e veloce
+  profile: 'nvidia:nvidia/nemotron-3-ultra-550b-a55b',  // analisi profonda (Nemotron, come volevi)
 };
 
 // Prefisso shadow_monarch_ → incluso nel backup cloud (createBackupPayload).
