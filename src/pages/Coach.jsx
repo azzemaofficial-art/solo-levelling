@@ -1078,6 +1078,7 @@ function VisualCoach() {
   // Accoda solo il TESTO per la voce. Cap a 2: evita backlog stantio in auto mode.
   const enqueueSpeak = useCallback((text) => {
     if (!text) return;
+    if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([28, 16, 28]); // feedback aptico nuovo comando
     speakQueueRef.current.push(text);
     if (speakQueueRef.current.length > 2) speakQueueRef.current = speakQueueRef.current.slice(-2);
     speakNext();
@@ -1573,7 +1574,19 @@ function VisualCoach() {
         </div>
         <div className="flex items-center gap-1.5">
           {streaming && <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold" style={{ background: 'rgba(16,185,129,0.25)', color: C.emerald.hex, border: `1px solid ${C.emerald.border}`, animation: 'pulse-glow 2s ease-in-out infinite' }}>● LIVE</span>}
-          {autoMode && <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold" style={{ background: 'rgba(249,115,22,0.25)', color: C.orange.hex, border: `1px solid ${C.orange.border}`, animation: 'pulse-glow 1.2s ease-in-out infinite' }}>{observeProgress > 0 ? `AUTO ${observeProgress}/${VERDICT_EVERY}` : 'AUTO'}</span>}
+          {autoMode && (
+            <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold inline-flex items-center gap-1.5" style={{ background: 'rgba(249,115,22,0.25)', color: C.orange.hex, border: `1px solid ${C.orange.border}` }}>
+              AUTO
+              <span className="flex gap-0.5">
+                {Array.from({ length: VERDICT_EVERY }).map((_, i) => (
+                  <motion.span key={i} className="w-1.5 h-1.5 rounded-full inline-block"
+                    style={{ background: i < observeProgress ? C.orange.hex : 'rgba(249,115,22,0.25)' }}
+                    animate={i === observeProgress ? { scale: [1, 1.5, 1], opacity: [0.5, 1, 0.5] } : { scale: 1 }}
+                    transition={{ duration: 0.9, repeat: Infinity }} />
+                ))}
+              </span>
+            </span>
+          )}
           <motion.button whileTap={{ scale: 0.9 }} onClick={stopCamera}
             className="w-9 h-9 rounded-xl flex items-center justify-center font-black text-sm"
             style={{ background: 'rgba(185,28,28,0.55)', border: `1px solid ${C.red.border}`, color: '#fff' }}>
@@ -1703,7 +1716,28 @@ function VisualCoach() {
                 {analysis?.time && <p className="text-[9px] font-mono flex-shrink-0" style={{ color: '#6b7280' }}>{analysis.time}</p>}
               </div>
               {analysis?.content
-                ? <p className="text-sm text-white leading-snug whitespace-pre-wrap font-medium">{analysis.content}</p>
+                ? (() => {
+                    const parts = {};
+                    String(analysis.content).split('\n').forEach((line) => {
+                      const m = line.match(/^\s*(COMANDO|VISTO|PERCH[ÉE]|SITUAZIONE|ISTRUZIONE|PUNTO)\s*:\s*(.*)/i);
+                      if (m) parts[m[1].toUpperCase().replace('PERCHE', 'PERCHÉ')] = m[2].trim();
+                    });
+                    const cmd = parts.COMANDO || parts.ISTRUZIONE || parts.SITUAZIONE;
+                    if (!cmd) return <p className="text-sm text-white leading-snug whitespace-pre-wrap font-medium">{analysis.content}</p>;
+                    return (
+                      <motion.div key={analysis.time}
+                        initial={{ scale: 0.96, opacity: 0.6 }} animate={{ scale: 1, opacity: 1 }}
+                        transition={{ type: 'spring', stiffness: 360, damping: 22 }}
+                        className="rounded-xl px-3.5 py-3 relative overflow-hidden"
+                        style={{ background: 'linear-gradient(135deg, rgba(16,185,129,0.16), rgba(124,58,237,0.10))', border: '1px solid rgba(16,185,129,0.35)', boxShadow: '0 0 24px rgba(16,185,129,0.18)' }}>
+                        <span className="absolute left-0 top-0 bottom-0 w-1" style={{ background: 'linear-gradient(180deg, #10b981, #7c3aed)' }} />
+                        <p className="text-[15px] font-black text-white leading-tight pl-1.5" style={{ letterSpacing: '-0.01em' }}>{cmd}</p>
+                        {parts.VISTO && <p className="mt-1.5 text-[11px] text-emerald-200/80 pl-1.5">👁 {parts.VISTO}</p>}
+                        {parts.PERCHÉ && <p className="mt-0.5 text-[11px] text-violet-200/70 italic pl-1.5">💡 {parts.PERCHÉ}</p>}
+                        {parts.PUNTO && <p className="mt-1 text-[11px] font-bold text-amber-300 pl-1.5">🏆 {parts.PUNTO}</p>}
+                      </motion.div>
+                    );
+                  })()
                 : <p className="text-xs font-bold" style={{ color: C.violet.hex, fontFamily: 'Orbitron, sans-serif' }}>Primo comando in arrivo…</p>
               }
             </motion.div>
