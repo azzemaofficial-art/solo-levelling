@@ -980,6 +980,7 @@ function VisualCoach() {
   const sessionFeedbacksRef = useRef([]);
   const speakQueueRef = useRef([]);   // coda comandi da mostrare/leggere uno alla volta
   const presentingRef = useRef(false); // true mentre un comando è a schermo + in lettura
+  const lastLandmarksRef = useRef(null); // ultimi landmark MediaPipe → angoli reali per l'AI
   const observationsRef = useRef([]);  // osservazioni accumulate in auto (osserva N → 1 verdetto)
   const [observeProgress, setObserveProgress] = useState(0);
   const VERDICT_EVERY = 3;             // il maestro osserva 3 momenti, poi dà UN verdetto
@@ -1211,9 +1212,11 @@ function VisualCoach() {
               { color: 'rgba(0,255,136,0.8)', lineWidth: 2 });
             du.drawLandmarks(result.landmarks[0],
               { color: '#FF6B35', lineWidth: 1, radius: 4 });
+            lastLandmarksRef.current = result.landmarks[0];   // per la precisione AI (angoli reali)
             const nose = result.landmarks[0][0];
             if (nose) setCentered(nose.x > 0.2 && nose.x < 0.8 && nose.y < 0.85 ? 'ok' : 'off');
           } else {
+            lastLandmarksRef.current = null;
             setCentered('none');
           }
           rafRef.current = requestAnimationFrame(loop);
@@ -1279,6 +1282,31 @@ function VisualCoach() {
     } finally { setAnalyzing(false); analyzingRef.current = false; }
   }, [mode, buildPrompt, currentDisc, enqueueSpeak]);
 
+  // Angoli articolari reali dallo scheletro MediaPipe → grounding di PRECISIONE per l'AI.
+  const computePoseHint = useCallback(() => {
+    const lm = lastLandmarksRef.current;
+    if (!lm || lm.length < 29) return '';
+    const ang = (a, b, c) => {
+      const A = lm[a], B = lm[b], C = lm[c];
+      if (!A || !B || !C) return null;
+      if ((A.visibility ?? 1) < 0.4 || (B.visibility ?? 1) < 0.4 || (C.visibility ?? 1) < 0.4) return null;
+      const v1x = A.x - B.x, v1y = A.y - B.y, v2x = C.x - B.x, v2y = C.y - B.y;
+      const d = Math.hypot(v1x, v1y) * Math.hypot(v2x, v2y);
+      if (!d) return null;
+      const cos = Math.max(-1, Math.min(1, (v1x * v2x + v1y * v2y) / d));
+      return Math.round((Math.acos(cos) * 180) / Math.PI);
+    };
+    const out = [];
+    const push = (lbl, v) => { if (v != null) out.push(`${lbl} ${v}°`); };
+    push('gomito sx', ang(11, 13, 15)); push('gomito dx', ang(12, 14, 16));
+    push('ginocchio sx', ang(23, 25, 27)); push('ginocchio dx', ang(24, 26, 28));
+    push('anca sx', ang(11, 23, 25)); push('anca dx', ang(12, 24, 26));
+    const sM = lm[11] && lm[12] ? { x: (lm[11].x + lm[12].x) / 2, y: (lm[11].y + lm[12].y) / 2 } : null;
+    const hM = lm[23] && lm[24] ? { x: (lm[23].x + lm[24].x) / 2, y: (lm[23].y + lm[24].y) / 2 } : null;
+    if (sM && hM) out.push(`busto inclinato ${Math.round((Math.atan2(Math.abs(sM.x - hM.x), Math.abs(hM.y - sM.y) || 0.001) * 180) / Math.PI)}° dalla verticale`);
+    return out.join(', ');
+  }, []);
+
   // ── AUTO: il maestro osserva in silenzio, poi UN verdetto (no voce ogni tick) ──
   // Ogni tick = un'osservazione silenziosa accumulata. Al 3° tick → verdetto fuso e
   // letto UNA volta. Se un'osservazione vede rischio infortunio → verdetto SUBITO.
@@ -1287,20 +1315,25 @@ function VisualCoach() {
     analyzingRef.current = true;
     const canvas = canvasRef.current;
     const video = videoRef.current;
-    canvas.width = video.videoWidth || 640; canvas.height = video.videoHeight || 480;
-    canvas.getContext('2d').drawImage(video, 0, 0);
-    const base64 = canvas.toDataURL('image/jpeg', 0.72).split(',')[1];
+    // Downscale a max 512px → upload più leggero e analisi più veloce (performance)
+    const vw = video.videoWidth || 640, vh = video.videoHeight || 480;
+    const sc = Math.min(1, 512 / vw);
+    canvas.width = Math.round(vw * sc); canvas.height = Math.round(vh * sc);
+    canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+    const base64 = canvas.toDataURL('image/jpeg', 0.6).split(',')[1];
+    const poseHint = computePoseHint();   // angoli reali per la precisione
     setAnalyzing(true);
     try {
       // 1) OSSERVAZIONE silenziosa (osservatori, niente cervello, niente voce)
       const obsRes = await fetch('/api/nvidia/visual', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageBase64: base64, mimeType: 'image/jpeg', mode, observeOnly: true }),
+        body: JSON.stringify({ imageBase64: base64, mimeType: 'image/jpeg', mode, observeOnly: true, poseHint }),
       });
       const obsData = await obsRes.json();
       let reachedVerdict = false;
       if (obsRes.ok && obsData.observation) {
-        observationsRef.current = [...observationsRef.current, obsData.observation].slice(-VERDICT_EVERY);
+        const obsText = poseHint ? `${obsData.observation} [angoli: ${poseHint}]` : obsData.observation;
+        observationsRef.current = [...observationsRef.current, obsText].slice(-VERDICT_EVERY);
         setObserveProgress(observationsRef.current.length);
         const urgent = obsData.risk || /infortun|rischio|pericol|cede|collass|iperesten/i.test(obsData.observation);
         reachedVerdict = urgent || observationsRef.current.length >= VERDICT_EVERY;
@@ -1309,7 +1342,7 @@ function VisualCoach() {
       if (reachedVerdict) {
         const verRes = await fetch('/api/nvidia/visual', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ mode, observations: observationsRef.current, prompt: buildPrompt(currentDisc?.prompt) }),
+          body: JSON.stringify({ mode, observations: observationsRef.current, prompt: buildPrompt(currentDisc?.prompt), poseHint }),
         });
         const data = await verRes.json();
         if (verRes.ok && data.content) {
@@ -1328,7 +1361,7 @@ function VisualCoach() {
     } catch (_) {
       // silenzioso: tieni l'ultimo verdetto a schermo
     } finally { setAnalyzing(false); analyzingRef.current = false; }
-  }, [mode, buildPrompt, currentDisc, enqueueSpeak]);
+  }, [mode, buildPrompt, currentDisc, enqueueSpeak, computePoseHint]);
 
   const analyzeSession = useCallback(async () => {
     const feedbacks = sessionFeedbacksRef.current;

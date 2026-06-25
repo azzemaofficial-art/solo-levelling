@@ -1113,12 +1113,15 @@ export default async function handler(req, res) {
   // resta al verdetto/path pieno. Più segnalazione rischio infortunio immediato.
   if (observeOnly) {
     const techPrompt = VISION_TECH_OBSERVER(disciplineLabel);
+    // Angoli articolari REALI dallo scheletro (MediaPipe) → osservazione precisa, non a stima.
+    const poseLine = req.body?.poseHint ? `\nDATI SCHELETRO (angoli reali misurati, usali per essere preciso): ${req.body.poseHint}.` : '';
+    const userObs = `Descrivi cosa vedi in questo frame.${poseLine} Se vedi un rischio di infortunio, inizia con "RISCHIO:".`;
     let observation = '';
     if (groqKey) {
-      const g = await callVisionGroq(groqKey, imageBase64, mimeType, techPrompt, 'Descrivi cosa vedi in questo frame. Se vedi un rischio di infortunio, inizia con "RISCHIO:".');
+      const g = await callVisionGroq(groqKey, imageBase64, mimeType, techPrompt, userObs);
       if (g?.ok) observation = g.data?.choices?.[0]?.message?.content?.trim() || '';
     } else if (cosmosKey) {
-      const c = await callVisionCosmos(cosmosKey, cosmosModel, imageBase64, mimeType, 'Descrivi postura, equilibrio e angoli articolari. Se c\'è rischio infortunio inizia con "RISCHIO:".');
+      const c = await callVisionCosmos(cosmosKey, cosmosModel, imageBase64, mimeType, `Descrivi postura, equilibrio e angoli articolari.${poseLine} Se c'è rischio infortunio inizia con "RISCHIO:".`);
       if (c?.ok) observation = c.data?.choices?.[0]?.message?.content?.trim() || '';
     }
     const risk = /RISCHIO|infortun|rischio|pericol|cede sotto|collass|iperesten|sbilanc/i.test(observation);
