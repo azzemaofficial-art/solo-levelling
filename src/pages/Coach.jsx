@@ -991,62 +991,52 @@ function VisualCoach() {
     return () => window.speechSynthesis?.removeEventListener('voiceschanged', load);
   }, []);
 
-  // Tempo minimo di permanenza a schermo di un comando quando la voce è OFF (o non disponibile)
-  const COMMAND_VISIBLE_MS = 4000;
+  // ── Coda VOCALE (solo audio) — disaccoppiata dal display ────────────────────
+  // Il testo a schermo si aggiorna SUBITO e RESTA (gestito in captureAndAnalyze);
+  // qui gestiamo solo la voce, che legge un comando per intero prima del successivo.
+  const speakNextRef = useRef(() => {});
+  const speakNext = useCallback(() => {
+    if (presentingRef.current) return;            // sta già leggendo → aspetta la fine
+    if (!voiceOn || !window.speechSynthesis) { speakQueueRef.current = []; return; }
+    const text = speakQueueRef.current.shift();
+    if (text == null) return;
 
-  // Mostra e legge il prossimo comando in coda. NON interrompe mai quello in corso:
-  // attende la fine della lettura (o COMMAND_VISIBLE_MS) prima di passare al successivo.
-  const presentNext = useCallback(() => {
-    if (presentingRef.current) return;            // c'è già un comando in lettura → aspetta
-    const item = speakQueueRef.current.shift();
-    if (!item) return;
-    presentingRef.current = true;
-    setAnalysis(item);                            // display sincronizzato con la voce
-
-    let advanced = false;
-    const advance = () => {
-      if (advanced) return;                       // un solo avanzamento per comando
-      advanced = true;
-      presentingRef.current = false;
-      setTimeout(() => presentNext(), 200);       // breve pausa, poi il prossimo
-    };
-
-    const clean = (item.content || '')
+    const clean = String(text)
       .replace(/\*\*/g, '').replace(/[*#_~`]/g, '')
       .replace(/RIGA\s*\d+\s*[—-]/g, '')
       .replace(/(COMANDO|VISTO|PERCHÉ|SITUAZIONE|ISTRUZIONE|PUNTO)\s*:/gi, '')
       .replace(/[^\x00-\x7F]/g, (c) => /\p{Emoji}/u.test(c) ? '' : c)
       .replace(/\n+/g, '. ')
       .trim();
+    if (!clean) { speakNextRef.current(); return; }
 
-    if (voiceOn && window.speechSynthesis && clean) {
-      const utt = new SpeechSynthesisUtterance(clean);
-      utt.lang = 'it-IT';
-      utt.rate = 1.1;
-      utt.pitch = 1;
-      const itVoice = voicesRef.current.find((v) => v.lang === 'it-IT' || v.lang.startsWith('it'));
-      if (itVoice) utt.voice = itVoice;
-      utt.onend = advance;
-      utt.onerror = advance;
-      window.speechSynthesis.speak(utt);
-      // Watchdog: iOS Safari a volte non emette onend → stima durata e avanza comunque
-      const watchdogMs = Math.min(15000, Math.max(COMMAND_VISIBLE_MS, clean.length * 90));
-      setTimeout(advance, watchdogMs);
-    } else {
-      // voce OFF: tieni il comando visibile per COMMAND_VISIBLE_MS poi avanza
-      setTimeout(advance, COMMAND_VISIBLE_MS);
-    }
+    presentingRef.current = true;
+    let advanced = false;
+    const advance = () => {
+      if (advanced) return;
+      advanced = true;
+      presentingRef.current = false;
+      setTimeout(() => speakNextRef.current(), 150);
+    };
+    const utt = new SpeechSynthesisUtterance(clean);
+    utt.lang = 'it-IT'; utt.rate = 1.1; utt.pitch = 1;
+    const itVoice = voicesRef.current.find((v) => v.lang === 'it-IT' || v.lang.startsWith('it'));
+    if (itVoice) utt.voice = itVoice;
+    utt.onend = advance;
+    utt.onerror = advance;
+    window.speechSynthesis.speak(utt);
+    // Watchdog iOS Safari: se onend non scatta, avanza comunque dopo durata stimata
+    setTimeout(advance, Math.min(15000, Math.max(3500, clean.length * 90)));
   }, [voiceOn]);
+  speakNextRef.current = speakNext;
 
-  // Accoda un comando. Cap: tiene al massimo l'ultimo in attesa (evita backlog stantio
-  // quando l'auto-analisi è più veloce della lettura → resta sempre vicino al real-time).
-  const enqueueCommand = useCallback((item) => {
-    speakQueueRef.current.push(item);
-    if (speakQueueRef.current.length > 1) {
-      speakQueueRef.current = speakQueueRef.current.slice(-1);
-    }
-    presentNext();
-  }, [presentNext]);
+  // Accoda solo il TESTO per la voce. Cap a 2: evita backlog stantio in auto mode.
+  const enqueueSpeak = useCallback((text) => {
+    if (!text) return;
+    speakQueueRef.current.push(text);
+    if (speakQueueRef.current.length > 2) speakQueueRef.current = speakQueueRef.current.slice(-2);
+    speakNext();
+  }, [speakNext]);
 
   const timer = useRoundTimer({ rounds, roundDuration, restDuration: 60 });
   const currentDisc = ALL_DISCIPLINES.find((d) => d.id === mode) || ALL_DISCIPLINES[0];
@@ -1220,8 +1210,9 @@ function VisualCoach() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Errore AI');
-      // Accoda: il comando verrà mostrato e letto per intero prima del successivo
-      enqueueCommand({ content: data.content, provider: data.provider, time: new Date().toLocaleTimeString('it-IT') });
+      // Display SUBITO e persistente (non sparisce); la voce va in coda separata
+      setAnalysis({ content: data.content, provider: data.provider, time: new Date().toLocaleTimeString('it-IT') });
+      enqueueSpeak(data.content);
       // Store last 3 feedbacks to avoid repetition
       feedbackHistoryRef.current = [data.content.split('\n')[0], ...feedbackHistoryRef.current].slice(0, 3);
       // Accumulate all feedbacks for session analysis
@@ -1237,7 +1228,7 @@ function VisualCoach() {
     } catch (err) {
       setAnalysis({ content: '⚠️ ' + err.message, provider: null, time: new Date().toLocaleTimeString('it-IT') });
     } finally { setAnalyzing(false); analyzingRef.current = false; }
-  }, [mode, buildPrompt, currentDisc, enqueueCommand]);
+  }, [mode, buildPrompt, currentDisc, enqueueSpeak]);
 
   const analyzeSession = useCallback(async () => {
     const feedbacks = sessionFeedbacksRef.current;

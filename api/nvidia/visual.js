@@ -838,6 +838,17 @@ PERCHÉ: <principio tecnico/biomeccanico in una frase — ometti se ovvio>
 
 Tono secco, professionale, in italiano. Mai ripetere il focus dei feedback recenti: cambia sempre angolo di analisi.`;
 
+// Osservatore tecnico: DESCRIVE il frame reale, NON recita tip da manuale.
+// È questo che rende i consigli "veri" (analisi del frame) invece di pescati da una lista.
+const VISION_TECH_OBSERVER = (disciplineLabel) => `Sei un OSSERVATORE TECNICO esperto di ${disciplineLabel}. Stai guardando UN frame reale di un atleta in allenamento.
+Descrivi ESCLUSIVAMENTE ciò che vedi DAVVERO in questa immagine, in modo concreto:
+- posizione del corpo e guardia; dove sono mani, gomiti, ginocchia, piedi, testa, sguardo
+- il gesto o la tecnica che sta eseguendo IN QUESTO ISTANTE
+- errori o imprecisioni VISIBILI (indica la parte del corpo + cosa non va)
+- allineamenti/angoli articolari se rilevabili
+REGOLE: NON dare consigli generici, NON elencare tip da manuale, NON inventare ciò che non è visibile.
+Solo osservazione fattuale di QUESTO frame. 2-4 frasi brevi, italiano, tecnico-preciso.`;
+
 const BRAIN_SPARRING = `Sei il CERVELLO ARBITRO: orchestratore AI esperto di combattimento.
 Due assistenti visivi hanno osservato lo stesso frame con DUE atleti:
 - OSSERVATORE TECNICO: descrive azioni, attacchi, distanza.
@@ -932,11 +943,14 @@ export default async function handler(req, res) {
   const sparring = /sparring|partner|drill/.test(mode);
   const disciplineLabel = DISCIPLINE_LABELS[mode] || mode;
 
-  // 1. I DUE COACH VISIVI in parallelo — Groq (tecnica) + Cosmos (biomeccanica)
+  // 1. I DUE COACH VISIVI in parallelo — entrambi OSSERVANO il frame reale
+  //    (Groq = tecnica, Cosmos = biomeccanica). Niente liste predefinite: descrivono
+  //    solo ciò che vedono, così il cervello produce un consiglio VERO non "da database".
+  const techObserverPrompt = VISION_TECH_OBSERVER(disciplineLabel);
   if (groqKey || cosmosKey) {
     const [groqRes, cosmosRes] = await Promise.allSettled([
-      groqKey ? callVisionGroq(groqKey, imageBase64, mimeType, systemPrompt, prompt) : Promise.resolve({ ok: false }),
-      cosmosKey ? callVisionCosmos(cosmosKey, cosmosModel, imageBase64, mimeType, prompt) : Promise.resolve({ ok: false }),
+      groqKey ? callVisionGroq(groqKey, imageBase64, mimeType, techObserverPrompt, 'Descrivi cosa vedi in questo frame.') : Promise.resolve({ ok: false }),
+      cosmosKey ? callVisionCosmos(cosmosKey, cosmosModel, imageBase64, mimeType, 'Analizza postura, equilibrio e angoli articolari in questo frame.') : Promise.resolve({ ok: false }),
     ]);
 
     const groqText = groqRes.status === 'fulfilled' && groqRes.value?.ok
