@@ -919,6 +919,79 @@ async function callBrainOrchestrator({ isSparring, disciplineLabel, techObs, bio
   return null;
 }
 
+// ─── CERVELLO VERDETTO — fusione su PIÙ momenti consecutivi ───────────────────
+// A differenza dell'orchestratore (un frame → un comando), qui il maestro ha
+// OSSERVATO l'atleta in N momenti e cerca il PATTERN ricorrente. Niente immagine:
+// fonde solo le osservazioni reali già raccolte → UN comando finale.
+const BRAIN_VERDICT = `Sei IL MAESTRO: hai appena osservato l'atleta in più momenti consecutivi della STESSA sessione.
+Ti vengono date le osservazioni reali (tecniche e biomeccaniche) di quei momenti.
+Il tuo compito: trovare il PATTERN RICORRENTE (non un dettaglio di un singolo istante) e dare UN comando di coaching finale, da bordo ring.
+
+REGOLE FERREE:
+- Basati SOLO sulle osservazioni fornite: vietati consigli generici o da manuale.
+- Cita la parte del corpo precisa (es. "gomito destro", "anca", "pianta del piede") e quando utile un riferimento misurabile (angolo ~45°/~90°, direzione, altezza).
+- Se le osservazioni indicano un RISCHIO DI INFORTUNIO, quello è la priorità assoluta.
+- Se la forma è corretta e migliorata, dillo con un comando di mantenimento — non inventare un difetto.
+
+FORMATO (esatto, max 3 righe, NO markdown, NO emoji):
+COMANDO: <verbo imperativo + correzione fisica specifica con la parte del corpo>
+VISTO: <il pattern concreto osservato nei momenti, 5-8 parole>
+PERCHÉ: <principio tecnico/biomeccanico in una frase — ometti se ovvio>
+Tono secco, professionale, in italiano. Cambia sempre angolo rispetto ai feedback recenti.`;
+
+async function callBrainVerdict({ disciplineLabel, observations, antiRepeatContext }) {
+  if (!observations || observations.length === 0) return null;
+  const user = [
+    `DISCIPLINA: ${disciplineLabel}`,
+    `\nHAI OSSERVATO L'ATLETA IN ${observations.length} MOMENTI CONSECUTIVI:`,
+    ...observations.map((o, i) => `Momento ${i + 1}: ${o}`),
+    antiRepeatContext ? `\n${antiRepeatContext}` : '',
+    `\nTrova il pattern ricorrente e restituisci il comando finale nel formato richiesto.`,
+  ].filter(Boolean).join('\n');
+
+  for (const p of BRAIN_PROVIDERS) {
+    const apiKey = p.key();
+    if (!apiKey) continue;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 9000);
+    try {
+      const res = await fetch(`${p.base}/chat/completions`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: p.model,
+          messages: [
+            { role: 'system', content: BRAIN_VERDICT },
+            { role: 'user', content: user },
+          ],
+          max_tokens: 260,
+          temperature: 0.45,
+        }),
+        signal: controller.signal,
+      });
+      const text = await res.text();
+      let data;
+      try { data = JSON.parse(text); } catch {
+        const lines = text.split('\n').filter((l) => l.startsWith('data: ') && !l.includes('[DONE]'));
+        for (let i = lines.length - 1; i >= 0; i--) {
+          try { const c = JSON.parse(lines[i].slice(6)); if (c.choices) { data = c; break; } } catch {}
+        }
+      }
+      const msg = data?.choices?.[0]?.message;
+      const raw = msg?.content || msg?.reasoning;
+      if (res.ok && raw) {
+        const content = raw.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+        if (content) return { content, brain: p.name };
+      }
+    } catch (_) {
+      // prova il provider successivo
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+  return null;
+}
+
 export default async function handler(req, res) {
   if (req.method === 'GET') {
     return res.status(200).json({
@@ -933,15 +1006,52 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { imageBase64, mimeType = 'image/jpeg', prompt, mode = 'muaythai' } = req.body || {};
+  const { imageBase64, mimeType = 'image/jpeg', prompt, mode = 'muaythai', observeOnly, observations } = req.body || {};
+  const disciplineLabel = DISCIPLINE_LABELS[mode] || mode;
+  const sparring = /sparring|partner|drill/.test(mode);
+
+  // ── MODALITÀ VERDETTO (nessuna immagine) ───────────────────────────────────
+  // Il client ha osservato N momenti in silenzio e ora chiede UN comando finale.
+  if (Array.isArray(observations) && observations.length > 0) {
+    const antiRepeat = (prompt && /FEEDBACK RECENTI/i.test(prompt))
+      ? 'FEEDBACK RECENTI (NON ripetere questi focus, cambia angolo):\n' + prompt.split(/FEEDBACK RECENTI[^\n]*\n/i)[1]
+      : '';
+    const verdict = await callBrainVerdict({ disciplineLabel, observations, antiRepeatContext: antiRepeat });
+    if (verdict) {
+      res.setHeader('X-Visual-Provider', verdict.brain);
+      res.setHeader('X-Visual-Mode', mode);
+      return res.status(200).json({ content: verdict.content, provider: verdict.brain, mode });
+    }
+    // fallback: ultima osservazione grezza come comando
+    const last = observations[observations.length - 1] || '';
+    return res.status(200).json({ content: last, provider: 'observer-direct', mode });
+  }
+
   if (!imageBase64) return res.status(400).json({ error: 'imageBase64 obbligatorio' });
 
   const systemPrompt = SYSTEM_PROMPTS[mode] || SYSTEM_PROMPTS.general;
   const groqKey = process.env.GROQ_API_KEY;
   const cosmosKey = process.env.COSMOS3_NVIDIA_API_KEY;
   const cosmosModel = process.env.COSMOS3_NVIDIA_MODEL || 'nvidia/cosmos-reason1-7b';
-  const sparring = /sparring|partner|drill/.test(mode);
-  const disciplineLabel = DISCIPLINE_LABELS[mode] || mode;
+
+  // ── MODALITÀ OSSERVAZIONE SILENZIOSA (auto mode) ───────────────────────────
+  // UN solo osservatore VELOCE (Groq tecnico ~2-3s) descrive il frame reale, senza
+  // cervello né comando: serve solo da accumulare. La biomeccanica (Cosmos, più lenta)
+  // resta al verdetto/path pieno. Più segnalazione rischio infortunio immediato.
+  if (observeOnly) {
+    const techPrompt = VISION_TECH_OBSERVER(disciplineLabel);
+    let observation = '';
+    if (groqKey) {
+      const g = await callVisionGroq(groqKey, imageBase64, mimeType, techPrompt, 'Descrivi cosa vedi in questo frame. Se vedi un rischio di infortunio, inizia con "RISCHIO:".');
+      if (g?.ok) observation = g.data?.choices?.[0]?.message?.content?.trim() || '';
+    } else if (cosmosKey) {
+      const c = await callVisionCosmos(cosmosKey, cosmosModel, imageBase64, mimeType, 'Descrivi postura, equilibrio e angoli articolari. Se c\'è rischio infortunio inizia con "RISCHIO:".');
+      if (c?.ok) observation = c.data?.choices?.[0]?.message?.content?.trim() || '';
+    }
+    const risk = /RISCHIO|infortun|rischio|pericol|cede sotto|collass|iperesten|sbilanc/i.test(observation);
+    res.setHeader('X-Visual-Mode', mode);
+    return res.status(200).json({ observation, risk, provider: 'observer-fast', mode });
+  }
 
   // 1. I DUE COACH VISIVI in parallelo — entrambi OSSERVANO il frame reale
   //    (Groq = tecnica, Cosmos = biomeccanica). Niente liste predefinite: descrivono

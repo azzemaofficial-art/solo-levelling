@@ -980,6 +980,9 @@ function VisualCoach() {
   const sessionFeedbacksRef = useRef([]);
   const speakQueueRef = useRef([]);   // coda comandi da mostrare/leggere uno alla volta
   const presentingRef = useRef(false); // true mentre un comando è a schermo + in lettura
+  const observationsRef = useRef([]);  // osservazioni accumulate in auto (osserva N → 1 verdetto)
+  const [observeProgress, setObserveProgress] = useState(0);
+  const VERDICT_EVERY = 3;             // il maestro osserva 3 momenti, poi dà UN verdetto
   const [sessionAnalysis, setSessionAnalysis] = useState(null);
   const [analyzingSession, setAnalyzingSession] = useState(false);
 
@@ -1230,6 +1233,57 @@ function VisualCoach() {
     } finally { setAnalyzing(false); analyzingRef.current = false; }
   }, [mode, buildPrompt, currentDisc, enqueueSpeak]);
 
+  // ── AUTO: il maestro osserva in silenzio, poi UN verdetto (no voce ogni tick) ──
+  // Ogni tick = un'osservazione silenziosa accumulata. Al 3° tick → verdetto fuso e
+  // letto UNA volta. Se un'osservazione vede rischio infortunio → verdetto SUBITO.
+  const autoTick = useCallback(async () => {
+    if (!videoRef.current || !canvasRef.current || analyzingRef.current) return;
+    analyzingRef.current = true;
+    const canvas = canvasRef.current;
+    const video = videoRef.current;
+    canvas.width = video.videoWidth || 640; canvas.height = video.videoHeight || 480;
+    canvas.getContext('2d').drawImage(video, 0, 0);
+    const base64 = canvas.toDataURL('image/jpeg', 0.72).split(',')[1];
+    setAnalyzing(true);
+    try {
+      // 1) OSSERVAZIONE silenziosa (osservatori, niente cervello, niente voce)
+      const obsRes = await fetch('/api/nvidia/visual', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageBase64: base64, mimeType: 'image/jpeg', mode, observeOnly: true }),
+      });
+      const obsData = await obsRes.json();
+      let reachedVerdict = false;
+      if (obsRes.ok && obsData.observation) {
+        observationsRef.current = [...observationsRef.current, obsData.observation].slice(-VERDICT_EVERY);
+        setObserveProgress(observationsRef.current.length);
+        const urgent = obsData.risk || /infortun|rischio|pericol|cede|collass|iperesten/i.test(obsData.observation);
+        reachedVerdict = urgent || observationsRef.current.length >= VERDICT_EVERY;
+      }
+      // 2) VERDETTO finale del maestro (parla UNA volta) — su tutte le osservazioni
+      if (reachedVerdict) {
+        const verRes = await fetch('/api/nvidia/visual', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mode, observations: observationsRef.current, prompt: buildPrompt(currentDisc?.prompt) }),
+        });
+        const data = await verRes.json();
+        if (verRes.ok && data.content) {
+          setAnalysis({ content: data.content, provider: data.provider, time: new Date().toLocaleTimeString('it-IT') });
+          enqueueSpeak(data.content);
+          feedbackHistoryRef.current = [data.content.split('\n')[0], ...feedbackHistoryRef.current].slice(0, 3);
+          sessionFeedbacksRef.current = [...sessionFeedbacksRef.current, data.content].slice(0, 30);
+          if (isSparring(mode) && data.content) {
+            const point = parsePoint(data.content);
+            if (point) { setScore((s) => ({ ...s, [point]: s[point] + 1 })); setLastPoint(point); setTimeout(() => setLastPoint(null), 2500); }
+          }
+        }
+        observationsRef.current = [];
+        setObserveProgress(0);
+      }
+    } catch (_) {
+      // silenzioso: tieni l'ultimo verdetto a schermo
+    } finally { setAnalyzing(false); analyzingRef.current = false; }
+  }, [mode, buildPrompt, currentDisc, enqueueSpeak]);
+
   const analyzeSession = useCallback(async () => {
     const feedbacks = sessionFeedbacksRef.current;
     if (feedbacks.length === 0) return;
@@ -1252,9 +1306,13 @@ function VisualCoach() {
 
   useEffect(() => {
     if (autoMode && streaming) {
-      captureAndAnalyze();
-      autoTimerRef.current = setInterval(captureAndAnalyze, 4000);
-    } else { clearInterval(autoTimerRef.current); }
+      observationsRef.current = []; setObserveProgress(0);
+      autoTick();
+      autoTimerRef.current = setInterval(autoTick, 4000);
+    } else {
+      clearInterval(autoTimerRef.current);
+      observationsRef.current = []; setObserveProgress(0);
+    }
     return () => clearInterval(autoTimerRef.current);
   }, [autoMode, streaming]);
 
@@ -1381,7 +1439,7 @@ function VisualCoach() {
         </div>
         <div className="flex items-center gap-1.5">
           {streaming && <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold" style={{ background: 'rgba(16,185,129,0.25)', color: C.emerald.hex, border: `1px solid ${C.emerald.border}`, animation: 'pulse-glow 2s ease-in-out infinite' }}>● LIVE</span>}
-          {autoMode && <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold" style={{ background: 'rgba(249,115,22,0.25)', color: C.orange.hex, border: `1px solid ${C.orange.border}`, animation: 'pulse-glow 1.2s ease-in-out infinite' }}>AUTO</span>}
+          {autoMode && <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold" style={{ background: 'rgba(249,115,22,0.25)', color: C.orange.hex, border: `1px solid ${C.orange.border}`, animation: 'pulse-glow 1.2s ease-in-out infinite' }}>{observeProgress > 0 ? `AUTO ${observeProgress}/${VERDICT_EVERY}` : 'AUTO'}</span>}
           <motion.button whileTap={{ scale: 0.9 }} onClick={stopCamera}
             className="w-9 h-9 rounded-xl flex items-center justify-center font-black text-sm"
             style={{ background: 'rgba(185,28,28,0.55)', border: `1px solid ${C.red.border}`, color: '#fff' }}>
