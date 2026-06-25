@@ -986,6 +986,10 @@ function VisualCoach() {
   const [observeProgress, setObserveProgress] = useState(0);
   const [framingHint, setFramingHint] = useState('');     // avviso "inquadra il corpo"
   const [trackQuality, setTrackQuality] = useState('none'); // full | upper | partial | none
+  const [repCount, setRepCount] = useState(0);            // conta-ripetizioni (guidato)
+  const repCountRef = useRef(0);
+  const repPhaseRef = useRef('up');
+  const guidedRunningRef = useRef(false);
   const VERDICT_EVERY = 3;             // il maestro osserva 3 momenti, poi dà UN verdetto
   // ── Modalità GUIDATA (circuito drill su misura) ─────────────────────────────
   const [guidedOn, setGuidedOn] = useState(false);
@@ -1216,6 +1220,26 @@ function VisualCoach() {
             du.drawLandmarks(result.landmarks[0],
               { color: '#FF6B35', lineWidth: 1, radius: 4 });
             lastLandmarksRef.current = result.landmarks[0];   // per la precisione AI (angoli reali)
+            // Conta-ripetizioni (guidato): oscillazione angolo ginocchio/gomito
+            if (guidedRunningRef.current) {
+              const L = result.landmarks[0];
+              const a3 = (a, b, c) => {
+                const A = L[a], B = L[b], C = L[c];
+                if (!A || !B || !C) return null;
+                const v1x = A.x - B.x, v1y = A.y - B.y, v2x = C.x - B.x, v2y = C.y - B.y;
+                const d = Math.hypot(v1x, v1y) * Math.hypot(v2x, v2y);
+                if (!d) return null;
+                return (Math.acos(Math.max(-1, Math.min(1, (v1x * v2x + v1y * v2y) / d))) * 180) / Math.PI;
+              };
+              const kL = a3(23, 25, 27), kR = a3(24, 26, 28), eL = a3(11, 13, 15), eR = a3(12, 14, 16);
+              let aa = null;
+              if (kL != null || kR != null) aa = ((kL ?? kR) + (kR ?? kL)) / 2;
+              else if (eL != null || eR != null) aa = ((eL ?? eR) + (eR ?? eL)) / 2;
+              if (aa != null) {
+                if (repPhaseRef.current === 'up' && aa < 95) repPhaseRef.current = 'down';
+                else if (repPhaseRef.current === 'down' && aa > 155) { repPhaseRef.current = 'up'; repCountRef.current += 1; setRepCount(repCountRef.current); }
+              }
+            }
             const nose = result.landmarks[0][0];
             if (nose) setCentered(nose.x > 0.2 && nose.x < 0.8 && nose.y < 0.85 ? 'ok' : 'off');
           } else {
@@ -1450,7 +1474,7 @@ function VisualCoach() {
   const nextDrillRef = useRef(() => {});
 
   const finishDrill = useCallback(async () => {
-    stopGuidedTimers();
+    stopGuidedTimers(); guidedRunningRef.current = false;
     setGuidedPhase('review'); setGuidedLoading(true);
     const d = guidedPlan[guidedIdx] || {};
     try {
@@ -1471,6 +1495,7 @@ function VisualCoach() {
   const startDrill = useCallback(() => {
     const d = guidedPlan[guidedIdx]; if (!d) return;
     guidedObsRef.current = []; setGuidedReview(null);
+    repCountRef.current = 0; repPhaseRef.current = 'up'; setRepCount(0); guidedRunningRef.current = true; // conta-rip
     setGuidedPhase('running'); setGuidedTimeLeft(d.durationSec);
     unlockSpeech();
     enqueueSpeak(`Prossimo: ${d.name}. ${d.focus || ''}. Pronti, via!`);
@@ -1510,7 +1535,7 @@ function VisualCoach() {
   }, [autoMode, guidedPlan, generateGuidedPlan]);
 
   const stopGuided = useCallback(() => {
-    stopGuidedTimers();
+    stopGuidedTimers(); guidedRunningRef.current = false;
     setGuidedOn(false); setGuidedPhase('idle'); setGuidedReview(null);
     window.speechSynthesis?.cancel();
   }, [stopGuidedTimers]);
@@ -1731,11 +1756,21 @@ function VisualCoach() {
             {guidedPhase === 'running' && guidedPlan[guidedIdx] && (
               <div className="text-center space-y-2">
                 <p className="text-xs font-bold" style={{ color: C.emerald.hex }}>{guidedPlan[guidedIdx].name}</p>
-                <p className="text-5xl font-black text-white tabular-nums" style={{ fontFamily: 'Orbitron, sans-serif' }}>{Math.floor(guidedTimeLeft / 60)}:{String(guidedTimeLeft % 60).padStart(2, '0')}</p>
+                <div className="flex items-center justify-center gap-5">
+                  <div>
+                    <p className="text-5xl font-black text-white tabular-nums leading-none" style={{ fontFamily: 'Orbitron, sans-serif' }}>{Math.floor(guidedTimeLeft / 60)}:{String(guidedTimeLeft % 60).padStart(2, '0')}</p>
+                    <p className="text-[8px] tracking-widest uppercase text-gray-500 mt-1">tempo</p>
+                  </div>
+                  <div className="w-px h-12" style={{ background: 'rgba(255,255,255,0.1)' }} />
+                  <div>
+                    <p className="text-5xl font-black tabular-nums leading-none" style={{ fontFamily: 'Orbitron, sans-serif', color: C.emerald.hex }}>{repCount}</p>
+                    <p className="text-[8px] tracking-widest uppercase text-gray-500 mt-1">rip</p>
+                  </div>
+                </div>
                 <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.08)' }}>
                   <div style={{ height: '100%', width: `${guidedPlan[guidedIdx].durationSec ? (guidedTimeLeft / guidedPlan[guidedIdx].durationSec) * 100 : 0}%`, background: C.emerald.hex, transition: 'width 1s linear' }} />
                 </div>
-                {guidedPlan[guidedIdx].watchFor && <p className="text-[11px] text-gray-400">👁 {guidedPlan[guidedIdx].watchFor}</p>}
+                {guidedPlan[guidedIdx].watchFor && <p className="text-[11px] text-gray-400 flex items-center justify-center gap-1.5"><Eye size={12} /> {guidedPlan[guidedIdx].watchFor}</p>}
                 <button onClick={() => finishDrillRef.current()} className="text-[11px] text-gray-500 underline">termina ora</button>
               </div>
             )}
