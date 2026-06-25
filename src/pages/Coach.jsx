@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Eye, Lightbulb, Trophy, ScanSearch, Play, Pause, Target, FlipHorizontal2, Volume2, VolumeX, Bone, X } from 'lucide-react';
 
 // ─── Quick prompts ─────────────────────────────────────────────────────────────
 const COACH_QUICK = [
@@ -1620,10 +1621,10 @@ function VisualCoach() {
               </span>
             </span>
           )}
-          <motion.button whileTap={{ scale: 0.9 }} onClick={stopCamera}
-            className="w-9 h-9 rounded-xl flex items-center justify-center font-black text-sm"
+          <motion.button whileTap={{ scale: 0.9 }} onClick={stopCamera} aria-label="Chiudi sessione"
+            className="w-9 h-9 rounded-xl flex items-center justify-center"
             style={{ background: 'rgba(185,28,28,0.55)', border: `1px solid ${C.red.border}`, color: '#fff' }}>
-            ✕
+            <X size={16} />
           </motion.button>
         </div>
       </div>
@@ -1765,9 +1766,9 @@ function VisualCoach() {
                         style={{ background: 'linear-gradient(135deg, rgba(16,185,129,0.16), rgba(124,58,237,0.10))', border: '1px solid rgba(16,185,129,0.35)', boxShadow: '0 0 24px rgba(16,185,129,0.18)' }}>
                         <span className="absolute left-0 top-0 bottom-0 w-1" style={{ background: 'linear-gradient(180deg, #10b981, #7c3aed)' }} />
                         <p className="text-[15px] font-black text-white leading-tight pl-1.5" style={{ letterSpacing: '-0.01em' }}>{cmd}</p>
-                        {parts.VISTO && <p className="mt-1.5 text-[11px] text-emerald-200/80 pl-1.5">👁 {parts.VISTO}</p>}
-                        {parts.PERCHÉ && <p className="mt-0.5 text-[11px] text-violet-200/70 italic pl-1.5">💡 {parts.PERCHÉ}</p>}
-                        {parts.PUNTO && <p className="mt-1 text-[11px] font-bold text-amber-300 pl-1.5">🏆 {parts.PUNTO}</p>}
+                        {parts.VISTO && <p className="mt-1.5 text-[11px] text-emerald-200/80 pl-1.5 flex items-center gap-1.5"><Eye size={12} className="shrink-0" /> {parts.VISTO}</p>}
+                        {parts.PERCHÉ && <p className="mt-0.5 text-[11px] text-violet-200/70 italic pl-1.5 flex items-center gap-1.5"><Lightbulb size={12} className="shrink-0" /> {parts.PERCHÉ}</p>}
+                        {parts.PUNTO && <p className="mt-1 text-[11px] font-bold text-amber-300 pl-1.5 flex items-center gap-1.5"><Trophy size={12} className="shrink-0" /> {parts.PUNTO}</p>}
                       </motion.div>
                     );
                   })()
@@ -1784,42 +1785,42 @@ function VisualCoach() {
               className="flex-1 py-3.5 rounded-xl text-white text-sm font-black transition-all disabled:opacity-40 relative overflow-hidden"
               style={{ background: `linear-gradient(135deg, ${C.violet.hex}, #4f46e5)`, boxShadow: `0 4px 18px ${C.violet.glow}` }}>
               <span className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent)', animation: 'chip-sheen 2s ease-in-out infinite', backgroundSize: '200% 100%' }} />
-              <span className="relative">🔍 Analizza</span>
+              <span className="relative inline-flex items-center justify-center gap-1.5"><ScanSearch size={16} /> Analizza</span>
             </motion.button>
             <motion.button whileTap={{ scale: 0.93 }} onClick={() => { if (!autoMode && guidedOn) stopGuided(); setAutoMode((v) => !v); }}
               className="flex-1 py-3.5 rounded-xl text-white text-sm font-black transition-all relative overflow-hidden"
               style={autoMode
                 ? { background: `linear-gradient(135deg, ${C.orange.hex}, #b45309)`, boxShadow: `0 4px 18px ${C.orange.glow}` }
                 : { background: 'rgba(55,65,81,0.7)', border: '1px solid rgba(255,255,255,0.1)' }}>
-              {autoMode ? '⏸ Stop Auto' : '▶ Auto'}
+              <span className="inline-flex items-center justify-center gap-1.5">{autoMode ? <><Pause size={15} /> Stop Auto</> : <><Play size={15} /> Auto</>}</span>
             </motion.button>
             <motion.button whileTap={{ scale: 0.93 }} onClick={() => guidedOn ? stopGuided() : startGuided()}
               className="flex-1 py-3.5 rounded-xl text-white text-sm font-black transition-all relative overflow-hidden"
               style={guidedOn
                 ? { background: 'linear-gradient(135deg, #10b981, #047857)', boxShadow: '0 4px 18px rgba(16,185,129,0.4)' }
                 : { background: 'rgba(55,65,81,0.7)', border: '1px solid rgba(255,255,255,0.1)' }}>
-              {guidedOn ? '✕ Esci' : '🎯 Guidato'}
+              <span className="inline-flex items-center justify-center gap-1.5">{guidedOn ? <><X size={15} /> Esci</> : <><Target size={15} /> Guidato</>}</span>
             </motion.button>
           </div>
           <div className="flex gap-2">
             <motion.button whileTap={{ scale: 0.9 }} onClick={flipCamera}
               className="flex-1 py-2.5 rounded-xl text-white font-bold text-xs transition-all flex items-center justify-center gap-1.5"
               style={{ background: 'rgba(55,65,81,0.6)', border: '1px solid rgba(255,255,255,0.08)' }}>
-              🔄 Gira
+              <FlipHorizontal2 size={14} /> Gira
             </motion.button>
             <motion.button whileTap={{ scale: 0.9 }} onClick={() => setVoiceOn((v) => { const nv = !v; if (nv) unlockSpeech(); else window.speechSynthesis?.cancel(); return nv; })}
               className="flex-1 py-2.5 rounded-xl text-white font-bold text-xs transition-all flex items-center justify-center gap-1.5"
               style={voiceOn
                 ? { background: 'linear-gradient(135deg, #059669, #047857)', boxShadow: '0 4px 16px rgba(5,150,105,0.4)' }
                 : { background: 'rgba(55,65,81,0.6)', border: '1px solid rgba(255,255,255,0.08)' }}>
-              🔊 Voce {voiceOn ? 'ON' : 'OFF'}
+              {voiceOn ? <Volume2 size={14} /> : <VolumeX size={14} />} Voce {voiceOn ? 'ON' : 'OFF'}
             </motion.button>
             <motion.button whileTap={{ scale: 0.9 }} onClick={() => setSkeletonOn((v) => !v)}
               className="flex-1 py-2.5 rounded-xl text-white font-bold text-xs transition-all flex items-center justify-center gap-1.5"
               style={skeletonOn
                 ? { background: 'linear-gradient(135deg, #7c3aed, #4f46e5)', boxShadow: '0 4px 16px rgba(124,58,237,0.45)' }
                 : { background: 'rgba(55,65,81,0.6)', border: '1px solid rgba(255,255,255,0.08)' }}>
-              🦴 Scheletro
+              <Bone size={14} /> Scheletro
             </motion.button>
           </div>
 
