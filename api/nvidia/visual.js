@@ -923,21 +923,23 @@ async function callBrainOrchestrator({ isSparring, disciplineLabel, techObs, bio
 // A differenza dell'orchestratore (un frame → un comando), qui il maestro ha
 // OSSERVATO l'atleta in N momenti e cerca il PATTERN ricorrente. Niente immagine:
 // fonde solo le osservazioni reali già raccolte → UN comando finale.
-const BRAIN_VERDICT = `Sei IL MAESTRO: hai appena osservato l'atleta in più momenti consecutivi della STESSA sessione.
-Ti vengono date le osservazioni reali (tecniche e biomeccaniche) di quei momenti.
+const BRAIN_VERDICT = `Sei IL MAESTRO: un istruttore d'élite che ha appena osservato l'atleta in più momenti consecutivi della STESSA sessione.
+Ti vengono date le osservazioni reali (tecniche e biomeccaniche) di quei momenti. Hai occhio per OGNI minimo dettaglio.
 Il tuo compito: trovare il PATTERN RICORRENTE (non un dettaglio di un singolo istante) e dare UN comando di coaching finale, da bordo ring.
 
 REGOLE FERREE:
-- Basati SOLO sulle osservazioni fornite: vietati consigli generici o da manuale.
-- Cita la parte del corpo precisa (es. "gomito destro", "anca", "pianta del piede") e quando utile un riferimento misurabile (angolo ~45°/~90°, direzione, altezza).
-- Se le osservazioni indicano un RISCHIO DI INFORTUNIO, quello è la priorità assoluta.
-- Se la forma è corretta e migliorata, dillo con un comando di mantenimento — non inventare un difetto.
+- Basati SOLO sulle osservazioni fornite: vietati consigli generici o da manuale ("stai attento", "migliora la guardia" sono BANDITI).
+- Sii CHIRURGICO: cita la parte del corpo precisa (es. "gomito destro", "anca sinistra", "pianta del piede") + un riferimento misurabile quando possibile (angolo ~45°/~90°, direzione avanti/dentro, altezza al mento/costole).
+- UN solo difetto-chiave per verdetto: il più importante adesso. Non elencare.
+- MEMORIA: se un errore presente nei FEEDBACK RECENTI è ANCORA visibile nelle osservazioni → NON cambiare argomento, RINCARA con più forza ("Te l'ho già detto: ..."). Se invece è stato corretto o non c'è più → scegli un dettaglio NUOVO, mai ripetere lo stesso consiglio.
+- Se le osservazioni indicano un RISCHIO DI INFORTUNIO, è la priorità assoluta.
+- Se la forma è davvero corretta, dillo con un comando di mantenimento — non inventare un difetto.
 
 FORMATO (esatto, max 3 righe, NO markdown, NO emoji):
 COMANDO: <verbo imperativo + correzione fisica specifica con la parte del corpo>
 VISTO: <il pattern concreto osservato nei momenti, 5-8 parole>
 PERCHÉ: <principio tecnico/biomeccanico in una frase — ometti se ovvio>
-Tono secco, professionale, in italiano. Cambia sempre angolo rispetto ai feedback recenti.`;
+Tono secco, professionale, esigente, in italiano.`;
 
 async function callBrainVerdict({ disciplineLabel, observations, antiRepeatContext }) {
   if (!observations || observations.length === 0) return null;
@@ -992,6 +994,35 @@ async function callBrainVerdict({ disciplineLabel, observations, antiRepeatConte
   return null;
 }
 
+// ─── CERVELLO JSON — generazione strutturata (piano drill, pagella) ──────────
+async function callBrainJSON({ system, user, maxTokens = 600, temperature = 0.6 }) {
+  for (const p of BRAIN_PROVIDERS) {
+    const apiKey = p.key();
+    if (!apiKey) continue;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 13000);
+    try {
+      const res = await fetch(`${p.base}/chat/completions`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: p.model, messages: [{ role: 'system', content: system }, { role: 'user', content: user }], max_tokens: maxTokens, temperature }),
+        signal: controller.signal,
+      });
+      const text = await res.text();
+      let data;
+      try { data = JSON.parse(text); } catch {
+        const lines = text.split('\n').filter((l) => l.startsWith('data: ') && !l.includes('[DONE]'));
+        for (let i = lines.length - 1; i >= 0; i--) { try { const c = JSON.parse(lines[i].slice(6)); if (c.choices) { data = c; break; } } catch {} }
+      }
+      const msg = data?.choices?.[0]?.message;
+      const raw = (msg?.content || msg?.reasoning || '').replace(/<think>[\s\S]*?<\/think>/gi, '');
+      const m = raw.match(/\{[\s\S]*\}/);
+      if (m) { try { return JSON.parse(m[0]); } catch {} }
+    } catch (_) {} finally { clearTimeout(timeout); }
+  }
+  return null;
+}
+
 export default async function handler(req, res) {
   if (req.method === 'GET') {
     return res.status(200).json({
@@ -1006,15 +1037,57 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { imageBase64, mimeType = 'image/jpeg', prompt, mode = 'muaythai', observeOnly, observations } = req.body || {};
+  const { imageBase64, mimeType = 'image/jpeg', prompt, mode = 'muaythai', observeOnly, observations, generatePlan, drillReview, drill } = req.body || {};
   const disciplineLabel = DISCIPLINE_LABELS[mode] || mode;
   const sparring = /sparring|partner|drill/.test(mode);
+
+  // ── GENERA CIRCUITO (piano drill su misura, nessuna immagine) ──────────────
+  if (generatePlan) {
+    const { goal = '', level = '', context = '' } = req.body;
+    const plan = await callBrainJSON({
+      system: `Sei un coach d'élite di ${disciplineLabel}. Crei circuiti di allenamento PERSONALIZZATI, progressivi, specifici e sicuri. Rispondi SOLO con JSON valido.`,
+      user: `Disciplina: ${disciplineLabel}\nObiettivo: ${goal || 'migliorare la tecnica'}\nLivello: ${level || 'intermedio'}\nContesto: ${context || '-'}\n\nCrea un circuito di 4-6 drill progressivi e SPECIFICI per questa disciplina e obiettivo, eseguibili davanti a una camera.\nPer ogni drill:\n- name: nome breve e concreto\n- durationSec: durata sensata (tecnica 30-45, condizionamento 45-75)\n- focus: cosa allena, 1 frase\n- watchFor: cosa il coach osserva per valutarlo (parti del corpo, angoli), 1 frase\nRispondi SOLO con: {"drills":[{"name":"...","durationSec":40,"focus":"...","watchFor":"..."}]}`,
+      maxTokens: 800,
+    });
+    const drills = Array.isArray(plan?.drills)
+      ? plan.drills.filter((d) => d && d.name).map((d) => ({
+          name: String(d.name).slice(0, 70),
+          durationSec: Math.max(15, Math.min(120, parseInt(d.durationSec) || 40)),
+          focus: String(d.focus || '').slice(0, 160),
+          watchFor: String(d.watchFor || '').slice(0, 180),
+        })).slice(0, 6)
+      : [];
+    if (drills.length) return res.status(200).json({ drills, discipline: disciplineLabel });
+    return res.status(200).json({ drills: [], error: 'Piano non disponibile, riprova.' });
+  }
+
+  // ── PAGELLA DRILL (review di UN esercizio, da osservazioni reali) ───────────
+  if (drillReview) {
+    const obs = Array.isArray(observations) ? observations.filter(Boolean) : [];
+    const d = drill || {};
+    const review = await callBrainJSON({
+      system: `Sei IL MAESTRO di ${disciplineLabel}. Valuti UN singolo drill appena eseguito basandoti SOLO sulle osservazioni reali fornite. Vietato il generico: cita parti del corpo e dettagli concreti. Rispondi SOLO con JSON valido.`,
+      user: `DRILL ESEGUITO: "${d.name || 'esercizio'}"\nFocus: ${d.focus || '-'}\nCosa guardare: ${d.watchFor || '-'}\n\nOSSERVAZIONI REALI durante il drill (${obs.length}):\n${obs.map((o, i) => `${i + 1}. ${o}`).join('\n') || '(nessuna osservazione)'}\n\nValuta SOLO questo drill, da ciò che è stato osservato.\nRispondi SOLO con: {"good":["cosa ha fatto bene, max 3, concreto"],"fix":["cosa correggere con parte del corpo, max 3"],"score":7,"cue":"UN comando imperativo per la prossima esecuzione"}`,
+      maxTokens: 600,
+    });
+    if (review && (review.good || review.fix || review.cue)) {
+      return res.status(200).json({
+        review: {
+          good: Array.isArray(review.good) ? review.good.slice(0, 3) : [],
+          fix: Array.isArray(review.fix) ? review.fix.slice(0, 3) : [],
+          score: Math.max(0, Math.min(10, parseInt(review.score) || 6)),
+          cue: String(review.cue || '').slice(0, 140),
+        },
+      });
+    }
+    return res.status(200).json({ review: { good: [], fix: [obs[obs.length - 1] || 'Lavora sulla tecnica di base'], score: 6, cue: 'Mantieni la forma corretta' } });
+  }
 
   // ── MODALITÀ VERDETTO (nessuna immagine) ───────────────────────────────────
   // Il client ha osservato N momenti in silenzio e ora chiede UN comando finale.
   if (Array.isArray(observations) && observations.length > 0) {
     const antiRepeat = (prompt && /FEEDBACK RECENTI/i.test(prompt))
-      ? 'FEEDBACK RECENTI (NON ripetere questi focus, cambia angolo):\n' + prompt.split(/FEEDBACK RECENTI[^\n]*\n/i)[1]
+      ? 'FEEDBACK RECENTI (applica la REGOLA MEMORIA: se l\'errore persiste rincara, altrimenti cambia dettaglio):\n' + prompt.split(/FEEDBACK RECENTI[^\n]*\n/i)[1]
       : '';
     const verdict = await callBrainVerdict({ disciplineLabel, observations, antiRepeatContext: antiRepeat });
     if (verdict) {

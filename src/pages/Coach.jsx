@@ -964,7 +964,7 @@ function VisualCoach() {
   const [roundDuration, setRoundDuration] = useState(180);
   const [score, setScore] = useState({ a: 0, b: 0 });
   const [lastPoint, setLastPoint] = useState(null);
-  const [voiceOn, setVoiceOn] = useState(false);
+  const [voiceOn, setVoiceOn] = useState(true);
   const [skeletonOn, setSkeletonOn] = useState(true);
   const [centered, setCentered] = useState(null);
   const [facingMode, setFacingMode] = useState('environment');
@@ -983,6 +983,19 @@ function VisualCoach() {
   const observationsRef = useRef([]);  // osservazioni accumulate in auto (osserva N → 1 verdetto)
   const [observeProgress, setObserveProgress] = useState(0);
   const VERDICT_EVERY = 3;             // il maestro osserva 3 momenti, poi dà UN verdetto
+  // ── Modalità GUIDATA (circuito drill su misura) ─────────────────────────────
+  const [guidedOn, setGuidedOn] = useState(false);
+  const [guidedPlan, setGuidedPlan] = useState([]);        // [{name,durationSec,focus,watchFor}]
+  const [guidedIdx, setGuidedIdx] = useState(0);
+  const [guidedPhase, setGuidedPhase] = useState('idle');  // idle|gen|ready|running|review|done
+  const [guidedTimeLeft, setGuidedTimeLeft] = useState(0);
+  const [guidedReview, setGuidedReview] = useState(null);  // {good[],fix[],score,cue}
+  const [guidedAutoAdvance, setGuidedAutoAdvance] = useState(false);
+  const [guidedLoading, setGuidedLoading] = useState(false);
+  const [guidedLevel, setGuidedLevel] = useState('intermedio');
+  const guidedTimerRef = useRef(null);   // countdown 1s
+  const guidedTickRef = useRef(null);    // osservazione durante il drill
+  const guidedObsRef = useRef([]);       // osservazioni del drill corrente
   const [sessionAnalysis, setSessionAnalysis] = useState(null);
   const [analyzingSession, setAnalyzingSession] = useState(false);
 
@@ -993,6 +1006,35 @@ function VisualCoach() {
     window.speechSynthesis?.addEventListener('voiceschanged', load);
     return () => window.speechSynthesis?.removeEventListener('voiceschanged', load);
   }, []);
+
+  // ── Sblocco TTS — DEVE girare dentro un gesto utente ────────────────────────
+  // iOS Safari e Chrome bloccano speechSynthesis fuori da un'interazione: in auto
+  // mode la voce parte da un timer, quindi senza questo "priming" non si sente nulla.
+  const speechUnlockedRef = useRef(false);
+  const unlockSpeech = useCallback(() => {
+    const synth = window.speechSynthesis;
+    if (!synth) return;
+    try {
+      synth.cancel();
+      const u = new SpeechSynthesisUtterance(' ');
+      u.volume = 0; u.lang = 'it-IT';
+      synth.speak(u);
+      synth.resume();
+      speechUnlockedRef.current = true;
+      const v = synth.getVoices();
+      if (v && v.length) voicesRef.current = v;       // Safari popola le voci dopo il gesto
+    } catch (_) {}
+  }, []);
+
+  // Keepalive: Chrome mette in pausa la sintesi dopo ~15s — la riattiviamo.
+  useEffect(() => {
+    if (!voiceOn) return;
+    const id = setInterval(() => {
+      const s = window.speechSynthesis;
+      if (s && s.paused) s.resume();
+    }, 5000);
+    return () => clearInterval(id);
+  }, [voiceOn]);
 
   // ── Coda VOCALE (solo audio) — disaccoppiata dal display ────────────────────
   // Il testo a schermo si aggiorna SUBITO e RESTA (gestito in captureAndAnalyze);
@@ -1078,6 +1120,7 @@ function VisualCoach() {
 
   const startSession = async () => {
     sessionStartRef.current = Date.now();
+    unlockSpeech();                       // gesto utente: sblocca la voce per l'auto mode
     setScore({ a: 0, b: 0 }); setLastPoint(null);
     setStep('live'); setAnalysis(null);
     await startCamera();
@@ -1103,6 +1146,8 @@ function VisualCoach() {
     window.speechSynthesis?.cancel();
     setSessionAnalysis(null);
     clearInterval(autoTimerRef.current);
+    clearInterval(guidedTimerRef.current); clearInterval(guidedTickRef.current);
+    setGuidedOn(false); setGuidedPhase('idle'); setGuidedReview(null); setGuidedPlan([]); setGuidedIdx(0);
   };
 
   // ── Skeleton MediaPipe ─────────────────────────────────────────────────────
@@ -1316,6 +1361,95 @@ function VisualCoach() {
     return () => clearInterval(autoTimerRef.current);
   }, [autoMode, streaming]);
 
+  // ── GUIDATO: genera circuito → drill (Via → timer+osserva → pagella) → next ──
+  const stopGuidedTimers = useCallback(() => {
+    clearInterval(guidedTimerRef.current); guidedTimerRef.current = null;
+    clearInterval(guidedTickRef.current); guidedTickRef.current = null;
+  }, []);
+
+  const generateGuidedPlan = useCallback(async () => {
+    setGuidedLoading(true); setGuidedReview(null); setGuidedPhase('gen');
+    try {
+      const res = await fetch('/api/nvidia/visual', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ generatePlan: true, mode, goal: sessionContext, level: guidedLevel, context: sessionContext }),
+      });
+      const data = await res.json();
+      if (res.ok && data.drills?.length) {
+        setGuidedPlan(data.drills); setGuidedIdx(0); setGuidedPhase('ready');
+      } else { setGuidedPhase('idle'); alert(data.error || 'Circuito non disponibile, riprova.'); }
+    } catch { setGuidedPhase('idle'); } finally { setGuidedLoading(false); }
+  }, [mode, sessionContext, guidedLevel]);
+
+  const finishDrillRef = useRef(() => {});
+  const nextDrillRef = useRef(() => {});
+
+  const finishDrill = useCallback(async () => {
+    stopGuidedTimers();
+    setGuidedPhase('review'); setGuidedLoading(true);
+    const d = guidedPlan[guidedIdx] || {};
+    try {
+      const res = await fetch('/api/nvidia/visual', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ drillReview: true, mode, drill: d, observations: guidedObsRef.current }),
+      });
+      const data = await res.json();
+      if (res.ok && data.review) {
+        setGuidedReview(data.review);
+        if (data.review.cue) enqueueSpeak(`${d.name}. ${data.review.cue}`);
+        if (guidedAutoAdvance) setTimeout(() => nextDrillRef.current(), 7000);
+      }
+    } catch {} finally { setGuidedLoading(false); }
+  }, [guidedPlan, guidedIdx, mode, enqueueSpeak, guidedAutoAdvance, stopGuidedTimers]);
+  finishDrillRef.current = finishDrill;
+
+  const startDrill = useCallback(() => {
+    const d = guidedPlan[guidedIdx]; if (!d) return;
+    guidedObsRef.current = []; setGuidedReview(null);
+    setGuidedPhase('running'); setGuidedTimeLeft(d.durationSec);
+    unlockSpeech();
+    enqueueSpeak(`Prossimo: ${d.name}. ${d.focus || ''}. Pronti, via!`);
+    guidedTimerRef.current = setInterval(() => {
+      setGuidedTimeLeft((t) => { if (t <= 1) { finishDrillRef.current(); return 0; } return t - 1; });
+    }, 1000);
+    guidedTickRef.current = setInterval(async () => {
+      if (!videoRef.current || !canvasRef.current || analyzingRef.current) return;
+      analyzingRef.current = true;
+      try {
+        const canvas = canvasRef.current, video = videoRef.current;
+        canvas.width = video.videoWidth || 640; canvas.height = video.videoHeight || 480;
+        canvas.getContext('2d').drawImage(video, 0, 0);
+        const base64 = canvas.toDataURL('image/jpeg', 0.72).split(',')[1];
+        const r = await fetch('/api/nvidia/visual', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ imageBase64: base64, mimeType: 'image/jpeg', mode, observeOnly: true }) });
+        const dt = await r.json();
+        if (r.ok && dt.observation) guidedObsRef.current = [...guidedObsRef.current, dt.observation].slice(-8);
+      } catch {} finally { analyzingRef.current = false; }
+    }, 4000);
+  }, [guidedPlan, guidedIdx, mode, enqueueSpeak, unlockSpeech]);
+
+  const nextDrill = useCallback(() => {
+    stopGuidedTimers(); setGuidedReview(null);
+    setGuidedIdx((i) => {
+      const ni = i + 1;
+      if (ni >= guidedPlan.length) { setGuidedPhase('done'); return i; }
+      setGuidedPhase('ready'); return ni;
+    });
+  }, [guidedPlan, stopGuidedTimers]);
+  nextDrillRef.current = nextDrill;
+
+  const startGuided = useCallback(() => {
+    if (autoMode) setAutoMode(false);
+    setGuidedOn(true);
+    if (guidedPlan.length === 0) generateGuidedPlan();
+    else setGuidedPhase('ready');
+  }, [autoMode, guidedPlan, generateGuidedPlan]);
+
+  const stopGuided = useCallback(() => {
+    stopGuidedTimers();
+    setGuidedOn(false); setGuidedPhase('idle'); setGuidedReview(null);
+    window.speechSynthesis?.cancel();
+  }, [stopGuidedTimers]);
+
   useEffect(() => () => { streamRef.current?.getTracks().forEach((t) => t.stop()); }, []);
 
   // ── Setup ──────────────────────────────────────────────────────────────────
@@ -1467,9 +1601,87 @@ function VisualCoach() {
       <div className="absolute bottom-0 inset-x-0 z-30 flex flex-col"
         style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.95) 65%, rgba(0,0,0,0.55) 88%, transparent)', paddingBottom: 'max(16px, env(safe-area-inset-bottom))' }}>
 
+        {/* CARD GUIDATA — circuito drill su misura */}
+        {guidedOn && (
+          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+            className="mx-3 mt-3 rounded-2xl p-4"
+            style={{ background: 'rgba(6,20,16,0.94)', border: `1px solid ${C.emerald.border}`, backdropFilter: 'blur(8px)' }}>
+
+            {guidedPhase === 'gen' && (
+              <div className="text-center py-3">
+                <p className="text-sm font-black" style={{ color: C.emerald.hex, fontFamily: 'Orbitron, sans-serif' }}>🎯 Genero il tuo circuito…</p>
+                <p className="text-[11px] text-gray-500 mt-1">Esercizi su misura per {currentDisc?.label}</p>
+              </div>
+            )}
+
+            {guidedPhase === 'ready' && guidedPlan[guidedIdx] && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-mono tracking-widest text-gray-500">DRILL {guidedIdx + 1}/{guidedPlan.length}</span>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded" style={{ background: 'rgba(16,185,129,0.15)', color: C.emerald.hex }}>{guidedPlan[guidedIdx].durationSec}s</span>
+                </div>
+                <p className="text-lg font-black text-white leading-tight">{guidedPlan[guidedIdx].name}</p>
+                {guidedPlan[guidedIdx].focus && <p className="text-xs text-gray-400">{guidedPlan[guidedIdx].focus}</p>}
+                <motion.button whileTap={{ scale: 0.95 }} onClick={startDrill}
+                  className="w-full py-3.5 rounded-xl text-white font-black text-sm"
+                  style={{ background: `linear-gradient(135deg, ${C.emerald.hex}, #047857)`, boxShadow: '0 4px 18px rgba(16,185,129,0.4)' }}>
+                  ▶ Via — sono pronto
+                </motion.button>
+              </div>
+            )}
+
+            {guidedPhase === 'running' && guidedPlan[guidedIdx] && (
+              <div className="text-center space-y-2">
+                <p className="text-xs font-bold" style={{ color: C.emerald.hex }}>{guidedPlan[guidedIdx].name}</p>
+                <p className="text-5xl font-black text-white tabular-nums" style={{ fontFamily: 'Orbitron, sans-serif' }}>{Math.floor(guidedTimeLeft / 60)}:{String(guidedTimeLeft % 60).padStart(2, '0')}</p>
+                <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.08)' }}>
+                  <div style={{ height: '100%', width: `${guidedPlan[guidedIdx].durationSec ? (guidedTimeLeft / guidedPlan[guidedIdx].durationSec) * 100 : 0}%`, background: C.emerald.hex, transition: 'width 1s linear' }} />
+                </div>
+                {guidedPlan[guidedIdx].watchFor && <p className="text-[11px] text-gray-400">👁 {guidedPlan[guidedIdx].watchFor}</p>}
+                <button onClick={() => finishDrillRef.current()} className="text-[11px] text-gray-500 underline">termina ora</button>
+              </div>
+            )}
+
+            {guidedPhase === 'review' && (
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-mono tracking-widest text-gray-500">PAGELLA · {guidedPlan[guidedIdx]?.name}</span>
+                  {guidedReview && <span className="text-base font-black" style={{ color: guidedReview.score >= 7 ? C.emerald.hex : guidedReview.score >= 5 ? C.orange.hex : C.red.hex }}>{guidedReview.score}/10</span>}
+                </div>
+                {guidedLoading && <p className="text-xs text-gray-500">⏳ Analizzo il drill…</p>}
+                {guidedReview && (
+                  <>
+                    {guidedReview.good?.length > 0 && <div className="space-y-1">{guidedReview.good.map((g, i) => <p key={i} className="text-xs text-gray-200">✅ {g}</p>)}</div>}
+                    {guidedReview.fix?.length > 0 && <div className="space-y-1">{guidedReview.fix.map((f, i) => <p key={i} className="text-xs" style={{ color: '#fca5a5' }}>❌ {f}</p>)}</div>}
+                    {guidedReview.cue && <p className="text-sm font-bold text-white mt-1">🎯 {guidedReview.cue}</p>}
+                  </>
+                )}
+                <motion.button whileTap={{ scale: 0.95 }} onClick={() => nextDrillRef.current()}
+                  className="w-full py-3 rounded-xl text-white font-black text-sm mt-1"
+                  style={{ background: `linear-gradient(135deg, ${C.violet.hex}, #4f46e5)` }}>
+                  {guidedIdx + 1 >= guidedPlan.length ? '🏁 Fine circuito' : 'Prossimo drill →'}
+                </motion.button>
+                <label className="flex items-center gap-2 text-[11px] text-gray-500">
+                  <input type="checkbox" checked={guidedAutoAdvance} onChange={(e) => setGuidedAutoAdvance(e.target.checked)} /> auto-avanza dopo la pagella
+                </label>
+              </div>
+            )}
+
+            {guidedPhase === 'done' && (
+              <div className="text-center space-y-2 py-2">
+                <p className="text-lg font-black" style={{ color: C.emerald.hex }}>🎉 Circuito completato!</p>
+                <div className="flex gap-2">
+                  <motion.button whileTap={{ scale: 0.95 }} onClick={() => { setGuidedPlan([]); generateGuidedPlan(); }} className="flex-1 py-2.5 rounded-xl text-white font-bold text-xs" style={{ background: `linear-gradient(135deg, ${C.emerald.hex}, #047857)` }}>🔄 Nuovo circuito</motion.button>
+                  <motion.button whileTap={{ scale: 0.95 }} onClick={stopGuided} className="flex-1 py-2.5 rounded-xl text-white font-bold text-xs" style={{ background: 'rgba(55,65,81,0.7)' }}>Esci</motion.button>
+                </div>
+              </div>
+            )}
+          </motion.div>
+        )}
+
         {/* SEZIONE COMMENTI AI — il comando RESTA visibile; l'analisi è solo un puntino */}
         <AnimatePresence>
-          {(analysis || analyzing) && (
+          {!guidedOn && (analysis || analyzing) && (
             <motion.div
               initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 6 }}
               transition={{ type: 'spring', stiffness: 280, damping: 24 }}
@@ -1507,12 +1719,19 @@ function VisualCoach() {
               <span className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent)', animation: 'chip-sheen 2s ease-in-out infinite', backgroundSize: '200% 100%' }} />
               <span className="relative">🔍 Analizza</span>
             </motion.button>
-            <motion.button whileTap={{ scale: 0.93 }} onClick={() => setAutoMode((v) => !v)}
+            <motion.button whileTap={{ scale: 0.93 }} onClick={() => { if (!autoMode && guidedOn) stopGuided(); setAutoMode((v) => !v); }}
               className="flex-1 py-3.5 rounded-xl text-white text-sm font-black transition-all relative overflow-hidden"
               style={autoMode
                 ? { background: `linear-gradient(135deg, ${C.orange.hex}, #b45309)`, boxShadow: `0 4px 18px ${C.orange.glow}` }
                 : { background: 'rgba(55,65,81,0.7)', border: '1px solid rgba(255,255,255,0.1)' }}>
-              {autoMode ? '⏸ Stop Auto' : '▶ Auto Analizza'}
+              {autoMode ? '⏸ Stop Auto' : '▶ Auto'}
+            </motion.button>
+            <motion.button whileTap={{ scale: 0.93 }} onClick={() => guidedOn ? stopGuided() : startGuided()}
+              className="flex-1 py-3.5 rounded-xl text-white text-sm font-black transition-all relative overflow-hidden"
+              style={guidedOn
+                ? { background: 'linear-gradient(135deg, #10b981, #047857)', boxShadow: '0 4px 18px rgba(16,185,129,0.4)' }
+                : { background: 'rgba(55,65,81,0.7)', border: '1px solid rgba(255,255,255,0.1)' }}>
+              {guidedOn ? '✕ Esci' : '🎯 Guidato'}
             </motion.button>
           </div>
           <div className="flex gap-2">
@@ -1521,7 +1740,7 @@ function VisualCoach() {
               style={{ background: 'rgba(55,65,81,0.6)', border: '1px solid rgba(255,255,255,0.08)' }}>
               🔄 Gira
             </motion.button>
-            <motion.button whileTap={{ scale: 0.9 }} onClick={() => { setVoiceOn((v) => !v); if (voiceOn) window.speechSynthesis?.cancel(); }}
+            <motion.button whileTap={{ scale: 0.9 }} onClick={() => setVoiceOn((v) => { const nv = !v; if (nv) unlockSpeech(); else window.speechSynthesis?.cancel(); return nv; })}
               className="flex-1 py-2.5 rounded-xl text-white font-bold text-xs transition-all flex items-center justify-center gap-1.5"
               style={voiceOn
                 ? { background: 'linear-gradient(135deg, #059669, #047857)', boxShadow: '0 4px 16px rgba(5,150,105,0.4)' }
