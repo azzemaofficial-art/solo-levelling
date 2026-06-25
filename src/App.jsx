@@ -8,6 +8,7 @@ import { useFxCombo } from './hooks/useFxCombo';
 import { subscribeUiToast, emitUiToast } from './utils/uiEvents';
 import { cloudPush, getCloudSession, refreshCloudSession } from './utils/cloudSync';
 import { fetchTelegramLogs } from './utils/personalAgentSync';
+import NeuralIntro from './components/NeuralIntro';
 
 const SystemHub = lazy(() => import('./pages/SystemHub'));
 const Calendar = lazy(() => import('./pages/Calendar'));
@@ -59,6 +60,9 @@ function App() {
   };
   const [activePage, setActivePage] = useState('system');
   const [lastPageIndex, setLastPageIndex] = useState(0);
+  const [showIntro, setShowIntro] = useState(() => {
+    try { if (sessionStorage.getItem('sm_intro_seen')) return false; sessionStorage.setItem('sm_intro_seen', '1'); return true; } catch { return false; }
+  });
   const [pageIntroFx, setPageIntroFx] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
@@ -1299,6 +1303,7 @@ useEffect(() => { localStorage.setItem('shadow_monarch_macros', JSON.stringify(m
   return (
     <div
       className={`app-shell-fs gameframe-shell premium-shell system-scanlines neon-cinema theme-${activePage} ${shouldReduceFx ? 'fx-lite' : ''} max-w-[390px] mx-auto bg-void-black relative shadow-2xl overflow-hidden border-x border-white/5 flex flex-col`}>
+      {showIntro && <NeuralIntro onDone={() => setShowIntro(false)} />}
       <div className="pointer-events-none absolute inset-0 cinematic-backdrop">
         <div className="absolute inset-0 aurora-layer"></div>
         <div className="absolute inset-0 hud-grid"></div>
