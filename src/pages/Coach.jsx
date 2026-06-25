@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Eye, Lightbulb, Trophy, ScanSearch, Play, Pause, Target, FlipHorizontal2, Volume2, VolumeX, Bone, X } from 'lucide-react';
+import { Eye, Lightbulb, Trophy, ScanSearch, Play, Pause, Target, FlipHorizontal2, Volume2, VolumeX, Bone, X, Move } from 'lucide-react';
 
 // ─── Quick prompts ─────────────────────────────────────────────────────────────
 const COACH_QUICK = [
@@ -984,6 +984,8 @@ function VisualCoach() {
   const lastLandmarksRef = useRef(null); // ultimi landmark MediaPipe → angoli reali per l'AI
   const observationsRef = useRef([]);  // osservazioni accumulate in auto (osserva N → 1 verdetto)
   const [observeProgress, setObserveProgress] = useState(0);
+  const [framingHint, setFramingHint] = useState('');     // avviso "inquadra il corpo"
+  const [trackQuality, setTrackQuality] = useState('none'); // full | upper | partial | none
   const VERDICT_EVERY = 3;             // il maestro osserva 3 momenti, poi dà UN verdetto
   // ── Modalità GUIDATA (circuito drill su misura) ─────────────────────────────
   const [guidedOn, setGuidedOn] = useState(false);
@@ -1283,30 +1285,51 @@ function VisualCoach() {
     } finally { setAnalyzing(false); analyzingRef.current = false; }
   }, [mode, buildPrompt, currentDisc, enqueueSpeak]);
 
-  // Angoli articolari reali dallo scheletro MediaPipe → grounding di PRECISIONE per l'AI.
-  const computePoseHint = useCallback(() => {
+  // ── PRECISIONE: angoli reali dallo scheletro + smoothing + framing + segnali ──
+  const poseHistRef = useRef([]);
+  const computePose = useCallback(() => {
     const lm = lastLandmarksRef.current;
-    if (!lm || lm.length < 29) return '';
+    if (!lm || lm.length < 29) return { framingOk: false, quality: 'none', hint: '', alerts: [] };
+    const vis = (i) => lm[i]?.visibility ?? 1;
     const ang = (a, b, c) => {
       const A = lm[a], B = lm[b], C = lm[c];
-      if (!A || !B || !C) return null;
-      if ((A.visibility ?? 1) < 0.4 || (B.visibility ?? 1) < 0.4 || (C.visibility ?? 1) < 0.4) return null;
+      if (!A || !B || !C || vis(a) < 0.4 || vis(b) < 0.4 || vis(c) < 0.4) return null;
       const v1x = A.x - B.x, v1y = A.y - B.y, v2x = C.x - B.x, v2y = C.y - B.y;
       const d = Math.hypot(v1x, v1y) * Math.hypot(v2x, v2y);
       if (!d) return null;
-      const cos = Math.max(-1, Math.min(1, (v1x * v2x + v1y * v2y) / d));
-      return Math.round((Math.acos(cos) * 180) / Math.PI);
+      return Math.round((Math.acos(Math.max(-1, Math.min(1, (v1x * v2x + v1y * v2y) / d))) * 180) / Math.PI);
     };
-    const out = [];
-    const push = (lbl, v) => { if (v != null) out.push(`${lbl} ${v}°`); };
-    push('gomito sx', ang(11, 13, 15)); push('gomito dx', ang(12, 14, 16));
-    push('ginocchio sx', ang(23, 25, 27)); push('ginocchio dx', ang(24, 26, 28));
-    push('anca sx', ang(11, 23, 25)); push('anca dx', ang(12, 24, 26));
+    // 1) framing/qualità tracking
+    const core = vis(11) > 0.4 && vis(12) > 0.4 && vis(23) > 0.4 && vis(24) > 0.4;
+    const legs = vis(25) > 0.4 || vis(26) > 0.4;
+    const anyVis = lm.some((p) => (p?.visibility ?? 0) > 0.5);
+    const quality = core ? (legs ? 'full' : 'upper') : (anyVis ? 'partial' : 'none');
+    const framingOk = core;
+    // 2) smoothing: mediana delle ultime 3 letture per stabilità
+    const cur = { eL: ang(11, 13, 15), eR: ang(12, 14, 16), kL: ang(23, 25, 27), kR: ang(24, 26, 28), hL: ang(11, 23, 25), hR: ang(12, 24, 26) };
+    const hist = [...poseHistRef.current, cur].slice(-3);
+    poseHistRef.current = hist;
+    const med = (k) => { const v = hist.map((h) => h[k]).filter((x) => x != null).sort((a, b) => a - b); return v.length ? v[Math.floor(v.length / 2)] : null; };
+    const sm = { eL: med('eL'), eR: med('eR'), kL: med('kL'), kR: med('kR'), hL: med('hL'), hR: med('hR') };
     const sM = lm[11] && lm[12] ? { x: (lm[11].x + lm[12].x) / 2, y: (lm[11].y + lm[12].y) / 2 } : null;
     const hM = lm[23] && lm[24] ? { x: (lm[23].x + lm[24].x) / 2, y: (lm[23].y + lm[24].y) / 2 } : null;
-    if (sM && hM) out.push(`busto inclinato ${Math.round((Math.atan2(Math.abs(sM.x - hM.x), Math.abs(hM.y - sM.y) || 0.001) * 180) / Math.PI)}° dalla verticale`);
-    return out.join(', ');
-  }, []);
+    const lean = sM && hM ? Math.round((Math.atan2(Math.abs(sM.x - hM.x), Math.abs(hM.y - sM.y) || 0.001) * 180) / Math.PI) : null;
+    const parts = [];
+    const p = (lbl, v) => { if (v != null) parts.push(`${lbl} ${v}°`); };
+    p('gomito sx', sm.eL); p('gomito dx', sm.eR); p('ginocchio sx', sm.kL); p('ginocchio dx', sm.kR); p('anca sx', sm.hL); p('anca dx', sm.hR);
+    if (lean != null) parts.push(`busto ${lean}° dalla verticale`);
+    // 3) segnali geometrici misurati (fatti certi per l'AI)
+    const alerts = [];
+    if (sm.eL != null && sm.eL > 168) alerts.push('gomito sx iperesteso');
+    if (sm.eR != null && sm.eR > 168) alerts.push('gomito dx iperesteso');
+    const striking = /box|mma|muay|kick|karate|taekwondo|sanda|kung|wing|krav|sambo|hapkido|judo|wrestl|bjj|luta|pankration|silat|systema|capoeira|kendo/i.test(mode);
+    if (striking) {
+      if (vis(15) > 0.4 && vis(11) > 0.4 && lm[15].y > lm[11].y + 0.08) alerts.push('guardia sx bassa (mano sotto la spalla)');
+      if (vis(16) > 0.4 && vis(12) > 0.4 && lm[16].y > lm[12].y + 0.08) alerts.push('guardia dx bassa (mano sotto la spalla)');
+    }
+    if (lean != null && lean > 38) alerts.push('busto troppo inclinato');
+    return { framingOk, quality, hint: parts.join(', '), alerts };
+  }, [mode]);
 
   // ── AUTO: il maestro osserva in silenzio, poi UN verdetto (no voce ogni tick) ──
   // Ogni tick = un'osservazione silenziosa accumulata. Al 3° tick → verdetto fuso e
@@ -1322,7 +1345,14 @@ function VisualCoach() {
     canvas.width = Math.round(vw * sc); canvas.height = Math.round(vh * sc);
     canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
     const base64 = canvas.toDataURL('image/jpeg', 0.6).split(',')[1];
-    const poseHint = computePoseHint();   // angoli reali per la precisione
+    const pose = computePose();
+    // GATE inquadratura: se il corpo è solo parziale, niente analisi imprecisa
+    if (skeletonOn && pose.quality === 'partial') {
+      setFramingHint('Inquadra tutto il corpo nel riquadro'); setTrackQuality('partial');
+      analyzingRef.current = false; return;
+    }
+    setFramingHint(''); setTrackQuality(pose.quality);
+    const poseHint = pose.hint + (pose.alerts.length ? `. SEGNALI MISURATI (certi): ${pose.alerts.join('; ')}` : '');
     setAnalyzing(true);
     try {
       // 1) OSSERVAZIONE silenziosa (osservatori, niente cervello, niente voce)
@@ -1362,7 +1392,7 @@ function VisualCoach() {
     } catch (_) {
       // silenzioso: tieni l'ultimo verdetto a schermo
     } finally { setAnalyzing(false); analyzingRef.current = false; }
-  }, [mode, buildPrompt, currentDisc, enqueueSpeak, computePoseHint]);
+  }, [mode, buildPrompt, currentDisc, enqueueSpeak, computePose, skeletonOn]);
 
   const analyzeSession = useCallback(async () => {
     const feedbacks = sessionFeedbacksRef.current;
@@ -1607,6 +1637,16 @@ function VisualCoach() {
           }
         </div>
         <div className="flex items-center gap-1.5">
+          {streaming && (autoMode || guidedOn) && skeletonOn && (
+            <span className="px-2 py-0.5 rounded-md text-[9px] font-bold inline-flex items-center gap-1" title="Qualità tracking corpo"
+              style={{
+                background: trackQuality === 'full' ? 'rgba(16,185,129,0.22)' : trackQuality === 'upper' ? 'rgba(56,189,248,0.2)' : trackQuality === 'partial' ? 'rgba(249,115,22,0.22)' : 'rgba(120,120,120,0.2)',
+                color: trackQuality === 'full' ? C.emerald.hex : trackQuality === 'upper' ? '#38bdf8' : trackQuality === 'partial' ? C.orange.hex : '#9ca3af',
+              }}>
+              <span className="w-1.5 h-1.5 rounded-full" style={{ background: 'currentColor' }} />
+              {trackQuality === 'full' ? 'corpo pieno' : trackQuality === 'upper' ? 'busto' : trackQuality === 'partial' ? 'parziale' : 'no corpo'}
+            </span>
+          )}
           {streaming && <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold" style={{ background: 'rgba(16,185,129,0.25)', color: C.emerald.hex, border: `1px solid ${C.emerald.border}`, animation: 'pulse-glow 2s ease-in-out infinite' }}>● LIVE</span>}
           {autoMode && (
             <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold inline-flex items-center gap-1.5" style={{ background: 'rgba(249,115,22,0.25)', color: C.orange.hex, border: `1px solid ${C.orange.border}` }}>
@@ -1643,6 +1683,17 @@ function VisualCoach() {
           <ScoreTracker score={score} onScore={handleScore} lastPoint={lastPoint} />
         </div>
       )}
+
+      {/* Avviso inquadratura — il corpo non è ben visibile per un'analisi precisa */}
+      <AnimatePresence>
+        {framingHint && (autoMode || guidedOn) && (
+          <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+            className="absolute left-1/2 -translate-x-1/2 z-30 px-3 py-1.5 rounded-full text-[11px] font-bold flex items-center gap-1.5"
+            style={{ top: 'calc(max(12px, env(safe-area-inset-top)) + 56px)', background: 'rgba(249,115,22,0.92)', color: '#1a1208', boxShadow: '0 4px 18px rgba(249,115,22,0.4)' }}>
+            <Move size={13} /> {framingHint}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* BLOCCO INFERIORE — feedback + comandi, ancorato in basso (sempre visibile) */}
       <div className="absolute bottom-0 inset-x-0 z-30 flex flex-col"

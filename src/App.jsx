@@ -67,12 +67,6 @@ function App() {
   });
   const [levelUpTo, setLevelUpTo] = useState(null);
   const prevLevelRef = React.useRef(null);
-  useEffect(() => {
-    const lvl = Number(playerStats?.level || 1);
-    if (prevLevelRef.current == null) { prevLevelRef.current = lvl; return; } // niente al primo mount
-    if (lvl > prevLevelRef.current) setLevelUpTo(lvl);
-    prevLevelRef.current = lvl;
-  }, [playerStats?.level]);
   const [pageIntroFx, setPageIntroFx] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
@@ -346,6 +340,14 @@ function App() {
       unsubscribe();
     };
   }, []);
+
+  // Level-up cinematico al salire di livello (dopo la dichiarazione di playerStats)
+  useEffect(() => {
+    const lvl = Number(playerStats?.level || 1);
+    if (prevLevelRef.current == null) { prevLevelRef.current = lvl; return; } // niente al primo mount
+    if (lvl > prevLevelRef.current) setLevelUpTo(lvl);
+    prevLevelRef.current = lvl;
+  }, [playerStats?.level]);
 
   // Salvataggi automatici
   useEffect(() => { localStorage.setItem('shadow_monarch_logs', JSON.stringify(systemLogs)); }, [systemLogs]);
