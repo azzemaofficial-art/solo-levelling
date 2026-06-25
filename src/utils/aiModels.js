@@ -21,8 +21,9 @@ const TASK_DEFAULT = {
   profile: 'nvidia/llama-3.1-nemotron-70b-instruct',    // analisi profonda + consigli
 };
 
-const KEY_GLOBAL = 'sm_ai_model_global';
-const keyFor = (task) => `sm_ai_model_${task}`;
+// Prefisso shadow_monarch_ → incluso nel backup cloud (createBackupPayload).
+const KEY_GLOBAL = 'shadow_monarch_ai_model_global';
+const keyFor = (task) => `shadow_monarch_ai_model_${task}`;
 
 const read = (k) => {
   if (typeof window === 'undefined') return '';

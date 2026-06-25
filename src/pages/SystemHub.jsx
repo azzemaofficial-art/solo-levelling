@@ -385,7 +385,7 @@ const SystemHub = ({ systemLogs, setSystemLogs, dailyGoal, setDailyGoal, hydrati
   const [aiModelProfile, setAiModelProfile] = useState(() => getTaskOverride('profile'));
   // Analisi profilo profonda (Nemotron)
   const [profileAnalysis, setProfileAnalysis] = useState(() => {
-    try { const raw = localStorage.getItem('sm_profile_analysis_last'); return raw ? JSON.parse(raw) : null; } catch { return null; }
+    try { const raw = localStorage.getItem('shadow_monarch_profile_analysis_last'); return raw ? JSON.parse(raw) : null; } catch { return null; }
   });
   const [isAnalyzingProfile, setIsAnalyzingProfile] = useState(false);
   const [generatedRecipe, setGeneratedRecipe] = useState(() => {
@@ -2717,9 +2717,9 @@ Italiano, diretto, esigente. Niente markdown pesante, usa i titoli con emoji com
       const entry = { content, model: usedModel, date: new Date().toISOString() };
       setProfileAnalysis(entry);
       try {
-        localStorage.setItem('sm_profile_analysis_last', JSON.stringify(entry));
-        const hist = JSON.parse(localStorage.getItem('sm_profile_analysis_history') || '[]');
-        localStorage.setItem('sm_profile_analysis_history', JSON.stringify([entry, ...hist].slice(0, 12)));
+        localStorage.setItem('shadow_monarch_profile_analysis_last', JSON.stringify(entry));
+        const hist = JSON.parse(localStorage.getItem('shadow_monarch_profile_analysis_history') || '[]');
+        localStorage.setItem('shadow_monarch_profile_analysis_history', JSON.stringify([entry, ...hist].slice(0, 12)));
       } catch {}
       emitUiToast({ message: 'Analisi profilo pronta', tone: 'success', durationMs: 2400 });
     } catch (err) {
