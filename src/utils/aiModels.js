@@ -4,21 +4,23 @@
 //  di fallback automatica del proxy. Persistito in localStorage.
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Modelli GRATIS via Groq + NVIDIA NIM (proxy /api/ai/chat). Prefisso groq:/nvidia:.
+// (Lista provvisoria, verificata sull'endpoint reale dopo il deploy.)
 export const AI_MODELS = [
   { id: '', label: 'Automatico (fallback)' },
-  { id: 'google/gemini-flash-1.5', label: 'Gemini Flash — veloce, ottimo JSON' },
-  { id: 'openai/gpt-4o-mini', label: 'GPT-4o-mini — OpenAI' },
-  { id: 'google/gemma-2-27b-it', label: 'Gemma 27B — Google' },
-  { id: 'meta-llama/llama-3.3-70b-instruct', label: 'Llama 3.3 70B' },
-  { id: 'qwen/qwen-2.5-72b-instruct', label: 'Qwen 72B' },
-  { id: 'nvidia/llama-3.1-nemotron-70b-instruct', label: 'Nemotron 70B — potente, ragionamento' },
+  { id: 'groq:llama-3.3-70b-versatile', label: 'Groq Llama 3.3 70B — veloce' },
+  { id: 'groq:meta-llama/llama-4-scout-17b-16e-instruct', label: 'Groq Llama 4 Scout' },
+  { id: 'nvidia:qwen/qwen3.5-397b-a17b', label: 'NVIDIA Qwen 3.5 397B — potente' },
+  { id: 'nvidia:google/diffusiongemma-26b-a4b-it', label: 'NVIDIA Gemma 26B' },
+  { id: 'nvidia:nvidia/nemotron-3-ultra-550b-a55b', label: 'NVIDIA Nemotron Ultra 550B — top' },
+  { id: 'nvidia:deepseek-ai/deepseek-v4-pro', label: 'NVIDIA DeepSeek V4 Pro' },
 ];
 
 // Default consigliati per funzione quando l'utente non ha scelto nulla.
 const TASK_DEFAULT = {
-  meal: 'google/gemini-flash-1.5',                      // JSON preciso e completo
-  recipe: 'google/gemini-flash-1.5',                    // niente OpenAI (crediti finiti)
-  profile: 'nvidia/llama-3.1-nemotron-70b-instruct',    // analisi profonda + consigli
+  meal: 'groq:llama-3.3-70b-versatile',              // veloce e affidabile su JSON
+  recipe: 'nvidia:qwen/qwen3.5-397b-a17b',           // creativo e potente
+  profile: 'nvidia:nvidia/nemotron-3-ultra-550b-a55b', // analisi profonda (Nemotron, come volevi)
 };
 
 // Prefisso shadow_monarch_ → incluso nel backup cloud (createBackupPayload).

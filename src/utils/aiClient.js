@@ -1,6 +1,6 @@
 import { pushTelemetryEntry } from './telemetry';
 
-const DEFAULT_PROXY_PATH = '/api/openrouter/chat';
+const DEFAULT_PROXY_PATH = '/api/ai/chat'; // Groq + NVIDIA NIM (gratis), no crediti OpenRouter
 const DEFAULT_MAX_RETRIES = 2;
 const DEFAULT_TIMEOUT_MS = 22000;
 const RETRYABLE_STATUS = new Set([408, 409, 425, 429, 500, 502, 503, 504]);
@@ -10,7 +10,7 @@ const SHADOW_AI_STATUS_EVENT = 'shadow_ai_status';
 
 let queueTail = Promise.resolve();
 let inflightCount = 0;
-const DEFAULT_MODEL_CANDIDATES = ['qwen/qwen3.6-plus:free', 'openai/gpt-4o-mini'];
+const DEFAULT_MODEL_CANDIDATES = ['groq:llama-3.3-70b-versatile', 'nvidia:google/diffusiongemma-26b-a4b-it'];
 
 const getProxyPath = () => {
   const configured = import.meta.env.VITE_SYSTEM_AI_PROXY;
