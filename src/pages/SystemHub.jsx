@@ -4,6 +4,7 @@ import { playSfx } from '../utils/sfx';
 import { speakEvent } from '../utils/voice';
 import AnimeStrip from '../components/AnimeStrip';
 import { formatAiErrorDetail, parseModelJson, requestSystemAI } from '../utils/aiClient';
+import { AI_MODELS, getModelFor, getGlobalModel, setGlobalModel, getTaskOverride, setTaskOverride } from '../utils/aiModels';
 import { computeReadinessOutcome, computeSleepCoach, computeWeightTrendGuard, computeWeeklyOverview, evaluateDataQuality } from '../utils/healthLogic';
 import { emitShadowFxBurst } from '../utils/fxEvents';
 import { emitUiToast } from '../utils/uiEvents';
@@ -377,6 +378,16 @@ const SystemHub = ({ systemLogs, setSystemLogs, dailyGoal, setDailyGoal, hydrati
   const [mealAnalysisErrorSnapshot, setMealAnalysisErrorSnapshot] = useState(null);
   const [recipePrompt, setRecipePrompt] = useState(() => localStorage.getItem('shadow_monarch_recipe_prompt') || '');
   const [isGeneratingRecipe, setIsGeneratingRecipe] = useState(false);
+  // Selettore modelli AI (globale + override per funzione)
+  const [aiModelGlobal, setAiModelGlobal] = useState(() => getGlobalModel());
+  const [aiModelMeal, setAiModelMeal] = useState(() => getTaskOverride('meal'));
+  const [aiModelRecipe, setAiModelRecipe] = useState(() => getTaskOverride('recipe'));
+  const [aiModelProfile, setAiModelProfile] = useState(() => getTaskOverride('profile'));
+  // Analisi profilo profonda (Nemotron)
+  const [profileAnalysis, setProfileAnalysis] = useState(() => {
+    try { const raw = localStorage.getItem('sm_profile_analysis_last'); return raw ? JSON.parse(raw) : null; } catch { return null; }
+  });
+  const [isAnalyzingProfile, setIsAnalyzingProfile] = useState(false);
   const [generatedRecipe, setGeneratedRecipe] = useState(() => {
     try {
       const raw = localStorage.getItem('shadow_monarch_generated_recipe');
@@ -2661,6 +2672,63 @@ const SystemHub = ({ systemLogs, setSystemLogs, dailyGoal, setDailyGoal, hydrati
       return { ...prev, enabledIds: nextIds };
     });
   };
+  // ── ANALISI PROFILO PROFONDA (Nemotron) — generale, non sul singolo giorno ──
+  const analyzeProfile = async () => {
+    if (isAnalyzingProfile) return;
+    setIsAnalyzingProfile(true);
+    try {
+      const last30 = systemLogs.slice(-30);
+      const avg = (sel) => last30.length ? Math.round(last30.reduce((s, l) => s + Number(sel(l) || 0), 0) / last30.length) : 0;
+      const trainDays = last30.filter((l) => Number(l.workoutBurn ?? l.burned ?? 0) > 100).length;
+      const weights = last30.map((l) => Number(l.weight || 0)).filter((w) => w > 0);
+      const weightTrend = weights.length >= 2 ? (weights[weights.length - 1] - weights[0]).toFixed(1) : '0';
+      const pesoKg = Number(playerStats?.currentWeightKg || 0) || (weights[weights.length - 1] || 70);
+      const altezzaCm = Number(playerStats?.heightCm || metabolicProfile?.heightCm || 178);
+      const bmi = altezzaCm > 0 ? (pesoKg / ((altezzaCm / 100) ** 2)).toFixed(1) : '?';
+      const ctx = `PROFILO COMPLETO (ultimi 30 giorni di dati reali):
+- Obiettivo: ${playerStats?.objective || 'recomp'} | Livello ${playerStats?.level || 1} | Streak ${playerStats?.streak || 0}gg
+- Fisico: ${pesoKg}kg | ${altezzaCm}cm | BMI ${bmi} | ${playerStats?.age || metabolicProfile?.age || 25} anni | ${(playerStats?.sex || 'male') === 'male' ? 'uomo' : 'donna'}
+- Peso target: ${playerStats?.bodyGoal?.targetWeightKg || 'n/d'}kg | trend peso 30gg: ${weightTrend}kg
+- Allenamenti: ${trainDays}/30 giorni attivi
+- Medie 30gg: ${avg((l) => l.consumed)} kcal/die | ${avg((l) => l.protein)}g proteine | ${avg((l) => l.carbs)}g carb | ${avg((l) => l.fatMacros)}g grassi
+- Target: ${Math.round(Number(effectiveDailyGoal || dailyGoal || 2400))} kcal | ${Math.round(Number(adaptiveMacroTargets?.protein || macroGoals?.protein || 150))}g proteine
+- Sonno medio: ${avg((l) => l.sleepHours)}h`;
+
+      const data = await requestSystemAI({
+        model: getModelFor('profile') || undefined,
+        temperature: 0.5,
+        max_tokens: 1100,
+        timeoutMs: 40000,
+        messages: [
+          { role: 'system', content: `Sei un coach d'élite di nutrizione e performance. Analizzi il PROFILO GENERALE dell'atleta sui dati reali (non il singolo giorno), in profondità. Sii concreto, basati sui numeri forniti, niente generico.
+Struttura la risposta in sezioni chiare con questi titoli:
+📊 QUADRO GENERALE — cosa dicono davvero i numeri (2-3 frasi)
+✅ COSA FUNZIONA — punti di forza concreti
+⚠️ CRITICITÀ — i 2-3 problemi più importanti, con il perché
+🎯 PIANO D'AZIONE — 4-5 azioni specifiche e misurabili per le prossime settimane
+🔮 PROIEZIONE — dove porta la traiettoria attuale e cosa cambiare
+Italiano, diretto, esigente. Niente markdown pesante, usa i titoli con emoji come sopra.` },
+          { role: 'user', content: ctx },
+        ],
+      });
+      const content = String(data?.choices?.[0]?.message?.content || '').trim();
+      if (!content) throw new Error('Analisi vuota');
+      const usedModel = String(data?._shadowMeta?.model || '').trim();
+      const entry = { content, model: usedModel, date: new Date().toISOString() };
+      setProfileAnalysis(entry);
+      try {
+        localStorage.setItem('sm_profile_analysis_last', JSON.stringify(entry));
+        const hist = JSON.parse(localStorage.getItem('sm_profile_analysis_history') || '[]');
+        localStorage.setItem('sm_profile_analysis_history', JSON.stringify([entry, ...hist].slice(0, 12)));
+      } catch {}
+      emitUiToast({ message: 'Analisi profilo pronta', tone: 'success', durationMs: 2400 });
+    } catch (err) {
+      emitUiToast({ message: 'Analisi profilo fallita: ' + formatAiErrorDetail(err?.message || ''), tone: 'warning', durationMs: 3200 });
+    } finally {
+      setIsAnalyzingProfile(false);
+    }
+  };
+
   const generateRecipeFromPrompt = async (autoMode = false) => {
     if (isGeneratingRecipe) return;
     const prompt = String(recipePrompt || '').trim();
@@ -2720,6 +2788,7 @@ Rispondi SOLO JSON valido:
         : `${profileCtx}\n\nRichiesta specifica: ${prompt}\n\nCrea una versione fitporn di questa ricetta, adattata ai miei macro residui.`;
 
       const data = await requestSystemAI({
+        model: getModelFor('recipe') || undefined,
         temperature: 0.82,
         max_tokens: 700,
         timeoutMs: 28000,
@@ -4484,10 +4553,10 @@ Rispondi SOLO JSON valido:
     const lowReliabilityMode = safeMode || reliabilityScore < 62;
     const messagesContent = buildMealAiMessages(oracleText, { safeMode: lowReliabilityMode });
     let data = await requestSystemAI({
-      model: modelOverride || undefined,
+      model: modelOverride || getModelFor('meal') || undefined,
       temperature: lowReliabilityMode ? 0.02 : 0.05,
       top_p: lowReliabilityMode ? 0.1 : 0.15,
-      max_tokens: 240,
+      max_tokens: 480,
       timeoutMs: 28000,
       messages: [
         {
@@ -4501,10 +4570,10 @@ Rispondi SOLO JSON valido:
     let parsed = parseModelJson(data, { schema: 'meal_analysis' });
     if (!hasValidMealPayload(parsed)) {
       data = await requestSystemAI({
-        model: modelOverride || undefined,
+        model: modelOverride || getModelFor('meal') || undefined,
         temperature: 0.02,
         top_p: 0.1,
-        max_tokens: 220,
+        max_tokens: 380,
         timeoutMs: 26000,
         messages: [
           {
@@ -4528,10 +4597,10 @@ Rispondi SOLO JSON valido:
     if (parsedValid) {
       try {
         const validatorResponse = await requestSystemAI({
-          model: modelOverride || undefined,
+          model: modelOverride || getModelFor('meal') || undefined,
           temperature: 0.01,
           top_p: 0.08,
-          max_tokens: 220,
+          max_tokens: 380,
           timeoutMs: 24000,
           messages: [
             {
@@ -5567,6 +5636,51 @@ Rispondi SOLO JSON valido:
         <p className="mt-2 text-[8px] text-gray-600 uppercase">Indicazioni generali, non mediche.</p>
         </div>
       </motion.div>
+      {/* ── CONFIG MODELLI AI ── */}
+      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mb-6 rounded-2xl overflow-hidden relative p-4" style={{ background: 'linear-gradient(145deg, rgba(8,10,22,0.97), rgba(12,16,32,0.93))', border: '1px solid rgba(99,102,241,0.22)' }}>
+        <p className="text-[9px] uppercase tracking-[0.36em] font-bold" style={{ color: 'rgba(129,140,248,0.9)' }}>◈ Configurazione</p>
+        <p className="text-sm font-black text-white mb-3" style={{ fontFamily: 'Russo One, sans-serif' }}>Modelli AI</p>
+        <div className="space-y-2">
+          {[
+            { label: '🌐 Globale (default)', value: aiModelGlobal, set: (v) => { setAiModelGlobal(v); setGlobalModel(v); } },
+            { label: '🍽️ Analisi pasto', value: aiModelMeal, set: (v) => { setAiModelMeal(v); setTaskOverride('meal', v); } },
+            { label: '👨‍🍳 Ricetta', value: aiModelRecipe, set: (v) => { setAiModelRecipe(v); setTaskOverride('recipe', v); } },
+            { label: '🧠 Analisi profilo', value: aiModelProfile, set: (v) => { setAiModelProfile(v); setTaskOverride('profile', v); } },
+          ].map((row) => (
+            <div key={row.label} className="flex items-center justify-between gap-2">
+              <span className="text-[10px] text-gray-300 flex-shrink-0">{row.label}</span>
+              <select value={row.value} onChange={(e) => row.set(e.target.value)}
+                className="bg-black/55 border border-white/10 rounded-lg text-white text-[10px] px-2 py-1.5 focus:outline-none focus:border-indigo-400/50 max-w-[60%]">
+                {AI_MODELS.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+              </select>
+            </div>
+          ))}
+        </div>
+        <p className="mt-2 text-[8px] text-gray-600">Override vuoto = usa il globale. Globale vuoto = catena automatica del proxy.</p>
+      </motion.div>
+
+      {/* ── ANALISI PROFILO PROFONDA (Nemotron) ── */}
+      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mb-6 rounded-2xl overflow-hidden relative p-4" style={{ background: 'linear-gradient(145deg, rgba(6,18,14,0.97), rgba(8,24,18,0.93))', border: '1px solid rgba(16,185,129,0.22)' }}>
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <p className="text-[9px] uppercase tracking-[0.36em] font-bold" style={{ color: 'rgba(52,211,153,0.9)' }}>◈ Deep Analysis</p>
+            <p className="text-sm font-black text-white" style={{ fontFamily: 'Russo One, sans-serif' }}>Analisi Profilo</p>
+          </div>
+          <button onClick={analyzeProfile} disabled={isAnalyzingProfile}
+            className={`text-[10px] px-3 py-1.5 rounded-lg border transition-colors ${isAnalyzingProfile ? 'border-gray-700 text-gray-500' : 'border-emerald-400/50 text-emerald-300 hover:bg-emerald-500/20'}`}>
+            {isAnalyzingProfile ? '⏳ Analizzo…' : '🧠 Analizza profilo'}
+          </button>
+        </div>
+        {profileAnalysis ? (
+          <div className="rounded-xl p-3" style={{ background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(16,185,129,0.2)' }}>
+            <p className="text-[8px] text-gray-500 mb-1.5">{new Date(profileAnalysis.date).toLocaleString('it-IT')}{profileAnalysis.model ? ` · ${profileAnalysis.model}` : ''}</p>
+            <p className="text-[11px] text-gray-200 whitespace-pre-wrap leading-relaxed">{profileAnalysis.content}</p>
+          </div>
+        ) : (
+          <p className="text-[10px] text-gray-500">Genera un'analisi profonda del tuo profilo sugli ultimi 30 giorni di dati reali — quadro, criticità, piano d'azione e proiezione.</p>
+        )}
+      </motion.div>
+
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.0289 }} className="mb-6 rounded-2xl overflow-hidden relative" style={{ background: 'linear-gradient(145deg, rgba(10,6,22,0.97), rgba(20,8,36,0.93))', border: '1px solid rgba(167,139,250,0.22)', boxShadow: '0 8px 32px rgba(124,58,237,0.1), inset 0 1px 0 rgba(255,255,255,0.04)' }}>
         <div className="pointer-events-none absolute -top-8 -right-8 h-32 w-32 rounded-full blur-3xl" style={{ background: 'rgba(124,58,237,0.16)' }} />
         <div className="p-4 relative z-10">
