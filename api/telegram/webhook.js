@@ -1,7 +1,7 @@
 // Telegram Webhook — riceve messaggi, analizza con Nemotron 550B, risponde + deep link al sito
 // Setup: GET /api/telegram/webhook?setup=1
 
-import { GATE, nextQuestion, gradeAnswer, progressLine, progressCard, initLearn } from './learn.js';
+import { GATES, GATE_IDS, nextQuestion, gradeAnswer, startBoss, bossQuestion, gradeBoss, progressLine, progressCard, initLearn, normalize as normLearn, gateButtons, levelOf } from './learn.js';
 
 const NVIDIA_BASE = 'https://integrate.api.nvidia.com/v1';
 const GROQ_BASE   = 'https://api.groq.com/openai/v1';
@@ -641,12 +641,19 @@ async function answerCbq(token, cbqId, text = '') {
 
 const LEARN_KEY = (id) => `tg_learn:${id}`;
 
-async function sendQuiz(token, id) {
-  let st = (await kvGet(LEARN_KEY(id))) || initLearn();
-  const { qid, text, keyboard } = nextQuestion(st);
-  st.pending = qid;
+async function sendQuiz(token, id, gateOverride) {
+  let st = normLearn((await kvGet(LEARN_KEY(id))) || initLearn());
+  const q = nextQuestion(st, gateOverride);
+  st.pending = { gate: q.gate, qid: q.qid, review: !!q.review };
   await kvSet(LEARN_KEY(id), st, 2592000);
-  await sendTelegramMessage(token, id, text, keyboard);
+  await sendTelegramMessage(token, id, q.text, q.keyboard);
+}
+
+async function sendBossQuestion(token, id, st) {
+  const q = bossQuestion(st);
+  if (!q) return;
+  await kvSet(LEARN_KEY(id), st, 2592000);
+  await sendTelegramMessage(token, id, q.text, q.keyboard);
 }
 
 export default async function handler(req, res) {
@@ -672,20 +679,58 @@ export default async function handler(req, res) {
     const cChat = cbq.message?.chat?.id;
     if (chatId && String(cChat) !== String(chatId)) { await answerCbq(botToken, cbq.id); return res.status(200).json({ ok: true }); }
     const data = String(cbq.data || '');
+    // ▶️ prossima domanda normale
     if (data === 'lnext') {
       await answerCbq(botToken, cbq.id);
       await sendQuiz(botToken, cChat);
       return res.status(200).json({ ok: true });
     }
+    // 🐉 avvia boss da bottone
+    if (data === 'lboss') {
+      await answerCbq(botToken, cbq.id);
+      let st = startBoss(normLearn((await kvGet(LEARN_KEY(cChat))) || initLearn()));
+      await sendTelegramMessage(botToken, cChat, `🐉 <b>BOSS QUIZ</b> — ${GATES[st.boss.gate].name}\n${st.boss.ids.length} domande. Pronto?`);
+      await sendBossQuestion(botToken, cChat, st);
+      return res.status(200).json({ ok: true });
+    }
+    // 🔀 cambio Gate (materia)
+    if (data.startsWith('lg|')) {
+      const gate = data.split('|')[1];
+      let st = normLearn((await kvGet(LEARN_KEY(cChat))) || initLearn());
+      if (GATES[gate]) { st.activeGate = gate; st.pending = null; await kvSet(LEARN_KEY(cChat), st, 2592000); }
+      await answerCbq(botToken, cbq.id, GATES[gate] ? `${GATES[gate].emoji} ${GATES[gate].name}` : '');
+      await sendQuiz(botToken, cChat, gate);
+      return res.status(200).json({ ok: true });
+    }
+    // 🐉 risposta BOSS
+    if (data.startsWith('bq|')) {
+      const [, gate, qidS, optS] = data.split('|');
+      let st = normLearn((await kvGet(LEARN_KEY(cChat))) || initLearn());
+      const g = gradeBoss(st, gate, parseInt(qidS, 10), parseInt(optS, 10));
+      if (!g.ok) { await answerCbq(botToken, cbq.id); return res.status(200).json({ ok: true }); }
+      await answerCbq(botToken, cbq.id, g.correct ? '✅' : '❌');
+      if (g.done) {
+        await kvSet(LEARN_KEY(cChat), g.state, 2592000);
+        const perfect = g.score === g.of;
+        await kvPush(`tg_queue:${cChat}`, { type: 'learn_boss', amount: g.bonus, score: g.score, of: g.of, ts: Date.now() });
+        await sendTelegramMessage(botToken, cChat,
+          `🐉 <b>BOSS sconfitto!</b>\nPunteggio: <b>${g.score}/${g.of}</b>${perfect ? ' — PERFETTO! 🏆' : ''}\n+${g.bonus} XP bonus\n\n${progressLine(g.state)}`,
+          { inline_keyboard: [[{ text: '🧠 Continua', callback_data: 'lnext' }]] });
+      } else {
+        await sendBossQuestion(botToken, cChat, g.state);
+      }
+      return res.status(200).json({ ok: true });
+    }
+    // risposta quiz normale
     if (data.startsWith('lq|')) {
-      const [, qidS, optS] = data.split('|');
-      let st = (await kvGet(LEARN_KEY(cChat))) || initLearn();
-      const g = gradeAnswer(st, parseInt(qidS, 10), parseInt(optS, 10));
+      const [, gate, qidS, optS] = data.split('|');
+      let st = normLearn((await kvGet(LEARN_KEY(cChat))) || initLearn());
+      const g = gradeAnswer(st, gate, parseInt(qidS, 10), parseInt(optS, 10));
       if (!g.ok) { await answerCbq(botToken, cbq.id, 'Già risposta'); return res.status(200).json({ ok: true }); }
       await kvSet(LEARN_KEY(cChat), g.state, 2592000);
-      await kvPush(`tg_queue:${cChat}`, { type: 'learn_xp', amount: g.xpGained, gate: GATE.id, ts: Date.now() }); // sync XP all'app
+      await kvPush(`tg_queue:${cChat}`, { type: 'learn_xp', amount: g.xpGained, gate, ts: Date.now() }); // sync XP all'app
       await answerCbq(botToken, cbq.id, g.correct ? `✅ +${g.xpGained} XP` : '❌');
-      const head = g.correct ? `✅ <b>Giusto!</b> +${g.xpGained} XP` : `❌ <b>Sbagliato.</b> +${g.xpGained} XP`;
+      const head = g.correct ? `✅ <b>Giusto!</b> +${g.xpGained} XP${g.review ? ' (ripasso)' : ''}` : `❌ <b>Sbagliato.</b> +${g.xpGained} XP`;
       await sendTelegramMessage(botToken, cChat, `${head}\n💡 ${g.exp}\n\n${progressLine(g.state)}`,
         { inline_keyboard: [[{ text: '▶️ Prossima domanda', callback_data: 'lnext' }]] });
       return res.status(200).json({ ok: true });
@@ -744,7 +789,9 @@ export default async function handler(req, res) {
       '📅 /oggi — totale calorie e macro di oggi\n' +
       '💊 /integratori — lista integratori consigliati\n' +
       '🧠 /quiz — Gate della Conoscenza: impara a pillole (+XP, livelli, streak)\n' +
-      '📈 /progressi — il tuo livello, streak e avanzamento corso\n\n' +
+      '🚪 /gate — cambia materia (Programmazione+IA · Inglese · Cultura)\n' +
+      '🐉 /boss — Boss Quiz: 6 domande, bonus XP\n' +
+      '📈 /progressi — livello, streak, ripassi e avanzamento\n\n' +
       'I macro sono calcolati su database nutrizionale reale, non stimati a caso 📊'
     );
     return res.status(200).json({ ok: true });
@@ -755,10 +802,20 @@ export default async function handler(req, res) {
     await sendQuiz(botToken, incomingChatId);
     return res.status(200).json({ ok: true });
   }
+  if (text === '/gate' || text === '/materia') {
+    await sendTelegramMessage(botToken, incomingChatId, '🚪 Scegli il <b>Gate</b> da studiare:', gateButtons());
+    return res.status(200).json({ ok: true });
+  }
+  if (text === '/boss') {
+    let st = startBoss((await kvGet(LEARN_KEY(incomingChatId))) || initLearn());
+    await sendTelegramMessage(botToken, incomingChatId, `🐉 <b>BOSS QUIZ</b> — ${GATES[st.boss.gate].name}\n${st.boss.ids.length} domande, niente aiuti. Pronto?`);
+    await sendBossQuestion(botToken, incomingChatId, st);
+    return res.status(200).json({ ok: true });
+  }
   if (text === '/progressi') {
     const st = (await kvGet(LEARN_KEY(incomingChatId))) || initLearn();
     await sendTelegramMessage(botToken, incomingChatId, progressCard(st),
-      { inline_keyboard: [[{ text: '🧠 Fai un quiz', callback_data: 'lnext' }]] });
+      { inline_keyboard: [[{ text: '🧠 Quiz', callback_data: 'lnext' }, { text: '🐉 Boss', callback_data: 'lboss' }]] });
     return res.status(200).json({ ok: true });
   }
 

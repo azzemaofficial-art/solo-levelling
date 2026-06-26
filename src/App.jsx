@@ -379,6 +379,23 @@ useEffect(() => { localStorage.setItem('shadow_monarch_macros', JSON.stringify(m
   // Applica payload Telegram al log di oggi (usato da URL param e da server claim)
   const applyTgImport = useCallback((payload) => {
     if (!payload?.type) return;
+    // 🧠 Gate della Conoscenza: XP guadagnato studiando su Telegram → livello del personaggio
+    if (payload.type === 'learn_xp' || payload.type === 'learn_boss') {
+      const gained = Number(payload.amount || 0);
+      if (gained > 0) {
+        setPlayerStats?.((prev) => {
+          const exp = Number(prev?.exp || 0) + gained;
+          const nextLevel = Math.floor(exp / 100) + 1;            // 100 XP/livello → fa scattare il Level-Up cinematico
+          return { ...prev, exp, level: Math.max(Number(prev?.level || 1), nextLevel) };
+        });
+        const msg = payload.type === 'learn_boss'
+          ? `🐉 Boss del Sapere sconfitto! +${gained} XP (${payload.score}/${payload.of})`
+          : `🧠 Studio: +${gained} XP`;
+        emitUiToast({ message: msg, tone: 'success', durationMs: 4000 });
+        triggerFxBurst('success');
+      }
+      return;
+    }
     const key = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit' });
     setSystemLogs((prev) => {
       const idx = prev.findIndex((l) => l.date === key);

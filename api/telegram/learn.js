@@ -1,114 +1,212 @@
 // ─────────────────────────────────────────────────────────────────────────────
-//  Gate della Conoscenza — corso "Programmazione + IA" (quiz-first, stile corso)
-//  Logica pura (niente I/O): curriculum + grading + rendering. La persistenza KV
-//  e l'invio Telegram stanno in webhook.js.
+//  Gate della Conoscenza — Fase 2: multi-Gate + SRS (ripasso spaziato) + Boss.
+//  Logica pura (niente I/O). Persistenza KV e invio Telegram in webhook.js.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const GATE = { id: 'prog-ia', name: 'Programmazione + IA', emoji: '🟩' };
+const LETTERS = ['A', 'B', 'C', 'D'];
+const today = () => new Date().toISOString().slice(0, 10);
+const addDays = (n) => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
+const SRS_DAYS = [1, 2, 4, 8, 16, 35]; // intervalli per box
 
-// Corso strutturato in moduli, in ordine. Ogni domanda: { m, q, a[], correct, exp }
-export const COURSE = [
-  // ── Modulo 1 — Fondamenti di programmazione ──
-  { m: 'Fondamenti', q: 'A cosa serve una <b>variabile</b>?', a: ['Memorizzare un valore riutilizzabile', 'Spegnere il programma', 'Disegnare a schermo'], correct: 0, exp: 'Una variabile è un contenitore con un nome che memorizza un valore (numero, testo, ecc.) per riusarlo.' },
-  { m: 'Fondamenti', q: 'Cosa fa un <b>ciclo (loop)</b>?', a: ['Ripete istruzioni più volte', 'Cancella i file', 'Crea una variabile'], correct: 0, exp: 'Un loop (for/while) ripete un blocco di codice finché una condizione è vera — evita di scrivere lo stesso codice N volte.' },
-  { m: 'Fondamenti', q: 'Una <b>funzione</b> serve a…', a: ['Raggruppare codice riutilizzabile in un blocco con un nome', 'Aumentare la RAM', 'Colorare il testo'], correct: 0, exp: 'Una funzione impacchetta una logica sotto un nome: la richiami quando vuoi, anche con input diversi (parametri).' },
-  { m: 'Fondamenti', q: 'In <code>if (x &gt; 10)</code> cosa rappresenta <code>x &gt; 10</code>?', a: ['Una condizione (vero/falso)', 'Una variabile', 'Un commento'], correct: 0, exp: 'È una condizione booleana: vale true o false e decide se eseguire il blocco dentro l\'if.' },
-  { m: 'Fondamenti', q: 'Cos\'è un <b>array</b>?', a: ['Una lista ordinata di elementi', 'Un singolo numero', 'Un errore'], correct: 0, exp: 'Un array è una collezione ordinata: [10, 20, 30]. Accedi per indice (parte da 0).' },
-  { m: 'Fondamenti', q: 'Cosa significa <b>"bug"</b>?', a: ['Un errore nel codice', 'Una funzione veloce', 'Un tipo di variabile'], correct: 0, exp: 'Un bug è un difetto che fa comportare male il programma. "Debug" = trovarlo e correggerlo.' },
+// ── GATE (corsi strutturati, in ordine) ─────────────────────────────────────
+export const GATES = {
+  'prog-ia': {
+    name: 'Programmazione + IA', emoji: '🟩', course: [
+      { m: 'Fondamenti', q: 'A cosa serve una <b>variabile</b>?', a: ['Memorizzare un valore riutilizzabile', 'Spegnere il programma', 'Disegnare a schermo'], correct: 0, exp: 'Una variabile è un contenitore con un nome che memorizza un valore.' },
+      { m: 'Fondamenti', q: 'Cosa fa un <b>ciclo (loop)</b>?', a: ['Ripete istruzioni più volte', 'Cancella i file', 'Crea una variabile'], correct: 0, exp: 'Un loop ripete un blocco finché una condizione è vera.' },
+      { m: 'Fondamenti', q: 'Una <b>funzione</b> serve a…', a: ['Raggruppare codice riutilizzabile', 'Aumentare la RAM', 'Colorare il testo'], correct: 0, exp: 'Impacchetta una logica sotto un nome, richiamabile con input diversi.' },
+      { m: 'Fondamenti', q: 'Cos\'è un <b>array</b>?', a: ['Una lista ordinata di elementi', 'Un singolo numero', 'Un errore'], correct: 0, exp: 'Collezione ordinata: [10,20,30], accesso per indice (da 0).' },
+      { m: 'Fondamenti', q: 'Cosa significa <b>"bug"</b>?', a: ['Un errore nel codice', 'Una funzione veloce', 'Un tipo di variabile'], correct: 0, exp: 'Difetto che fa comportare male il programma. Debug = correggerlo.' },
+      { m: 'IA: concetti', q: 'Cos\'è il <b>Machine Learning</b>?', a: ['Imparare schemi dai dati, non da regole scritte a mano', 'Un linguaggio', 'Un tipo di PC'], correct: 0, exp: 'Il modello impara dai dati a fare previsioni.' },
+      { m: 'IA: concetti', q: '<b>Training</b> vs <b>inference</b>?', a: ['Training = impara; inference = usa ciò che ha imparato', 'Sinonimi', 'Inference prima del training'], correct: 0, exp: 'Training è la fase di apprendimento; inference è l\'uso.' },
+      { m: 'IA: concetti', q: 'Cos\'è l\'<b>overfitting</b>?', a: ['Memorizza il training e generalizza male', 'Modello troppo piccolo', 'Modello troppo veloce'], correct: 0, exp: 'Impara "a memoria" e fallisce su dati nuovi.' },
+      { m: 'IA: concetti', q: 'Cosa NON è vero dell\'IA generativa?', a: ['Dice sempre la verità con certezza', 'Genera contenuti nuovi', 'Può sbagliare'], correct: 0, exp: 'Produce contenuti plausibili ma non garantiti veri: verifica.' },
+      { m: 'LLM', q: 'Cos\'è un <b>token</b>?', a: ['Un pezzo di testo che il modello elabora', 'Una password', 'Un file'], correct: 0, exp: 'Parole o frammenti: costi e limiti si misurano in token.' },
+      { m: 'LLM', q: 'Cosa fa un LLM in sostanza?', a: ['Predice il token successivo più probabile', 'Cerca su Google', 'Esegue codice'], correct: 0, exp: 'Genera testo prevedendo un token alla volta dal contesto.' },
+      { m: 'LLM', q: 'Cos\'è la <b>context window</b>?', a: ['Quanto testo tiene a mente in una volta', 'La finestra del browser', 'La GPU'], correct: 0, exp: 'Limite di token considerati; oltre, dimentica le parti vecchie.' },
+      { m: 'LLM', q: 'Cos\'è un\'<b>allucinazione</b>?', a: ['Inventa info false ma plausibili', 'Va in crash', 'Risponde lento'], correct: 0, exp: 'Afferma cose convincenti ma sbagliate: verifica i fatti.' },
+      { m: 'LLM', q: '<b>Temperature</b> alta rende l\'output…', a: ['Più creativo/vario (meno preciso)', 'Più veloce', 'Più corto'], correct: 0, exp: 'Alta = creatività; bassa = preciso (utile per JSON/codice).' },
+      { m: 'Prompt', q: 'Un buon prompt è…', a: ['Specifico su compito, contesto e formato', 'Il più corto possibile', 'Solo emoji'], correct: 0, exp: 'Specificità vince: cosa vuoi, contesto, formato di output.' },
+      { m: 'Prompt', q: 'Cos\'è il <b>few-shot</b>?', a: ['Dare esempi nel prompt per guidare l\'output', 'Usare pochi token', 'Poche domande'], correct: 0, exp: '2-3 esempi input→output: il modello imita lo schema.' },
+      { m: 'Prompt', q: 'Assegnare un <b>ruolo</b> serve a…', a: ['Orientare tono e competenza', 'Velocizzare', 'Ridurre i costi'], correct: 0, exp: 'Il system prompt imposta prospettiva e stile.' },
+      { m: 'Prompt', q: 'Per <b>JSON valido</b> conviene…', a: ['Chiedere il formato e mostrare lo schema', 'Sperare', 'Alzare la temperature'], correct: 0, exp: 'Specifica lo schema, chiedi "SOLO JSON", temperature bassa.' },
+      { m: 'Coding+IA', q: 'Codice scritto dall\'IA: dovresti sempre…', a: ['Leggerlo e testarlo', 'Copiarlo a occhi chiusi', 'Disattivare i test'], correct: 0, exp: 'Accelera ma può sbagliare: sei tu il responsabile.' },
+      { m: 'Coding+IA', q: 'Limite reale degli assistenti AI?', a: ['Possono inventare API inesistenti', 'Non sanno scrivere testo', 'Solo offline'], correct: 0, exp: 'Possono "allucinare" metodi: verifica nella documentazione.' },
+    ],
+  },
+  english: {
+    name: 'Inglese', emoji: '🟦', course: [
+      { m: 'Phrasal', q: '"give up" significa…', a: ['Arrendersi', 'Iniziare', 'Regalare'], correct: 0, exp: 'give up = arrendersi/smettere. "Don\'t give up."' },
+      { m: 'Phrasal', q: '"look forward to" significa…', a: ['Non vedere l\'ora', 'Guardare avanti per strada', 'Dimenticare'], correct: 0, exp: 'I look forward to seeing you = non vedo l\'ora di vederti.' },
+      { m: 'Phrasal', q: '"turn off" significa…', a: ['Spegnere', 'Accendere', 'Girare'], correct: 0, exp: 'turn off the light = spegni la luce. (turn on = accendere)' },
+      { m: 'Grammar', q: 'Passato di "go" è…', a: ['went', 'goed', 'gone (con have)'], correct: 0, exp: 'go → went (past simple); gone è il participio (have gone).' },
+      { m: 'Grammar', q: 'Comparativo di "good" è…', a: ['better', 'gooder', 'more good'], correct: 0, exp: 'good → better → the best (irregolare).' },
+      { m: 'Grammar', q: 'Plurale di "child" è…', a: ['children', 'childs', 'childes'], correct: 0, exp: 'child → children (irregolare).' },
+      { m: 'Grammar', q: '"used to" esprime…', a: ['Un\'abitudine passata', 'Il futuro', 'Un ordine'], correct: 0, exp: 'I used to play = una volta giocavo (non più).' },
+      { m: 'Vocab', q: '"borrow" vs "lend": tu prendi in prestito →', a: ['borrow', 'lend', 'rent out'], correct: 0, exp: 'borrow = prendere in prestito; lend = dare in prestito.' },
+      { m: 'Vocab', q: '"make" o "do"? __ a decision', a: ['make', 'do', 'have'], correct: 0, exp: 'make a decision/mistake; do homework/the dishes.' },
+      { m: 'Prepos', q: 'Preposizione: "__ night" (di notte)', a: ['at', 'in', 'on'], correct: 0, exp: 'at night, in the morning, on Monday.' },
+      { m: 'Grammar', q: '"I have __ that film" (visto)', a: ['seen', 'saw', 'see'], correct: 0, exp: 'Present perfect: have + participio (seen).' },
+      { m: 'Vocab', q: '"advice" (consiglio) è…', a: ['Non numerabile (no "advices")', 'Sempre plurale', 'Un verbo'], correct: 0, exp: 'advice è uncountable: "some advice", non "advices".' },
+      { m: 'Grammar', q: '"would rather" significa…', a: ['Preferirei', 'Dovrei', 'Vorrei dire'], correct: 0, exp: 'I would rather stay = preferirei restare.' },
+      { m: 'Vocab', q: '"actually" significa…', a: ['In realtà / veramente', 'Attualmente', 'Velocemente'], correct: 0, exp: 'False friend! actually = in realtà; "attualmente" = currently.' },
+    ],
+  },
+  sapere: {
+    name: 'Cultura & Sapere', emoji: '🟪', course: [
+      { m: 'Scienza', q: 'Formula chimica dell\'acqua?', a: ['H₂O', 'CO₂', 'O₂'], correct: 0, exp: 'Acqua = H₂O: due idrogeni e un ossigeno.' },
+      { m: 'Scienza', q: 'Organo che pompa il sangue?', a: ['Il cuore', 'I polmoni', 'Il fegato'], correct: 0, exp: 'Il cuore pompa il sangue nel corpo.' },
+      { m: 'Scienza', q: 'Gas che respiriamo per vivere?', a: ['Ossigeno', 'Azoto', 'Elio'], correct: 0, exp: 'Respiriamo ossigeno (O₂) ed espelliamo CO₂.' },
+      { m: 'Scienza', q: 'La fotosintesi produce…', a: ['Ossigeno', 'Anidride carbonica', 'Metano'], correct: 0, exp: 'Le piante usano CO₂+luce e rilasciano ossigeno.' },
+      { m: 'Spazio', q: 'Pianeta più grande del sistema solare?', a: ['Giove', 'Saturno', 'Terra'], correct: 0, exp: 'Giove è il più grande, un gigante gassoso.' },
+      { m: 'Spazio', q: 'Primo uomo sulla Luna?', a: ['Neil Armstrong (1969)', 'Yuri Gagarin', 'Buzz Aldrin'], correct: 0, exp: 'Armstrong, missione Apollo 11, 1969. Gagarin = primo in orbita.' },
+      { m: 'Storia', q: 'Caduta del Muro di Berlino?', a: ['1989', '1945', '2001'], correct: 0, exp: '9 novembre 1989: fine simbolica della Guerra Fredda.' },
+      { m: 'Arte', q: 'Chi dipinse la Gioconda?', a: ['Leonardo da Vinci', 'Michelangelo', 'Raffaello'], correct: 0, exp: 'La Gioconda (Mona Lisa) è di Leonardo, al Louvre.' },
+      { m: 'Geografia', q: 'Capitale dell\'Australia?', a: ['Canberra', 'Sydney', 'Melbourne'], correct: 0, exp: 'Canberra (non Sydney, errore comune).' },
+      { m: 'Matematica', q: 'Valore approssimato di π (pi greco)?', a: ['3,14', '2,72', '1,61'], correct: 0, exp: 'π ≈ 3,14159. (2,72 ≈ e; 1,61 ≈ sezione aurea.)' },
+      { m: 'Scienza', q: 'Cosa contiene il DNA?', a: ['L\'informazione genetica', 'Energia pura', 'Ossigeno'], correct: 0, exp: 'Il DNA codifica le istruzioni genetiche degli esseri viventi.' },
+      { m: 'Geografia', q: 'Quanti sono i continenti (modello classico)?', a: ['7', '4', '10'], correct: 0, exp: 'Modello a 7: Africa, Asia, Europa, Nord/Sud America, Oceania, Antartide.' },
+      { m: 'Scienza', q: 'Velocità della luce ~', a: ['300.000 km/s', '300 km/h', '30.000 km/s'], correct: 0, exp: '~299.792 km/s nel vuoto.' },
+      { m: 'Storia', q: 'In che secolo siamo (anni 2000)?', a: ['XXI', 'XX', 'XIX'], correct: 0, exp: 'Dal 2001 siamo nel XXI secolo (21°).' },
+    ],
+  },
+};
 
-  // ── Modulo 2 — Concetti di IA ──
-  { m: 'IA: concetti', q: 'Cos\'è il <b>Machine Learning</b>?', a: ['Imparare schemi dai dati invece di regole scritte a mano', 'Un linguaggio di programmazione', 'Un tipo di computer'], correct: 0, exp: 'Nel ML il modello impara dai dati a fare previsioni, invece di seguire regole programmate esplicitamente.' },
-  { m: 'IA: concetti', q: 'Differenza tra <b>training</b> e <b>inference</b>?', a: ['Training = il modello impara; inference = il modello usa ciò che ha imparato', 'Sono sinonimi', 'Inference avviene prima del training'], correct: 0, exp: 'Training è la fase (lenta, costosa) in cui il modello apprende; inference è quando lo usi per rispondere.' },
-  { m: 'IA: concetti', q: 'Cos\'è il <b>dataset</b>?', a: ['L\'insieme di dati usati per addestrare/valutare il modello', 'Il codice del modello', 'La GPU'], correct: 0, exp: 'Il dataset è la raccolta di esempi da cui il modello impara. Qualità dei dati = qualità del modello.' },
-  { m: 'IA: concetti', q: 'Cos\'è l\'<b>overfitting</b>?', a: ['Il modello memorizza i dati di training e generalizza male sui nuovi', 'Il modello è troppo piccolo', 'Il modello è troppo veloce'], correct: 0, exp: 'Overfitting: impara "a memoria" il training e fallisce su dati nuovi. Si combatte con più dati, regolarizzazione, ecc.' },
-  { m: 'IA: concetti', q: 'Una <b>rete neurale</b> è ispirata a…', a: ['I neuroni del cervello', 'I circuiti elettrici delle case', 'I database SQL'], correct: 0, exp: 'È fatta di "neuroni" artificiali in strati che si passano segnali pesati — vagamente ispirati al cervello.' },
-  { m: 'IA: concetti', q: 'Cosa NON è vero dell\'IA generativa?', a: ['Capisce sempre la verità con certezza', 'Genera testo/immagini nuove', 'Può sbagliare'], correct: 0, exp: 'L\'IA generativa produce contenuti plausibili ma NON ha una garanzia di verità: va sempre verificata.' },
-
-  // ── Modulo 3 — Come funzionano gli LLM ──
-  { m: 'LLM', q: 'Cos\'è un <b>token</b> in un LLM?', a: ['Un pezzo di testo (parola o sotto-parola) che il modello elabora', 'Una password', 'Un file'], correct: 0, exp: 'Gli LLM lavorano a token: parole o frammenti. Costo e limiti si misurano in token, non in caratteri.' },
-  { m: 'LLM', q: 'Cosa fa un LLM, in sostanza?', a: ['Predice il token successivo più probabile', 'Cerca su Google', 'Esegue codice'], correct: 0, exp: 'Un LLM genera testo predicendo, un token alla volta, qual è il più probabile dato il contesto.' },
-  { m: 'LLM', q: 'Cos\'è la <b>context window</b>?', a: ['Quanto testo il modello può "tenere a mente" in una volta', 'La finestra del browser', 'La velocità della GPU'], correct: 0, exp: 'È il limite di token (input+output) che il modello considera. Oltre, "dimentica" le parti più vecchie.' },
-  { m: 'LLM', q: 'Cos\'è un\'<b>allucinazione</b>?', a: ['Quando il modello inventa info false ma plausibili', 'Quando va in crash', 'Quando risponde lento'], correct: 0, exp: 'L\'LLM può produrre affermazioni convincenti ma sbagliate: verifica sempre i fatti importanti.' },
-  { m: 'LLM', q: 'La <b>temperature</b> alta rende l\'output…', a: ['Più creativo/vario (ma meno preciso)', 'Più veloce', 'Più corto'], correct: 0, exp: 'Temperature alta = più casualità/creatività; bassa = più deterministico e preciso (utile per JSON/codice).' },
-  { m: 'LLM', q: 'Perché stessi prompt danno a volte risposte diverse?', a: ['C\'è casualità nel campionamento dei token', 'Il modello cambia ogni giorno', 'È un bug'], correct: 0, exp: 'Il sampling introduce variabilità (specie con temperature > 0). Per ripetibilità si abbassa la temperature.' },
-
-  // ── Modulo 4 — Prompt engineering ──
-  { m: 'Prompt', q: 'Qual è il modo migliore per un buon prompt?', a: ['Essere specifico su compito, contesto e formato di output', 'Scrivere il meno possibile', 'Usare solo emoji'], correct: 0, exp: 'Specificità vince: di\' cosa vuoi, dai contesto e indica il formato (es. "rispondi in JSON con campi x,y").' },
-  { m: 'Prompt', q: 'Cos\'è il <b>few-shot prompting</b>?', a: ['Dare alcuni esempi nel prompt per guidare l\'output', 'Usare pochi token', 'Fare poche domande'], correct: 0, exp: 'Few-shot = includi 2-3 esempi input→output. Il modello imita lo schema: spesso migliora molto la qualità.' },
-  { m: 'Prompt', q: 'Assegnare un <b>ruolo</b> ("Sei un esperto di…") serve a…', a: ['Orientare tono e competenza della risposta', 'Velocizzare il modello', 'Ridurre i costi'], correct: 0, exp: 'Il ruolo (system prompt) imposta prospettiva e stile: "Sei un nutrizionista preciso…" cambia le risposte.' },
-  { m: 'Prompt', q: 'Per ottenere <b>JSON valido</b> conviene…', a: ['Chiedere esplicitamente il formato e mostrarne lo schema', 'Sperare vada bene', 'Alzare la temperature'], correct: 0, exp: 'Specifica lo schema esatto e chiedi "SOLO JSON". Temperature bassa aiuta la struttura.' },
-  { m: 'Prompt', q: 'Il <b>chain-of-thought</b> ("ragiona passo passo") aiuta…', a: ['Nei problemi che richiedono ragionamento a step', 'A risparmiare token', 'A generare immagini'], correct: 0, exp: 'Far ragionare il modello a step migliora compiti logici/matematici, al costo di più token.' },
-  { m: 'Prompt', q: 'Se la risposta è troppo lunga, cosa chiedi?', a: ['Un vincolo esplicito ("max 3 frasi")', 'Di alzare la temperature', 'Di usare più token'], correct: 0, exp: 'Vincoli espliciti su lunghezza/formato ("massimo 3 punti elenco") controllano l\'output.' },
-
-  // ── Modulo 5 — Programmare con l'IA ──
-  { m: 'Coding+IA', q: 'Usando l\'IA per scrivere codice, dovresti sempre…', a: ['Leggere e testare il codice prima di fidarti', 'Copiarlo senza guardare', 'Disattivare i test'], correct: 0, exp: 'L\'IA accelera ma può sbagliare: rivedi e testa. Sei tu responsabile del codice che spedisci.' },
-  { m: 'Coding+IA', q: 'Per far correggere un bug all\'IA, cosa dai?', a: ['Il codice + l\'errore esatto + cosa ti aspetti', 'Solo "non funziona"', 'Niente, indovina lei'], correct: 0, exp: 'Contesto preciso = fix preciso: incolla l\'errore, il codice rilevante e il comportamento atteso.' },
-  { m: 'Coding+IA', q: 'Qual è un limite reale degli assistenti AI di coding?', a: ['Possono inventare API/funzioni inesistenti', 'Non sanno scrivere testo', 'Funzionano solo offline'], correct: 0, exp: 'Possono "allucinare" metodi che non esistono: verifica nella documentazione reale.' },
-  { m: 'Coding+IA', q: 'Modo efficace di lavorare con l\'IA su un progetto?', a: ['Passi piccoli e verificabili, un pezzo alla volta', 'Chiedere tutto in un colpo gigante', 'Mai dare contesto'], correct: 0, exp: 'Iterazioni piccole e testabili battono il "fai tutto": meno errori, più controllo.' },
-  { m: 'Coding+IA', q: 'Cos\'è un <b>MCP / tool</b> per un agente AI?', a: ['Uno strumento esterno che l\'IA può usare (es. cercare, leggere file)', 'Un linguaggio nuovo', 'Una GPU'], correct: 0, exp: 'I tool danno "braccia" all\'IA: leggere file, chiamare API, eseguire azioni oltre al solo testo.' },
-];
-
-export const TOTAL = COURSE.length;
+export const GATE_IDS = Object.keys(GATES);
 export const levelOf = (xp) => Math.floor((xp || 0) / 100) + 1;
 const RANKS = ['E', 'D', 'C', 'B', 'A', 'S'];
-export const rankOf = (state) => RANKS[Math.min(RANKS.length - 1, Math.floor(((state?.done || 0) / TOTAL) * RANKS.length))];
 
 export function initLearn() {
-  return { idx: 0, xp: 0, streak: 0, lastDay: '', correct: 0, total: 0, done: 0, pending: null };
+  return { xp: 0, streak: 0, lastDay: '', prog: {}, srs: [], pending: null, activeGate: 'prog-ia', boss: null };
 }
 
-const today = () => new Date().toISOString().slice(0, 10);
-
-// Costruisce la prossima domanda (in ordine, poi cicla). Non muta lo stato.
-export function nextQuestion(state) {
-  const qid = (state.idx || 0) % TOTAL;
-  const q = COURSE[qid];
-  const letters = ['A', 'B', 'C', 'D'];
-  const text =
-    `${GATE.emoji} <b>${GATE.name}</b> · <i>${q.m}</i>\n` +
-    `Domanda ${qid + 1}/${TOTAL}\n\n` +
-    `${q.q}\n\n` +
-    q.a.map((opt, i) => `${letters[i]}) ${opt}`).join('\n');
-  const inline_keyboard = [q.a.map((_, i) => ({ text: letters[i], callback_data: `lq|${qid}|${i}` }))];
-  return { qid, text, keyboard: { inline_keyboard } };
+// Migra/normalizza lo stato (compatibilità col vecchio MVP a singolo gate)
+export function normalize(state) {
+  const s = state ? { ...state } : initLearn();
+  if (!s.prog) s.prog = {};
+  if (s.idx != null && !s.prog['prog-ia']) { s.prog['prog-ia'] = { idx: s.idx, correct: s.correct || 0, total: s.total || 0, done: s.done || 0 }; delete s.idx; }
+  if (!Array.isArray(s.srs)) s.srs = [];
+  if (!s.activeGate || !GATES[s.activeGate]) s.activeGate = 'prog-ia';
+  if (s.boss === undefined) s.boss = null;
+  if (!s.prog[s.activeGate]) s.prog[s.activeGate] = { idx: 0, correct: 0, total: 0, done: 0 };
+  return s;
 }
 
-// Valuta una risposta. Ritorna { ok, correct, exp, xpGained, state } (state aggiornato).
-export function gradeAnswer(state, qid, opt) {
-  const s = { ...state };
-  if (s.pending !== qid) return { ok: false, state: s }; // già risposta o non in attesa
-  const q = COURSE[qid];
+const gateProg = (s, g) => (s.prog[g] || (s.prog[g] = { idx: 0, correct: 0, total: 0, done: 0 }));
+export const rankOf = (s, g) => { const p = gateProg(s, g); const tot = GATES[g].course.length; return RANKS[Math.min(RANKS.length - 1, Math.floor(((p.done || 0) / tot) * RANKS.length))]; };
+
+function renderQ(gate, qid, { review = false, boss = false, n = 0, of = 0 } = {}) {
+  const G = GATES[gate], q = G.course[qid];
+  const tag = boss ? `🐉 <b>BOSS</b> ${n}/${of}` : review ? '🔁 <b>Ripasso</b>' : `Domanda ${qid + 1}/${G.course.length}`;
+  const text = `${G.emoji} <b>${G.name}</b> · <i>${q.m}</i>\n${tag}\n\n${q.q}\n\n` + q.a.map((o, i) => `${LETTERS[i]}) ${o}`).join('\n');
+  const prefix = boss ? 'bq' : 'lq';
+  const inline_keyboard = [q.a.map((_, i) => ({ text: LETTERS[i], callback_data: `${prefix}|${gate}|${qid}|${i}` }))];
+  return { gate, qid, text, keyboard: { inline_keyboard } };
+}
+
+// Prossima domanda normale: prima un ripasso SRS scaduto, altrimenti avanti nel gate
+export function nextQuestion(state, gateOverride) {
+  const s = normalize(state);
+  const due = s.srs.find((it) => it.due <= today() && GATES[it.gate]);
+  if (due) return { ...renderQ(due.gate, due.qid, { review: true }), review: true };
+  const gate = gateOverride && GATES[gateOverride] ? gateOverride : s.activeGate;
+  const qid = (gateProg(s, gate).idx || 0) % GATES[gate].course.length;
+  return { ...renderQ(gate, qid, {}), review: false };
+}
+
+function srsUpdate(s, gate, qid, correct) {
+  const i = s.srs.findIndex((it) => it.gate === gate && it.qid === qid);
+  if (correct) {
+    if (i >= 0) {
+      const box = (s.srs[i].box || 0) + 1;
+      if (box >= SRS_DAYS.length) s.srs.splice(i, 1);             // imparata: esce dal ripasso
+      else { s.srs[i].box = box; s.srs[i].due = addDays(SRS_DAYS[box]); }
+    }
+  } else {
+    if (i >= 0) { s.srs[i].box = 0; s.srs[i].due = addDays(SRS_DAYS[0]); }
+    else s.srs.push({ gate, qid, box: 0, due: addDays(SRS_DAYS[0]) });
+  }
+}
+
+export function gradeAnswer(state, gate, qid, opt) {
+  const s = normalize(state);
+  if (!s.pending || s.pending.gate !== gate || s.pending.qid !== qid) return { ok: false, state: s };
+  const wasReview = !!s.pending.review;
+  const q = GATES[gate].course[qid];
   const correct = opt === q.correct;
-  const xpGained = correct ? 15 : 3;
-  s.xp = (s.xp || 0) + xpGained;
-  s.total = (s.total || 0) + 1;
-  s.done = (s.done || 0) + 1;
-  if (correct) s.correct = (s.correct || 0) + 1;
-  // streak: +1 al primo quiz di un nuovo giorno
-  const d = today();
-  if (s.lastDay !== d) { s.streak = (s.streak || 0) + 1; s.lastDay = d; }
-  s.idx = (s.idx || 0) + 1;
+  const xpGained = correct ? (wasReview ? 10 : 15) : 3;
+  s.xp += xpGained;
+  const p = gateProg(s, gate);
+  p.total += 1;
+  if (correct) p.correct += 1;
+  if (!wasReview) { p.idx = (p.idx || 0) + 1; p.done = Math.min(GATES[gate].course.length, (p.done || 0) + 1); }
+  srsUpdate(s, gate, qid, correct);
+  const d = today(); if (s.lastDay !== d) { s.streak = (s.streak || 0) + 1; s.lastDay = d; }
   s.pending = null;
-  const correctLetter = ['A', 'B', 'C', 'D'][q.correct];
-  return { ok: true, correct, exp: `${q.exp}${correct ? '' : ` (Giusta: ${correctLetter})`}`, xpGained, state: s };
+  return { ok: true, correct, exp: `${q.exp}${correct ? '' : ` (Giusta: ${LETTERS[q.correct]})`}`, xpGained, review: wasReview, state: s };
+}
+
+// ── BOSS QUIZ (6 domande, niente spiegazioni, bonus finale) ──────────────────
+export function startBoss(state, gateOverride) {
+  const s = normalize(state);
+  const gate = gateOverride && GATES[gateOverride] ? gateOverride : s.activeGate;
+  const n = Math.min(6, GATES[gate].course.length);
+  const ids = [...GATES[gate].course.keys()].sort(() => Math.random() - 0.5).slice(0, n);
+  s.boss = { gate, ids, cur: 0, score: 0 };
+  s.pending = null;
+  return s;
+}
+export function bossQuestion(state) {
+  const s = normalize(state);
+  if (!s.boss) return null;
+  const { gate, ids, cur } = s.boss;
+  const qid = ids[cur];
+  return renderQ(gate, qid, { boss: true, n: cur + 1, of: ids.length });
+}
+export function gradeBoss(state, gate, qid, opt) {
+  const s = normalize(state);
+  if (!s.boss || s.boss.gate !== gate) return { ok: false, state: s };
+  const q = GATES[gate].course[qid];
+  const correct = opt === q.correct;
+  if (correct) s.boss.score += 1;
+  s.boss.cur += 1;
+  const done = s.boss.cur >= s.boss.ids.length;
+  if (done) {
+    const score = s.boss.score, of = s.boss.ids.length;
+    const bonus = score * 12 + (score === of ? 40 : 0); // perfetto = +40
+    s.xp += bonus;
+    const d = today(); if (s.lastDay !== d) { s.streak = (s.streak || 0) + 1; s.lastDay = d; }
+    s.boss = null;
+    return { ok: true, correct, done: true, score, of, bonus, state: s };
+  }
+  return { ok: true, correct, done: false, state: s };
 }
 
 export function progressLine(state) {
-  const lvl = levelOf(state.xp);
-  const acc = state.total ? Math.round((state.correct / state.total) * 100) : 0;
-  return `⚡ Lv ${lvl} · ${state.xp} XP · 🔥 ${state.streak || 0}gg · rank ${rankOf(state)} · ${acc}% giuste`;
+  const s = normalize(state);
+  const p = gateProg(s, s.activeGate);
+  const acc = p.total ? Math.round((p.correct / p.total) * 100) : 0;
+  return `⚡ Lv ${levelOf(s.xp)} · ${s.xp} XP · 🔥 ${s.streak || 0}gg · rank ${rankOf(s, s.activeGate)} · ${acc}%`;
 }
 
 export function progressCard(state) {
-  const lvl = levelOf(state.xp);
-  const pct = Math.min(100, Math.round(((state.done || 0) / TOTAL) * 100));
+  const s = normalize(state);
+  const due = s.srs.filter((it) => it.due <= today()).length;
+  const gates = GATE_IDS.map((g) => {
+    const p = gateProg(s, g), tot = GATES[g].course.length;
+    const pct = Math.min(100, Math.round(((p.done || 0) / tot) * 100));
+    return `${GATES[g].emoji} ${GATES[g].name}: ${pct}% · rank ${rankOf(s, g)}${g === s.activeGate ? ' ◀︎' : ''}`;
+  }).join('\n');
   return (
-    `${GATE.emoji} <b>Gate: ${GATE.name}</b>\n\n` +
-    `⚡ Livello <b>${lvl}</b> · <b>${state.xp || 0}</b> XP\n` +
-    `🔥 Streak: <b>${state.streak || 0}</b> giorni\n` +
-    `🎖️ Rank Gate: <b>${rankOf(state)}</b>\n` +
-    `📚 Avanzamento corso: <b>${pct}%</b>\n` +
-    `🎯 Precisione: <b>${state.total ? Math.round((state.correct / state.total) * 100) : 0}%</b> (${state.correct || 0}/${state.total || 0})\n\n` +
-    `Scrivi /quiz per continuare a salire di livello.`
+    `🚪 <b>Gate della Conoscenza</b>\n\n` +
+    `⚡ Livello <b>${levelOf(s.xp)}</b> · <b>${s.xp || 0}</b> XP\n` +
+    `🔥 Streak: <b>${s.streak || 0}</b> giorni\n` +
+    `🔁 Da ripassare oggi: <b>${due}</b>\n\n` +
+    `${gates}\n\n` +
+    `/quiz per continuare · /gate per cambiare materia · /boss per la sfida`
   );
+}
+
+export function gateButtons() {
+  return { inline_keyboard: [GATE_IDS.map((g) => ({ text: `${GATES[g].emoji} ${GATES[g].name}`, callback_data: `lg|${g}` }))] };
 }
