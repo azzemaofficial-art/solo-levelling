@@ -14,7 +14,7 @@ const VIOLET = [139, 92, 246];
 const CORAL = [255, 111, 97];
 const rgba = (c, a) => `rgba(${c[0]},${c[1]},${c[2]},${a})`;
 
-export default function NeuralIntro({ onDone, duration = 4200 }) {
+export default function NeuralIntro({ onDone, duration = 4800 }) {
   const canvasRef = useRef(null);
   const rafRef = useRef(0);
   const [visible, setVisible] = useState(true);
@@ -98,6 +98,9 @@ export default function NeuralIntro({ onDone, duration = 4200 }) {
     }));
 
     const start = performance.now();
+    const WHITE = [255, 255, 255];
+    let starsSpawned = false;      // climax: la sinapsi esplode in stelle
+    const stars = [];
 
     // silhouette cervello: blob organico "rugoso"
     const brainPath = (scale) => {
@@ -207,6 +210,48 @@ export default function NeuralIntro({ onDone, duration = 4200 }) {
         const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r * 7);
         g.addColorStop(0, rgba(p.c, p.a)); g.addColorStop(1, rgba(p.c, 0));
         ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p.x, p.y, p.r * 7, 0, 7); ctx.fill();
+      }
+
+      // ── CLIMAX ORCHESTRATO: la sinapsi centrale sboccia ed esplode in stelle ──
+      const bloom = Math.max(0, Math.min(1, (el - 0.58) / 0.34));
+      if (bloom > 0) {
+        if (!starsSpawned) {
+          starsSpawned = true;
+          for (let i = 0; i < 170; i++) {
+            const a = Math.random() * Math.PI * 2;
+            const sp = 2 + Math.random() * 10;
+            stars.push({ x: cx, y: cy, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, r: 0.6 + Math.random() * 1.9, c: Math.random() < 0.5 ? GOLD : Math.random() < 0.5 ? WHITE : CORAL, life: 1 });
+          }
+        }
+        const flash = Math.sin(bloom * Math.PI); // 0→1→0: il lampo del fiore
+        const fg = ctx.createRadialGradient(cx, cy, 0, cx, cy, R * 1.7);
+        fg.addColorStop(0, rgba(WHITE, 0.5 * flash)); fg.addColorStop(0.35, rgba(GOLD, 0.4 * flash)); fg.addColorStop(1, rgba(GOLD, 0));
+        ctx.fillStyle = fg; ctx.beginPath(); ctx.arc(cx, cy, R * 1.7, 0, 7); ctx.fill();
+        // shockwave: due anelli che si espandono
+        for (let k = 0; k < 2; k++) {
+          const rt = bloom - k * 0.16;
+          if (rt > 0 && rt < 1) {
+            ctx.strokeStyle = rgba(k === 0 ? WHITE : GOLD, (1 - rt) * 0.5);
+            ctx.lineWidth = 2.5 - rt * 1.5;
+            ctx.beginPath(); ctx.arc(cx, cy, rt * Math.max(W, H) * 0.62, 0, 7); ctx.stroke();
+          }
+        }
+        // le stelle che erompono
+        for (const s of stars) {
+          s.x += s.vx; s.y += s.vy; s.vx *= 0.985; s.vy *= 0.985; s.life -= 0.012;
+          if (s.life <= 0) continue;
+          const g = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, s.r * 4);
+          g.addColorStop(0, rgba(s.c, s.life)); g.addColorStop(1, rgba(s.c, 0));
+          ctx.fillStyle = g; ctx.beginPath(); ctx.arc(s.x, s.y, s.r * 4, 0, 7); ctx.fill();
+        }
+        // dendrite finale: un filamento luminoso che si protende nel buio
+        if (bloom > 0.5) {
+          const dlen = (bloom - 0.5) * 2 * R * 1.3;
+          const grd = ctx.createLinearGradient(cx, cy, cx + dlen, cy - dlen * 0.4);
+          grd.addColorStop(0, rgba(GOLD, 0.6)); grd.addColorStop(1, rgba(GOLD, 0));
+          ctx.strokeStyle = grd; ctx.lineWidth = 1.6;
+          ctx.beginPath(); ctx.moveTo(cx, cy); ctx.quadraticCurveTo(cx + dlen * 0.5, cy - dlen * 0.1, cx + dlen, cy - dlen * 0.4); ctx.stroke();
+        }
       }
 
       ctx.globalCompositeOperation = 'source-over';
