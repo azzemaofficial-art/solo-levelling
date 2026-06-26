@@ -1,6 +1,8 @@
 // Telegram Webhook — riceve messaggi, analizza con Nemotron 550B, risponde + deep link al sito
 // Setup: GET /api/telegram/webhook?setup=1
 
+import { GATE, nextQuestion, gradeAnswer, progressLine, progressCard, initLearn } from './learn.js';
+
 const NVIDIA_BASE = 'https://integrate.api.nvidia.com/v1';
 const GROQ_BASE   = 'https://api.groq.com/openai/v1';
 const SITE_URL = 'https://solo-levelling-gold.vercel.app';
@@ -627,6 +629,26 @@ async function sendTelegramMessage(token, chatId, text, replyMarkup) {
   });
 }
 
+// ── Gate della Conoscenza: helper Telegram ──────────────────────────────────
+async function answerCbq(token, cbqId, text = '') {
+  try {
+    await fetch(`https://api.telegram.org/bot${token}/answerCallbackQuery`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ callback_query_id: cbqId, text }),
+    });
+  } catch (_) {}
+}
+
+const LEARN_KEY = (id) => `tg_learn:${id}`;
+
+async function sendQuiz(token, id) {
+  let st = (await kvGet(LEARN_KEY(id))) || initLearn();
+  const { qid, text, keyboard } = nextQuestion(st);
+  st.pending = qid;
+  await kvSet(LEARN_KEY(id), st, 2592000);
+  await sendTelegramMessage(token, id, text, keyboard);
+}
+
 export default async function handler(req, res) {
   const botToken = process.env.SHADOW_BOT_TOKEN;
   const chatId = process.env.SHADOW_BOT_CHAT_ID;
@@ -643,6 +665,35 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(200).json({ ok: true });
 
   const update = req.body;
+
+  // ── Tap sui bottoni quiz (callback_query) — Gate della Conoscenza ──
+  const cbq = update?.callback_query;
+  if (cbq) {
+    const cChat = cbq.message?.chat?.id;
+    if (chatId && String(cChat) !== String(chatId)) { await answerCbq(botToken, cbq.id); return res.status(200).json({ ok: true }); }
+    const data = String(cbq.data || '');
+    if (data === 'lnext') {
+      await answerCbq(botToken, cbq.id);
+      await sendQuiz(botToken, cChat);
+      return res.status(200).json({ ok: true });
+    }
+    if (data.startsWith('lq|')) {
+      const [, qidS, optS] = data.split('|');
+      let st = (await kvGet(LEARN_KEY(cChat))) || initLearn();
+      const g = gradeAnswer(st, parseInt(qidS, 10), parseInt(optS, 10));
+      if (!g.ok) { await answerCbq(botToken, cbq.id, 'Già risposta'); return res.status(200).json({ ok: true }); }
+      await kvSet(LEARN_KEY(cChat), g.state, 2592000);
+      await kvPush(`tg_queue:${cChat}`, { type: 'learn_xp', amount: g.xpGained, gate: GATE.id, ts: Date.now() }); // sync XP all'app
+      await answerCbq(botToken, cbq.id, g.correct ? `✅ +${g.xpGained} XP` : '❌');
+      const head = g.correct ? `✅ <b>Giusto!</b> +${g.xpGained} XP` : `❌ <b>Sbagliato.</b> +${g.xpGained} XP`;
+      await sendTelegramMessage(botToken, cChat, `${head}\n💡 ${g.exp}\n\n${progressLine(g.state)}`,
+        { inline_keyboard: [[{ text: '▶️ Prossima domanda', callback_data: 'lnext' }]] });
+      return res.status(200).json({ ok: true });
+    }
+    await answerCbq(botToken, cbq.id);
+    return res.status(200).json({ ok: true });
+  }
+
   const message = update?.message;
   if (!message) return res.status(200).json({ ok: true });
 
@@ -691,9 +742,23 @@ export default async function handler(req, res) {
       '📷 <b>Foto</b> — manda la foto del piatto, stimo io gli alimenti\n' +
       '🎤 <b>Vocale</b> — dimmi a voce cosa hai mangiato\n\n' +
       '📅 /oggi — totale calorie e macro di oggi\n' +
-      '💊 /integratori — lista integratori consigliati\n\n' +
+      '💊 /integratori — lista integratori consigliati\n' +
+      '🧠 /quiz — Gate della Conoscenza: impara a pillole (+XP, livelli, streak)\n' +
+      '📈 /progressi — il tuo livello, streak e avanzamento corso\n\n' +
       'I macro sono calcolati su database nutrizionale reale, non stimati a caso 📊'
     );
+    return res.status(200).json({ ok: true });
+  }
+
+  // ── Gate della Conoscenza ──
+  if (text === '/quiz' || text === '/studia') {
+    await sendQuiz(botToken, incomingChatId);
+    return res.status(200).json({ ok: true });
+  }
+  if (text === '/progressi') {
+    const st = (await kvGet(LEARN_KEY(incomingChatId))) || initLearn();
+    await sendTelegramMessage(botToken, incomingChatId, progressCard(st),
+      { inline_keyboard: [[{ text: '🧠 Fai un quiz', callback_data: 'lnext' }]] });
     return res.status(200).json({ ok: true });
   }
 
