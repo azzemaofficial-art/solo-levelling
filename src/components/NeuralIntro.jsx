@@ -121,6 +121,7 @@ export default function NeuralIntro({ onDone, duration = 4800 }) {
       const el = Math.min(1, (now - start) / (duration - 700));
       const ease = 1 - Math.pow(1 - el, 3);
       const zoom = 1 + ease * 0.22;       // push-in cinematografico
+      const settle = el > 0.85 ? Math.max(0, 1 - (el - 0.85) / 0.15) : 1; // finale "congelato"
       const reveal = Math.min(1, el / 0.55); // build-up rete
       if (el > 0.5 && !titleIn) setTitleIn(true);
 
@@ -137,7 +138,7 @@ export default function NeuralIntro({ onDone, duration = 4800 }) {
       // particelle di sfondo (lontane)
       for (const p of parts) {
         if (p.z >= 0.55) continue;
-        p.x += p.vx; p.y += p.vy;
+        p.x += p.vx * settle; p.y += p.vy * settle;
         if (p.x < 0) p.x = W; if (p.x > W) p.x = 0; if (p.y < 0) p.y = H; if (p.y > H) p.y = 0;
         const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r * 6);
         g.addColorStop(0, rgba(p.c, p.a * 0.6)); g.addColorStop(1, rgba(p.c, 0));
@@ -205,7 +206,7 @@ export default function NeuralIntro({ onDone, duration = 4800 }) {
       // particelle in primo piano
       for (const p of parts) {
         if (p.z < 0.55) continue;
-        p.x += p.vx; p.y += p.vy;
+        p.x += p.vx * settle; p.y += p.vy * settle;
         if (p.x < 0) p.x = W; if (p.x > W) p.x = 0; if (p.y < 0) p.y = H; if (p.y > H) p.y = 0;
         const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r * 7);
         g.addColorStop(0, rgba(p.c, p.a)); g.addColorStop(1, rgba(p.c, 0));
@@ -238,7 +239,7 @@ export default function NeuralIntro({ onDone, duration = 4800 }) {
         }
         // le stelle che erompono
         for (const s of stars) {
-          s.x += s.vx; s.y += s.vy; s.vx *= 0.985; s.vy *= 0.985; s.life -= 0.012;
+          s.x += s.vx * settle; s.y += s.vy * settle; s.vx *= 0.985; s.vy *= 0.985; s.life -= 0.012;
           if (s.life <= 0) continue;
           const g = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, s.r * 4);
           g.addColorStop(0, rgba(s.c, s.life)); g.addColorStop(1, rgba(s.c, 0));
@@ -279,18 +280,26 @@ export default function NeuralIntro({ onDone, duration = 4800 }) {
           className="absolute inset-0 z-[999] cursor-pointer overflow-hidden"
           style={{ background: '#02030a' }}>
           <canvas ref={canvasRef} className="absolute inset-0" />
-          <motion.div
-            initial={{ opacity: 0, y: 16 }} animate={{ opacity: titleIn ? 1 : 0, y: titleIn ? 0 : 16 }}
-            transition={{ duration: 0.8, ease: 'easeOut' }}
-            className="absolute inset-x-0 bottom-[18%] flex flex-col items-center pointer-events-none">
-            <p className="text-[26px] font-black tracking-[0.2em] text-white"
-              style={{ fontFamily: 'Orbitron, sans-serif', textShadow: '0 0 24px rgba(255,210,74,0.55), 0 0 50px rgba(37,99,235,0.5)' }}>
-              SOLO LEVELING
-            </p>
-            <p className="mt-1.5 text-[10px] tracking-[0.45em] uppercase" style={{ color: 'rgba(255,210,74,0.85)' }}>
+          <div className="absolute inset-x-0 bottom-[18%] flex flex-col items-center pointer-events-none">
+            <div className="flex" style={{ fontFamily: 'Orbitron, sans-serif' }}>
+              {'SOLO LEVELING'.split('').map((ch, i) => (
+                <motion.span key={i}
+                  initial={{ opacity: 0, y: 18, filter: 'blur(10px)' }}
+                  animate={titleIn ? { opacity: 1, y: 0, filter: 'blur(0px)' } : {}}
+                  transition={{ delay: 0.045 * i, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+                  className="text-[26px] font-black tracking-[0.18em] text-white"
+                  style={{ textShadow: '0 0 24px rgba(255,210,74,0.55), 0 0 50px rgba(37,99,235,0.5)', whiteSpace: 'pre' }}>
+                  {ch}
+                </motion.span>
+              ))}
+            </div>
+            <motion.p
+              initial={{ opacity: 0, y: 8 }} animate={{ opacity: titleIn ? 1 : 0, y: titleIn ? 0 : 8 }}
+              transition={{ delay: 0.75, duration: 0.8, ease: 'easeOut' }}
+              className="mt-2 text-[10px] tracking-[0.45em] uppercase" style={{ color: 'rgba(255,210,74,0.85)' }}>
               System Awakening
-            </p>
-          </motion.div>
+            </motion.p>
+          </div>
           <p className="absolute bottom-5 right-5 text-[9px] tracking-widest uppercase text-white/35 pointer-events-none">tap per saltare</p>
         </motion.div>
       )}
