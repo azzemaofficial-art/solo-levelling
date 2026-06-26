@@ -791,6 +791,7 @@ export default async function handler(req, res) {
       '🧠 /quiz — Gate della Conoscenza: impara a pillole (+XP, livelli, streak)\n' +
       '🚪 /gate — cambia materia (Programmazione+IA · Inglese · Cultura)\n' +
       '🐉 /boss — Boss Quiz: 6 domande, bonus XP\n' +
+      '📖 /lezione — micro-lezione di teoria sul Gate attivo\n' +
       '📈 /progressi — livello, streak, ripassi e avanzamento\n\n' +
       'I macro sono calcolati su database nutrizionale reale, non stimati a caso 📊'
     );
@@ -810,6 +811,20 @@ export default async function handler(req, res) {
     let st = startBoss((await kvGet(LEARN_KEY(incomingChatId))) || initLearn());
     await sendTelegramMessage(botToken, incomingChatId, `🐉 <b>BOSS QUIZ</b> — ${GATES[st.boss.gate].name}\n${st.boss.ids.length} domande, niente aiuti. Pronto?`);
     await sendBossQuestion(botToken, incomingChatId, st);
+    return res.status(200).json({ ok: true });
+  }
+  if (text === '/lezione' || text === '/teoria') {
+    const st = normLearn((await kvGet(LEARN_KEY(incomingChatId))) || initLearn());
+    const G = GATES[st.activeGate];
+    await sendTelegramMessage(botToken, incomingChatId, `📖 Preparo una micro-lezione di <b>${G.name}</b>…`);
+    const out = await callAI([
+      { role: 'system', content: 'Sei un tutor che spiega in modo semplice e memorabile, in italiano. Micro-lezione di ~120 parole su UN concetto chiave, con un esempio concreto. Usa <b>grassetto</b> per i termini. SOLO testo e tag <b> (niente markdown #, *, backtick). Niente ragionamento visibile.' },
+      { role: 'user', content: `Materia: ${G.name}. Fammi una micro-lezione su un concetto utile e non banale di questa materia, per chi impara a pillole. Scegli tu il sotto-argomento.` },
+    ], true);
+    const lesson = String(out || '').replace(/<think>[\s\S]*?<\/think>/gi, '').replace(/[#*`]/g, '').trim();
+    await sendTelegramMessage(botToken, incomingChatId,
+      lesson ? `📖 <b>${G.name} — micro-lezione</b>\n\n${lesson}` : '⚠️ Lezione non disponibile, riprova tra poco.',
+      { inline_keyboard: [[{ text: '🧠 Quiz su questo', callback_data: 'lnext' }]] });
     return res.status(200).json({ ok: true });
   }
   if (text === '/progressi') {
