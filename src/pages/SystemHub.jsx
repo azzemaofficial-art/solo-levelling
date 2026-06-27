@@ -4851,7 +4851,6 @@ Rispondi SOLO JSON valido:
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.01 }}
         whileHover={{ y: -3, scale: 1.005 }}
         transition={{ delay: 0.01, type: 'spring', stiffness: 300, damping: 20 }}
         className="relative mb-6 overflow-hidden rounded-2xl p-5"
