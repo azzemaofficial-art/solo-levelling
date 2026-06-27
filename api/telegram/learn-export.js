@@ -2,7 +2,7 @@
 //  Export dati per l'Alveare Obsidian — usato dal ponte (tools/obsidian-hive.mjs).
 //  Auth: ?secret=<HIVE_SECRET>. Ritorna progresso apprendimento + campioni coach.
 // ─────────────────────────────────────────────────────────────────────────────
-import { GATES, GATE_IDS, normalize, levelOf } from './learn.js';
+import { GATES, GATE_IDS, normalize, levelOf } from '../../lib/learn.js';
 
 async function kvGet(key) {
   const url = process.env.KV_REST_API_URL, token = process.env.KV_REST_API_TOKEN;

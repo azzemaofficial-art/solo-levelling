@@ -1,7 +1,7 @@
 // Telegram Webhook — riceve messaggi, analizza con Nemotron 550B, risponde + deep link al sito
 // Setup: GET /api/telegram/webhook?setup=1
 
-import { GATES, GATE_IDS, nextQuestion, gradeAnswer, startBoss, bossQuestion, gradeBoss, progressLine, progressCard, initLearn, normalize as normLearn, gateButtons, levelOf, loadGen, baseCount, existingStems } from './learn.js';
+import { GATES, GATE_IDS, nextQuestion, gradeAnswer, startBoss, bossQuestion, gradeBoss, progressLine, progressCard, initLearn, normalize as normLearn, gateButtons, levelOf, loadGen, baseCount, existingStems } from '../../lib/learn.js';
 
 const NVIDIA_BASE = 'https://integrate.api.nvidia.com/v1';
 const GROQ_BASE   = 'https://api.groq.com/openai/v1';

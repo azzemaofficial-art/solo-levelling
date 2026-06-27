@@ -5,7 +5,7 @@
 //  Slot opzionale: ?slot=morning|afternoon|evening (ruota la materia).
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { nextQuestion, initLearn, normalize, loadGen } from './learn.js';
+import { nextQuestion, initLearn, normalize, loadGen } from '../../lib/learn.js';
 
 async function kvGet(key) {
   const url = process.env.KV_REST_API_URL, token = process.env.KV_REST_API_TOKEN;
