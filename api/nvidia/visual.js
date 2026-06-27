@@ -1070,6 +1070,11 @@ export default async function handler(req, res) {
   if (sample) {
     const chatId = req.body?.chatId || process.env.SHADOW_BOT_CHAT_ID;
     if (!chatId) return res.status(400).json({ ok: false, error: 'chatId mancante' });
+    // reset: azzera il dataset campioni (es. per togliere dati di test)
+    if (sample.reset) {
+      await kvSetRaw(`coach_samples:${chatId}`, []);
+      return res.status(200).json({ ok: true, reset: true, stored: 0 });
+    }
     const a = sample.angles || {};
     const row = {
       ts: new Date().toISOString(),
