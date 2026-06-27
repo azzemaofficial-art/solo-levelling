@@ -1,0 +1,41 @@
+// ─────────────────────────────────────────────────────────────────────────────
+//  Export dati per l'Alveare Obsidian — usato dal ponte (tools/obsidian-hive.mjs).
+//  Auth: ?secret=<HIVE_SECRET>. Ritorna progresso apprendimento + campioni coach.
+// ─────────────────────────────────────────────────────────────────────────────
+import { GATES, GATE_IDS, normalize, levelOf } from './learn.js';
+
+async function kvGet(key) {
+  const url = process.env.KV_REST_API_URL, token = process.env.KV_REST_API_TOKEN;
+  if (!url || !token) return null;
+  try {
+    const r = await fetch(`${url}/get/${encodeURIComponent(key)}`, { headers: { Authorization: `Bearer ${token}` } });
+    const d = await r.json();
+    if (d?.result == null) return null;
+    try { return JSON.parse(d.result); } catch { return d.result; }
+  } catch { return null; }
+}
+
+export default async function handler(req, res) {
+  const secret = process.env.HIVE_SECRET;
+  if (!secret) return res.status(403).json({ error: 'HIVE_SECRET non impostato su Vercel' });
+  const provided = req.query?.secret || (req.headers?.authorization || '').replace('Bearer ', '');
+  if (provided !== secret) return res.status(401).json({ error: 'unauthorized' });
+
+  const chatId = req.query?.chat_id || process.env.SHADOW_BOT_CHAT_ID;
+  if (!chatId) return res.status(400).json({ error: 'chat_id mancante' });
+
+  const learn = normalize((await kvGet(`tg_learn:${chatId}`)) || {});
+  const samples = (await kvGet(`coach_samples:${chatId}`)) || [];
+
+  const gates = GATE_IDS.map((g) => {
+    const p = learn.prog?.[g] || { done: 0, correct: 0, total: 0 };
+    return { id: g, name: GATES[g].name, emoji: GATES[g].emoji, done: p.done || 0, correct: p.correct || 0, total: p.total || 0, size: GATES[g].course.length };
+  });
+
+  return res.status(200).json({
+    chatId: String(chatId),
+    exportedAt: new Date().toISOString(),
+    learn: { xp: learn.xp || 0, level: levelOf(learn.xp), streak: learn.streak || 0, srsDue: (learn.srs || []).length, activeGate: learn.activeGate, gates },
+    samples: Array.isArray(samples) ? samples : [],
+  });
+}
