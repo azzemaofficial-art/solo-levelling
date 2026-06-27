@@ -102,6 +102,19 @@ export const GATES = {
 };
 
 export const GATE_IDS = Object.keys(GATES);
+
+// Baseline curata (snapshot) — le domande generate dall'AI si APPENDONO a questa.
+const BASE = {};
+for (const g of GATE_IDS) BASE[g] = GATES[g].course.slice();
+// Carica/aggiorna il pool generato per un gate (append-only → gli indici restano stabili).
+export function loadGen(gate, gen) {
+  if (!GATES[gate]) return;
+  GATES[gate].course = BASE[gate].concat(Array.isArray(gen) ? gen : []);
+}
+export const baseCount = (gate) => (BASE[gate] ? BASE[gate].length : 0);
+// Stem (testo) delle domande esistenti, per evitare duplicati in generazione
+export const existingStems = (gate) => (GATES[gate]?.course || []).map((x) => String(x.q).replace(/<[^>]+>/g, '')).slice(-40);
+
 export const levelOf = (xp) => Math.floor((xp || 0) / 100) + 1;
 const RANKS = ['E', 'D', 'C', 'B', 'A', 'S'];
 

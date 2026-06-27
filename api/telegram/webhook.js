@@ -1,7 +1,7 @@
 // Telegram Webhook — riceve messaggi, analizza con Nemotron 550B, risponde + deep link al sito
 // Setup: GET /api/telegram/webhook?setup=1
 
-import { GATES, GATE_IDS, nextQuestion, gradeAnswer, startBoss, bossQuestion, gradeBoss, progressLine, progressCard, initLearn, normalize as normLearn, gateButtons, levelOf } from './learn.js';
+import { GATES, GATE_IDS, nextQuestion, gradeAnswer, startBoss, bossQuestion, gradeBoss, progressLine, progressCard, initLearn, normalize as normLearn, gateButtons, levelOf, loadGen, baseCount, existingStems } from './learn.js';
 
 const NVIDIA_BASE = 'https://integrate.api.nvidia.com/v1';
 const GROQ_BASE   = 'https://api.groq.com/openai/v1';
@@ -640,10 +640,49 @@ async function answerCbq(token, cbqId, text = '') {
 }
 
 const LEARN_KEY = (id) => `tg_learn:${id}`;
+const GENQ_KEY = (gate) => `tg_genq:${gate}`;
+
+// Carica nel motore le domande generate dall'AI per un gate (pool infinito)
+async function hydrateGen(gate) {
+  if (!GATES[gate]) return [];
+  const gen = (await kvGet(GENQ_KEY(gate))) || [];
+  loadGen(gate, gen);
+  return gen;
+}
+
+// Genera N nuove domande via AI (gratis) e le appende al pool del gate
+async function generateQuestions(gate, n = 6) {
+  if (!GATES[gate]) return 0;
+  const avoid = existingStems(gate).slice(-25).join(' | ');
+  const out = await callAI([
+    { role: 'system', content: 'Generi domande a quiz a scelta multipla in italiano, accurate e di livello intermedio. Rispondi SOLO con JSON valido, nessun altro testo, niente ragionamento.' },
+    { role: 'user', content: `Tema: ${GATES[gate].name}. Genera ${n} domande NUOVE e varie (concetti utili, non banali), DIVERSE da queste già usate: ${avoid}\nOgnuna con 3 opzioni plausibili (una sola giusta) e una spiegazione di 1-2 frasi.\nFormato ESATTO: {"questions":[{"m":"modulo","q":"testo domanda","a":["op1","op2","op3"],"correct":0,"exp":"spiegazione"}]}\nVaria l'indice "correct" tra 0,1,2.` },
+  ], true);
+  if (!out) return 0;
+  let parsed;
+  try { const m = out.replace(/<think>[\s\S]*?<\/think>/gi, '').match(/\{[\s\S]*\}/); parsed = m ? JSON.parse(m[0]) : null; } catch { parsed = null; }
+  const arr = Array.isArray(parsed?.questions) ? parsed.questions : [];
+  const valid = arr.filter((q) => q && typeof q.q === 'string' && Array.isArray(q.a) && q.a.length >= 2 && Number.isInteger(q.correct) && q.correct >= 0 && q.correct < q.a.length && typeof q.exp === 'string')
+    .map((q) => ({ m: String(q.m || 'AI').slice(0, 24), q: String(q.q).slice(0, 240), a: q.a.slice(0, 4).map((x) => String(x).slice(0, 120)), correct: q.correct, exp: String(q.exp).slice(0, 300) }));
+  if (!valid.length) return 0;
+  const cur = (await kvGet(GENQ_KEY(gate))) || [];
+  const next = cur.concat(valid).slice(-80); // cap pool
+  await kvSet(GENQ_KEY(gate), next, 2592000 * 3);
+  loadGen(gate, next);
+  return valid.length;
+}
 
 async function sendQuiz(token, id, gateOverride) {
   let st = normLearn((await kvGet(LEARN_KEY(id))) || initLearn());
+  const gate = gateOverride && GATES[gateOverride] ? gateOverride : st.activeGate;
+  await hydrateGen(gate);
+  // pool esaurito? genera nuove domande infinite via AI
+  const p = st.prog[gate] || { done: 0 };
+  if ((p.done || 0) >= GATES[gate].course.length) {
+    await generateQuestions(gate, 6);
+  }
   const q = nextQuestion(st, gateOverride);
+  await hydrateGen(q.gate); // assicura il pool del gate effettivo (anche se review di altro gate)
   st.pending = { gate: q.gate, qid: q.qid, review: !!q.review };
   await kvSet(LEARN_KEY(id), st, 2592000);
   await sendTelegramMessage(token, id, q.text, q.keyboard);
@@ -688,7 +727,9 @@ export default async function handler(req, res) {
     // 🐉 avvia boss da bottone
     if (data === 'lboss') {
       await answerCbq(botToken, cbq.id);
-      let st = startBoss(normLearn((await kvGet(LEARN_KEY(cChat))) || initLearn()));
+      const raw = normLearn((await kvGet(LEARN_KEY(cChat))) || initLearn());
+      await hydrateGen(raw.activeGate);
+      let st = startBoss(raw);
       await sendTelegramMessage(botToken, cChat, `🐉 <b>BOSS QUIZ</b> — ${GATES[st.boss.gate].name}\n${st.boss.ids.length} domande. Pronto?`);
       await sendBossQuestion(botToken, cChat, st);
       return res.status(200).json({ ok: true });
@@ -705,6 +746,7 @@ export default async function handler(req, res) {
     // 🐉 risposta BOSS
     if (data.startsWith('bq|')) {
       const [, gate, qidS, optS] = data.split('|');
+      await hydrateGen(gate);
       let st = normLearn((await kvGet(LEARN_KEY(cChat))) || initLearn());
       const g = gradeBoss(st, gate, parseInt(qidS, 10), parseInt(optS, 10));
       if (!g.ok) { await answerCbq(botToken, cbq.id); return res.status(200).json({ ok: true }); }
@@ -724,6 +766,7 @@ export default async function handler(req, res) {
     // 📖 spiegazione più lunga (AI) su una domanda
     if (data.startsWith('lx|')) {
       const [, gate, qidS] = data.split('|');
+      await hydrateGen(gate);
       const q = GATES[gate]?.course[parseInt(qidS, 10)];
       await answerCbq(botToken, cbq.id, 'Spiego meglio…');
       if (!q) return res.status(200).json({ ok: true });
@@ -740,6 +783,7 @@ export default async function handler(req, res) {
     // risposta quiz normale
     if (data.startsWith('lq|')) {
       const [, gate, qidS, optS] = data.split('|');
+      await hydrateGen(gate);
       let st = normLearn((await kvGet(LEARN_KEY(cChat))) || initLearn());
       const g = gradeAnswer(st, gate, parseInt(qidS, 10), parseInt(optS, 10));
       if (!g.ok) { await answerCbq(botToken, cbq.id, 'Già risposta'); return res.status(200).json({ ok: true }); }
@@ -827,7 +871,9 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true });
   }
   if (text === '/boss') {
-    let st = startBoss((await kvGet(LEARN_KEY(incomingChatId))) || initLearn());
+    const raw = normLearn((await kvGet(LEARN_KEY(incomingChatId))) || initLearn());
+    await hydrateGen(raw.activeGate);
+    let st = startBoss(raw);
     await sendTelegramMessage(botToken, incomingChatId, `🐉 <b>BOSS QUIZ</b> — ${GATES[st.boss.gate].name}\n${st.boss.ids.length} domande, niente aiuti. Pronto?`);
     await sendBossQuestion(botToken, incomingChatId, st);
     return res.status(200).json({ ok: true });

@@ -5,7 +5,7 @@
 //  Slot opzionale: ?slot=morning|afternoon|evening (ruota la materia).
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { nextQuestion, initLearn, normalize } from './learn.js';
+import { nextQuestion, initLearn, normalize, loadGen } from './learn.js';
 
 async function kvGet(key) {
   const url = process.env.KV_REST_API_URL, token = process.env.KV_REST_API_TOKEN;
@@ -51,6 +51,11 @@ export default async function handler(req, res) {
 
   const KEY = `tg_learn:${chatId}`;
   let st = normLoad(await kvGet(KEY));
+  // idrata il pool generato per i gate coinvolti (override + attivo), così include le domande AI
+  for (const g of [gateOverride, st.activeGate].filter(Boolean)) {
+    const gen = await kvGet(`tg_genq:${g}`);
+    if (gen) loadGen(g, gen);
+  }
   const q = nextQuestion(st, gateOverride);
   st.pending = { gate: q.gate, qid: q.qid, review: !!q.review };
   await kvSet(KEY, st, 2592000);
