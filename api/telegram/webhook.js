@@ -721,6 +721,22 @@ export default async function handler(req, res) {
       }
       return res.status(200).json({ ok: true });
     }
+    // 📖 spiegazione più lunga (AI) su una domanda
+    if (data.startsWith('lx|')) {
+      const [, gate, qidS] = data.split('|');
+      const q = GATES[gate]?.course[parseInt(qidS, 10)];
+      await answerCbq(botToken, cbq.id, 'Spiego meglio…');
+      if (!q) return res.status(200).json({ ok: true });
+      const plain = (t) => String(t || '').replace(/<[^>]+>/g, '');
+      const out = await callAI([
+        { role: 'system', content: 'Sei un tutor chiaro e brillante. Spiega in italiano, ~120 parole, PERCHÉ la risposta corretta è giusta e perché le altre no, con un esempio concreto e memorabile. SOLO testo semplice e tag <b> (niente markdown #, *, backtick). Niente ragionamento visibile.' },
+        { role: 'user', content: `Domanda: ${plain(q.q)}\nRisposta corretta: ${q.a[q.correct]}\nOpzioni sbagliate: ${q.a.filter((_, i) => i !== q.correct).join('; ')}\nSpiegami meglio.` },
+      ], true);
+      const exp = String(out || '').replace(/<think>[\s\S]*?<\/think>/gi, '').replace(/[#*`]/g, '').trim();
+      await sendTelegramMessage(botToken, cChat, exp ? `📖 ${exp}` : `💡 ${q.exp}`,
+        { inline_keyboard: [[{ text: '▶️ Prossima domanda', callback_data: 'lnext' }]] });
+      return res.status(200).json({ ok: true });
+    }
     // risposta quiz normale
     if (data.startsWith('lq|')) {
       const [, gate, qidS, optS] = data.split('|');
@@ -732,7 +748,10 @@ export default async function handler(req, res) {
       await answerCbq(botToken, cbq.id, g.correct ? `✅ +${g.xpGained} XP` : '❌');
       const head = g.correct ? `✅ <b>Giusto!</b> +${g.xpGained} XP${g.review ? ' (ripasso)' : ''}` : `❌ <b>Sbagliato.</b> +${g.xpGained} XP`;
       await sendTelegramMessage(botToken, cChat, `${head}\n💡 ${g.exp}\n\n${progressLine(g.state)}`,
-        { inline_keyboard: [[{ text: '▶️ Prossima domanda', callback_data: 'lnext' }]] });
+        { inline_keyboard: [
+          [{ text: '📖 Spiega meglio', callback_data: `lx|${gate}|${qidS}` }],
+          [{ text: '▶️ Prossima domanda', callback_data: 'lnext' }],
+        ] });
       return res.status(200).json({ ok: true });
     }
     await answerCbq(botToken, cbq.id);

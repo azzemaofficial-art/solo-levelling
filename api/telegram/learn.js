@@ -127,9 +127,13 @@ export const rankOf = (s, g) => { const p = gateProg(s, g); const tot = GATES[g]
 function renderQ(gate, qid, { review = false, boss = false, n = 0, of = 0 } = {}) {
   const G = GATES[gate], q = G.course[qid];
   const tag = boss ? `🐉 <b>BOSS</b> ${n}/${of}` : review ? '🔁 <b>Ripasso</b>' : `Domanda ${qid + 1}/${G.course.length}`;
-  const text = `${G.emoji} <b>${G.name}</b> · <i>${q.m}</i>\n${tag}\n\n${q.q}\n\n` + q.a.map((o, i) => `${LETTERS[i]}) ${o}`).join('\n');
+  // Mescola le opzioni: la risposta giusta NON è più sempre la A. La callback_data
+  // porta l'indice ORIGINALE, così la correzione resta corretta senza stato extra.
+  const order = q.a.map((_, i) => i).sort(() => Math.random() - 0.5);
+  const text = `${G.emoji} <b>${G.name}</b> · <i>${q.m}</i>\n${tag}\n\n${q.q}\n\n` +
+    order.map((orig, d) => `${LETTERS[d]}) ${q.a[orig]}`).join('\n');
   const prefix = boss ? 'bq' : 'lq';
-  const inline_keyboard = [q.a.map((_, i) => ({ text: LETTERS[i], callback_data: `${prefix}|${gate}|${qid}|${i}` }))];
+  const inline_keyboard = [order.map((orig, d) => ({ text: LETTERS[d], callback_data: `${prefix}|${gate}|${qid}|${orig}` }))];
   return { gate, qid, text, keyboard: { inline_keyboard } };
 }
 
@@ -172,7 +176,7 @@ export function gradeAnswer(state, gate, qid, opt) {
   srsUpdate(s, gate, qid, correct);
   const d = today(); if (s.lastDay !== d) { s.streak = (s.streak || 0) + 1; s.lastDay = d; }
   s.pending = null;
-  return { ok: true, correct, exp: `${q.exp}${correct ? '' : ` (Giusta: ${LETTERS[q.correct]})`}`, xpGained, review: wasReview, state: s };
+  return { ok: true, correct, exp: `${q.exp}${correct ? '' : `\n✔️ Giusta: <b>${q.a[q.correct]}</b>`}`, xpGained, review: wasReview, state: s };
 }
 
 // ── BOSS QUIZ (6 domande, niente spiegazioni, bonus finale) ──────────────────
