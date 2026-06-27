@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Eye, Lightbulb, Trophy, ScanSearch, Play, Pause, Target, FlipHorizontal2, Volume2, VolumeX, Bone, X, Move } from 'lucide-react';
+import { Eye, Lightbulb, Trophy, ScanSearch, Play, Pause, Target, FlipHorizontal2, Volume2, VolumeX, Bone, X, Move, ThumbsUp, ThumbsDown } from 'lucide-react';
 
 // ─── Quick prompts ─────────────────────────────────────────────────────────────
 const COACH_QUICK = [
@@ -984,6 +984,10 @@ function VisualCoach() {
   const lastLandmarksRef = useRef(null); // ultimi landmark MediaPipe → angoli reali per l'AI
   const observationsRef = useRef([]);  // osservazioni accumulate in auto (osserva N → 1 verdetto)
   const [observeProgress, setObserveProgress] = useState(0);
+  // ── Cattura dati per l'alveare: ogni verdetto = 1 campione (angoli + esito + 👍/👎) ──
+  const pendingSampleRef = useRef(null); // ultimo verdetto in attesa di etichetta/invio
+  const [sampleFeedback, setSampleFeedback] = useState(null); // null | 'shown' | 'up' | 'down'
+  const [sampleCount, setSampleCount] = useState(0);          // campioni inviati in sessione
   const [framingHint, setFramingHint] = useState('');     // avviso "inquadra il corpo"
   const [trackQuality, setTrackQuality] = useState('none'); // full | upper | partial | none
   const [repCount, setRepCount] = useState(0);            // conta-ripetizioni (guidato)
@@ -1273,6 +1277,53 @@ function VisualCoach() {
     return p;
   }, [sessionContext, pastSessions]);
 
+  // ── ALVEARE: invia un campione coach al cloud (KV → ponte Obsidian) ─────────
+  const postSample = useCallback(async (row) => {
+    if (!row) return;
+    try {
+      const r = await fetch('/api/nvidia/visual', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sample: row, mode }),
+      });
+      if (r.ok) setSampleCount((n) => n + 1);
+    } catch (_) { /* silenzioso: la cattura non deve mai disturbare la sessione */ }
+  }, [mode]);
+
+  // Mette in staging un nuovo verdetto: se ce n'era uno non etichettato, lo invia (label vuota).
+  const stageSample = useCallback((verdict, angles, alerts) => {
+    if (pendingSampleRef.current) postSample(pendingSampleRef.current); // flush del precedente
+    pendingSampleRef.current = {
+      exercise: mode,
+      verdict: (verdict || '').split('\n')[0].slice(0, 200),
+      angles: angles || {},
+      alerts: alerts || [],
+      label: '',
+    };
+    setSampleFeedback('shown');
+  }, [mode, postSample]);
+
+  // L'utente etichetta l'ultimo verdetto (👍 utile / 👎 sbagliato) → invio immediato.
+  const labelSample = useCallback((label) => {
+    const row = pendingSampleRef.current;
+    if (!row) return;
+    pendingSampleRef.current = null;
+    postSample({ ...row, label });
+    setSampleFeedback(label);
+    setTimeout(() => setSampleFeedback(null), 1600);
+  }, [postSample]);
+
+  // Flush best-effort dell'ultimo campione non etichettato all'uscita (unmount / cambio disciplina).
+  useEffect(() => () => {
+    const row = pendingSampleRef.current;
+    if (row && navigator.sendBeacon) {
+      try {
+        navigator.sendBeacon('/api/nvidia/visual',
+          new Blob([JSON.stringify({ sample: row, mode })], { type: 'application/json' }));
+      } catch (_) {}
+      pendingSampleRef.current = null;
+    }
+  }, [mode]);
+
   const captureAndAnalyze = useCallback(async () => {
     if (!videoRef.current || !canvasRef.current || analyzingRef.current) return;
     analyzingRef.current = true;
@@ -1292,6 +1343,7 @@ function VisualCoach() {
       // Display SUBITO e persistente (non sparisce); la voce va in coda separata
       setAnalysis({ content: data.content, provider: data.provider, time: new Date().toLocaleTimeString('it-IT') });
       enqueueSpeak(data.content);
+      stageSample(data.content, {}, []); // cattura per l'alveare (angoli non calcolati in manuale)
       // Store last 3 feedbacks to avoid repetition
       feedbackHistoryRef.current = [data.content.split('\n')[0], ...feedbackHistoryRef.current].slice(0, 3);
       // Accumulate all feedbacks for session analysis
@@ -1307,13 +1359,13 @@ function VisualCoach() {
     } catch (err) {
       setAnalysis({ content: '⚠️ ' + err.message, provider: null, time: new Date().toLocaleTimeString('it-IT') });
     } finally { setAnalyzing(false); analyzingRef.current = false; }
-  }, [mode, buildPrompt, currentDisc, enqueueSpeak]);
+  }, [mode, buildPrompt, currentDisc, enqueueSpeak, stageSample]);
 
   // ── PRECISIONE: angoli reali dallo scheletro + smoothing + framing + segnali ──
   const poseHistRef = useRef([]);
   const computePose = useCallback(() => {
     const lm = lastLandmarksRef.current;
-    if (!lm || lm.length < 29) return { framingOk: false, quality: 'none', hint: '', alerts: [] };
+    if (!lm || lm.length < 29) return { framingOk: false, quality: 'none', hint: '', alerts: [], angles: {} };
     const vis = (i) => lm[i]?.visibility ?? 1;
     const ang = (a, b, c) => {
       const A = lm[a], B = lm[b], C = lm[c];
@@ -1352,7 +1404,7 @@ function VisualCoach() {
       if (vis(16) > 0.4 && vis(12) > 0.4 && lm[16].y > lm[12].y + 0.08) alerts.push('guardia dx bassa (mano sotto la spalla)');
     }
     if (lean != null && lean > 38) alerts.push('busto troppo inclinato');
-    return { framingOk, quality, hint: parts.join(', '), alerts };
+    return { framingOk, quality, hint: parts.join(', '), alerts, angles: { ...sm, lean } };
   }, [mode]);
 
   // ── AUTO: il maestro osserva in silenzio, poi UN verdetto (no voce ogni tick) ──
@@ -1403,6 +1455,7 @@ function VisualCoach() {
         if (verRes.ok && data.content) {
           setAnalysis({ content: data.content, provider: data.provider, time: new Date().toLocaleTimeString('it-IT') });
           enqueueSpeak(data.content);
+          stageSample(data.content, pose.angles, pose.alerts); // cattura per l'alveare (angoli reali)
           feedbackHistoryRef.current = [data.content.split('\n')[0], ...feedbackHistoryRef.current].slice(0, 3);
           sessionFeedbacksRef.current = [...sessionFeedbacksRef.current, data.content].slice(0, 30);
           if (isSparring(mode) && data.content) {
@@ -1416,7 +1469,7 @@ function VisualCoach() {
     } catch (_) {
       // silenzioso: tieni l'ultimo verdetto a schermo
     } finally { setAnalyzing(false); analyzingRef.current = false; }
-  }, [mode, buildPrompt, currentDisc, enqueueSpeak, computePose, skeletonOn]);
+  }, [mode, buildPrompt, currentDisc, enqueueSpeak, computePose, skeletonOn, stageSample]);
 
   const analyzeSession = useCallback(async () => {
     const feedbacks = sessionFeedbacksRef.current;
@@ -1833,6 +1886,9 @@ function VisualCoach() {
                   </span>
                 )}
                 <div className="h-px flex-1" style={{ background: `linear-gradient(90deg, ${C.violet.hex}66, transparent)` }} />
+                {sampleCount > 0 && (
+                  <span className="text-[9px] font-mono font-bold flex-shrink-0" style={{ color: '#fbbf24' }} title="Campioni raccolti per l'alveare">🐝 {sampleCount}</span>
+                )}
                 {analysis?.time && <p className="text-[9px] font-mono flex-shrink-0" style={{ color: '#6b7280' }}>{analysis.time}</p>}
               </div>
               {analysis?.content
@@ -1855,6 +1911,32 @@ function VisualCoach() {
                         {parts.VISTO && <p className="mt-1.5 text-[11px] text-emerald-200/80 pl-1.5 flex items-center gap-1.5"><Eye size={12} className="shrink-0" /> {parts.VISTO}</p>}
                         {parts.PERCHÉ && <p className="mt-0.5 text-[11px] text-violet-200/70 italic pl-1.5 flex items-center gap-1.5"><Lightbulb size={12} className="shrink-0" /> {parts.PERCHÉ}</p>}
                         {parts.PUNTO && <p className="mt-1 text-[11px] font-bold text-amber-300 pl-1.5 flex items-center gap-1.5"><Trophy size={12} className="shrink-0" /> {parts.PUNTO}</p>}
+                        {/* 👍/👎 — etichetta il consiglio: alimenta il dataset dell'alveare */}
+                        {sampleFeedback && (
+                          <div className="mt-2.5 flex items-center gap-2 pl-1.5">
+                            {sampleFeedback === 'up' || sampleFeedback === 'down' ? (
+                              <motion.span initial={{ scale: 0.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+                                className="text-[11px] font-bold flex items-center gap-1"
+                                style={{ color: sampleFeedback === 'up' ? '#34d399' : '#f87171' }}>
+                                {sampleFeedback === 'up' ? <><ThumbsUp size={12} /> Salvato, grazie</> : <><ThumbsDown size={12} /> Annotato</>}
+                              </motion.span>
+                            ) : (
+                              <>
+                                <span className="text-[10px] text-gray-400">Consiglio giusto?</span>
+                                <motion.button whileTap={{ scale: 0.85 }} onClick={() => labelSample('up')}
+                                  className="w-7 h-7 rounded-lg flex items-center justify-center"
+                                  style={{ background: 'rgba(16,185,129,0.16)', border: '1px solid rgba(16,185,129,0.4)' }} aria-label="Consiglio utile">
+                                  <ThumbsUp size={13} className="text-emerald-300" />
+                                </motion.button>
+                                <motion.button whileTap={{ scale: 0.85 }} onClick={() => labelSample('down')}
+                                  className="w-7 h-7 rounded-lg flex items-center justify-center"
+                                  style={{ background: 'rgba(248,113,113,0.14)', border: '1px solid rgba(248,113,113,0.38)' }} aria-label="Consiglio sbagliato">
+                                  <ThumbsDown size={13} className="text-red-300" />
+                                </motion.button>
+                              </>
+                            )}
+                          </div>
+                        )}
                       </motion.div>
                     );
                   })()

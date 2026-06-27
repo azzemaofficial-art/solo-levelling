@@ -1023,6 +1023,29 @@ async function callBrainJSON({ system, user, maxTokens = 600, temperature = 0.6 
   return null;
 }
 
+// ─── KV (Upstash REST) — cattura campioni coach per l'alveare Obsidian ────────
+async function kvGetRaw(key) {
+  const url = process.env.KV_REST_API_URL, token = process.env.KV_REST_API_TOKEN;
+  if (!url || !token) return null;
+  try {
+    const r = await fetch(`${url}/get/${encodeURIComponent(key)}`, { headers: { Authorization: `Bearer ${token}` } });
+    const d = await r.json();
+    if (d?.result == null) return null;
+    try { return JSON.parse(d.result); } catch { return d.result; }
+  } catch { return null; }
+}
+async function kvSetRaw(key, value, ttl = 7776000) {
+  const url = process.env.KV_REST_API_URL, token = process.env.KV_REST_API_TOKEN;
+  if (!url || !token) return;
+  try {
+    await fetch(`${url}/pipeline`, {
+      method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify([['SET', key, JSON.stringify(value), 'EX', String(ttl)]]),
+    });
+  } catch (_) {}
+}
+const num = (v) => (v == null || v === '' || Number.isNaN(Number(v)) ? null : Math.round(Number(v)));
+
 export default async function handler(req, res) {
   if (req.method === 'GET') {
     return res.status(200).json({
@@ -1037,9 +1060,35 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { imageBase64, mimeType = 'image/jpeg', prompt, mode = 'muaythai', observeOnly, observations, generatePlan, drillReview, drill } = req.body || {};
+  const { imageBase64, mimeType = 'image/jpeg', prompt, mode = 'muaythai', observeOnly, observations, generatePlan, drillReview, drill, sample } = req.body || {};
   const disciplineLabel = DISCIPLINE_LABELS[mode] || mode;
   const sparring = /sparring|partner|drill/.test(mode);
+
+  // ── CATTURA CAMPIONE COACH → alveare (nessuna immagine, solo dati) ─────────
+  // Il Visual Coach manda qui ogni verdetto + (opzionale) pollice su/giù dell'utente.
+  // Si accumula in KV coach_samples:<chatId> come array JSON, letto dall'export/ponte.
+  if (sample) {
+    const chatId = req.body?.chatId || process.env.SHADOW_BOT_CHAT_ID;
+    if (!chatId) return res.status(400).json({ ok: false, error: 'chatId mancante' });
+    const a = sample.angles || {};
+    const row = {
+      ts: new Date().toISOString(),
+      exercise: String(sample.exercise || mode || '').slice(0, 40),
+      eL: num(a.eL), eR: num(a.eR), kL: num(a.kL), kR: num(a.kR),
+      hL: num(a.hL), hR: num(a.hR), lean: num(a.lean),
+      alerts: Array.isArray(sample.alerts) ? sample.alerts.slice(0, 6).map((x) => String(x).slice(0, 40)) : [],
+      verdict: String(sample.verdict || '').slice(0, 200),
+      label: sample.label === 'up' || sample.label === 1 ? 'up'
+        : sample.label === 'down' || sample.label === -1 ? 'down' : '',
+    };
+    const KEY = `coach_samples:${chatId}`;
+    const cur = (await kvGetRaw(KEY)) || [];
+    const arr = Array.isArray(cur) ? cur : [];
+    arr.push(row);
+    const capped = arr.slice(-1000); // tieni gli ultimi 1000 campioni
+    await kvSetRaw(KEY, capped);
+    return res.status(200).json({ ok: true, stored: capped.length, sample: row });
+  }
 
   // ── GENERA CIRCUITO (piano drill su misura, nessuna immagine) ──────────────
   if (generatePlan) {
