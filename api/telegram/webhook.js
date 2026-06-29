@@ -537,10 +537,11 @@ async function extractMealFromImage(imageBase64, mimeType) {
 }
 
 // ─── OCR ETICHETTA nutrizionale → macro PRECISI (Nemotron VL) ───
-const LABEL_OCR_PROMPT = `Sei un OCR specializzato in etichette nutrizionali. Leggi i valori dall'etichetta in foto.
-Restituisci SOLO questo JSON valido (numeri puri, niente unità; usa null se un dato manca):
+const LABEL_OCR_PROMPT = `Sei un OCR specializzato in etichette nutrizionali. Leggi OGNI riga della tabella valori.
+Mappa i termini: Energia/Energy→kcal (se in kJ converti: kcal=kJ/4.184), Grassi/Fat→fat, "di cui saturi"→sat_fat, Carboidrati/Carbohydrate→carbs, "di cui zuccheri"→sugars, Fibre/Fibre→fiber, Proteine/Protein→protein, Sale/Salt→salt.
+Restituisci SOLO questo JSON valido (numeri puri, niente unità; null SOLO se la riga è davvero assente):
 {"name":"<nome prodotto se visibile, breve>","basis":"100g|100ml|porzione","portion_g":<grammi di una porzione o null>,"kcal":<n>,"protein":<n>,"carbs":<n>,"sugars":<n|null>,"fat":<n>,"sat_fat":<n|null>,"fiber":<n|null>,"salt":<n|null>}
-"basis" indica a cosa si riferiscono i valori (di solito "100g"). Nessun testo fuori dal JSON.`;
+"basis" = a cosa si riferiscono i valori (di solito "100g"). Leggi attentamente la riga dei grassi. Nessun testo fuori dal JSON.`;
 
 async function extractLabelFromImage(imageBase64, mimeType) {
   // primario: Nemotron VL con la key OCR dedicata; fallback: stack vision esistente
