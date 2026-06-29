@@ -536,6 +536,62 @@ async function extractMealFromImage(imageBase64, mimeType) {
   return parseAIResponse(raw);
 }
 
+// ─── OCR ETICHETTA nutrizionale → macro PRECISI (Nemotron VL) ───
+const LABEL_OCR_PROMPT = `Sei un OCR specializzato in etichette nutrizionali. Leggi i valori dall'etichetta in foto.
+Restituisci SOLO questo JSON valido (numeri puri, niente unità; usa null se un dato manca):
+{"name":"<nome prodotto se visibile, breve>","basis":"100g|100ml|porzione","portion_g":<grammi di una porzione o null>,"kcal":<n>,"protein":<n>,"carbs":<n>,"sugars":<n|null>,"fat":<n>,"sat_fat":<n|null>,"fiber":<n|null>,"salt":<n|null>}
+"basis" indica a cosa si riferiscono i valori (di solito "100g"). Nessun testo fuori dal JSON.`;
+
+async function extractLabelFromImage(imageBase64, mimeType) {
+  // primario: Nemotron VL con la key OCR dedicata; fallback: stack vision esistente
+  const raw =
+    await callVisionNvidia(process.env.NEMOTRON_OCR_API_KEY, 'nvidia/nemotron-nano-12b-v2-vl', imageBase64, mimeType, LABEL_OCR_PROMPT)
+    || await callVisionNvidia(process.env.LLAMA_VISION2_API_KEY, 'meta/llama-3.2-90b-vision-instruct', imageBase64, mimeType, LABEL_OCR_PROMPT)
+    || await callVisionGroqScout(imageBase64, mimeType, LABEL_OCR_PROMPT);
+  if (!raw) return null;
+  try {
+    const m = String(raw).replace(/<think>[\s\S]*?<\/think>/gi, '').match(/\{[\s\S]*\}/);
+    if (!m) return null;
+    const o = JSON.parse(m[0]);
+    const num = (v) => (v == null || v === '' || Number.isNaN(Number(v)) ? null : Number(v));
+    if (num(o.kcal) == null && num(o.protein) == null && num(o.carbs) == null) return null; // niente di utile
+    return {
+      name: String(o.name || 'Prodotto').slice(0, 60),
+      basis: /ml/i.test(o.basis) ? '100ml' : /porz/i.test(o.basis) ? 'porzione' : '100g',
+      portion_g: num(o.portion_g),
+      kcal: num(o.kcal), protein: num(o.protein), carbs: num(o.carbs), sugars: num(o.sugars),
+      fat: num(o.fat), sat_fat: num(o.sat_fat), fiber: num(o.fiber), salt: num(o.salt),
+    };
+  } catch { return null; }
+}
+
+// Normalizza i valori dell'etichetta a "per 100g/ml", poi scala sui grammi consumati
+async function processLabelMeal(botToken, chatId, label, gramsArg, slotArg) {
+  // fattore per portare a 100 unità di base
+  let per100 = (v) => v;
+  if (label.basis === 'porzione' && label.portion_g) per100 = (v) => (v == null ? null : v * 100 / label.portion_g);
+  const grams = gramsArg || (label.basis === 'porzione' && label.portion_g ? label.portion_g : 100);
+  const f = grams / 100;
+  const sc = (v) => (v == null ? 0 : Math.round(per100(v) * f));
+  const m = { kcal: sc(label.kcal), protein: sc(label.protein), carbs: sc(label.carbs), fat: sc(label.fat) };
+  const slot = slotArg || 'merenda';
+  const name = label.name || 'Prodotto';
+
+  await kvPush(`tg_queue:${chatId}`, { type: 'meal', ts: Date.now(), kcal: m.kcal, protein: m.protein, carbs: m.carbs, fat: m.fat, name, slot });
+  const day = await addDaily(chatId, m);
+  await logMeal(chatId, { ts: Date.now(), date: new Date().toISOString().slice(0, 10), slot, name, kcal: m.kcal, protein: m.protein, carbs: m.carbs, fat: m.fat });
+
+  const baseLbl = label.basis === 'porzione' && label.portion_g ? `porzione ${label.portion_g}g` : label.basis;
+  let reply = `🏷️ <b>${name}</b> — etichetta letta\n`;
+  reply += `📦 Per ${grams}g (valori da ${baseLbl}):\n`;
+  reply += `📊 <b>~${m.kcal} kcal</b> · P ${m.protein}g · C ${m.carbs}g · G ${m.fat}g`;
+  if (label.sugars != null) reply += `\n🍬 Zuccheri: ${Math.round(per100(label.sugars) * f)}g`;
+  if (label.salt != null) reply += ` · 🧂 Sale: ${(per100(label.salt) * f).toFixed(1)}g`;
+  reply += `\n\n📅 Oggi: <b>${day.kcal} kcal</b>${day.burn ? ` · 🔥 ${day.burn} bruciate` : ''} (netto ${day.kcal - day.burn})`;
+  reply += `\n💡 <i>Per grammi diversi: rimanda la foto con didascalia es. "etichetta 50g".</i>`;
+  await sendTelegramMessage(botToken, chatId, reply);
+}
+
 // ─── Burn workout via tabella MET (kcal = MET × peso × ore) ───
 const MET_TABLE = [
   { kw: ['corsa', 'corro', 'running', 'jogging'], met: 9.8 },
@@ -839,15 +895,31 @@ export default async function handler(req, res) {
     text = transcript.trim();
   }
 
-  // 📷 Foto del piatto → Vision (Gemini Flash → Groq llama-4-scout) → pasto
+  // 📷 Foto → piatto (vision) OPPURE 🏷️ etichetta nutrizionale (OCR) se la didascalia lo indica
   if (!text && message.photo?.length) {
+    const caption = String(message.caption || '');
+    const isLabel = /etichett|valori\s*nutriz|\bvalori\b|nutrition\s*facts|\blabel\b|confezione|barattolo/i.test(caption);
+    const gMatch = caption.match(/(\d+(?:[.,]\d+)?)\s*(?:g|gr|gramm)/i);
+    const grams = gMatch ? Math.round(parseFloat(gMatch[1].replace(',', '.'))) : null;
+    const slotMatch = caption.match(/colazione|pranzo|cena|merenda/i);
+    const slot = slotMatch ? slotMatch[0].toLowerCase() : null;
     const ph = message.photo[message.photo.length - 1]; // risoluzione massima
     const buf = await getTelegramFile(botToken, ph.file_id);
-    const parsed = buf ? await extractMealFromImage(buf.toString('base64'), 'image/jpeg') : null;
+    if (!buf) {
+      await sendTelegramMessage(botToken, incomingChatId, '⚠️ Non sono riuscito a scaricare la foto. Riprova.');
+      return res.status(200).json({ ok: true });
+    }
+    if (isLabel) {
+      const label = await extractLabelFromImage(buf.toString('base64'), 'image/jpeg');
+      if (label) await processLabelMeal(botToken, incomingChatId, label, grams, slot);
+      else await sendTelegramMessage(botToken, incomingChatId, '⚠️ Non sono riuscito a leggere l\'etichetta. Inquadra bene la <b>tabella valori nutrizionali</b>, con più luce e senza riflessi.');
+      return res.status(200).json({ ok: true });
+    }
+    const parsed = await extractMealFromImage(buf.toString('base64'), 'image/jpeg');
     if (parsed?.type === 'meal' && parsed.items?.length) {
       await processMeal(botToken, incomingChatId, parsed);
     } else {
-      await sendTelegramMessage(botToken, incomingChatId, '⚠️ Non sono riuscito a leggere il piatto. Più luce e inquadratura dall\'alto, oppure scrivi gli alimenti.');
+      await sendTelegramMessage(botToken, incomingChatId, '⚠️ Non sono riuscito a leggere il piatto. Più luce e inquadratura dall\'alto, oppure scrivi gli alimenti.\n💡 Per un\'<b>etichetta</b>: rimanda la foto con didascalia "etichetta" (+ grammi, es. "etichetta 50g").');
     }
     return res.status(200).json({ ok: true });
   }
@@ -861,7 +933,8 @@ export default async function handler(req, res) {
       'Dimmi cosa hai mangiato o che allenamento hai fatto — anche con 🎤 <b>vocale</b> o 📷 <b>foto del piatto</b>:\n\n' +
       '🍽️ <b>Pasto</b> — "Cena: pollo 200g, riso 100g cotto, insalata"\n' +
       '🏋️ <b>Workout</b> — "45 min corsa + 30 min pesi"\n' +
-      '📷 <b>Foto</b> — manda la foto del piatto, stimo io gli alimenti\n' +
+      '📷 <b>Foto piatto</b> — manda la foto del piatto, stimo io gli alimenti\n' +
+      '🏷️ <b>Etichetta</b> — foto della tabella nutrizionale con didascalia "etichetta" (macro precisi dal confezionato; aggiungi i grammi es. "etichetta 50g")\n' +
       '🎤 <b>Vocale</b> — dimmi a voce cosa hai mangiato\n\n' +
       '📅 /oggi — totale calorie e macro di oggi\n' +
       '💊 /integratori — lista integratori consigliati\n' +
