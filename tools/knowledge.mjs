@@ -112,7 +112,7 @@ ${sources.map((s) => `- **${s.title}** — _${s.topic}_ (${s.count} principi)`).
 
 async function main() {
   fs.mkdirSync(PAPERS, { recursive: true });
-  const files = fs.readdirSync(PAPERS).filter((f) => !f.startsWith('.') && /\.(txt|md|pdf)$/i.test(f));
+  const files = fs.readdirSync(PAPERS).filter((f) => !f.startsWith('.') && !f.startsWith('_') && /\.(txt|md|pdf)$/i.test(f));
   if (!files.length) {
     console.log(`📂 Nessun paper in: ${PAPERS}\n   Metti lì file .txt/.md${hasPdftotext ? '/.pdf' : ' (.pdf: installa poppler con "brew install poppler")'} e rilancia.`);
     return;
