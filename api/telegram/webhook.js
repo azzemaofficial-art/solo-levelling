@@ -676,9 +676,10 @@ async function sendQuiz(token, id, gateOverride) {
   let st = normLearn((await kvGet(LEARN_KEY(id))) || initLearn());
   const gate = gateOverride && GATES[gateOverride] ? gateOverride : st.activeGate;
   await hydrateGen(gate);
-  // pool esaurito? genera nuove domande infinite via AI
-  const p = st.prog[gate] || { done: 0 };
-  if ((p.done || 0) >= GATES[gate].course.length) {
+  // pool quasi esaurito? genera nuove domande infinite via AI IN ANTICIPO (su idx, non done
+  // che è cappato a course.length). Così non si arriva mai al wrap "stesse domande".
+  const p = st.prog[gate] || { idx: 0, done: 0 };
+  if ((p.idx || 0) >= GATES[gate].course.length - 2) {
     await generateQuestions(gate, 6);
   }
   const q = nextQuestion(st, gateOverride);
