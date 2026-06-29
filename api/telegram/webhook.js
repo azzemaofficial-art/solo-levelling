@@ -2,6 +2,7 @@
 // Setup: GET /api/telegram/webhook?setup=1
 
 import { GATES, GATE_IDS, nextQuestion, gradeAnswer, startBoss, bossQuestion, gradeBoss, progressLine, progressCard, initLearn, normalize as normLearn, gateButtons, levelOf, loadGen, baseCount, existingStems } from '../../lib/learn.js';
+import { NUTRITION_PRINCIPLES } from '../../lib/knowledgeBase.js';
 
 const NVIDIA_BASE = 'https://integrate.api.nvidia.com/v1';
 const GROQ_BASE   = 'https://api.groq.com/openai/v1';
@@ -724,9 +725,16 @@ async function hydrateGen(gate) {
 async function generateQuestions(gate, n = 6) {
   if (!GATES[gate]) return 0;
   const avoid = existingStems(gate).slice(-25).join(' | ');
+  // Per il gate Scienza: ancora le domande ai PRINCIPI reali della knowledge base
+  // (paper distillati) → quiz fondati sulla scienza raccolta, non inventati.
+  let sourceBlock = '';
+  if (gate === 'scienza' && Array.isArray(NUTRITION_PRINCIPLES) && NUTRITION_PRINCIPLES.length) {
+    const pool = [...NUTRITION_PRINCIPLES].sort(() => Math.random() - 0.5).slice(0, 14);
+    sourceBlock = `\nBASA OGNI DOMANDA su questi PRINCIPI SCIENTIFICI reali (non inventare fatti fuori da questi):\n- ${pool.join('\n- ')}\n`;
+  }
   const out = await callAI([
     { role: 'system', content: 'Generi domande a quiz a scelta multipla in italiano, accurate e di livello intermedio. Rispondi SOLO con JSON valido, nessun altro testo, niente ragionamento.' },
-    { role: 'user', content: `Tema: ${GATES[gate].name}. Genera ${n} domande NUOVE e varie (concetti utili, non banali), DIVERSE da queste già usate: ${avoid}\nOgnuna con 3 opzioni plausibili (una sola giusta) e una spiegazione di 1-2 frasi.\nFormato ESATTO: {"questions":[{"m":"modulo","q":"testo domanda","a":["op1","op2","op3"],"correct":0,"exp":"spiegazione"}]}\nVaria l'indice "correct" tra 0,1,2.` },
+    { role: 'user', content: `Tema: ${GATES[gate].name}. Genera ${n} domande NUOVE e varie (concetti utili, non banali), DIVERSE da queste già usate: ${avoid}${sourceBlock}\nOgnuna con 3 opzioni plausibili (una sola giusta) e una spiegazione di 1-2 frasi.\nFormato ESATTO: {"questions":[{"m":"modulo","q":"testo domanda","a":["op1","op2","op3"],"correct":0,"exp":"spiegazione"}]}\nVaria l'indice "correct" tra 0,1,2.` },
   ], true);
   if (!out) return 0;
   let parsed;
