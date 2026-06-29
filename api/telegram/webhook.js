@@ -2,7 +2,7 @@
 // Setup: GET /api/telegram/webhook?setup=1
 
 import { GATES, GATE_IDS, nextQuestion, gradeAnswer, startBoss, bossQuestion, gradeBoss, progressLine, progressCard, initLearn, normalize as normLearn, gateButtons, levelOf, loadGen, baseCount, existingStems } from '../../lib/learn.js';
-import { NUTRITION_PRINCIPLES } from '../../lib/knowledgeBase.js';
+import { NUTRITION_PRINCIPLES, knowledgePromptFor } from '../../lib/knowledgeBase.js';
 
 const NVIDIA_BASE = 'https://integrate.api.nvidia.com/v1';
 const GROQ_BASE   = 'https://api.groq.com/openai/v1';
@@ -953,7 +953,8 @@ export default async function handler(req, res) {
       '📅 /oggi — totale calorie e macro di oggi\n' +
       '💊 /integratori — lista integratori consigliati\n' +
       '🧠 /quiz — Gate della Conoscenza: impara a pillole (+XP, livelli, streak)\n' +
-      '🚪 /gate — cambia materia (Programmazione+IA · Inglese · Cultura)\n' +
+      '🔬 /scienza — quiz Scienza & Biohacking (dai paper veri)\n' +
+      '🚪 /gate — cambia materia (Programmazione+IA · Inglese · Cultura · 🔬 Scienza)\n' +
       '🐉 /boss — Boss Quiz: 6 domande, bonus XP\n' +
       '📖 /lezione — micro-lezione di teoria sul Gate attivo\n' +
       '📈 /progressi — livello, streak, ripassi e avanzamento\n\n' +
@@ -969,6 +970,14 @@ export default async function handler(req, res) {
   }
   if (text === '/gate' || text === '/materia') {
     await sendTelegramMessage(botToken, incomingChatId, '🚪 Scegli il <b>Gate</b> da studiare:', gateButtons());
+    return res.status(200).json({ ok: true });
+  }
+  // 🔬 scorciatoia: imposta il gate Scienza e manda subito un quiz
+  if (text === '/scienza' || text === '/salute' || text === '/biohacking') {
+    const st = normLearn((await kvGet(LEARN_KEY(incomingChatId))) || initLearn());
+    st.activeGate = 'scienza'; st.pending = null;
+    await kvSet(LEARN_KEY(incomingChatId), st, 2592000);
+    await sendQuiz(botToken, incomingChatId, 'scienza');
     return res.status(200).json({ ok: true });
   }
   if (text === '/boss') {
@@ -1114,7 +1123,14 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true });
   }
 
-  // ── Altro (info / fallback): rispondi col testo dell'LLM ──
-  await sendTelegramMessage(botToken, incomingChatId, parsed?.text || raw);
+  // ── Domanda / consiglio: rispondi col CERVELLO scientifico (knowledge base) ──
+  const profile = await kvGet(`tg_profile:${incomingChatId}`);
+  const profLine = profile?.weightKg ? ` Profilo utente: ${profile.weightKg}kg${profile.heightCm ? `, ${profile.heightCm}cm` : ''}${profile.age ? `, ${profile.age} anni` : ''}.` : '';
+  const coachSys = `Sei il coach AI dello Shadow Hunter System: esperto di fitness, nutrizione, arti marziali, sonno e longevità. Rispondi in italiano, diretto, pratico e azionabile, massimo ~140 parole. Quando pertinente, FONDA i consigli sui PRINCIPI SCIENTIFICI qui sotto e cita brevemente il dato (es. "studi mostrano..."). Niente markdown pesante.${profLine}${knowledgePromptFor(text)}`;
+  const coachReply = await callAI([
+    { role: 'system', content: coachSys },
+    { role: 'user', content: text },
+  ], isSimpleQuery(text));
+  await sendTelegramMessage(botToken, incomingChatId, coachReply || parsed?.text || raw);
   return res.status(200).json({ ok: true });
 }

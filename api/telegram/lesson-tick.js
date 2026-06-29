@@ -35,7 +35,7 @@ async function sendMessage(token, chatId, text, replyMarkup) {
   });
 }
 
-const SLOT_GATE = { morning: 'english', afternoon: 'prog-ia', evening: null }; // evening = ripasso/auto
+const SLOT_GATE = { morning: 'english', afternoon: 'prog-ia', evening: 'scienza' }; // sera = Scienza & Biohacking (i ripassi SRS scaduti hanno comunque priorità)
 
 export default async function handler(req, res) {
   const secret = process.env.CRON_SECRET;
@@ -62,7 +62,7 @@ export default async function handler(req, res) {
 
   const intro = slot === 'morning' ? '☀️ <b>Pillola del mattino</b>'
     : slot === 'afternoon' ? '⚡ <b>Quiz del pomeriggio</b>'
-    : slot === 'evening' ? '🌙 <b>Ripasso della sera</b>'
+    : slot === 'evening' ? '🔬 <b>Scienza della sera</b>'
     : '🧠 <b>Gate della Conoscenza</b>';
   await sendMessage(token, chatId, `${intro}\n\n${q.text}`, q.keyboard);
 
