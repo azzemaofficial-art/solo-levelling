@@ -21,7 +21,7 @@ const PAPERS = path.join(VAULT, 'papers');
 const MANIFEST = path.join(PAPERS, '.processed.json');
 const LIB_OUT = path.join(REPO, 'lib', 'knowledgeBase.js');
 const MEM_OUT = path.join(VAULT, 'memorie', 'scienza-nutrizione.md');
-const MAX_PRINCIPLES = 140;
+const MAX_PRINCIPLES = 240;
 const MAX_CHARS = 18000; // quanto testo del paper passare all'AI
 
 // Ripulisce i refusi più comuni del modello free e normalizza gli spazi.
@@ -39,6 +39,8 @@ function fixTypos(s) {
     [/lactate[- ]shuffle/gi, 'lactate-shuttle'], [/shuffle del lattato/gi, 'shuttle del lattato'],
     [/\bchilogramo\b/gi, 'chilogrammo'], [/proteine lento rilascio/gi, 'proteine a lento rilascio'],
     [/\bConsapevoli che\b/g, 'Sii consapevole che'],
+    [/Evitare di fareamento all'integrazione/gi, 'Non fare affidamento sull’integrazione'],
+    [/di fareamento/gi, 'di fare affidamento'], [/\bfareamento\b/gi, 'fare affidamento'],
     [/\s{2,}/g, ' '], [/\s+([,.;:])/g, '$1'],
   ];
   for (const [re, rep] of map) t = t.replace(re, rep);
@@ -123,7 +125,8 @@ export function knowledgePromptFor(query, max = 2600) {
   if (!terms.length) return _wrap(NUTRITION_PRINCIPLES, max);
   const scored = NUTRITION_PRINCIPLES.map((p, i) => {
     const n = _norm(p);
-    let s = 0; for (const t of terms) if (n.includes(t)) s++;
+    // match per radice: confronta il prefisso (6 char) → "stressato" aggancia "stress"
+    let s = 0; for (const t of terms) if (n.includes(t.slice(0, 6))) s++;
     return { p, i, s };
   });
   const hits = scored.filter((x) => x.s > 0).sort((a, b) => b.s - a.s || a.i - b.i).map((x) => x.p);
