@@ -32,15 +32,32 @@ async function main() {
   const acc = totTot ? Math.round((totCorr / totTot) * 100) : 0;
   appendCsv('dataset/learning.csv', `${nowISO},all,${L.xp},${L.level},${L.streak},${totDone},${acc}`);
 
-  // 2b) dataset/coach-samples.csv — append nuovi campioni
+  // 2b) dataset/coach-samples.csv — append SOLO i nuovi (dedup per ts, niente duplicati a ogni run)
   if (Array.isArray(data.samples) && data.samples.length) {
+    ensureHeader('dataset/coach-samples.csv', 'ts,exercise,eL,eR,kL,kR,hL,hR,lean,alerts,verdict,label');
+    const have = existingKeys('dataset/coach-samples.csv', 0);
     for (const s of data.samples) {
+      if (have.has(String(s.ts))) continue;
       const a = s.angles || {};
       appendCsv('dataset/coach-samples.csv',
         [s.ts || '', csv(s.exercise), a.eL ?? '', a.eR ?? '', a.kL ?? '', a.kR ?? '', a.hL ?? '', a.hR ?? '', a.lean ?? '',
          csv((s.alerts || []).join('; ')), csv(s.verdict || ''), csv(s.label || '')].join(','));
     }
   }
+
+  // 2c) dataset/meals.csv — storico pasti (dedup per ts) + sintesi dieta
+  const meals = Array.isArray(data.meals) ? data.meals : [];
+  if (meals.length) {
+    ensureHeader('dataset/meals.csv', 'ts,date,slot,name,kcal,protein,carbs,fat');
+    const have = existingKeys('dataset/meals.csv', 0);
+    for (const m of meals) {
+      if (have.has(String(m.ts))) continue;
+      appendCsv('dataset/meals.csv',
+        [m.ts || '', m.date || '', csv(m.slot || ''), csv(m.name || ''), m.kcal ?? '', m.protein ?? '', m.carbs ?? '', m.fat ?? ''].join(','));
+    }
+  }
+  const diet = dietSummary(meals);
+  const P = data.profile || {};
 
   // 3) dashboard.md
   const gateRows = (L.gates || []).map((g) => {
@@ -69,7 +86,15 @@ aggiornato: ${stamp}
 ${gateRows || '| — | — | — | — |'}
 
 ## 🥋 Coach dataset
-- Campioni raccolti: **${countLines('dataset/coach-samples.csv') - 1}** (file \`dataset/coach-samples.csv\`)
+- Campioni raccolti: **${Math.max(0, countLines('dataset/coach-samples.csv') - 1)}** (file \`dataset/coach-samples.csv\`)
+
+## 🍝 Dieta
+${diet.days ? `- Giorni tracciati: **${diet.days}**  ·  Pasti: **${diet.count}**
+- Media/giorno: **${diet.kcal} kcal** · P ${diet.protein}g · C ${diet.carbs}g · G ${diet.fat}g
+- Ultimi 7 giorni: **${diet.kcal7} kcal/die** · P ${diet.protein7}g` : '- *(ancora nessun pasto registrato — mandane uno al bot)*'}
+
+## 🧍 Profilo corporeo
+${profileLine(P) || '- *(nessuna misurazione — scrivi al bot es. "peso 78kg")*'}
 
 ---
 *Fonte: cloud → ponte \`tools/obsidian-hive.mjs\`*
@@ -79,13 +104,15 @@ ${gateRows || '| — | — | — | — |'}
   const weak = (L.gates || []).filter((g) => g.total >= 3).sort((x, y) => (x.correct / x.total) - (y.correct / y.total))[0];
   const ctx = `Livello ${L.level}, ${L.xp} XP, streak ${L.streak} giorni, precisione ${acc}%. Gate: ` +
     (L.gates || []).map((g) => `${g.name} ${g.total ? Math.round((g.correct / g.total) * 100) : 0}% (${g.done}/${g.size})`).join(', ') +
-    `. Campioni coach: ${data.samples?.length || 0}.`;
+    `. Campioni coach: ${data.samples?.length || 0}.` +
+    (diet.days ? ` Dieta (${diet.days}gg, ${diet.count} pasti): media ${diet.kcal} kcal/die, ${diet.protein}g proteine, ${diet.carbs}g carbo, ${diet.fat}g grassi; ultimi 7gg ${diet.kcal7} kcal/die.` : ' Nessun pasto registrato.') +
+    (profileLine(P) ? ` Profilo: ${profileLine(P).replace(/\n?- /g, ' ').trim()}.` : '');
   let memory = '';
   try {
     const ai = await fetch(`${BASE}/api/ai/chat`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ messages: [
-        { role: 'system', content: 'Sei la memoria di un coach personale. Dai dati, scrivi un breve profilo in italiano (~120 parole) su questa persona: cosa sta imparando, punti di forza, dove è debole, e 2 consigli mirati. Tono diretto e personale ("tu"). Solo testo semplice, niente markdown.' },
+        { role: 'system', content: 'Sei la memoria di un coach personale (apprendimento + allenamento + NUTRIZIONE). Dai dati, scrivi un breve profilo in italiano (~140 parole) su questa persona: cosa sta imparando, punti di forza, dove è debole, com\'è la sua dieta (calorie/proteine vs fisico e obiettivo) e 2-3 consigli mirati anche alimentari. Tono diretto e personale ("tu"). Solo testo semplice, niente markdown.' },
         { role: 'user', content: ctx },
       ] }),
     });
@@ -108,6 +135,43 @@ function write(rel, content) { fs.mkdirSync(path.dirname(fp(rel)), { recursive: 
 function appendCsv(rel, line) { fs.mkdirSync(path.dirname(fp(rel)), { recursive: true }); fs.appendFileSync(fp(rel), line + '\n'); }
 function countLines(rel) { try { return fs.readFileSync(fp(rel), 'utf8').split('\n').filter(Boolean).length; } catch { return 1; } }
 function csv(v) { const s = String(v ?? ''); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; }
+function ensureHeader(rel, header) { try { if (!fs.existsSync(fp(rel)) || !fs.readFileSync(fp(rel), 'utf8').trim()) write(rel, header + '\n'); } catch { write(rel, header + '\n'); } }
+function existingKeys(rel, idx) {
+  const set = new Set();
+  try { fs.readFileSync(fp(rel), 'utf8').split('\n').filter(Boolean).slice(1).forEach((l) => set.add((l.split(',')[idx] || '').trim())); } catch {}
+  return set;
+}
+// Sintesi dieta: medie/giorno su tutto lo storico e sugli ultimi 7 giorni
+function dietSummary(meals) {
+  if (!Array.isArray(meals) || !meals.length) return { days: 0, count: 0 };
+  const byDay = {};
+  for (const m of meals) {
+    const d = m.date || String(m.ts || '').slice(0, 10);
+    if (!d) continue;
+    (byDay[d] = byDay[d] || { kcal: 0, protein: 0, carbs: 0, fat: 0 });
+    byDay[d].kcal += +m.kcal || 0; byDay[d].protein += +m.protein || 0; byDay[d].carbs += +m.carbs || 0; byDay[d].fat += +m.fat || 0;
+  }
+  const days = Object.keys(byDay).sort();
+  const avg = (ds, k) => ds.length ? Math.round(ds.reduce((s, d) => s + byDay[d][k], 0) / ds.length) : 0;
+  const last7 = days.slice(-7);
+  return {
+    days: days.length, count: meals.length,
+    kcal: avg(days, 'kcal'), protein: avg(days, 'protein'), carbs: avg(days, 'carbs'), fat: avg(days, 'fat'),
+    kcal7: avg(last7, 'kcal'), protein7: avg(last7, 'protein'),
+  };
+}
+function profileLine(P) {
+  if (!P || typeof P !== 'object') return '';
+  const bits = [];
+  if (P.weightKg != null) bits.push(`- Peso: **${P.weightKg} kg**${P.targetWeightKg != null ? ` (target ${P.targetWeightKg} kg)` : ''}`);
+  if (P.heightCm != null) bits.push(`- Altezza: **${P.heightCm} cm**`);
+  if (P.bodyFatPct != null) bits.push(`- Body fat: **${P.bodyFatPct}%**`);
+  if (P.muscleMassKg != null) bits.push(`- Muscolo: **${P.muscleMassKg} kg**`);
+  if (P.leanMassKg != null) bits.push(`- Massa magra: **${P.leanMassKg} kg**`);
+  if (P.visceralFat != null) bits.push(`- Grasso viscerale: **${P.visceralFat}**`);
+  if (P.age != null) bits.push(`- Età: **${P.age}**`);
+  return bits.join('\n');
+}
 function updateBetween(rel, body) {
   let t = ''; try { t = fs.readFileSync(fp(rel), 'utf8'); } catch {}
   const block = `<!-- HIVE:MEMORY:START -->\n${body}\n<!-- HIVE:MEMORY:END -->`;

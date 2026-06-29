@@ -72,6 +72,15 @@ async function addDaily(chatId, m) {
   return next;
 }
 
+// Log pasti PERSISTENTE (per l'alveare Obsidian): storico rotante, non scade in 48h
+async function logMeal(chatId, entry) {
+  const k = `tg_meals:${chatId}`;
+  const cur = (await kvGet(k)) || [];
+  const arr = Array.isArray(cur) ? cur : [];
+  arr.push(entry);
+  await kvSet(k, arr.slice(-300), 7776000); // ultimi 300 pasti, TTL 90 giorni
+}
+
 // Provider chain — Groq primo per i fast (no reasoning, JSON pulito), 550B per task lenti
 const PROVIDERS = [
   { key: () => process.env.GROQ_API_KEY,                  model: 'llama-3.3-70b-versatile',                      fast: true,  baseUrl: GROQ_BASE },
@@ -586,6 +595,10 @@ async function processMeal(botToken, chatId, parsed) {
     kcal: m.kcal, protein: m.protein, carbs: m.carbs, fat: m.fat, name, slot,
   });
   const day = await addDaily(chatId, m);
+  await logMeal(chatId, {
+    ts: Date.now(), date: new Date().toISOString().slice(0, 10),
+    slot, name, kcal: m.kcal, protein: m.protein, carbs: m.carbs, fat: m.fat,
+  });
 
   let reply = `${SLOT_EMOJI[slot] || '🍽️'} <b>${name}</b> — ${slot}\n`;
   if (m.breakdown.length) reply += '\n' + m.breakdown.join('\n') + '\n';

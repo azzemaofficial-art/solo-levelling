@@ -26,6 +26,8 @@ export default async function handler(req, res) {
 
   const learn = normalize((await kvGet(`tg_learn:${chatId}`)) || {});
   const samples = (await kvGet(`coach_samples:${chatId}`)) || [];
+  const meals = (await kvGet(`tg_meals:${chatId}`)) || [];
+  const profile = (await kvGet(`tg_profile:${chatId}`)) || {};
 
   const gates = GATE_IDS.map((g) => {
     const p = learn.prog?.[g] || { done: 0, correct: 0, total: 0 };
@@ -37,5 +39,7 @@ export default async function handler(req, res) {
     exportedAt: new Date().toISOString(),
     learn: { xp: learn.xp || 0, level: levelOf(learn.xp), streak: learn.streak || 0, srsDue: (learn.srs || []).length, activeGate: learn.activeGate, gates },
     samples: Array.isArray(samples) ? samples : [],
+    meals: Array.isArray(meals) ? meals : [],
+    profile: profile && typeof profile === 'object' ? profile : {},
   });
 }
