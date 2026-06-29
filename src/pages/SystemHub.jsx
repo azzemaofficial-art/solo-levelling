@@ -8,7 +8,7 @@ import { AI_MODELS, getModelFor, getGlobalModel, setGlobalModel, getTaskOverride
 import { computeReadinessOutcome, computeSleepCoach, computeWeightTrendGuard, computeWeeklyOverview, evaluateDataQuality } from '../utils/healthLogic';
 import { emitShadowFxBurst } from '../utils/fxEvents';
 import { emitUiToast } from '../utils/uiEvents';
-import { knowledgePrompt } from '../../lib/knowledgeBase.js';
+import { knowledgePrompt, knowledgePromptFor } from '../../lib/knowledgeBase.js';
 const QUICK_PROTOCOLS = [
   { id: 'nutrition', title: 'Nutrition Lock', desc: 'Chiudi proteine + kcal target', color: 'text-cyan-200 border-cyan-300/30 bg-cyan-500/10' },
   { id: 'hydration', title: 'Hydration Shield', desc: 'Acqua costante durante il giorno', color: 'text-emerald-200 border-emerald-300/30 bg-emerald-500/10' },
@@ -1977,7 +1977,7 @@ const SystemHub = ({ systemLogs, setSystemLogs, dailyGoal, setDailyGoal, hydrati
     setIsShadowChatLoading(true);
     const profileCtx = `Profilo Shadow Hunter: obiettivo=${playerStats.objective || 'recomp'}, livello=${playerStats.level || 1}, streak=${streak}. Oggi: kcal=${Math.round(Number(todayData.consumed || 0))}/${Math.round(effectiveDailyGoal || dailyGoal || 0)}, prot=${Math.round(Number(todayData.protein || 0))}g, burn=${Math.round(Number(todayData.workoutBurn ?? todayData.burned ?? 0))}kcal, h2o=${Math.round(Number(todayData.waterMl || 0))}ml. Integratori consigliati: ${dailySupplementCore?.map((s) => s.name).join(', ') || '--'}.`;
     const isHeavy = text.length > 80 || /piano|analisi|completo|settimana|ottimizza|spiega|confronta|perché|strategia|programma/i.test(text);
-    const systemPrompt = `Sei Nemotron${isHeavy ? ' 550B' : ''}, il coach AI del Shadow Hunter System. Sei un esperto di fitness, nutrizione, arti marziali e performance atletica. Rispondi in italiano, sii diretto e tecnico. ${isHeavy ? 'Puoi rispondere in modo approfondito.' : 'Massimo 150 parole per risposta.'} ${profileCtx}${knowledgePrompt()}`;
+    const systemPrompt = `Sei Nemotron${isHeavy ? ' 550B' : ''}, il coach AI del Shadow Hunter System. Sei un esperto di fitness, nutrizione, arti marziali e performance atletica. Rispondi in italiano, sii diretto e tecnico. ${isHeavy ? 'Puoi rispondere in modo approfondito.' : 'Massimo 150 parole per risposta.'} ${profileCtx}${knowledgePromptFor(text)}`;
     try {
       const res = await fetch('/api/nvidia/coach', {
         method: 'POST',
@@ -2708,7 +2708,7 @@ Struttura la risposta in sezioni chiare con questi titoli:
 ⚠️ CRITICITÀ — i 2-3 problemi più importanti, con il perché
 🎯 PIANO D'AZIONE — 4-5 azioni specifiche e misurabili per le prossime settimane
 🔮 PROIEZIONE — dove porta la traiettoria attuale e cosa cambiare
-Italiano, diretto, esigente. Niente markdown pesante, usa i titoli con emoji come sopra.${knowledgePrompt()}` },
+Italiano, diretto, esigente. Niente markdown pesante, usa i titoli con emoji come sopra.${knowledgePromptFor(ctx)}` },
           { role: 'user', content: ctx },
         ],
       });

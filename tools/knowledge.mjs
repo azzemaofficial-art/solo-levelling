@@ -37,6 +37,8 @@ function fixTypos(s) {
     [/\bsession\b/gi, 'sessioni'], [/\bsession\//gi, 'sessioni/'],
     [/aggiuntivo ridurre/gi, 'aggiuntivo riduce'],
     [/lactate[- ]shuffle/gi, 'lactate-shuttle'], [/shuffle del lattato/gi, 'shuttle del lattato'],
+    [/\bchilogramo\b/gi, 'chilogrammo'], [/proteine lento rilascio/gi, 'proteine a lento rilascio'],
+    [/\bConsapevoli che\b/g, 'Sii consapevole che'],
     [/\s{2,}/g, ' '], [/\s+([,.;:])/g, '$1'],
   ];
   for (const [re, rep] of map) t = t.replace(re, rep);
@@ -98,11 +100,37 @@ export const KNOWLEDGE_SOURCES = [
 ${sources.map((s) => `  { title: \`${esc(s.title)}\`, topic: \`${esc(s.topic)}\`, principles: ${s.count} },`).join('\n')}
 ];
 
+const _HEADER = "\\n\\nPRINCIPI SCIENTIFICI (distillati da paper reali — fonda i consigli su questi e citali quando pertinenti):\\n";
+const _norm = (s) => String(s).toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');
+const _STOP = new Set(['della','dello','degli','delle','come','dopo','prima','molto','anche','essere','perche','quando','quanto','sono','hanno','con','per','che','non','una','uno','gli','dei','del','nel','nella','sul','più','meno','cosa','dove','fare','puoi','devo','vorrei','meglio','aiuto','consiglio','consigli']);
+function _wrap(list, max) {
+  let body = list.map((p, i) => \`\${i + 1}. \${p}\`).join('\\n');
+  if (body.length > max) body = body.slice(0, max).replace(/\\n[^\\n]*$/, '') + '\\n…';
+  return _HEADER + body;
+}
+
+// Iniezione "statica": i primi N principi (fallback / nessuna query).
 export function knowledgePrompt(max = 3500) {
   if (!Array.isArray(NUTRITION_PRINCIPLES) || !NUTRITION_PRINCIPLES.length) return '';
-  let body = NUTRITION_PRINCIPLES.map((p, i) => \`\${i + 1}. \${p}\`).join('\\n');
-  if (body.length > max) body = body.slice(0, max).replace(/\\n[^\\n]*$/, '') + '\\n…';
-  return \`\\n\\nPRINCIPI SCIENTIFICI (distillati da paper forniti dall'utente — fonda i consigli su questi e citali quando pertinenti):\\n\${body}\`;
+  return _wrap(NUTRITION_PRINCIPLES, max);
+}
+
+// Iniezione "per pertinenza": classifica i principi in base alla domanda/contesto
+// e inietta i più rilevanti. Ribalta il sistema da "primi N" a "i N che servono".
+export function knowledgePromptFor(query, max = 2600) {
+  if (!Array.isArray(NUTRITION_PRINCIPLES) || !NUTRITION_PRINCIPLES.length) return '';
+  const terms = [...new Set(_norm(query || '').split(/[^a-z0-9]+/).filter((w) => w.length >= 4 && !_STOP.has(w)))];
+  if (!terms.length) return _wrap(NUTRITION_PRINCIPLES, max);
+  const scored = NUTRITION_PRINCIPLES.map((p, i) => {
+    const n = _norm(p);
+    let s = 0; for (const t of terms) if (n.includes(t)) s++;
+    return { p, i, s };
+  });
+  const hits = scored.filter((x) => x.s > 0).sort((a, b) => b.s - a.s || a.i - b.i).map((x) => x.p);
+  // se pochi match, completa con i principi generali (in ordine) fino al budget
+  const rest = scored.filter((x) => x.s === 0).map((x) => x.p);
+  const ordered = [...hits, ...rest];
+  return _wrap(ordered, max);
 }
 `;
   fs.writeFileSync(LIB_OUT, body);
