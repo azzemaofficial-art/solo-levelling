@@ -21,8 +21,27 @@ const PAPERS = path.join(VAULT, 'papers');
 const MANIFEST = path.join(PAPERS, '.processed.json');
 const LIB_OUT = path.join(REPO, 'lib', 'knowledgeBase.js');
 const MEM_OUT = path.join(VAULT, 'memorie', 'scienza-nutrizione.md');
-const MAX_PRINCIPLES = 80;
+const MAX_PRINCIPLES = 140;
 const MAX_CHARS = 18000; // quanto testo del paper passare all'AI
+
+// Ripulisce i refusi più comuni del modello free e normalizza gli spazi.
+function fixTypos(s) {
+  let t = ' ' + String(s) + ' ';
+  const map = [
+    [/\bdiguno\b/gi, 'digiuno'], [/\bAbattere\b/g, 'Abbattere'], [/\babattere\b/g, 'abbattere'],
+    [/\bPrediliggere\b/g, 'Prediligi'], [/\bprediliggere\b/g, 'prediligi'],
+    [/\bPriorizzare\b/g, 'Privilegia'], [/\bpriorizzare\b/g, 'privilegia'],
+    [/\bPriorizza\b/g, 'Privilegia'], [/\bpriorizza\b/g, 'privilegia'],
+    [/succ\s+succ/gi, 'succo'], [/\bsucc\b/gi, 'succo'],
+    [/\bfinest\b/gi, 'finestre'], [/\beccess\b/gi, 'eccesso'],
+    [/\bsession\b/gi, 'sessioni'], [/\bsession\//gi, 'sessioni/'],
+    [/aggiuntivo ridurre/gi, 'aggiuntivo riduce'],
+    [/lactate[- ]shuffle/gi, 'lactate-shuttle'], [/shuffle del lattato/gi, 'shuttle del lattato'],
+    [/\s{2,}/g, ' '], [/\s+([,.;:])/g, '$1'],
+  ];
+  for (const [re, rep] of map) t = t.replace(re, rep);
+  return t.trim();
+}
 
 const hasPdftotext = spawnSync('pdftotext', ['-v']).error == null;
 
@@ -41,7 +60,7 @@ async function distill(title, text) {
   const r = await fetch(`${BASE}/api/ai/chat`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ messages: [
-      { role: 'system', content: 'Sei uno scienziato della nutrizione e dello sport. Distilli un paper in PRINCIPI azionabili, concreti e specifici (con numeri/soglie quando ci sono). Niente fronzoli, niente "potrebbe": solo ciò che il paper supporta. Rispondi SOLO con JSON valido: {"topic":"area breve","principles":["frase azionabile 1","frase 2", ...]} — da 5 a 10 principi, in italiano, ognuno autosufficiente.' },
+      { role: 'system', content: 'Sei uno scienziato della nutrizione e dello sport. Distilli un paper in PRINCIPI azionabili, concreti e specifici (con numeri/soglie quando ci sono). Niente fronzoli, niente "potrebbe": solo ciò che il paper supporta. Scrivi in ITALIANO CORRETTO e scorrevole: frasi complete, nessun refuso, nessuna parola troncata o abbreviata, nessun anglicismo inventato. Rispondi SOLO con JSON valido: {"topic":"area breve","principles":["frase azionabile 1","frase 2", ...]} — da 5 a 10 principi, in italiano, ognuno autosufficiente.' },
       { role: 'user', content: `TITOLO: ${title}\n\nTESTO (estratto):\n${text.slice(0, MAX_CHARS)}` },
     ] }),
   });
@@ -138,7 +157,7 @@ async function main() {
     console.log(`+${out.principles.length} principi.`);
   }
 
-  man.principles = dedup(man.principles).slice(-MAX_PRINCIPLES);
+  man.principles = dedup(man.principles.map(fixTypos)).slice(-MAX_PRINCIPLES);
   saveManifest(man);
   writeLib(man.principles, man.sources);
   writeMemory(man.sources, man.principles);
