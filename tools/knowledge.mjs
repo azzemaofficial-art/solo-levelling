@@ -79,7 +79,7 @@ export const KNOWLEDGE_SOURCES = [
 ${sources.map((s) => `  { title: \`${esc(s.title)}\`, topic: \`${esc(s.topic)}\`, principles: ${s.count} },`).join('\n')}
 ];
 
-export function knowledgePrompt(max = 1800) {
+export function knowledgePrompt(max = 3500) {
   if (!Array.isArray(NUTRITION_PRINCIPLES) || !NUTRITION_PRINCIPLES.length) return '';
   let body = NUTRITION_PRINCIPLES.map((p, i) => \`\${i + 1}. \${p}\`).join('\\n');
   if (body.length > max) body = body.slice(0, max).replace(/\\n[^\\n]*$/, '') + '\\n…';
