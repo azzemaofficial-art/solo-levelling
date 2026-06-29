@@ -740,11 +740,16 @@ async function generateQuestions(gate, n = 6) {
   let parsed;
   try { const m = out.replace(/<think>[\s\S]*?<\/think>/gi, '').match(/\{[\s\S]*\}/); parsed = m ? JSON.parse(m[0]) : null; } catch { parsed = null; }
   const arr = Array.isArray(parsed?.questions) ? parsed.questions : [];
+  // normalizza il testo domanda per rilevare i doppioni (no tag/punteggiatura, primi 50 char)
+  const qkey = (s) => String(s).toLowerCase().replace(/<\/?[a-z][^>]*>/gi, '').replace(/[^a-z0-9 ]/g, '').replace(/\s+/g, ' ').trim().slice(0, 60);
+  const existing = new Set((GATES[gate]?.course || []).map((c) => qkey(c.q))); // base + generate già nel pool
+  const seen = new Set();
   const valid = arr.filter((q) => q && typeof q.q === 'string' && Array.isArray(q.a) && q.a.length >= 2 && Number.isInteger(q.correct) && q.correct >= 0 && q.correct < q.a.length && typeof q.exp === 'string')
-    .map((q) => ({ m: String(q.m || 'AI').slice(0, 24), q: String(q.q).slice(0, 240), a: q.a.slice(0, 4).map((x) => String(x).slice(0, 120)), correct: q.correct, exp: String(q.exp).slice(0, 300) }));
+    .map((q) => ({ m: String(q.m || 'AI').slice(0, 24), q: String(q.q).slice(0, 240), a: q.a.slice(0, 4).map((x) => String(x).slice(0, 120)), correct: q.correct, exp: String(q.exp).slice(0, 300) }))
+    .filter((q) => { const k = qkey(q.q); if (!k || existing.has(k) || seen.has(k)) return false; seen.add(k); return true; }); // scarta i doppioni
   if (!valid.length) return 0;
   const cur = (await kvGet(GENQ_KEY(gate))) || [];
-  const next = cur.concat(valid).slice(-80); // cap pool
+  const next = cur.concat(valid).slice(-160); // cap pool (più ampio → più domande uniche)
   await kvSet(GENQ_KEY(gate), next, 2592000 * 3);
   loadGen(gate, next);
   return valid.length;
