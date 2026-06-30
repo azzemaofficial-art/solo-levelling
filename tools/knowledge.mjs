@@ -21,7 +21,7 @@ const PAPERS = path.join(VAULT, 'papers');
 const MANIFEST = path.join(PAPERS, '.processed.json');
 const LIB_OUT = path.join(REPO, 'lib', 'knowledgeBase.js');
 const MEM_OUT = path.join(VAULT, 'memorie', 'scienza-nutrizione.md');
-const MAX_PRINCIPLES = 400;
+const MAX_PRINCIPLES = 700;
 const MAX_CHARS = 18000; // quanto testo del paper passare all'AI
 
 // Ripulisce i refusi più comuni del modello free e normalizza gli spazi.
