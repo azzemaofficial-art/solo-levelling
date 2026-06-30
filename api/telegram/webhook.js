@@ -594,6 +594,14 @@ async function processLabelMeal(botToken, chatId, label, gramsArg, slotArg) {
   await sendTelegramMessage(botToken, chatId, reply);
 }
 
+// Descrizione generica di una foto (per consiglio integratori / contesto)
+const DESCRIBE_PROMPT = `Descrivi in italiano, in 1-3 frasi, cosa è visibile in questa foto. Se ci sono INTEGRATORI / barattoli / capsule / polveri, elenca i nomi o tipi leggibili e le dosi se visibili. Se è una persona o un contesto, descrivi in modo oggettivo e neutro, SENZA diagnosi o giudizi sulla salute. Solo descrizione fattuale.`;
+async function describeImage(imageBase64, mimeType) {
+  return (await callVisionNvidia(process.env.NEMOTRON_OCR_API_KEY, 'nvidia/nemotron-nano-12b-v2-vl', imageBase64, mimeType, DESCRIBE_PROMPT))
+    || (await callVisionNvidia(process.env.LLAMA_VISION2_API_KEY, 'meta/llama-3.2-90b-vision-instruct', imageBase64, mimeType, DESCRIBE_PROMPT))
+    || (await callVisionGroqScout(imageBase64, mimeType, DESCRIBE_PROMPT));
+}
+
 // ─── Burn workout via tabella MET (kcal = MET × peso × ore) ───
 const MET_TABLE = [
   { kw: ['corsa', 'corro', 'running', 'jogging'], met: 9.8 },
@@ -948,6 +956,23 @@ export default async function handler(req, res) {
       else await sendTelegramMessage(botToken, incomingChatId, '⚠️ Non sono riuscito a leggere l\'etichetta. Inquadra bene la <b>tabella valori nutrizionali</b>, con più luce e senza riflessi.');
       return res.status(200).json({ ok: true });
     }
+    // 💊 Foto + didascalia "integratori"/"sintomi"/"consiglio" → consiglio integratori (knowledge base)
+    if (/integrat|supplement|sintom|come sto|consigl|pillole|capsule|\bstack\b|vitamin/i.test(caption)) {
+      const desc = await describeImage(buf.toString('base64'), 'image/jpeg');
+      const profile = await kvGet(`tg_profile:${incomingChatId}`);
+      const profLine = profile?.weightKg ? ` Atleta: ${profile.weightKg}kg${profile.age ? `, ${profile.age} anni` : ''}, obiettivo recomp/forza.` : '';
+      const visionLine = desc ? `Nella foto si vede: ${desc}.` : 'La foto non è chiara.';
+      const sys = `Sei un esperto di integrazione sportiva basata sull'evidenza. In base a ciò che mostra la foto e alla didascalia, consiglia in italiano (max ~150 parole, niente markdown pesante).
+- Se la foto mostra INTEGRATORI: di' quali riconosci, se sono utili e a che dose secondo l'evidenza, cosa è ridondante e cosa eventualmente manca rispetto agli obiettivi.
+- Se mostra una persona o un contesto: sii ONESTO — una foto NON permette di stabilire carenze o cosa ti serve. Spiega che servono SINTOMI descritti o esami del sangue, e dai consigli generali utili supportati dall'evidenza.
+Consiglia SOLO integratori presenti nei PRINCIPI scientifici. Ricorda: gli integratori vengono dopo sonno/dieta/allenamento; non è diagnosi medica.${profLine}${knowledgePromptFor('integratori ' + caption + ' ' + (desc || ''), 3000)}`;
+      const reply = await callAI([
+        { role: 'system', content: sys },
+        { role: 'user', content: `${visionLine}${caption ? ` Didascalia: "${caption}".` : ''}` },
+      ], false);
+      await sendTelegramMessage(botToken, incomingChatId, safeHtml(reply || '⚠️ Non sono riuscito a interpretare la foto. Descrivimi cosa vorresti sapere o quali sintomi hai.'));
+      return res.status(200).json({ ok: true });
+    }
     const parsed = await extractMealFromImage(buf.toString('base64'), 'image/jpeg');
     if (parsed?.type === 'meal' && parsed.items?.length) {
       await processMeal(botToken, incomingChatId, parsed);
@@ -971,6 +996,7 @@ export default async function handler(req, res) {
       '🏋️ <b>Workout</b> — "45 min corsa + 30 min pesi"\n' +
       '📷 <b>Foto piatto</b> — manda la foto del piatto, stimo io gli alimenti\n' +
       '🏷️ <b>Etichetta</b> — foto della tabella nutrizionale con didascalia "etichetta" (macro precisi dal confezionato; aggiungi i grammi es. "etichetta 50g")\n' +
+      '💊 <b>Integratori</b> — foto dei tuoi integratori con didascalia "integratori" → ti dico cosa vale e cosa manca. Oppure scrivimi come ti senti (es. "sono stanco e dormo male") → consigli science-based\n' +
       '🎤 <b>Vocale</b> — dimmi a voce cosa hai mangiato\n\n' +
       '📅 /oggi — totale calorie e macro di oggi\n' +
       '💊 /integratori — lista integratori consigliati\n' +
@@ -1148,7 +1174,8 @@ export default async function handler(req, res) {
   // ── Domanda / consiglio: rispondi col CERVELLO scientifico (knowledge base) ──
   const profile = await kvGet(`tg_profile:${incomingChatId}`);
   const profLine = profile?.weightKg ? ` Profilo utente: ${profile.weightKg}kg${profile.heightCm ? `, ${profile.heightCm}cm` : ''}${profile.age ? `, ${profile.age} anni` : ''}.` : '';
-  const coachSys = `Sei il coach AI dello Shadow Hunter System: esperto di fitness, nutrizione, arti marziali, sonno e longevità. Rispondi in italiano, diretto, pratico e azionabile, massimo ~140 parole. Quando pertinente, FONDA i consigli sui PRINCIPI SCIENTIFICI qui sotto e cita brevemente il dato (es. "studi mostrano..."). Niente markdown pesante.${profLine}${knowledgePromptFor(text)}`;
+  const coachSys = `Sei il coach AI dello Shadow Hunter System: esperto di fitness, nutrizione, arti marziali, sonno e longevità. Rispondi in italiano, diretto, pratico e azionabile, massimo ~150 parole. Quando pertinente, FONDA i consigli sui PRINCIPI SCIENTIFICI qui sotto e cita brevemente il dato (es. "studi mostrano...").
+Se l'utente descrive SINTOMI o SENSAZIONI (stanchezza, sonno scarso, poca energia, stress, dolori articolari, scarso recupero, fame, ecc.): collega a possibili cause modificabili e suggerisci 2-3 interventi concreti + eventuali INTEGRATORI supportati dall'evidenza (con dose) presenti nei principi. Ricorda sempre che NON è una diagnosi medica e che gli integratori vengono dopo sonno/dieta/allenamento; per sintomi persistenti suggerisci un controllo medico/del sangue. Niente markdown pesante.${profLine}${knowledgePromptFor(text)}`;
   const coachReply = await callAI([
     { role: 'system', content: coachSys },
     { role: 'user', content: text },
