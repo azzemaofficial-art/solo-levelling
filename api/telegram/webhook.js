@@ -758,7 +758,9 @@ async function generateQuestions(gate, n = 6) {
 async function sendQuiz(token, id, gateOverride) {
   let st = normLearn((await kvGet(LEARN_KEY(id))) || initLearn());
   const gate = gateOverride && GATES[gateOverride] ? gateOverride : st.activeGate;
-  await hydrateGen(gate);
+  // carica i pool generati di TUTTI i gate: così un ripasso SRS di QUALSIASI materia
+  // ha la sua domanda disponibile (altrimenti course[qid] undefined → crash)
+  for (const g of GATE_IDS) await hydrateGen(g);
   // pool quasi esaurito? genera nuove domande infinite via AI IN ANTICIPO (su idx, non done
   // che è cappato a course.length). Così non si arriva mai al wrap "stesse domande".
   const p = st.prog[gate] || { idx: 0, done: 0 };
