@@ -389,6 +389,11 @@ const SystemHub = ({ systemLogs, setSystemLogs, dailyGoal, setDailyGoal, hydrati
     try { const raw = localStorage.getItem('shadow_monarch_profile_analysis_last'); return raw ? JSON.parse(raw) : null; } catch { return null; }
   });
   const [isAnalyzingProfile, setIsAnalyzingProfile] = useState(false);
+  // Consigli integratori science-based (dalla knowledge base)
+  const [supplementAdvice, setSupplementAdvice] = useState(() => {
+    try { const raw = localStorage.getItem('shadow_monarch_supplement_advice_last'); return raw ? JSON.parse(raw) : null; } catch { return null; }
+  });
+  const [isRecommendingSupp, setIsRecommendingSupp] = useState(false);
   const [generatedRecipe, setGeneratedRecipe] = useState(() => {
     try {
       const raw = localStorage.getItem('shadow_monarch_generated_recipe');
@@ -2727,6 +2732,45 @@ Italiano, diretto, esigente. Niente markdown pesante, usa i titoli con emoji com
       emitUiToast({ message: 'Analisi profilo fallita: ' + formatAiErrorDetail(err?.message || ''), tone: 'warning', durationMs: 3200 });
     } finally {
       setIsAnalyzingProfile(false);
+    }
+  };
+
+  // 💊 Consiglia integratori — stack personalizzato e fondato sui paper (knowledge base)
+  const recommendSupplements = async () => {
+    if (isRecommendingSupp) return;
+    setIsRecommendingSupp(true);
+    try {
+      const pesoKg = Number(playerStats?.currentWeightKg || 0) || 80;
+      const altezzaCm = Number(playerStats?.heightCm || metabolicProfile?.heightCm || 178);
+      const ctx = `Atleta: ${pesoKg}kg, ${altezzaCm}cm, ${playerStats?.age || metabolicProfile?.age || 25} anni, ${(playerStats?.sex || 'male') === 'male' ? 'uomo' : 'donna'}. Obiettivo: ${playerStats?.objective || 'recomp'}. Allenamento regolare (forza + arti marziali). Vuole sapere quali INTEGRATORI prendere, con priorità basata sull'evidenza.`;
+      // recupero i principi rilevanti agli integratori dalla knowledge base
+      const suppQuery = 'integratori creatina proteine whey leucina caseina omega-3 vitamina D K2 magnesio zinco glicina ashwagandha beta-alanina citrullina caffeina curcumina berberina sonno testosterone recupero';
+      const data = await requestSystemAI({
+        model: getModelFor('profile') || undefined,
+        temperature: 0.4,
+        max_tokens: 1100,
+        timeoutMs: 40000,
+        messages: [
+          { role: 'system', content: `Sei un esperto di integrazione sportiva basata sull'evidenza. Consiglia uno STACK di integratori PERSONALIZZATO per questo atleta, ESCLUSIVAMENTE in base ai PRINCIPI SCIENTIFICI forniti (non inventare, non consigliare ciò che non è supportato). Ordina per PRIORITÀ.
+Struttura così:
+🥇 FONDAMENTALI (alta evidenza) — nome, dose, quando assumerlo, perché (1 frase col dato)
+🥈 UTILI (evidenza buona/contesto-dipendente) — idem
+🧪 OPZIONALI/SPERIMENTALI (evidenza debole) — segnala l'incertezza
+⚠️ NOTA: gli integratori vengono DOPO sonno, dieta e allenamento; consulta un medico per condizioni/farmaci.
+Italiano, conciso, niente markdown pesante. Dosi concrete (anche per ${pesoKg}kg quando rilevante).${knowledgePromptFor(suppQuery, 3200)}` },
+          { role: 'user', content: ctx },
+        ],
+      });
+      const content = String(data?.choices?.[0]?.message?.content || '').trim();
+      if (!content) throw new Error('Risposta vuota');
+      const entry = { content, model: String(data?._shadowMeta?.model || '').trim(), date: new Date().toISOString() };
+      setSupplementAdvice(entry);
+      try { localStorage.setItem('shadow_monarch_supplement_advice_last', JSON.stringify(entry)); } catch {}
+      emitUiToast({ message: 'Consigli integratori pronti', tone: 'success', durationMs: 2400 });
+    } catch (err) {
+      emitUiToast({ message: 'Consigli integratori falliti: ' + formatAiErrorDetail(err?.message || ''), tone: 'warning', durationMs: 3200 });
+    } finally {
+      setIsRecommendingSupp(false);
     }
   };
 
@@ -5666,10 +5710,16 @@ Rispondi SOLO JSON valido:
             <p className="text-[9px] uppercase tracking-[0.36em] font-bold" style={{ color: 'rgba(52,211,153,0.9)' }}>◈ Deep Analysis</p>
             <p className="text-sm font-black text-white" style={{ fontFamily: 'Russo One, sans-serif' }}>Analisi Profilo</p>
           </div>
-          <button onClick={analyzeProfile} disabled={isAnalyzingProfile}
-            className={`text-[10px] px-3 py-1.5 rounded-lg border transition-colors ${isAnalyzingProfile ? 'border-gray-700 text-gray-500' : 'border-emerald-400/50 text-emerald-300 hover:bg-emerald-500/20'}`}>
-            {isAnalyzingProfile ? '⏳ Analizzo…' : '🧠 Analizza profilo'}
-          </button>
+          <div className="flex gap-1.5">
+            <button onClick={recommendSupplements} disabled={isRecommendingSupp}
+              className={`text-[10px] px-3 py-1.5 rounded-lg border transition-colors ${isRecommendingSupp ? 'border-gray-700 text-gray-500' : 'border-indigo-400/50 text-indigo-300 hover:bg-indigo-500/20'}`}>
+              {isRecommendingSupp ? '⏳…' : '💊 Integratori'}
+            </button>
+            <button onClick={analyzeProfile} disabled={isAnalyzingProfile}
+              className={`text-[10px] px-3 py-1.5 rounded-lg border transition-colors ${isAnalyzingProfile ? 'border-gray-700 text-gray-500' : 'border-emerald-400/50 text-emerald-300 hover:bg-emerald-500/20'}`}>
+              {isAnalyzingProfile ? '⏳ Analizzo…' : '🧠 Analizza profilo'}
+            </button>
+          </div>
         </div>
         {profileAnalysis ? (
           <div className="rounded-xl p-3" style={{ background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(16,185,129,0.2)' }}>
@@ -5677,7 +5727,13 @@ Rispondi SOLO JSON valido:
             <p className="text-[11px] text-gray-200 whitespace-pre-wrap leading-relaxed">{profileAnalysis.content}</p>
           </div>
         ) : (
-          <p className="text-[10px] text-gray-500">Genera un'analisi profonda del tuo profilo sugli ultimi 30 giorni di dati reali — quadro, criticità, piano d'azione e proiezione.</p>
+          <p className="text-[10px] text-gray-500">Genera un'analisi profonda del tuo profilo sugli ultimi 30 giorni di dati reali — quadro, criticità, piano d'azione e proiezione. Oppure 💊 per uno stack integratori personalizzato dai paper.</p>
+        )}
+        {supplementAdvice && (
+          <div className="mt-2 rounded-xl p-3" style={{ background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(129,140,248,0.25)' }}>
+            <p className="text-[8px] text-indigo-300/80 mb-1.5">💊 Stack integratori · {new Date(supplementAdvice.date).toLocaleString('it-IT')}{supplementAdvice.model ? ` · ${supplementAdvice.model}` : ''}</p>
+            <p className="text-[11px] text-gray-200 whitespace-pre-wrap leading-relaxed">{supplementAdvice.content}</p>
+          </div>
         )}
       </motion.div>
 
