@@ -1061,6 +1061,7 @@ function VisualCoach() {
     const clean = String(text)
       .replace(/\*\*/g, '').replace(/[*#_~`]/g, '')
       .replace(/RIGA\s*\d+\s*[—-]/g, '')
+      .replace(/\bBENE\s*:/gi, 'Bene,').replace(/\bPROVA\s*:/gi, 'Prova')
       .replace(/(COMANDO|VISTO|PERCHÉ|SITUAZIONE|ISTRUZIONE|PUNTO)\s*:/gi, '')
       .replace(/[^\x00-\x7F]/g, (c) => /\p{Emoji}/u.test(c) ? '' : c)
       .replace(/\n+/g, '. ')
@@ -1895,7 +1896,7 @@ function VisualCoach() {
                 ? (() => {
                     const parts = {};
                     String(analysis.content).split('\n').forEach((line) => {
-                      const m = line.match(/^\s*(COMANDO|VISTO|PERCH[ÉE]|SITUAZIONE|ISTRUZIONE|PUNTO)\s*:\s*(.*)/i);
+                      const m = line.match(/^\s*(COMANDO|BENE|PROVA|VISTO|PERCH[ÉE]|SITUAZIONE|ISTRUZIONE|PUNTO)\s*:\s*(.*)/i);
                       if (m) parts[m[1].toUpperCase().replace('PERCHE', 'PERCHÉ')] = m[2].trim();
                     });
                     const cmd = parts.COMANDO || parts.ISTRUZIONE || parts.SITUAZIONE;
@@ -1907,7 +1908,10 @@ function VisualCoach() {
                         className="rounded-xl px-3.5 py-3 relative overflow-hidden"
                         style={{ background: 'linear-gradient(135deg, rgba(16,185,129,0.16), rgba(124,58,237,0.10))', border: '1px solid rgba(16,185,129,0.35)', boxShadow: '0 0 24px rgba(16,185,129,0.18)' }}>
                         <span className="absolute left-0 top-0 bottom-0 w-1" style={{ background: 'linear-gradient(180deg, #10b981, #7c3aed)' }} />
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-orange-300/90 pl-1.5 mb-0.5">⚠️ Correggi</p>
                         <p className="text-[15px] font-black text-white leading-tight pl-1.5" style={{ letterSpacing: '-0.01em' }}>{cmd}</p>
+                        {parts.BENE && <p className="mt-2 text-[12px] font-semibold text-emerald-300 pl-1.5 flex items-start gap-1.5"><span className="shrink-0">✅</span> <span><b className="uppercase text-[9px] tracking-wider opacity-80">Bene</b> · {parts.BENE}</span></p>}
+                        {parts.PROVA && <p className="mt-1.5 text-[12px] font-bold text-amber-200 pl-1.5 flex items-start gap-1.5 rounded-lg px-1.5 py-1" style={{ background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.3)' }}><span className="shrink-0">🥊</span> <span><b className="uppercase text-[9px] tracking-wider opacity-80">Prova ora</b> · {parts.PROVA}</span></p>}
                         {parts.VISTO && <p className="mt-1.5 text-[11px] text-emerald-200/80 pl-1.5 flex items-center gap-1.5"><Eye size={12} className="shrink-0" /> {parts.VISTO}</p>}
                         {parts.PERCHÉ && <p className="mt-0.5 text-[11px] text-violet-200/70 italic pl-1.5 flex items-center gap-1.5"><Lightbulb size={12} className="shrink-0" /> {parts.PERCHÉ}</p>}
                         {parts.PUNTO && <p className="mt-1 text-[11px] font-bold text-amber-300 pl-1.5 flex items-center gap-1.5"><Trophy size={12} className="shrink-0" /> {parts.PUNTO}</p>}

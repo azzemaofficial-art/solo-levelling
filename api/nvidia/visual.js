@@ -831,12 +831,13 @@ REGOLE DI PRECISIONE (fondamentali):
 - Se gli osservatori si contraddicono, fidati della biomeccanica per equilibrio/baricentro e della tecnica per il gesto.
 - Resta specifico per la disciplina indicata e per quello che è davvero visibile nel frame.
 
-FORMATO (esatto, max 3 righe, NO markdown, NO emoji):
-COMANDO: <verbo imperativo + correzione fisica specifica con la parte del corpo>
-VISTO: <l'errore concreto osservato, 5-8 parole>
+FORMATO (esatto, max 4 righe, NO markdown, NO emoji):
+COMANDO: <la cosa #1 da CORREGGERE: verbo imperativo + parte del corpo specifica>
+BENE: <una cosa che sta facendo GIUSTA adesso, specifica e sincera — rinforzo positivo>
+PROVA: <il prossimo COLPO o COMBO concreto da fare ORA, specifico per la disciplina>
 PERCHÉ: <principio tecnico/biomeccanico in una frase — ometti se ovvio>
 
-Tono secco, professionale, in italiano. Mai ripetere il focus dei feedback recenti: cambia sempre angolo di analisi.`;
+Tono secco, professionale ma incoraggiante, in italiano. Dai SEMPRE sia ciò che va bene sia ciò da correggere. Mai ripetere il focus dei feedback recenti: cambia sempre angolo.`;
 
 // Osservatore tecnico: DESCRIVE il frame reale, NON recita tip da manuale.
 // È questo che rende i consigli "veri" (analisi del frame) invece di pescati da una lista.
@@ -844,7 +845,7 @@ const VISION_TECH_OBSERVER = (disciplineLabel) => `Sei un OSSERVATORE TECNICO es
 Descrivi ESCLUSIVAMENTE ciò che vedi DAVVERO in questa immagine, in modo concreto:
 - posizione del corpo e guardia; dove sono mani, gomiti, ginocchia, piedi, testa, sguardo
 - il gesto o la tecnica che sta eseguendo IN QUESTO ISTANTE
-- errori o imprecisioni VISIBILI (indica la parte del corpo + cosa non va)
+- ciò che è ESEGUITO BENE (parte del corpo + cosa è corretto) E gli errori/imprecisioni VISIBILI (parte del corpo + cosa non va)
 - allineamenti/angoli articolari se rilevabili
 REGOLE: NON dare consigli generici, NON elencare tip da manuale, NON inventare ciò che non è visibile.
 Solo osservazione fattuale di QUESTO frame. 2-4 frasi brevi, italiano, tecnico-preciso.`;
@@ -891,7 +892,7 @@ async function callBrainOrchestrator({ isSparring, disciplineLabel, techObs, bio
             { role: 'system', content: system },
             { role: 'user', content: obsBlock },
           ],
-          max_tokens: 260,
+          max_tokens: 340,
           temperature: 0.45,
         }),
         signal: controller.signal,
@@ -935,11 +936,12 @@ REGOLE FERREE:
 - Se le osservazioni indicano un RISCHIO DI INFORTUNIO, è la priorità assoluta.
 - Se la forma è davvero corretta, dillo con un comando di mantenimento — non inventare un difetto.
 
-FORMATO (esatto, max 3 righe, NO markdown, NO emoji):
-COMANDO: <verbo imperativo + correzione fisica specifica con la parte del corpo>
-VISTO: <il pattern concreto osservato nei momenti, 5-8 parole>
+FORMATO (esatto, max 4 righe, NO markdown, NO emoji):
+COMANDO: <la cosa #1 da CORREGGERE adesso: verbo imperativo + parte del corpo specifica>
+BENE: <una cosa che l'atleta sta facendo GIUSTA in questo momento, specifica e sincera (parte del corpo o tecnica) — rinforzo positivo, mai vago>
+PROVA: <il prossimo COLPO o COMBO concreto da eseguire ORA, specifico per la disciplina (es. "jab-cross-gancio sinistro", "low kick destro", "doppio teep")>
 PERCHÉ: <principio tecnico/biomeccanico in una frase — ometti se ovvio>
-Tono secco, professionale, esigente, in italiano.`;
+Tono secco, professionale, esigente ma incoraggiante, in italiano. Dai SEMPRE sia il difetto sia ciò che va bene.`;
 
 async function callBrainVerdict({ disciplineLabel, observations, antiRepeatContext }) {
   if (!observations || observations.length === 0) return null;
@@ -966,7 +968,7 @@ async function callBrainVerdict({ disciplineLabel, observations, antiRepeatConte
             { role: 'system', content: BRAIN_VERDICT },
             { role: 'user', content: user },
           ],
-          max_tokens: 260,
+          max_tokens: 340,
           temperature: 0.45,
         }),
         signal: controller.signal,
