@@ -789,7 +789,24 @@ export default async function handler(req, res) {
     const webhookUrl = `${SITE_URL}/api/telegram/webhook`;
     const r = await fetch(`https://api.telegram.org/bot${botToken}/setWebhook?url=${encodeURIComponent(webhookUrl)}`);
     const d = await r.json();
-    return res.status(200).json({ ok: d.ok, description: d.description, webhookUrl });
+    // Registra il MENU comandi del bot (la lista che appare toccando "/")
+    const commands = [
+      { command: 'scienza', description: '🔬 Quiz Scienza & Biohacking (dai paper veri)' },
+      { command: 'quiz', description: '🧠 Quiz del Gate attivo (+XP, livelli, streak)' },
+      { command: 'gate', description: '🚪 Cambia materia (IA · Inglese · Cultura · Scienza)' },
+      { command: 'boss', description: '🐉 Boss Quiz: 6 domande, bonus XP' },
+      { command: 'lezione', description: '📖 Micro-lezione di teoria sul Gate attivo' },
+      { command: 'progressi', description: '📈 Livello, streak, ripassi e avanzamento' },
+      { command: 'oggi', description: '📅 Totale calorie e macro di oggi' },
+      { command: 'integratori', description: '💊 Lista integratori consigliati' },
+      { command: 'help', description: 'ℹ️ Cosa posso fare' },
+    ];
+    const c = await fetch(`https://api.telegram.org/bot${botToken}/setMyCommands`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ commands }),
+    });
+    const cd = await c.json();
+    return res.status(200).json({ ok: d.ok && cd.ok, webhook: d.description, commands: cd.ok ? `${commands.length} registrati` : cd.description, webhookUrl });
   }
 
   if (req.method !== 'POST') return res.status(200).json({ ok: true });
@@ -939,6 +956,9 @@ export default async function handler(req, res) {
   }
 
   if (!text) return res.status(200).json({ ok: true });
+
+  // Normalizza i comandi: "/scienza@NomeBot" → "/scienza" (il menu/gruppi aggiungono @bot)
+  if (text.startsWith('/')) text = text.replace(/^(\/[A-Za-z_]+)@\w+/, '$1').trim();
 
   // Comandi speciali
   if (text === '/start' || text === '/help') {
