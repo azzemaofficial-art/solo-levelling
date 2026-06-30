@@ -1,7 +1,7 @@
 // Telegram Webhook — riceve messaggi, analizza con Nemotron 550B, risponde + deep link al sito
 // Setup: GET /api/telegram/webhook?setup=1
 
-import { GATES, GATE_IDS, nextQuestion, gradeAnswer, startBoss, bossQuestion, gradeBoss, progressLine, progressCard, initLearn, normalize as normLearn, gateButtons, levelOf, loadGen, baseCount, existingStems, safeHtml } from '../../lib/learn.js';
+import { GATES, GATE_IDS, nextQuestion, gradeAnswer, startBoss, bossQuestion, gradeBoss, progressLine, progressCard, initLearn, normalize as normLearn, gateButtons, levelOf, loadGen, baseCount, existingStems, safeHtml, studyLabel, difficultyForLevel } from '../../lib/learn.js';
 import { NUTRITION_PRINCIPLES, knowledgePromptFor } from '../../lib/knowledgeBase.js';
 
 const NVIDIA_BASE = 'https://integrate.api.nvidia.com/v1';
@@ -729,10 +729,12 @@ async function hydrateGen(gate) {
   return gen;
 }
 
-// Genera N nuove domande via AI (gratis) e le appende al pool del gate
-async function generateQuestions(gate, n = 6) {
+// Genera N nuove domande via AI (gratis) e le appende al pool del gate.
+// `level` (1-10) → adatta la DIFFICOLTÀ delle domande al livello di studio dell'utente.
+async function generateQuestions(gate, n = 6, level = 0) {
   if (!GATES[gate]) return 0;
   const avoid = existingStems(gate).slice(-25).join(' | ');
+  const diff = level ? difficultyForLevel(level) : 'intermedia';
   // Per il gate Scienza: ancora le domande ai PRINCIPI reali della knowledge base
   // (paper distillati) → quiz fondati sulla scienza raccolta, non inventati.
   let sourceBlock = '';
@@ -741,8 +743,8 @@ async function generateQuestions(gate, n = 6) {
     sourceBlock = `\nBASA OGNI DOMANDA su questi PRINCIPI SCIENTIFICI reali (non inventare fatti fuori da questi):\n- ${pool.join('\n- ')}\n`;
   }
   const out = await callAI([
-    { role: 'system', content: 'Generi domande a quiz a scelta multipla in italiano, accurate e di livello intermedio. Rispondi SOLO con JSON valido, nessun altro testo, niente ragionamento.' },
-    { role: 'user', content: `Tema: ${GATES[gate].name}. Genera ${n} domande NUOVE e varie (concetti utili, non banali), DIVERSE da queste già usate: ${avoid}${sourceBlock}\nOgnuna con 3 opzioni plausibili (una sola giusta) e una spiegazione di 1-2 frasi.\nFormato ESATTO: {"questions":[{"m":"modulo","q":"testo domanda","a":["op1","op2","op3"],"correct":0,"exp":"spiegazione"}]}\nVaria l'indice "correct" tra 0,1,2.` },
+    { role: 'system', content: `Generi domande a quiz a scelta multipla in italiano, accurate e di difficoltà ${diff}. Rispondi SOLO con JSON valido, nessun altro testo, niente ragionamento.` },
+    { role: 'user', content: `Tema: ${GATES[gate].name}. Genera ${n} domande NUOVE e varie di difficoltà ${diff} (non banali), DIVERSE da queste già usate: ${avoid}${sourceBlock}\nOgnuna con 3 opzioni plausibili (una sola giusta) e una spiegazione di 1-2 frasi che aiuti a CAPIRE e APPLICARE il concetto.\nFormato ESATTO: {"questions":[{"m":"modulo","q":"testo domanda","a":["op1","op2","op3"],"correct":0,"exp":"spiegazione"}]}\nVaria l'indice "correct" tra 0,1,2.` },
   ], true);
   if (!out) return 0;
   let parsed;
@@ -773,7 +775,7 @@ async function sendQuiz(token, id, gateOverride) {
   // che è cappato a course.length). Così non si arriva mai al wrap "stesse domande".
   const p = st.prog[gate] || { idx: 0, done: 0 };
   if ((p.idx || 0) >= GATES[gate].course.length - 2) {
-    await generateQuestions(gate, 6);
+    await generateQuestions(gate, 6, p.level || 1);
   }
   const q = nextQuestion(st, gateOverride);
   await hydrateGen(q.gate); // assicura il pool del gate effettivo (anche se review di altro gate)
@@ -902,7 +904,12 @@ export default async function handler(req, res) {
       await kvPush(`tg_queue:${cChat}`, { type: 'learn_xp', amount: g.xpGained, gate, ts: Date.now() }); // sync XP all'app
       await answerCbq(botToken, cbq.id, g.correct ? `✅ +${g.xpGained} XP` : '❌');
       const head = g.correct ? `✅ <b>Giusto!</b> +${g.xpGained} XP${g.review ? ' (ripasso)' : ''}` : `❌ <b>Sbagliato.</b> +${g.xpGained} XP`;
-      await sendTelegramMessage(botToken, cChat, `${head}\n💡 ${safeHtml(g.exp)}\n\n${progressLine(g.state)}`,
+      // feedback livello di studio adattivo
+      const sl = studyLabel(g.level);
+      const lvLine = g.levelDelta > 0 ? `\n📈 Livello studio: ${sl.emoji} <b>Lv ${sl.level} ${sl.label}</b> (salito!)`
+        : g.levelDelta < 0 ? `\n📉 Livello studio: ${sl.emoji} <b>Lv ${sl.level} ${sl.label}</b> (sceso — ripassa!)`
+        : `\n${sl.emoji} Livello studio: <b>Lv ${sl.level} ${sl.label}</b>`;
+      await sendTelegramMessage(botToken, cChat, `${head}${lvLine}\n💡 ${safeHtml(g.exp)}\n\n${progressLine(g.state)}`,
         { inline_keyboard: [
           [{ text: '📖 Spiega meglio', callback_data: `lx|${gate}|${qidS}` }],
           [{ text: '▶️ Prossima domanda', callback_data: 'lnext' }],
