@@ -1,7 +1,7 @@
 // Telegram Webhook — riceve messaggi, analizza con Nemotron 550B, risponde + deep link al sito
 // Setup: GET /api/telegram/webhook?setup=1
 
-import { GATES, GATE_IDS, nextQuestion, gradeAnswer, startBoss, bossQuestion, gradeBoss, progressLine, progressCard, initLearn, normalize as normLearn, gateButtons, levelOf, loadGen, baseCount, existingStems } from '../../lib/learn.js';
+import { GATES, GATE_IDS, nextQuestion, gradeAnswer, startBoss, bossQuestion, gradeBoss, progressLine, progressCard, initLearn, normalize as normLearn, gateButtons, levelOf, loadGen, baseCount, existingStems, safeHtml } from '../../lib/learn.js';
 import { NUTRITION_PRINCIPLES, knowledgePromptFor } from '../../lib/knowledgeBase.js';
 
 const NVIDIA_BASE = 'https://integrate.api.nvidia.com/v1';
@@ -892,7 +892,7 @@ export default async function handler(req, res) {
       await kvPush(`tg_queue:${cChat}`, { type: 'learn_xp', amount: g.xpGained, gate, ts: Date.now() }); // sync XP all'app
       await answerCbq(botToken, cbq.id, g.correct ? `✅ +${g.xpGained} XP` : '❌');
       const head = g.correct ? `✅ <b>Giusto!</b> +${g.xpGained} XP${g.review ? ' (ripasso)' : ''}` : `❌ <b>Sbagliato.</b> +${g.xpGained} XP`;
-      await sendTelegramMessage(botToken, cChat, `${head}\n💡 ${g.exp}\n\n${progressLine(g.state)}`,
+      await sendTelegramMessage(botToken, cChat, `${head}\n💡 ${safeHtml(g.exp)}\n\n${progressLine(g.state)}`,
         { inline_keyboard: [
           [{ text: '📖 Spiega meglio', callback_data: `lx|${gate}|${qidS}` }],
           [{ text: '▶️ Prossima domanda', callback_data: 'lnext' }],
@@ -1151,6 +1151,6 @@ export default async function handler(req, res) {
     { role: 'system', content: coachSys },
     { role: 'user', content: text },
   ], isSimpleQuery(text));
-  await sendTelegramMessage(botToken, incomingChatId, coachReply || parsed?.text || raw);
+  await sendTelegramMessage(botToken, incomingChatId, safeHtml(coachReply || parsed?.text || raw));
   return res.status(200).json({ ok: true });
 }
