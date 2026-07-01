@@ -2700,26 +2700,27 @@ const SystemHub = ({ systemLogs, setSystemLogs, dailyGoal, setDailyGoal, hydrati
 - Target: ${Math.round(Number(effectiveDailyGoal || dailyGoal || 2400))} kcal | ${Math.round(Number(adaptiveMacroTargets?.protein || macroGoals?.protein || 150))}g proteine
 - Sonno medio: ${avg((l) => l.sleepHours)}h`;
 
-      const data = await requestSystemAI({
-        model: getModelFor('profile') || undefined,
-        temperature: 0.5,
-        max_tokens: 1100,
-        timeoutMs: 40000,
-        messages: [
-          { role: 'system', content: `Sei un coach d'élite di nutrizione e performance. Analizzi il PROFILO GENERALE dell'atleta sui dati reali (non il singolo giorno), in profondità. Sii concreto, basati sui numeri forniti, niente generico.
+      const coachRes = await fetch('/api/nvidia/coach', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tier: 'max',
+          messages: [{ role: 'user', content: ctx }],
+          systemPrompt: `Sei un coach d'élite di nutrizione e performance. Analizzi il PROFILO GENERALE dell'atleta sui dati reali (non il singolo giorno), in profondità. Sii concreto, basati sui numeri forniti, niente generico.
 Struttura la risposta in sezioni chiare con questi titoli:
 📊 QUADRO GENERALE — cosa dicono davvero i numeri (2-3 frasi)
 ✅ COSA FUNZIONA — punti di forza concreti
 ⚠️ CRITICITÀ — i 2-3 problemi più importanti, con il perché
 🎯 PIANO D'AZIONE — 4-5 azioni specifiche e misurabili per le prossime settimane
 🔮 PROIEZIONE — dove porta la traiettoria attuale e cosa cambiare
-Italiano, diretto, esigente. Niente markdown pesante, usa i titoli con emoji come sopra.${knowledgePromptFor(ctx)}` },
-          { role: 'user', content: ctx },
-        ],
+Italiano, diretto, esigente. Niente markdown pesante, usa i titoli con emoji come sopra.${knowledgePromptFor(ctx)}`,
+        }),
+        signal: AbortSignal.timeout(45000),
       });
-      const content = String(data?.choices?.[0]?.message?.content || '').trim();
+      const data = await coachRes.json();
+      const content = String(data?.content || data?.choices?.[0]?.message?.content || '').trim();
       if (!content) throw new Error('Analisi vuota');
-      const usedModel = String(data?._shadowMeta?.model || '').trim();
+      const usedModel = String(data?.provider || data?.model || '').trim();
       const entry = { content, model: usedModel, date: new Date().toISOString() };
       setProfileAnalysis(entry);
       try {
@@ -2745,25 +2746,26 @@ Italiano, diretto, esigente. Niente markdown pesante, usa i titoli con emoji com
       const ctx = `Atleta: ${pesoKg}kg, ${altezzaCm}cm, ${playerStats?.age || metabolicProfile?.age || 25} anni, ${(playerStats?.sex || 'male') === 'male' ? 'uomo' : 'donna'}. Obiettivo: ${playerStats?.objective || 'recomp'}. Allenamento regolare (forza + arti marziali). Vuole sapere quali INTEGRATORI prendere, con priorità basata sull'evidenza.`;
       // recupero i principi rilevanti agli integratori dalla knowledge base
       const suppQuery = 'integratori creatina proteine whey leucina caseina omega-3 vitamina D K2 magnesio zinco glicina ashwagandha beta-alanina citrullina caffeina curcumina berberina sonno testosterone recupero';
-      const data = await requestSystemAI({
-        model: getModelFor('profile') || undefined,
-        temperature: 0.4,
-        max_tokens: 1100,
-        timeoutMs: 40000,
-        messages: [
-          { role: 'system', content: `Sei un esperto di integrazione sportiva basata sull'evidenza. Consiglia uno STACK di integratori PERSONALIZZATO per questo atleta, ESCLUSIVAMENTE in base ai PRINCIPI SCIENTIFICI forniti (non inventare, non consigliare ciò che non è supportato). Ordina per PRIORITÀ.
+      const suppRes = await fetch('/api/nvidia/coach', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tier: 'max',
+          messages: [{ role: 'user', content: ctx }],
+          systemPrompt: `Sei un esperto di integrazione sportiva basata sull'evidenza. Consiglia uno STACK di integratori PERSONALIZZATO per questo atleta, ESCLUSIVAMENTE in base ai PRINCIPI SCIENTIFICI forniti (non inventare, non consigliare ciò che non è supportato). Ordina per PRIORITÀ.
 Struttura così:
 🥇 FONDAMENTALI (alta evidenza) — nome, dose, quando assumerlo, perché (1 frase col dato)
 🥈 UTILI (evidenza buona/contesto-dipendente) — idem
 🧪 OPZIONALI/SPERIMENTALI (evidenza debole) — segnala l'incertezza
 ⚠️ NOTA: gli integratori vengono DOPO sonno, dieta e allenamento; consulta un medico per condizioni/farmaci.
-Italiano, conciso, niente markdown pesante. Dosi concrete (anche per ${pesoKg}kg quando rilevante).${knowledgePromptFor(suppQuery, 3200)}` },
-          { role: 'user', content: ctx },
-        ],
+Italiano, conciso, niente markdown pesante. Dosi concrete (anche per ${pesoKg}kg quando rilevante).${knowledgePromptFor(suppQuery, 3200)}`,
+        }),
+        signal: AbortSignal.timeout(45000),
       });
-      const content = String(data?.choices?.[0]?.message?.content || '').trim();
+      const data = await suppRes.json();
+      const content = String(data?.content || data?.choices?.[0]?.message?.content || '').trim();
       if (!content) throw new Error('Risposta vuota');
-      const entry = { content, model: String(data?._shadowMeta?.model || '').trim(), date: new Date().toISOString() };
+      const entry = { content, model: String(data?.provider || data?.model || '').trim(), date: new Date().toISOString() };
       setSupplementAdvice(entry);
       try { localStorage.setItem('shadow_monarch_supplement_advice_last', JSON.stringify(entry)); } catch {}
       emitUiToast({ message: 'Consigli integratori pronti', tone: 'success', durationMs: 2400 });
