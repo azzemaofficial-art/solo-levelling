@@ -776,7 +776,7 @@ async function sendQuiz(token, id, gateOverride) {
     const raw = (await kvGet(GENQ_KEY(g))) || [];
     // filtra le generate al livello attuale ±2 (le untagged = domande vecchie, sempre incluse)
     const curLv = (st.prog[g] || {}).level || 1;
-    const filtered = Array.isArray(raw) ? raw.filter((q) => !q._lv || Math.abs(q._lv - curLv) <= 2) : [];
+    const filtered = Array.isArray(raw) ? raw.filter((q) => Math.abs((q._lv || 1) - curLv) <= 2) : [];
     loadGen(g, filtered);
   }
   const p = st.prog[gate] || { idx: 0, done: 0 };
