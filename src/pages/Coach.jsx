@@ -1011,6 +1011,118 @@ function VisualCoach() {
   const [sessionAnalysis, setSessionAnalysis] = useState(null);
   const [analyzingSession, setAnalyzingSession] = useState(false);
 
+  // ── Modalità COMBO A COMANDO ─────────────────────────────────────────────────
+  const [comboOn, setComboOn] = useState(false);
+  const [comboPhase, setComboPhase] = useState('idle'); // idle|calling|go|judging|result
+  const [currentCombo, setCurrentCombo] = useState('');
+  const [comboCountdown, setComboCountdown] = useState(3);
+  const [comboResult, setComboResult] = useState(null); // {grade, feedback, nextCombo}
+  const [comboScore, setComboScore] = useState({ perfect: 0, good: 0, redo: 0 });
+  const comboPhaseRef = useRef('idle');
+  const comboTimerRef = useRef(null);
+
+  const COMBO_LIBRARY = {
+    boxing:     ['Jab-Cross', '1-2-3', 'Jab-Jab-Cross', '1-2-Gancio Corpo', 'Jab-Cross-Uppercut', '1-2-3-2', 'Jab-Cross-Corpo-Gancio', 'Double Jab-Cross-Uppercut-Gancio'],
+    muaythai:   ['Jab-Cross', 'Jab-Cross-Low Kick', 'Teep-Cross-Hook', 'Cross-Hook-Body Kick', 'Jab-Jab-Cross-Low Kick', 'Double Jab-Cross-Hook', 'Teep-Jab-Cross-Hook', 'Low Kick-Jab-Cross-Ginocchio'],
+    kickboxing: ['Jab-Cross-Roundhouse', 'Front Kick-Cross-Hook', 'Jab-Cross-Side Kick', 'Jab-Roundhouse-Cross', 'Cross-Hook-Body Kick', 'Jab-Cross-Spinning Back Kick'],
+    mma:        ['Jab-Cross-Level Change', 'Teep-Cross-Takedown', 'Jab-Cross-Body-Clinch', 'Combo-Sprawl', 'Jab-Cross-Hook-Doppia Gamba', 'Low Kick-Cross-Double Leg'],
+    karate:     ['Jab-Cross-Mawashi Geri', 'Kizami-Oi Zuki-Mae Geri', 'Gyaku Zuki-Mawashi Geri', 'Sanbon Zuki', 'Mae Geri-Mawashi Geri', 'Kizami-Gyaku-Yoko Geri'],
+    taekwondo:  ['Dollyo-Ap-Dollyo', 'Yeop Chagi-Dollyo', 'Double Dollyo', 'Spinning Hook-Dollyo', 'Jump Dollyo-Dollyo', 'Dwi Chagi-Dollyo Chagi'],
+    muayboran:  ['Jab-Cross-Tee Kha', 'Teep-Salab Fan Pla', 'Sok Ti-Sok Tad', 'Kao Tone-Kao Dode', 'Chok-Teep-Sok Ngad'],
+    kravmaga:   ['Burst-Strike-Move', 'Palm Strike-Knee-Push', 'Eye Gouge-Groin-Disengage', 'Forearm Block-Counter-Disengage', '360 Defense-Counter-Escape'],
+    default:    ['Jab-Cross', 'Jab-Cross-Hook', 'Hook-Cross-Hook', 'Cross-Hook-Cross', 'Jab-Jab-Cross-Hook', 'Combo veloce 4 colpi'],
+  };
+
+  const pickCombo = useCallback((exclude = '') => {
+    const list = COMBO_LIBRARY[mode] || COMBO_LIBRARY.default;
+    const filtered = list.filter((c) => c !== exclude);
+    return filtered[Math.floor(Math.random() * filtered.length)] || list[0];
+  }, [mode]);
+
+  const stopCombo = useCallback(() => {
+    clearTimeout(comboTimerRef.current);
+    setComboOn(false);
+    setComboPhase('idle');
+    comboPhaseRef.current = 'idle';
+    setCurrentCombo('');
+    setComboResult(null);
+  }, []);
+
+  const runComboJudge = useCallback(async (combo) => {
+    if (!videoRef.current || !canvasRef.current) return;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    const video = videoRef.current;
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
+    ctx.drawImage(video, 0, 0);
+    const imageBase64 = canvas.toDataURL('image/jpeg', 0.72).split(',')[1];
+    try {
+      const res = await fetch('/api/nvidia/visual', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ comboJudge: true, imageBase64, mimeType: 'image/jpeg', mode, targetCombo: combo }),
+      });
+      const data = await res.json();
+      return data;
+    } catch { return null; }
+  }, [mode]);
+
+  const currentComboRef = useRef('');
+  const nextComboRoundRef = useRef(null);
+
+  const nextComboRound = useCallback((suggestedCombo) => {
+    if (!comboPhaseRef.current || comboPhaseRef.current === 'idle') return;
+    const combo = suggestedCombo || pickCombo(currentComboRef.current);
+    currentComboRef.current = combo;
+    setCurrentCombo(combo);
+    setComboResult(null);
+    setComboPhase('calling');
+    comboPhaseRef.current = 'calling';
+    setComboCountdown(3);
+    enqueueSpeak(`Esegui: ${combo}`, true);
+    let c = 2;
+    const tick = () => {
+      setComboCountdown(c);
+      if (c <= 0) {
+        setComboPhase('go');
+        comboPhaseRef.current = 'go';
+        enqueueSpeak('Via!', true);
+        comboTimerRef.current = setTimeout(async () => {
+          if (comboPhaseRef.current !== 'go') return;
+          setComboPhase('judging');
+          comboPhaseRef.current = 'judging';
+          const result = await runComboJudge(combo);
+          if (comboPhaseRef.current !== 'judging') return;
+          const grade = result?.grade || 'good';
+          setComboResult({ grade, feedback: result?.feedback || '', nextCombo: result?.nextCombo || '' });
+          setComboScore((prev) => ({ ...prev, [grade]: (prev[grade] || 0) + 1 }));
+          setComboPhase('result');
+          comboPhaseRef.current = 'result';
+          const ttsMsg = grade === 'perfect' ? `Perfetto! ${result?.feedback || ''}` : grade === 'good' ? `Buono. ${result?.feedback || ''}` : `Riprova. ${result?.feedback || ''}`;
+          enqueueSpeak(ttsMsg, true);
+          comboTimerRef.current = setTimeout(() => {
+            if (comboPhaseRef.current !== 'result') return;
+            nextComboRoundRef.current?.(result?.nextCombo || '');
+          }, 3200);
+        }, 2500);
+        return;
+      }
+      c--;
+      comboTimerRef.current = setTimeout(tick, 800);
+    };
+    comboTimerRef.current = setTimeout(tick, 1000);
+  }, [pickCombo, enqueueSpeak, runComboJudge]);
+
+  nextComboRoundRef.current = nextComboRound;
+
+  const startCombo = useCallback(() => {
+    setComboScore({ perfect: 0, good: 0, redo: 0 });
+    setComboOn(true);
+    comboPhaseRef.current = 'calling';
+    nextComboRound('');
+  }, [nextComboRound]);
+
   // Precarica le voci appena disponibili (getVoices è asincrono su Chrome/Safari)
   useEffect(() => {
     const load = () => { voicesRef.current = window.speechSynthesis?.getVoices() || []; };
@@ -1866,9 +1978,80 @@ function VisualCoach() {
           </motion.div>
         )}
 
+        {/* ── COMBO A COMANDO ─────────────────────────────────────────────────── */}
+        <AnimatePresence>
+          {comboOn && (
+            <motion.div
+              key="combo-overlay"
+              initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.96 }}
+              className="mx-3 mt-3 rounded-2xl overflow-hidden"
+              style={{ background: 'linear-gradient(135deg, rgba(220,38,38,0.18), rgba(124,58,237,0.14))', border: '1px solid rgba(239,68,68,0.4)', boxShadow: '0 0 28px rgba(239,68,68,0.18)' }}>
+              {/* Punteggio */}
+              <div className="flex items-center justify-between px-4 pt-3 pb-1">
+                <span className="text-[9px] font-mono tracking-widest font-bold text-red-400/90">🥊 COMBO MODE</span>
+                <div className="flex items-center gap-3">
+                  <span className="text-[10px] font-black" style={{ color: '#34d399' }}>✅ {comboScore.perfect}</span>
+                  <span className="text-[10px] font-black" style={{ color: '#fbbf24' }}>👍 {comboScore.good}</span>
+                  <span className="text-[10px] font-black" style={{ color: '#f87171' }}>🔄 {comboScore.redo}</span>
+                  <button onClick={stopCombo} className="text-gray-500 hover:text-gray-300 ml-1"><X size={14} /></button>
+                </div>
+              </div>
+              <div className="px-4 pb-4">
+                {/* CALLING — mostra il combo con countdown */}
+                {comboPhase === 'calling' && (
+                  <div className="text-center space-y-2 py-2">
+                    <p className="text-[10px] uppercase tracking-widest text-gray-400">Esegui tra…</p>
+                    <motion.p key={comboCountdown} initial={{ scale: 1.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+                      className="text-5xl font-black" style={{ color: '#f97316' }}>{comboCountdown}</motion.p>
+                    <motion.p
+                      initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
+                      className="text-xl font-black text-white tracking-tight leading-tight">{currentCombo}</motion.p>
+                  </div>
+                )}
+                {/* GO! */}
+                {comboPhase === 'go' && (
+                  <div className="text-center py-3">
+                    <motion.p initial={{ scale: 0.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+                      className="text-5xl font-black" style={{ color: '#ef4444', textShadow: '0 0 30px rgba(239,68,68,0.6)' }}>VIA!</motion.p>
+                    <p className="text-base font-black text-white mt-1">{currentCombo}</p>
+                  </div>
+                )}
+                {/* JUDGING */}
+                {comboPhase === 'judging' && (
+                  <div className="text-center py-3 space-y-2">
+                    <p className="text-base font-black text-white">{currentCombo}</p>
+                    <div className="flex justify-center gap-1">{[0,1,2].map((i) => (
+                      <motion.span key={i} className="w-2 h-2 rounded-full" style={{ background: '#f97316' }}
+                        animate={{ opacity: [0.3,1,0.3] }} transition={{ duration: 0.6, repeat: Infinity, delay: i*0.2 }} />
+                    ))}</div>
+                    <p className="text-[10px] text-gray-400">Il coach valuta…</p>
+                  </div>
+                )}
+                {/* RESULT */}
+                {comboPhase === 'result' && comboResult && (
+                  <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-2 py-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-2xl">
+                        {comboResult.grade === 'perfect' ? '🌟' : comboResult.grade === 'good' ? '✅' : '🔄'}
+                      </span>
+                      <span className="text-sm font-black" style={{
+                        color: comboResult.grade === 'perfect' ? '#34d399' : comboResult.grade === 'good' ? '#fbbf24' : '#f87171'
+                      }}>
+                        {comboResult.grade === 'perfect' ? 'PERFETTO!' : comboResult.grade === 'good' ? 'BUONO' : 'RIPROVA'}
+                      </span>
+                    </div>
+                    {comboResult.feedback && <p className="text-[12px] text-gray-200 leading-snug">{comboResult.feedback}</p>}
+                    <p className="text-[10px] text-gray-500">Prossimo combo in arrivo…</p>
+                  </motion.div>
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* SEZIONE COMMENTI AI — il comando RESTA visibile; l'analisi è solo un puntino */}
         <AnimatePresence>
-          {!guidedOn && (analysis || analyzing) && (
+          {!guidedOn && !comboOn && (analysis || analyzing) && (
             <motion.div
               initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 6 }}
               transition={{ type: 'spring', stiffness: 280, damping: 24 }}
@@ -1972,6 +2155,13 @@ function VisualCoach() {
                 ? { background: 'linear-gradient(135deg, #10b981, #047857)', boxShadow: '0 4px 18px rgba(16,185,129,0.4)' }
                 : { background: 'rgba(55,65,81,0.7)', border: '1px solid rgba(255,255,255,0.1)' }}>
               <span className="inline-flex items-center justify-center gap-1.5">{guidedOn ? <><X size={15} /> Esci</> : <><Target size={15} /> Guidato</>}</span>
+            </motion.button>
+            <motion.button whileTap={{ scale: 0.93 }} onClick={() => comboOn ? stopCombo() : startCombo()}
+              className="flex-1 py-3.5 rounded-xl text-white text-sm font-black transition-all relative overflow-hidden"
+              style={comboOn
+                ? { background: 'linear-gradient(135deg, #dc2626, #9f1239)', boxShadow: '0 4px 18px rgba(220,38,38,0.5)' }
+                : { background: 'rgba(55,65,81,0.7)', border: '1px solid rgba(255,255,255,0.1)' }}>
+              <span className="inline-flex items-center justify-center gap-1.5">{comboOn ? <><X size={15} /> Stop</> : <>🥊 Combo</>}</span>
             </motion.button>
           </div>
           <div className="flex gap-2">

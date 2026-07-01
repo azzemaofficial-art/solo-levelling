@@ -1117,6 +1117,45 @@ export default async function handler(req, res) {
     return res.status(200).json({ drills: [], error: 'Piano non disponibile, riprova.' });
   }
 
+  // ── GIUDICE COMBO — analizza frame dopo l'esecuzione di UN combo chiamato ─────
+  // Il client manda: comboJudge=true, imageBase64, req.body.targetCombo (es. "Jab-Cross-Hook")
+  if (req.body?.comboJudge && imageBase64) {
+    const _groqKey = process.env.GROQ_API_KEY;
+    const _cosmosKey = process.env.COSMOS3_NVIDIA_API_KEY;
+    const _cosmosModel = process.env.COSMOS3_NVIDIA_MODEL || 'nvidia/cosmos-reason1-7b';
+    const targetCombo = String(req.body.targetCombo || 'tecnica').slice(0, 80);
+    const poseHint = req.body.poseHint || '';
+    const JUDGE_SYSTEM = `Sei un giudice esperto di ${disciplineLabel}. Guardi UN frame di un atleta che ha appena eseguito una tecnica/combo chiamata.
+Il tuo compito: stabilire se l'ha eseguita correttamente, in modo concreto e specifico basato su ciò che VEDI realmente.
+REGOLE: cita sempre la parte del corpo precisa. Niente consigli generici. Breve e diretto.
+FORMATO (esatto, NO markdown, NO emoji, 3 righe):
+VOTO: perfetto | buono | riprova
+FEEDBACK: <1 frase — se buono/perfetto: la cosa migliore fatta. Se riprova: il principale errore con parte del corpo>
+PROSSIMO: <il prossimo combo da chiamare, specifico per la disciplina, DIVERSO dall'attuale, es. "cross-gancio-low kick">`;
+    const userMsg = `L'atleta doveva eseguire: "${targetCombo}". ${poseHint ? `Dati scheletro: ${poseHint}.` : ''}\nGuarda il frame e giudica l'esecuzione.`;
+    let judgeResult = null;
+    if (_groqKey) {
+      try {
+        const g = await callVisionGroq(_groqKey, imageBase64, mimeType, JUDGE_SYSTEM, userMsg);
+        if (g?.ok) judgeResult = g.data?.choices?.[0]?.message?.content?.trim() || '';
+      } catch (_) {}
+    }
+    if (!judgeResult && _cosmosKey) {
+      try {
+        const c = await callVisionCosmos(_cosmosKey, _cosmosModel, imageBase64, mimeType, `${JUDGE_SYSTEM}\n\n${userMsg}`);
+        if (c?.ok) judgeResult = c.data?.choices?.[0]?.message?.content?.trim() || '';
+      } catch (_) {}
+    }
+    if (judgeResult) {
+      const lines = judgeResult.split('\n');
+      const get = (k) => { const l = lines.find((x) => new RegExp(`^${k}\\s*:`, 'i').test(x.trim())); return l ? l.replace(/^[^:]+:\s*/i, '').trim() : ''; };
+      const voto = get('VOTO').toLowerCase();
+      const grade = voto.includes('perfett') ? 'perfect' : voto.includes('buon') ? 'good' : 'redo';
+      return res.status(200).json({ grade, feedback: get('FEEDBACK'), nextCombo: get('PROSSIMO'), provider: 'combo-judge' });
+    }
+    return res.status(200).json({ grade: 'good', feedback: 'Continua così.', nextCombo: '', provider: 'fallback' });
+  }
+
   // ── PAGELLA DRILL (review di UN esercizio, da osservazioni reali) ───────────
   if (drillReview) {
     const obs = Array.isArray(observations) ? observations.filter(Boolean) : [];
