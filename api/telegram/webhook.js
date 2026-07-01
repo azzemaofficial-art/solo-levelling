@@ -758,8 +758,10 @@ async function generateQuestions(gate, n = 6, level = 0) {
     .map((q) => ({ m: String(q.m || 'AI').slice(0, 24), q: String(q.q).slice(0, 240), a: q.a.slice(0, 4).map((x) => String(x).slice(0, 120)), correct: q.correct, exp: String(q.exp).slice(0, 300) }))
     .filter((q) => { const k = qkey(q.q); if (!k || existing.has(k) || seen.has(k)) return false; seen.add(k); return true; }); // scarta i doppioni
   if (!valid.length) return 0;
+  const lv = Math.max(1, Math.min(10, level || 1));
+  const tagged = valid.map((q) => ({ ...q, _lv: lv })); // tag livello per filtraggio adattivo
   const cur = (await kvGet(GENQ_KEY(gate))) || [];
-  const next = cur.concat(valid).slice(-160); // cap pool (più ampio → più domande uniche)
+  const next = cur.concat(tagged).slice(-200); // cap pool
   await kvSet(GENQ_KEY(gate), next, 2592000 * 3);
   loadGen(gate, next);
   return valid.length;
@@ -770,15 +772,26 @@ async function sendQuiz(token, id, gateOverride) {
   const gate = gateOverride && GATES[gateOverride] ? gateOverride : st.activeGate;
   // carica i pool generati di TUTTI i gate: così un ripasso SRS di QUALSIASI materia
   // ha la sua domanda disponibile (altrimenti course[qid] undefined → crash)
-  for (const g of GATE_IDS) await hydrateGen(g);
-  // pool quasi esaurito? genera nuove domande infinite via AI IN ANTICIPO (su idx, non done
-  // che è cappato a course.length). Così non si arriva mai al wrap "stesse domande".
+  for (const g of GATE_IDS) {
+    const raw = (await kvGet(GENQ_KEY(g))) || [];
+    // filtra le generate al livello attuale ±2 (le untagged = domande vecchie, sempre incluse)
+    const curLv = (st.prog[g] || {}).level || 1;
+    const filtered = Array.isArray(raw) ? raw.filter((q) => !q._lv || Math.abs(q._lv - curLv) <= 2) : [];
+    loadGen(g, filtered);
+  }
   const p = st.prog[gate] || { idx: 0, done: 0 };
+  const curLv = p.level || 1;
+  // pool quasi esaurito? genera nuove domande al livello attuale
   if ((p.idx || 0) >= GATES[gate].course.length - 2) {
-    await generateQuestions(gate, 6, p.level || 1);
+    await generateQuestions(gate, 6, curLv);
   }
   const q = nextQuestion(st, gateOverride);
-  await hydrateGen(q.gate); // assicura il pool del gate effettivo (anche se review di altro gate)
+  // se la domanda è di un gate diverso (ripasso SRS), assicura il pool già filtrato per livello
+  if (q.gate !== gate) {
+    const raw2 = (await kvGet(GENQ_KEY(q.gate))) || [];
+    const lv2 = (st.prog[q.gate] || {}).level || 1;
+    loadGen(q.gate, Array.isArray(raw2) ? raw2.filter((x) => !x._lv || Math.abs(x._lv - lv2) <= 2) : []);
+  }
   st.pending = { gate: q.gate, qid: q.qid, review: !!q.review };
   await kvSet(LEARN_KEY(id), st, 2592000);
   await sendTelegramMessage(token, id, q.text, q.keyboard);
@@ -902,6 +915,8 @@ export default async function handler(req, res) {
       if (!g.ok) { await answerCbq(botToken, cbq.id, 'Già risposta'); return res.status(200).json({ ok: true }); }
       await kvSet(LEARN_KEY(cChat), g.state, 2592000);
       await kvPush(`tg_queue:${cChat}`, { type: 'learn_xp', amount: g.xpGained, gate, ts: Date.now() }); // sync XP all'app
+      // cambio livello → genera subito domande al nuovo livello (fire & forget)
+      if (g.levelDelta !== 0) generateQuestions(gate, 8, g.level).catch(() => {});
       await answerCbq(botToken, cbq.id, g.correct ? `✅ +${g.xpGained} XP` : '❌');
       const head = g.correct ? `✅ <b>Giusto!</b> +${g.xpGained} XP${g.review ? ' (ripasso)' : ''}` : `❌ <b>Sbagliato.</b> +${g.xpGained} XP`;
       // feedback livello di studio adattivo
