@@ -24,7 +24,7 @@ const WEB_TRIGGERS = /oggi|adesso|attual|recente|2025|2026|notizie|news|studio|r
 const PROVIDERS_FAST = [
   { name: 'groq-70b',       key: () => process.env.GROQ_API_KEY,                  base: GROQ_BASE,   model: () => 'llama-3.3-70b-versatile' },
   { name: 'groq-8b',        key: () => process.env.GROQ_API_KEY,                  base: GROQ_BASE,   model: () => 'llama-3.1-8b-instant' },
-  { name: 'diffusiongemma', key: () => process.env.QWEN35_NVIDIA_API_KEY,         base: NVIDIA_BASE, model: () => 'google/diffusiongemma-26b-a4b-it' },
+  { name: 'qwen3-235b', key: () => process.env.QWEN35_NVIDIA_API_KEY,         base: NVIDIA_BASE, model: () => 'qwen/qwen3-235b-a22b' },
   { name: 'phi4-mini',      key: () => process.env.PHI_NVIDIA_API_KEY,            base: NVIDIA_BASE, model: () => 'microsoft/phi-4-mini-instruct' },
   { name: 'mistral-large3', key: () => process.env.MISTRAL_NVIDIA_API_KEY,        base: NVIDIA_BASE, model: () => 'mistralai/mistral-large-3-675b-instruct-2512' },
   { name: 'step-3.7',       key: () => process.env.STEP37_NVIDIA_API_KEY,         base: NVIDIA_BASE, model: () => 'stepfun-ai/step-3.7-flash' },
