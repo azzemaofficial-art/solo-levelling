@@ -40,6 +40,23 @@ const PROVIDERS_MAX = [
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// Provider health tracking — skip providers that failed recently (5 min window)
+const providerHealth = new Map(); // name → { failures: number, lastFail: number }
+const HEALTH_WINDOW_MS = 5 * 60 * 1000;
+const MAX_FAILURES = 2;
+function isProviderHealthy(name) {
+  const h = providerHealth.get(name);
+  if (!h || h.failures < MAX_FAILURES) return true;
+  return Date.now() - h.lastFail > HEALTH_WINDOW_MS;
+}
+function recordProviderFail(name) {
+  const h = providerHealth.get(name) || { failures: 0, lastFail: 0 };
+  providerHealth.set(name, { failures: h.failures + 1, lastFail: Date.now() });
+}
+function recordProviderOk(name) {
+  providerHealth.delete(name);
+}
+
 async function tavilySearch(query) {
   const key = process.env.TAVILY_API_KEY;
   if (!key) return null;
@@ -113,7 +130,7 @@ export default async function handler(req, res) {
   }
 
   const providers = tier === 'max' ? PROVIDERS_MAX : PROVIDERS_FAST;
-  const maxTokens = tier === 'max' ? 2048 : 1024;
+  const maxTokens = tier === 'max' ? 4096 : 1024;
 
   // Ultima query dell'utente per decidere se cercare su web
   const lastUserMsg = [...messages].reverse().find((m) => m.role === 'user')?.content || '';
@@ -140,6 +157,7 @@ export default async function handler(req, res) {
   for (const provider of providers) {
     const apiKey = provider.key();
     if (!apiKey) continue;
+    if (!isProviderHealthy(provider.name)) continue;
     const model = provider.model();
 
     for (let attempt = 0; attempt < 2; attempt++) {
@@ -148,18 +166,21 @@ export default async function handler(req, res) {
         const msg = data?.choices?.[0]?.message;
         const content = msg?.content || msg?.reasoning_content || msg?.reasoning;
         if (ok && content) {
+          recordProviderOk(provider.name);
           res.setHeader('X-Coach-Provider', provider.name);
           res.setHeader('X-Coach-Model', model);
           res.setHeader('X-Coach-Web', usedWeb ? '1' : '0');
           return res.status(200).json({ content, provider: provider.name, model, web: usedWeb });
         }
         if ([429, 500, 502, 503].includes(status) && attempt < 1) { await sleep(500); continue; }
+        recordProviderFail(provider.name);
         break;
       } catch (_) {
         if (attempt < 1) { await sleep(500); continue; }
+        recordProviderFail(provider.name);
       }
     }
   }
 
-  return res.status(503).json({ error: 'Tutti i provider NVIDIA non disponibili. Riprova.' });
+  return res.status(503).json({ error: 'Tutti i provider non disponibili. Riprova tra qualche minuto.' });
 }

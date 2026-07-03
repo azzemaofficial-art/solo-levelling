@@ -825,6 +825,7 @@ export default async function handler(req, res) {
       { command: 'progressi', description: '📈 Livello, streak, ripassi e avanzamento' },
       { command: 'oggi', description: '📅 Totale calorie e macro di oggi' },
       { command: 'integratori', description: '💊 Lista integratori consigliati' },
+      { command: 'analisi', description: '🔍 Analisi AI del tuo profilo + dati di oggi' },
       { command: 'help', description: 'ℹ️ Cosa posso fare' },
     ];
     const c = await fetch(`https://api.telegram.org/bot${botToken}/setMyCommands`, {
@@ -1109,6 +1110,55 @@ Consiglia SOLO integratori presenti nei PRINCIPI scientifici. Ricorda: gli integ
       '🟡 Omega-3 — 2g EPA+DHA con cena\n🟣 Magnesio glicin. — 300mg per il sonno\n🌙 Caseina — 25-30g opzionale pre-sonno\n\n' +
       '<i>Profilo: recomp, allenamento frequente.</i>';
     await sendTelegramMessage(botToken, incomingChatId, reply);
+    return res.status(200).json({ ok: true });
+  }
+
+  if (text === '/analisi') {
+    await sendTelegramMessage(botToken, incomingChatId, '🔍 <b>Analisi in corso…</b>\n\nRaccoglie i tuoi dati e chiede a Nemotron 550B + ricerca web. Attendi 10-20 secondi.');
+    try {
+      const st = (await kvGet(LEARN_KEY(incomingChatId))) || initLearn();
+      const day = (await kvGet(todayKey(incomingChatId))) || {};
+      const ctx = [
+        `Atleta (Telegram): obiettivo ${st.goal || 'recomp'}, XP ${st.xp || 0}, livello studio ${(st.prog || {}).generale?.level || 1}, streak ${st.streak || 0}gg.`,
+        day.kcal ? `Oggi: ${day.kcal}kcal, P${day.protein}g C${day.carbs}g G${day.fat}g, burn ${day.burn || 0}kcal.` : 'Oggi: nessun dato pasto registrato.',
+        `Sessioni oggi: pasti ${day.meals || 0}, workout ${day.workouts || 0}.`,
+      ].join(' ');
+      const providers = [
+        { key: () => process.env.GROQ_API_KEY, model: 'llama-3.3-70b-versatile', baseUrl: GROQ_BASE },
+        { key: () => process.env.KIMI_NVIDIA_API_KEY, model: process.env.KIMI_NVIDIA_MODEL || 'moonshotai/kimi-k2.6', baseUrl: NVIDIA_BASE },
+      ];
+      let aiReply = '';
+      for (const p of providers) {
+        const k = p.key();
+        if (!k) continue;
+        const ctrl = new AbortController();
+        const t = setTimeout(() => ctrl.abort(), 20000);
+        try {
+          const r = await fetch(`${p.baseUrl}/chat/completions`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${k}` },
+            body: JSON.stringify({
+              model: p.model,
+              messages: [
+                { role: 'system', content: 'Sei un coach AI. Analizza brevemente il profilo dell\'atleta in 3-5 punti concreti. Rispondi in italiano, max 300 parole, niente markdown pesante.' },
+                { role: 'user', content: ctx },
+              ],
+              max_tokens: 400,
+              temperature: 0.7,
+            }),
+            signal: ctrl.signal,
+          });
+          clearTimeout(t);
+          const d = await r.json();
+          const c = d?.choices?.[0]?.message?.content?.trim();
+          if (r.ok && c) { aiReply = c; break; }
+        } catch (_) { clearTimeout(t); }
+      }
+      if (!aiReply) aiReply = 'Analisi non disponibile in questo momento. Riprova tra qualche minuto.';
+      await sendTelegramMessage(botToken, incomingChatId, `🔍 <b>Analisi Profilo</b>\n\n${aiReply}`);
+    } catch (e) {
+      await sendTelegramMessage(botToken, incomingChatId, '❌ Errore durante l\'analisi. Riprova tra qualche minuto.');
+    }
     return res.status(200).json({ ok: true });
   }
 

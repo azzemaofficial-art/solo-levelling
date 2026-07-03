@@ -389,10 +389,16 @@ const SystemHub = ({ systemLogs, setSystemLogs, dailyGoal, setDailyGoal, hydrati
     try { const raw = localStorage.getItem('shadow_monarch_profile_analysis_last'); return raw ? JSON.parse(raw) : null; } catch { return null; }
   });
   const [isAnalyzingProfile, setIsAnalyzingProfile] = useState(false);
+  const [profileAnalysisError, setProfileAnalysisError] = useState(null);
+  const [displayedProfileContent, setDisplayedProfileContent] = useState('');
+  const profileTypeTimer = useRef(null);
   // Consigli integratori science-based (dalla knowledge base)
   const [supplementAdvice, setSupplementAdvice] = useState(() => {
     try { const raw = localStorage.getItem('shadow_monarch_supplement_advice_last'); return raw ? JSON.parse(raw) : null; } catch { return null; }
   });
+  const [supplementError, setSupplementError] = useState(null);
+  const [displayedSuppContent, setDisplayedSuppContent] = useState('');
+  const suppTypeTimer = useRef(null);
   const [isRecommendingSupp, setIsRecommendingSupp] = useState(false);
   const [generatedRecipe, setGeneratedRecipe] = useState(() => {
     try {
@@ -2679,8 +2685,15 @@ const SystemHub = ({ systemLogs, setSystemLogs, dailyGoal, setDailyGoal, hydrati
     });
   };
   // ── ANALISI PROFILO PROFONDA (Nemotron) — generale, non sul singolo giorno ──
-  const analyzeProfile = async () => {
+  const analyzeProfile = async (forceRefresh = false) => {
     if (isAnalyzingProfile) return;
+    if (!forceRefresh && profileAnalysis?.date) {
+      const ageMs = Date.now() - new Date(profileAnalysis.date).getTime();
+      if (ageMs < 4 * 3600_000) {
+        emitUiToast({ message: `Analisi recente (${Math.round(ageMs / 60000)}min fa) — premi di nuovo per aggiornare`, tone: 'info', durationMs: 3000 });
+        return;
+      }
+    }
     setIsAnalyzingProfile(true);
     try {
       const last30 = systemLogs.slice(-30);
@@ -2700,11 +2713,14 @@ const SystemHub = ({ systemLogs, setSystemLogs, dailyGoal, setDailyGoal, hydrati
 - Target: ${Math.round(Number(effectiveDailyGoal || dailyGoal || 2400))} kcal | ${Math.round(Number(adaptiveMacroTargets?.protein || macroGoals?.protein || 150))}g proteine
 - Sonno medio: ${avg((l) => l.sleepHours)}h`;
 
+      const profileWebQuery = `nutrition performance coaching ${playerStats?.objective || 'body recomposition'} ${trainDays < 12 ? 'low training frequency' : 'high frequency training'} sleep ${avg((l) => l.sleepHours)}h recovery 2025 2026 evidence`;
       const coachRes = await fetch('/api/nvidia/coach', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           tier: 'max',
+          web: true,
+          webQuery: profileWebQuery,
           messages: [{ role: 'user', content: ctx }],
           systemPrompt: `Sei un coach d'élite di nutrizione e performance. Analizzi il PROFILO GENERALE dell'atleta sui dati reali (non il singolo giorno), in profondità. Sii concreto, basati sui numeri forniti, niente generico.
 Struttura la risposta in sezioni chiare con questi titoli:
@@ -2728,17 +2744,58 @@ Italiano, diretto, esigente. Niente markdown pesante, usa i titoli con emoji com
         const hist = JSON.parse(localStorage.getItem('shadow_monarch_profile_analysis_history') || '[]');
         localStorage.setItem('shadow_monarch_profile_analysis_history', JSON.stringify([entry, ...hist].slice(0, 12)));
       } catch {}
+      setProfileAnalysisError(null);
       emitUiToast({ message: 'Analisi profilo pronta', tone: 'success', durationMs: 2400 });
     } catch (err) {
-      emitUiToast({ message: 'Analisi profilo fallita: ' + formatAiErrorDetail(err?.message || ''), tone: 'warning', durationMs: 3200 });
+      setProfileAnalysisError(formatAiErrorDetail(err?.message || 'Errore sconosciuto'));
     } finally {
       setIsAnalyzingProfile(false);
     }
   };
 
+  // Typewriter — anima il testo di profilo e integratori parola per parola
+  useEffect(() => {
+    const text = profileAnalysis?.content;
+    if (!text) { setDisplayedProfileContent(''); return; }
+    clearInterval(profileTypeTimer.current);
+    const words = text.split(' ');
+    let i = 0;
+    setDisplayedProfileContent('');
+    profileTypeTimer.current = setInterval(() => {
+      const chunk = words.slice(i, i + 3).join(' ');
+      setDisplayedProfileContent((prev) => prev + (prev ? ' ' : '') + chunk);
+      i += 3;
+      if (i >= words.length) clearInterval(profileTypeTimer.current);
+    }, 25);
+    return () => clearInterval(profileTypeTimer.current);
+  }, [profileAnalysis?.content]);
+
+  useEffect(() => {
+    const text = supplementAdvice?.content;
+    if (!text) { setDisplayedSuppContent(''); return; }
+    clearInterval(suppTypeTimer.current);
+    const words = text.split(' ');
+    let i = 0;
+    setDisplayedSuppContent('');
+    suppTypeTimer.current = setInterval(() => {
+      const chunk = words.slice(i, i + 3).join(' ');
+      setDisplayedSuppContent((prev) => prev + (prev ? ' ' : '') + chunk);
+      i += 3;
+      if (i >= words.length) clearInterval(suppTypeTimer.current);
+    }, 25);
+    return () => clearInterval(suppTypeTimer.current);
+  }, [supplementAdvice?.content]);
+
   // 💊 Consiglia integratori — stack personalizzato e fondato sui paper (knowledge base)
-  const recommendSupplements = async () => {
+  const recommendSupplements = async (forceRefresh = false) => {
     if (isRecommendingSupp) return;
+    if (!forceRefresh && supplementAdvice?.date) {
+      const ageMs = Date.now() - new Date(supplementAdvice.date).getTime();
+      if (ageMs < 4 * 3600_000) {
+        emitUiToast({ message: `Stack integratori recente (${Math.round(ageMs / 60000)}min fa) — premi di nuovo per aggiornare`, tone: 'info', durationMs: 3000 });
+        return;
+      }
+    }
     setIsRecommendingSupp(true);
     try {
       const pesoKg = Number(playerStats?.currentWeightKg || 0) || 80;
@@ -2770,9 +2827,10 @@ Italiano, conciso, niente markdown pesante. Dosi concrete (anche per ${pesoKg}kg
       const entry = { content, model: String(data?.provider || data?.model || '').trim(), date: new Date().toISOString() };
       setSupplementAdvice(entry);
       try { localStorage.setItem('shadow_monarch_supplement_advice_last', JSON.stringify(entry)); } catch {}
+      setSupplementError(null);
       emitUiToast({ message: 'Consigli integratori pronti', tone: 'success', durationMs: 2400 });
     } catch (err) {
-      emitUiToast({ message: 'Consigli integratori falliti: ' + formatAiErrorDetail(err?.message || ''), tone: 'warning', durationMs: 3200 });
+      setSupplementError(formatAiErrorDetail(err?.message || 'Errore sconosciuto'));
     } finally {
       setIsRecommendingSupp(false);
     }
@@ -5725,18 +5783,30 @@ Rispondi SOLO JSON valido:
             </button>
           </div>
         </div>
+        {profileAnalysisError && (
+          <div className="mb-2 rounded-xl p-3 flex items-center justify-between gap-2" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)' }}>
+            <p className="text-[10px] text-red-400">Analisi fallita: {profileAnalysisError}</p>
+            <button onClick={() => analyzeProfile(true)} className="text-[10px] px-2 py-1 rounded-lg border border-red-400/40 text-red-300 hover:bg-red-500/20 flex-shrink-0">Riprova</button>
+          </div>
+        )}
         {profileAnalysis ? (
           <div className="rounded-xl p-3" style={{ background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(16,185,129,0.2)' }}>
             <p className="text-[8px] text-gray-500 mb-1.5">{new Date(profileAnalysis.date).toLocaleString('it-IT')}{profileAnalysis.model ? ` · ${profileAnalysis.model}` : ''}</p>
-            <p className="text-[11px] text-gray-200 whitespace-pre-wrap leading-relaxed">{profileAnalysis.content}</p>
+            <p className="text-[11px] text-gray-200 whitespace-pre-wrap leading-relaxed">{displayedProfileContent || profileAnalysis.content}</p>
           </div>
         ) : (
           <p className="text-[10px] text-gray-500">Genera un'analisi profonda del tuo profilo sugli ultimi 30 giorni di dati reali — quadro, criticità, piano d'azione e proiezione. Oppure 💊 per uno stack integratori personalizzato dai paper.</p>
         )}
+        {supplementError && (
+          <div className="mt-2 rounded-xl p-3 flex items-center justify-between gap-2" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)' }}>
+            <p className="text-[10px] text-red-400">Integratori falliti: {supplementError}</p>
+            <button onClick={() => recommendSupplements(true)} className="text-[10px] px-2 py-1 rounded-lg border border-red-400/40 text-red-300 hover:bg-red-500/20 flex-shrink-0">Riprova</button>
+          </div>
+        )}
         {supplementAdvice && (
           <div className="mt-2 rounded-xl p-3" style={{ background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(129,140,248,0.25)' }}>
             <p className="text-[8px] text-indigo-300/80 mb-1.5">💊 Stack integratori · {new Date(supplementAdvice.date).toLocaleString('it-IT')}{supplementAdvice.model ? ` · ${supplementAdvice.model}` : ''}</p>
-            <p className="text-[11px] text-gray-200 whitespace-pre-wrap leading-relaxed">{supplementAdvice.content}</p>
+            <p className="text-[11px] text-gray-200 whitespace-pre-wrap leading-relaxed">{displayedSuppContent || supplementAdvice.content}</p>
           </div>
         )}
       </motion.div>

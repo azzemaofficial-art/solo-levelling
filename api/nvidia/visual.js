@@ -862,8 +862,9 @@ PUNTO: <"Punto Rosso" / "Punto Blu" / "Nessun punto">
 Tono da arbitro professionista, in italiano.`;
 
 const BRAIN_PROVIDERS = [
-  { key: () => process.env.GROQ_API_KEY,            base: GROQ_BASE,   model: 'llama-3.3-70b-versatile',      name: 'groq-brain' },
-  { key: () => process.env.DEEPSEEK_PRO_API_KEY,    base: NVIDIA_BASE, model: 'deepseek-ai/deepseek-v4-pro',  name: 'deepseek-brain' },
+  { key: () => process.env.GROQ_API_KEY,            base: GROQ_BASE,   model: 'llama-3.3-70b-versatile',                      name: 'groq-brain' },
+  { key: () => process.env.DEEPSEEK_PRO_API_KEY,    base: NVIDIA_BASE, model: 'deepseek-ai/deepseek-v4-pro',                  name: 'deepseek-brain' },
+  { key: () => process.env.MISTRAL_NVIDIA_API_KEY,  base: NVIDIA_BASE, model: 'mistralai/mistral-large-3-675b-instruct-2512', name: 'mistral-brain' },
 ];
 
 async function callBrainOrchestrator({ isSparring, disciplineLabel, techObs, biomechObs, antiRepeatContext }) {
@@ -1140,10 +1141,14 @@ PROSSIMO: <il prossimo combo da chiamare, specifico per la disciplina, DIVERSO d
         if (g?.ok) judgeResult = g.data?.choices?.[0]?.message?.content?.trim() || '';
       } catch (_) {}
     }
-    if (!judgeResult && _cosmosKey) {
+    if (!judgeResult) {
       try {
-        const c = await callVisionCosmos(_cosmosKey, _cosmosModel, imageBase64, mimeType, `${JUDGE_SYSTEM}\n\n${userMsg}`);
-        if (c?.ok) judgeResult = c.data?.choices?.[0]?.message?.content?.trim() || '';
+        const _nvidiaKey = process.env.NVIDIA_API_KEY;
+        const _nvidiaModel = process.env.NVIDIA_MODEL || 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning';
+        if (_nvidiaKey) {
+          const n = await callVisionNvidia(_nvidiaKey, _nvidiaModel, imageBase64, mimeType, JUDGE_SYSTEM, userMsg);
+          if (n?.ok) judgeResult = n.data?.choices?.[0]?.message?.content?.trim() || n.data?.choices?.[0]?.message?.reasoning_content?.trim() || '';
+        }
       } catch (_) {}
     }
     if (judgeResult) {

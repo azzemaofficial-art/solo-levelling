@@ -156,7 +156,7 @@ export default async function handler(req, res) {
       try {
         const { ok, status, data } = await callProvider(apiKey, model, provider.base, fullMessages);
         const msg = data?.choices?.[0]?.message;
-        const content = msg?.content || msg?.reasoning;
+        const content = msg?.content || msg?.reasoning_content || msg?.reasoning;
         if (ok && content) {
           res.setHeader('X-Trainer-Provider', provider.name);
           res.setHeader('X-Trainer-Model', model);
