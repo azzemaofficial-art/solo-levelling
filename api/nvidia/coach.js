@@ -107,7 +107,7 @@ export default async function handler(req, res) {
   }
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { messages, systemPrompt, tier } = req.body || {};
+  const { messages, systemPrompt, tier, web, webQuery } = req.body || {};
   if (!Array.isArray(messages) || messages.length === 0) {
     return res.status(400).json({ error: 'messages obbligatorio' });
   }
@@ -120,8 +120,9 @@ export default async function handler(req, res) {
   let webContext = null;
   let usedWeb = false;
 
-  if (WEB_TRIGGERS.test(lastUserMsg)) {
-    webContext = await tavilySearch(lastUserMsg);
+  // web:true forza la ricerca; webQuery sovrascrive la query Tavily
+  if (web || WEB_TRIGGERS.test(lastUserMsg)) {
+    webContext = await tavilySearch(webQuery || lastUserMsg);
     if (webContext) usedWeb = true;
   }
 

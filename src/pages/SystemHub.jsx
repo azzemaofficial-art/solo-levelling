@@ -2751,6 +2751,8 @@ Italiano, diretto, esigente. Niente markdown pesante, usa i titoli con emoji com
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           tier: 'max',
+          web: true,
+          webQuery: `best supplements evidence 2025 2026 creatine omega-3 vitamin D magnesium protein recovery muscle growth martial arts ${playerStats?.objective || 'recomp'}`,
           messages: [{ role: 'user', content: ctx }],
           systemPrompt: `Sei un esperto di integrazione sportiva basata sull'evidenza. Consiglia uno STACK di integratori PERSONALIZZATO per questo atleta, ESCLUSIVAMENTE in base ai PRINCIPI SCIENTIFICI forniti (non inventare, non consigliare ciò che non è supportato). Ordina per PRIORITÀ.
 Struttura così:
