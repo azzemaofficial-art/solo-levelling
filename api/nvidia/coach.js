@@ -25,7 +25,7 @@ const PROVIDERS_FAST = [
   { name: 'groq-70b',       key: () => process.env.GROQ_API_KEY,                  base: GROQ_BASE,   model: () => 'llama-3.3-70b-versatile' },
   { name: 'groq-8b',        key: () => process.env.GROQ_API_KEY,                  base: GROQ_BASE,   model: () => 'llama-3.1-8b-instant' },
   { name: 'kimi-k2',        key: () => process.env.KIMI_NVIDIA_API_KEY,           base: NVIDIA_BASE, model: () => process.env.KIMI_NVIDIA_MODEL || 'moonshotai/kimi-k2.6' },
-  { name: 'qwen3.5-397b',   key: () => process.env.QWEN35_NVIDIA_API_KEY,        base: NVIDIA_BASE, model: () => process.env.QWEN35_NVIDIA_MODEL || 'qwen/qwen3.5-397b-a17b' },
+  { name: 'llama-3.1-70b',  key: () => process.env.LLAMA_NVIDIA_API_KEY,         base: NVIDIA_BASE, model: () => 'meta/llama-3.1-70b-instruct' },
   { name: 'phi4-mini',      key: () => process.env.PHI_NVIDIA_API_KEY,            base: NVIDIA_BASE, model: () => 'microsoft/phi-4-mini-instruct' },
   { name: 'mistral-large3', key: () => process.env.MISTRAL_NVIDIA_API_KEY,        base: NVIDIA_BASE, model: () => 'mistralai/mistral-large-3-675b-instruct-2512' },
   { name: 'mistral-medium3',key: () => process.env.MISTRAL_MEDIUM3_NVIDIA_API_KEY,base: NVIDIA_BASE, model: () => process.env.MISTRAL_MEDIUM3_NVIDIA_MODEL || 'mistralai/mistral-medium-3.5-128b' },
@@ -145,7 +145,7 @@ export default async function handler(req, res) {
       try {
         const { ok, status, data } = await callProvider(apiKey, model, provider.base, fullMessages, maxTokens);
         const msg = data?.choices?.[0]?.message;
-        const content = msg?.content || msg?.reasoning;
+        const content = msg?.content || msg?.reasoning_content || msg?.reasoning;
         if (ok && content) {
           res.setHeader('X-Coach-Provider', provider.name);
           res.setHeader('X-Coach-Model', model);

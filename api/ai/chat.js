@@ -13,7 +13,7 @@ const firstKey = (...names) => {
   return '';
 };
 
-const NVIDIA_KEY = () => firstKey('QWEN35_NVIDIA_API_KEY', 'NVIDIA_API_KEY', 'GEMMA_NVIDIA_API_KEY', 'COSMOS3_NVIDIA_API_KEY', 'LLAMA_NVIDIA_API_KEY');
+const NVIDIA_KEY = () => firstKey('NVIDIA_API_KEY', 'LLAMA_NVIDIA_API_KEY', 'KIMI_NVIDIA_API_KEY', 'DEEPSEEK_PRO_API_KEY');
 const GROQ_KEY = () => firstKey('GROQ_API_KEY');
 
 // Catena di fallback sempre disponibile (modelli che reggiamo per certo).
@@ -62,7 +62,7 @@ export default async function handler(req, res) {
         groq: Boolean(GROQ_KEY()),
         nvidia: Boolean(NVIDIA_KEY()),
       },
-      nvidiaKeySource: ['QWEN35_NVIDIA_API_KEY', 'NVIDIA_API_KEY', 'GEMMA_NVIDIA_API_KEY', 'COSMOS3_NVIDIA_API_KEY', 'LLAMA_NVIDIA_API_KEY']
+      nvidiaKeySource: ['NVIDIA_API_KEY', 'LLAMA_NVIDIA_API_KEY', 'KIMI_NVIDIA_API_KEY', 'DEEPSEEK_PRO_API_KEY']
         .filter((n) => process.env[n]),
       fallback: FALLBACK,
     });
