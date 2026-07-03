@@ -17,7 +17,7 @@ const NVIDIA_KEY = () => firstKey('QWEN35_NVIDIA_API_KEY', 'NVIDIA_API_KEY', 'GE
 const GROQ_KEY = () => firstKey('GROQ_API_KEY');
 
 // Catena di fallback sempre disponibile (modelli che reggiamo per certo).
-const FALLBACK = ['groq:llama-3.3-70b-versatile', 'nvidia:qwen/qwen3-235b-a22b'];
+const FALLBACK = ['groq:llama-3.3-70b-versatile', 'groq:llama-3.1-8b-instant'];
 
 function resolveProvider(modelId) {
   const id = String(modelId || '').trim();

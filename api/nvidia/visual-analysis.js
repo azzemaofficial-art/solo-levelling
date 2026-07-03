@@ -28,7 +28,7 @@ NON ripetere i feedback originali per intero — analizza i pattern, non elencar
 const PROVIDERS = [
   { name: 'groq-70b',       key: () => process.env.GROQ_API_KEY,                   model: 'llama-3.3-70b-versatile',                       base: GROQ_BASE },
   { name: 'groq-8b',        key: () => process.env.GROQ_API_KEY,                   model: 'llama-3.1-8b-instant',                          base: GROQ_BASE },
-  { name: 'qwen3-235b', key: () => process.env.QWEN35_NVIDIA_API_KEY,          model: 'qwen/qwen3-235b-a22b',              base: NVIDIA_BASE },
+  { name: 'kimi-k2',    key: () => process.env.KIMI_NVIDIA_API_KEY,             model: 'moonshotai/kimi-k2.6',              base: NVIDIA_BASE },
   { name: 'phi4-mini',      key: () => process.env.PHI_NVIDIA_API_KEY,             model: 'microsoft/phi-4-mini-instruct',                 base: NVIDIA_BASE },
   { name: 'mistral-large3', key: () => process.env.MISTRAL_NVIDIA_API_KEY,         model: 'mistralai/mistral-large-3-675b-instruct-2512',  base: NVIDIA_BASE },
   { name: 'nemotron-nano',  key: () => process.env.NVIDIA_API_KEY,                 model: 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning', base: NVIDIA_BASE },

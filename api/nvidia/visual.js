@@ -862,8 +862,8 @@ PUNTO: <"Punto Rosso" / "Punto Blu" / "Nessun punto">
 Tono da arbitro professionista, in italiano.`;
 
 const BRAIN_PROVIDERS = [
-  { key: () => process.env.QWEN35_NVIDIA_API_KEY, base: NVIDIA_BASE, model: 'qwen/qwen3-235b-a22b', name: 'qwen3-brain' },
-  { key: () => process.env.GROQ_API_KEY,          base: GROQ_BASE,   model: 'llama-3.3-70b-versatile',          name: 'gemma-brain(groq-fallback)' },
+  { key: () => process.env.GROQ_API_KEY,           base: GROQ_BASE,   model: 'llama-3.3-70b-versatile',       name: 'groq-brain' },
+  { key: () => process.env.KIMI_NVIDIA_API_KEY,    base: NVIDIA_BASE, model: 'moonshotai/kimi-k2.6',          name: 'kimi-brain' },
 ];
 
 async function callBrainOrchestrator({ isSparring, disciplineLabel, techObs, biomechObs, antiRepeatContext }) {
@@ -1275,7 +1275,7 @@ PROSSIMO: <il prossimo combo da chiamare, specifico per la disciplina, DIVERSO d
   // 2. NVIDIA fallback chain
   const nvidiaProviders = [
     { key: process.env.PHI4_NVIDIA_API_KEY, model: process.env.PHI4_NVIDIA_MODEL || 'microsoft/phi-4-multimodal-instruct', name: 'phi4-multimodal' },
-    { key: process.env.QWEN35_NVIDIA_API_KEY, model: process.env.QWEN35_NVIDIA_MODEL || 'qwen/qwen3-235b-a22b', name: 'qwen3-235b' },
+    { key: process.env.KIMI_NVIDIA_API_KEY, model: 'moonshotai/kimi-k2.6', name: 'kimi-k2' },
     { key: process.env.LLAMA_VISION2_API_KEY, model: 'meta/llama-3.2-90b-vision-instruct', name: 'llama-vision-90b-v2' },
     { key: process.env.MISTRAL_SMALL4_NVIDIA_API_KEY, model: 'meta/llama-3.2-90b-vision-instruct', name: 'llama-vision-90b' },
     { key: process.env.NVIDIA_API_KEY, model: process.env.NVIDIA_MODEL || 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning', name: 'nemotron-omni' },

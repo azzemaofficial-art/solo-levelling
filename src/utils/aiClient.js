@@ -10,7 +10,7 @@ const SHADOW_AI_STATUS_EVENT = 'shadow_ai_status';
 
 let queueTail = Promise.resolve();
 let inflightCount = 0;
-const DEFAULT_MODEL_CANDIDATES = ['groq:llama-3.3-70b-versatile', 'nvidia:qwen/qwen3-235b-a22b'];
+const DEFAULT_MODEL_CANDIDATES = ['groq:llama-3.3-70b-versatile', 'groq:llama-3.1-8b-instant'];
 
 const getProxyPath = () => {
   const configured = import.meta.env.VITE_SYSTEM_AI_PROXY;
