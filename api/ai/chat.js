@@ -13,8 +13,19 @@ const firstKey = (...names) => {
   return '';
 };
 
-const NVIDIA_KEY = () => firstKey('NVIDIA_API_KEY', 'LLAMA_NVIDIA_API_KEY', 'KIMI_NVIDIA_API_KEY', 'DEEPSEEK_PRO_API_KEY');
 const GROQ_KEY = () => firstKey('GROQ_API_KEY');
+
+// Mapping modello NVIDIA → chiave specifica (ogni modello ha la sua key su NIM)
+const NVIDIA_MODEL_KEY = {
+  'nvidia/nemotron-3-ultra-550b-a55b': () => firstKey('NVIDIA_550B_API_KEY'),
+  'deepseek-ai/deepseek-v4-pro':       () => firstKey('DEEPSEEK_PRO_API_KEY'),
+  'moonshotai/kimi-k2.6':              () => firstKey('KIMI_NVIDIA_API_KEY'),
+  'meta/llama-3.1-70b-instruct':       () => firstKey('LLAMA_NVIDIA_API_KEY'),
+  'microsoft/phi-4-mini-instruct':     () => firstKey('PHI_NVIDIA_API_KEY'),
+  'mistralai/mistral-large-3-675b-instruct-2512': () => firstKey('MISTRAL_NVIDIA_API_KEY'),
+  'mistralai/mistral-medium-3.5-128b': () => firstKey('MISTRAL_MEDIUM3_NVIDIA_API_KEY'),
+};
+const NVIDIA_KEY_DEFAULT = () => firstKey('NVIDIA_API_KEY', 'LLAMA_NVIDIA_API_KEY', 'KIMI_NVIDIA_API_KEY', 'DEEPSEEK_PRO_API_KEY');
 
 // Catena di fallback sempre disponibile (modelli che reggiamo per certo).
 const FALLBACK = ['groq:llama-3.3-70b-versatile', 'groq:llama-3.1-8b-instant'];
@@ -27,8 +38,10 @@ function resolveProvider(modelId) {
     return key ? { base: GROQ_BASE, key, model: id.slice(5), tag: id } : null;
   }
   if (id.startsWith('nvidia:')) {
-    const key = NVIDIA_KEY();
-    return key ? { base: NVIDIA_BASE, key, model: id.slice(7), tag: id } : null;
+    const modelName = id.slice(7);
+    const keyFn = NVIDIA_MODEL_KEY[modelName] || NVIDIA_KEY_DEFAULT;
+    const key = keyFn();
+    return key ? { base: NVIDIA_BASE, key, model: modelName, tag: id } : null;
   }
   return null; // id non prefissato (es. vecchi id OpenRouter) → salta al fallback
 }
@@ -62,7 +75,7 @@ export default async function handler(req, res) {
         groq: Boolean(GROQ_KEY()),
         nvidia: Boolean(NVIDIA_KEY()),
       },
-      nvidiaKeySource: ['NVIDIA_API_KEY', 'LLAMA_NVIDIA_API_KEY', 'KIMI_NVIDIA_API_KEY', 'DEEPSEEK_PRO_API_KEY']
+      nvidiaKeySource: ['NVIDIA_550B_API_KEY', 'DEEPSEEK_PRO_API_KEY', 'KIMI_NVIDIA_API_KEY', 'LLAMA_NVIDIA_API_KEY', 'MISTRAL_NVIDIA_API_KEY', 'NVIDIA_API_KEY']
         .filter((n) => process.env[n]),
       fallback: FALLBACK,
     });

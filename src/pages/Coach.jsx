@@ -1071,6 +1071,55 @@ function VisualCoach() {
   const currentComboRef = useRef('');
   const nextComboRoundRef = useRef(null);
 
+  // ── Coda VOCALE (solo audio) — disaccoppiata dal display ────────────────────
+  // Il testo a schermo si aggiorna SUBITO e RESTA (gestito in captureAndAnalyze);
+  // qui gestiamo solo la voce, che legge un comando per intero prima del successivo.
+  const speakNextRef = useRef(() => {});
+  const speakNext = useCallback(() => {
+    if (presentingRef.current) return;            // sta già leggendo → aspetta la fine
+    if (!voiceOn || !window.speechSynthesis) { speakQueueRef.current = []; return; }
+    const text = speakQueueRef.current.shift();
+    if (text == null) return;
+
+    const clean = String(text)
+      .replace(/\*\*/g, '').replace(/[*#_~`]/g, '')
+      .replace(/RIGA\s*\d+\s*[—-]/g, '')
+      .replace(/\bBENE\s*:/gi, 'Bene,').replace(/\bPROVA\s*:/gi, 'Prova')
+      .replace(/(COMANDO|VISTO|PERCHÉ|SITUAZIONE|ISTRUZIONE|PUNTO)\s*:/gi, '')
+      .replace(/[^\x00-\x7F]/g, (c) => /\p{Emoji}/u.test(c) ? '' : c)
+      .replace(/\n+/g, '. ')
+      .trim();
+    if (!clean) { speakNextRef.current(); return; }
+
+    presentingRef.current = true;
+    let advanced = false;
+    const advance = () => {
+      if (advanced) return;
+      advanced = true;
+      presentingRef.current = false;
+      setTimeout(() => speakNextRef.current(), 150);
+    };
+    const utt = new SpeechSynthesisUtterance(clean);
+    utt.lang = 'it-IT'; utt.rate = 1.1; utt.pitch = 1;
+    const itVoice = voicesRef.current.find((v) => v.lang === 'it-IT' || v.lang.startsWith('it'));
+    if (itVoice) utt.voice = itVoice;
+    utt.onend = advance;
+    utt.onerror = advance;
+    window.speechSynthesis.speak(utt);
+    // Watchdog iOS Safari: se onend non scatta, avanza comunque dopo durata stimata
+    setTimeout(advance, Math.min(15000, Math.max(3500, clean.length * 90)));
+  }, [voiceOn]);
+  speakNextRef.current = speakNext;
+
+  // Accoda solo il TESTO per la voce. Cap a 2: evita backlog stantio in auto mode.
+  const enqueueSpeak = useCallback((text) => {
+    if (!text) return;
+    if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([28, 16, 28]); // feedback aptico nuovo comando
+    speakQueueRef.current.push(text);
+    if (speakQueueRef.current.length > 2) speakQueueRef.current = speakQueueRef.current.slice(-2);
+    speakNext();
+  }, [speakNext]);
+
   const nextComboRound = useCallback((suggestedCombo) => {
     if (!comboPhaseRef.current || comboPhaseRef.current === 'idle') return;
     const combo = suggestedCombo || pickCombo(currentComboRef.current);
@@ -1159,55 +1208,6 @@ function VisualCoach() {
     }, 5000);
     return () => clearInterval(id);
   }, [voiceOn]);
-
-  // ── Coda VOCALE (solo audio) — disaccoppiata dal display ────────────────────
-  // Il testo a schermo si aggiorna SUBITO e RESTA (gestito in captureAndAnalyze);
-  // qui gestiamo solo la voce, che legge un comando per intero prima del successivo.
-  const speakNextRef = useRef(() => {});
-  const speakNext = useCallback(() => {
-    if (presentingRef.current) return;            // sta già leggendo → aspetta la fine
-    if (!voiceOn || !window.speechSynthesis) { speakQueueRef.current = []; return; }
-    const text = speakQueueRef.current.shift();
-    if (text == null) return;
-
-    const clean = String(text)
-      .replace(/\*\*/g, '').replace(/[*#_~`]/g, '')
-      .replace(/RIGA\s*\d+\s*[—-]/g, '')
-      .replace(/\bBENE\s*:/gi, 'Bene,').replace(/\bPROVA\s*:/gi, 'Prova')
-      .replace(/(COMANDO|VISTO|PERCHÉ|SITUAZIONE|ISTRUZIONE|PUNTO)\s*:/gi, '')
-      .replace(/[^\x00-\x7F]/g, (c) => /\p{Emoji}/u.test(c) ? '' : c)
-      .replace(/\n+/g, '. ')
-      .trim();
-    if (!clean) { speakNextRef.current(); return; }
-
-    presentingRef.current = true;
-    let advanced = false;
-    const advance = () => {
-      if (advanced) return;
-      advanced = true;
-      presentingRef.current = false;
-      setTimeout(() => speakNextRef.current(), 150);
-    };
-    const utt = new SpeechSynthesisUtterance(clean);
-    utt.lang = 'it-IT'; utt.rate = 1.1; utt.pitch = 1;
-    const itVoice = voicesRef.current.find((v) => v.lang === 'it-IT' || v.lang.startsWith('it'));
-    if (itVoice) utt.voice = itVoice;
-    utt.onend = advance;
-    utt.onerror = advance;
-    window.speechSynthesis.speak(utt);
-    // Watchdog iOS Safari: se onend non scatta, avanza comunque dopo durata stimata
-    setTimeout(advance, Math.min(15000, Math.max(3500, clean.length * 90)));
-  }, [voiceOn]);
-  speakNextRef.current = speakNext;
-
-  // Accoda solo il TESTO per la voce. Cap a 2: evita backlog stantio in auto mode.
-  const enqueueSpeak = useCallback((text) => {
-    if (!text) return;
-    if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([28, 16, 28]); // feedback aptico nuovo comando
-    speakQueueRef.current.push(text);
-    if (speakQueueRef.current.length > 2) speakQueueRef.current = speakQueueRef.current.slice(-2);
-    speakNext();
-  }, [speakNext]);
 
   const timer = useRoundTimer({ rounds, roundDuration, restDuration: 60 });
   const currentDisc = ALL_DISCIPLINES.find((d) => d.id === mode) || ALL_DISCIPLINES[0];
