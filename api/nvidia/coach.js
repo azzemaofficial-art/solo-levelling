@@ -24,16 +24,17 @@ const WEB_TRIGGERS = /oggi|adesso|attual|recente|2025|2026|notizie|news|studio|r
 const PROVIDERS_FAST = [
   { name: 'groq-70b',       key: () => process.env.GROQ_API_KEY,                  base: GROQ_BASE,   model: () => 'llama-3.3-70b-versatile' },
   { name: 'groq-8b',        key: () => process.env.GROQ_API_KEY,                  base: GROQ_BASE,   model: () => 'llama-3.1-8b-instant' },
-  { name: 'kimi-k2',    key: () => process.env.KIMI_NVIDIA_API_KEY,            base: NVIDIA_BASE, model: () => 'moonshotai/kimi-k2.6' },
+  { name: 'kimi-k2',        key: () => process.env.KIMI_NVIDIA_API_KEY,           base: NVIDIA_BASE, model: () => process.env.KIMI_NVIDIA_MODEL || 'moonshotai/kimi-k2.6' },
+  { name: 'qwen3.5-397b',   key: () => process.env.QWEN35_NVIDIA_API_KEY,        base: NVIDIA_BASE, model: () => process.env.QWEN35_NVIDIA_MODEL || 'qwen/qwen3.5-397b-a17b' },
   { name: 'phi4-mini',      key: () => process.env.PHI_NVIDIA_API_KEY,            base: NVIDIA_BASE, model: () => 'microsoft/phi-4-mini-instruct' },
   { name: 'mistral-large3', key: () => process.env.MISTRAL_NVIDIA_API_KEY,        base: NVIDIA_BASE, model: () => 'mistralai/mistral-large-3-675b-instruct-2512' },
-  { name: 'step-3.7',       key: () => process.env.STEP37_NVIDIA_API_KEY,         base: NVIDIA_BASE, model: () => 'stepfun-ai/step-3.7-flash' },
-  { name: 'mistral-medium3',key: () => process.env.MISTRAL_MEDIUM3_NVIDIA_API_KEY,base: NVIDIA_BASE, model: () => 'mistralai/mistral-medium-3-instruct' },
-  { name: 'nemotron-nano',  key: () => process.env.NVIDIA_API_KEY,                base: NVIDIA_BASE, model: () => 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning' },
+  { name: 'mistral-medium3',key: () => process.env.MISTRAL_MEDIUM3_NVIDIA_API_KEY,base: NVIDIA_BASE, model: () => process.env.MISTRAL_MEDIUM3_NVIDIA_MODEL || 'mistralai/mistral-medium-3.5-128b' },
+  { name: 'nemotron-nano',  key: () => process.env.NVIDIA_API_KEY,                base: NVIDIA_BASE, model: () => process.env.NVIDIA_MODEL || 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning' },
 ];
 
 const PROVIDERS_MAX = [
-  { name: 'nemotron-550b',  key: () => process.env.NVIDIA_550B_API_KEY,           base: NVIDIA_BASE, model: () => 'nvidia/nemotron-3-ultra-550b-a55b' },
+  { name: 'nemotron-550b',  key: () => process.env.NVIDIA_550B_API_KEY,           base: NVIDIA_BASE, model: () => process.env.NVIDIA_550B_MODEL || 'nvidia/nemotron-3-ultra-550b-a55b' },
+  { name: 'deepseek-v4pro', key: () => process.env.DEEPSEEK_PRO_API_KEY,          base: NVIDIA_BASE, model: () => process.env.DEEPSEEK_PRO_MODEL || 'deepseek-ai/deepseek-v4-pro' },
   ...PROVIDERS_FAST,
 ];
 

@@ -86,7 +86,8 @@ async function logMeal(chatId, entry) {
 const PROVIDERS = [
   { key: () => process.env.GROQ_API_KEY,                  model: 'llama-3.3-70b-versatile',                      fast: true,  baseUrl: GROQ_BASE },
   { key: () => process.env.GROQ_API_KEY,                  model: 'llama-3.1-8b-instant',                         fast: true,  baseUrl: GROQ_BASE },
-  { key: () => process.env.KIMI_NVIDIA_API_KEY,           model: 'moonshotai/kimi-k2.6',             fast: true,  baseUrl: NVIDIA_BASE },
+  { key: () => process.env.KIMI_NVIDIA_API_KEY,           model: process.env.KIMI_NVIDIA_MODEL || 'moonshotai/kimi-k2.6',             fast: true,  baseUrl: NVIDIA_BASE },
+  { key: () => process.env.QWEN35_NVIDIA_API_KEY,        model: process.env.QWEN35_NVIDIA_MODEL || 'qwen/qwen3.5-397b-a17b',         fast: true,  baseUrl: NVIDIA_BASE },
   { key: () => process.env.PHI_NVIDIA_API_KEY,            model: 'microsoft/phi-4-mini-instruct',                fast: true,  baseUrl: NVIDIA_BASE },
   { key: () => process.env.MISTRAL_NVIDIA_API_KEY,        model: 'mistralai/mistral-large-3-675b-instruct-2512', fast: true,  baseUrl: NVIDIA_BASE },
   { key: () => process.env.STEP37_NVIDIA_API_KEY,         model: 'stepfun-ai/step-3.7-flash',                    fast: true,  baseUrl: NVIDIA_BASE },

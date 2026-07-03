@@ -30,7 +30,8 @@ Quando l'utente chiede il piano calorico, chiedi (o usa quelli forniti):
 const PROVIDERS = [
   { name: 'groq-70b',        key: () => process.env.GROQ_API_KEY,                   base: GROQ_BASE,   model: () => 'llama-3.3-70b-versatile' },
   { name: 'groq-8b',         key: () => process.env.GROQ_API_KEY,                   base: GROQ_BASE,   model: () => 'llama-3.1-8b-instant' },
-  { name: 'kimi-k2',     key: () => process.env.KIMI_NVIDIA_API_KEY,            base: NVIDIA_BASE, model: () => 'moonshotai/kimi-k2.6' },
+  { name: 'kimi-k2',     key: () => process.env.KIMI_NVIDIA_API_KEY,            base: NVIDIA_BASE, model: () => process.env.KIMI_NVIDIA_MODEL || 'moonshotai/kimi-k2.6' },
+  { name: 'qwen3.5',    key: () => process.env.QWEN35_NVIDIA_API_KEY,          base: NVIDIA_BASE, model: () => process.env.QWEN35_NVIDIA_MODEL || 'qwen/qwen3.5-397b-a17b' },
   { name: 'phi4-mini',       key: () => process.env.PHI_NVIDIA_API_KEY,             base: NVIDIA_BASE, model: () => 'microsoft/phi-4-mini-instruct' },
   { name: 'mistral-large3',  key: () => process.env.MISTRAL_NVIDIA_API_KEY,         base: NVIDIA_BASE, model: () => 'mistralai/mistral-large-3-675b-instruct-2512' },
   { name: 'step-3.7',        key: () => process.env.STEP37_NVIDIA_API_KEY,          base: NVIDIA_BASE, model: () => 'stepfun-ai/step-3.7-flash' },

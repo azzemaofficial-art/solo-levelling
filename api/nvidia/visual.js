@@ -862,8 +862,8 @@ PUNTO: <"Punto Rosso" / "Punto Blu" / "Nessun punto">
 Tono da arbitro professionista, in italiano.`;
 
 const BRAIN_PROVIDERS = [
-  { key: () => process.env.GROQ_API_KEY,           base: GROQ_BASE,   model: 'llama-3.3-70b-versatile',       name: 'groq-brain' },
-  { key: () => process.env.KIMI_NVIDIA_API_KEY,    base: NVIDIA_BASE, model: 'moonshotai/kimi-k2.6',          name: 'kimi-brain' },
+  { key: () => process.env.GROQ_API_KEY,            base: GROQ_BASE,   model: 'llama-3.3-70b-versatile',      name: 'groq-brain' },
+  { key: () => process.env.DEEPSEEK_PRO_API_KEY,    base: NVIDIA_BASE, model: 'deepseek-ai/deepseek-v4-pro',  name: 'deepseek-brain' },
 ];
 
 async function callBrainOrchestrator({ isSparring, disciplineLabel, techObs, biomechObs, antiRepeatContext }) {
