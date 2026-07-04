@@ -1096,6 +1096,210 @@ const DISCIPLINE_LABELS = {
   partner_drills: 'Drill di coppia', sparring_general: 'Sparring libero',
 };
 
+// ─── KNOWLEDGE BASE — ERRORI COMUNI per disciplina ───────────────────────────
+// Rubrica di errori frequenti REALI, ognuno con la correzione MISURABILE (parte
+// del corpo + angolo/direzione/altezza anatomica). Iniettata nel blocco utente
+// dei cervelli così le correzioni diventano chirurgiche invece che generiche.
+const COMMON_ERRORS = {
+  muaythai: [
+    'Roundhouse col collo del piede invece della tibia → colpisci col terzo inferiore della tibia, anca ruota ~45° prima dell\'impatto',
+    'Gamba d\'appoggio piatta nel calcio → ruota sull\'avampiede portante di ~90°, tallone verso il bersaglio, non piede fisso a terra',
+    'Mano che scende dopo il calcio → tieni la mano opposta al calcio alta al mento, il braccio del lato che calcia difende la testa',
+    'Teep spinto solo con la gamba → spingi col tallone e chiudi l\'anca, lean-back del busto ~15°, non restare verticale',
+    'Ginocchiata in clinch senza controllo della nuca → pollici agganciati dietro la nuca, gomiti stretti, tira giù la testa mentre sali col ginocchio ~90°',
+    'Low kick che finisce sulla coscia frontale → mira al nervo peroneo sul lato esterno del ginocchio, punta il piede d\'appoggio a ~45°',
+    'Gomitata guidata dal braccio → guida con la spalla, gomito a ~90°, ruota il busto — la potenza nasce dal core non dal tricipite',
+    'Testa ferma e centrata dopo la combo → esci con step laterale di ~45° e riporta il mento dietro la spalla, mai sulla linea d\'attacco',
+  ],
+  boxing: [
+    'Gancio col gomito troppo alto → porta il gomito a ~90° parallelo al pavimento, non sopra la spalla',
+    'Mento in alto dopo il cross → riporta il mento dietro la spalla anteriore, sguardo sopra i guantoni',
+    'Jab lento a rientrare → ritira il pugno alla stessa velocità con cui esce, il gomito torna a coprire le costole',
+    'Cross senza rotazione dell\'anca → ruota l\'anca posteriore e stacca il tallone posteriore, la potenza sale dal piede non dalla spalla',
+    'Piedi incrociati nello spostamento → muovi prima il piede vicino alla direzione, mantieni la base larga come le spalle, mai accavallare',
+    'Uppercut solo di braccio → piega leggermente le ginocchia e spingi dalle gambe, gomito a ~90° vicino al corpo',
+    'Testa che resta sulla linea centrale → slip di ~15cm fuori linea dopo la combo, non restare frontale',
+    'Spalle contratte e alte tra i colpi → abbassa le spalle e resta rilassato, contrai solo all\'impatto',
+  ],
+  kickboxing: [
+    'Calcio caricato dal ginocchio senza camera → alza prima il ginocchio a ~90°, poi estendi la gamba come una frusta',
+    'Retrattazione lenta del calcio → riporta la gamba alla stessa velocità dell\'uscita, non lasciarla cadere a peso morto',
+    'Roundhouse col collo del piede → colpisci con la tibia, ruota il piede d\'appoggio a ~45° verso il bersaglio',
+    'Guardia che si abbassa quando calci → tieni entrambe le mani al mento durante il calcio, il busto non si sbilancia oltre ~15°',
+    'Side kick con la punta del piede in avanti → punta il piede verso il basso e colpisci col tallone, anca completamente ruotata',
+    'Peso sul tallone dopo il calcio → atterra sull\'avampiede pronto a rimbalzare, non piatto e fermo',
+    'Back kick senza guardare il bersaglio → gira la testa e guarda sopra la spalla prima di estendere il tallone all\'indietro',
+    'Combo che resta sullo stesso piano → alterna corpo e testa (body kick poi high kick) per aprire la guardia avversaria',
+  ],
+  karate: [
+    'Hikite molle al fianco → ritira la mano al fianco con decisione fino alla cresta iliaca, la rotazione crea la reazione del pugno',
+    'Gyaku-zuki senza rotazione dell\'anca → ruota il bacino ~45° verso il bersaglio, il pugno arriva col fianco non col braccio',
+    'Zenkutsu-dachi con ginocchio oltre la punta → allinea il ginocchio anteriore sopra la caviglia, ~60% peso avanti',
+    'Mawashi geri col collo del piede → colpisci con la tibia o l\'avampiede secondo lo stile, anca ruota completamente',
+    'Kime assente, colpo che spinge → contrai tutto il corpo per un istante all\'estensione massima, poi rilascia immediatamente',
+    'Mae geri con la gamba tesa dall\'inizio → alza il ginocchio a ~90°, spingi col metatarso, ritira sulla stessa traiettoria',
+    'Postura frontale al bersaglio → assumi hanmi a ~45°, riduci la superficie esposta',
+    'Spalle alzate nell\'esecuzione → abbassa e rilassa le spalle, la schiena resta verticale e il mento leggermente rientrato',
+  ],
+  bjj: [
+    'Fianchi alti in guardia chiusa → abbassa il bacino a terra, talloni che tirano l\'avversario, non le braccia',
+    'Braccia tese per trattenere nella guardia → aggancia con le gambe e i talloni, tieni i gomiti stretti al busto',
+    'Testa sollevata sotto side control → incolla l\'orecchio al tappeto sul lato dell\'avversario, crea il frame con l\'avambraccio sull\'anca',
+    'Armbar con le ginocchia aperte → stringi le ginocchia, alza i fianchi verso il gomito avversario, pollice della sua mano verso l\'alto',
+    'Triangle chiuso solo con le gambe → aggiusta l\'angolo dell\'anca a ~90° verso il lato, tira giù la testa prima di chiudere',
+    'Fuga dal mount solo di forza → bridge esplosivo su un lato bloccando braccio e gamba omolaterali, poi rolla — non spingere di petto',
+    'Passaggio di guardia in piedi col busto eretto → controlla i fianchi e abbassa la pressione, mai lasciare spazio sotto per il re-guard',
+    'Back control con hooks larghi → aggancia i talloni dentro le cosce, seatbelt stretta, mento dell\'avversario esposto per lo strangolo',
+  ],
+  wrestling: [
+    'Testa al centro nello shot → porta la testa al fianco (lato esterno), mai in mezzo al petto',
+    'Shot che scende verso il basso → esplodi in avanti col penetration step, ginocchio quasi a terra, non tuffarti verso il pavimento',
+    'Sprawl lento e alto → spara le anche a terra e le gambe indietro, petto che schiaccia sulla schiena avversaria',
+    'Stance troppo eretta → piega le ginocchia, abbassa il baricentro, schiena dritta e mani avanti pronte',
+    'Collar tie col gomito alto → abbassa il gomito e tira giù la testa avversaria, controlla il collo non i capelli',
+    'Double leg senza chiudere le mani → allaccia le mani dietro le ginocchia e tira verso di te mentre spingi la spalla nell\'addome',
+    'Alzarsi tra i movimenti → mantieni il baricentro basso in transizione, chi si rialza perde il livello e viene ripreso',
+    'Underhook passivo → alza l\'underhook fino all\'ascella e spingi il suo fianco, non lasciarlo neutro',
+  ],
+  mma: [
+    'Mani basse quando entri in clinch → tieni i gomiti dentro e le mani alte fino all\'aggancio, proteggi il mento dai colpi corti',
+    'Shot telegrafato senza setup → tira prima jab-cross per abbassare le mani, poi cambia livello ed entra sul double',
+    'Ground and pound accovacciato → siedi alto sul mount coi piedi agganciati, crea spazio per colpi potenti dall\'alto',
+    'Testa ferma nello scambio → muovi la testa fuori linea di ~15cm dopo ogni combo, non restare bersaglio fermo',
+    'Sprawl assente sul takedown → spara le anche a terra e allarga la base, poi risali con elbow o gira sul back',
+    'Sguardo abbassato sul corpo avversario → tieni gli occhi all\'altezza dello sterno/occhi, leggi anca e spalle non le mani',
+    'Low kick senza check → porta la tibia a ~45° per bloccare il calcio in arrivo, ginocchio flesso e piede sollevato',
+    'Restare frontale contro la gabbia → esci d\'angolo con footwork laterale, non farti schiacciare sulla rete senza pivot',
+  ],
+  kravmaga: [
+    'Difesa senza contrattacco → dopo la deviazione colpisci subito i bersagli vulnerabili (occhi, gola, inguine), mai bloccare e basta',
+    'Palm strike col polso molle → colpisci col tallone del palmo, polso rigido e dritto, la spinta parte dall\'anca',
+    'Mento in alto durante la presa al collo → abbassa il mento per proteggere la trachea, ruota verso il pollice dell\'aggressore per uscire',
+    'Fermarsi dopo il primo colpo → mantieni il movimento continuo e colpisci a raffica finché la minaccia non è neutralizzata',
+    'Gomitata solo di braccio → ruota tutto il corpo, gomito come punta di lancia a ~90°, il peso segue il colpo',
+    'Difesa da coltello che blocca la lama → devia il polso armato e muoviti fuori dalla linea d\'attacco, controlla poi colpisci',
+    'Base statica sotto stress → resta mobile con piedi larghi come le spalle, crea angoli invece di indietreggiare in linea retta',
+    'Ginocchiata senza controllo della testa → aggancia la nuca con entrambe le mani e tira giù mentre sali col ginocchio verso il plesso',
+  ],
+  taekwondo: [
+    'Calcio senza camera del ginocchio → alza prima il ginocchio verso il bersaglio, poi frusta la gamba e ritira sulla stessa linea',
+    'Equilibrio perso sulla gamba d\'appoggio → mantieni il ginocchio portante morbido e l\'avampiede radicato, busto sopra il bacino',
+    'Mani basse durante i calci → tieni la guardia alta al volto, i calci alti espongono la testa ai contrattacchi',
+    'Dollyo chagi col piede piatto → colpisci col collo del piede o la tibia, ruota il piede d\'appoggio a ~45°',
+    'Axe kick con la gamba piegata → sali dritto e abbatti il tallone dall\'alto, contatto sulla clavicola o testa',
+    'Back kick senza guardare → gira la testa e individua il bersaglio prima di estendere il tallone all\'indietro in linea retta',
+    'Fermarsi dopo un singolo calcio → concatena in blitz (ap chagi + dollyo) restando in rimbalzo, mai statico',
+    'Retrattazione lenta → riporta la gamba veloce quanto l\'estensione per non farti afferrare il calcio',
+  ],
+  judo: [
+    'Proiezione senza kuzushi → sbilancia PRIMA con tiro di braccia e direzione, poi entra: il kuzushi precede il tsukuri',
+    'Seoi-nage con la schiena eretta → piega le ginocchia e abbassa i fianchi sotto il baricentro avversario, poi estendi le gambe',
+    'O-soto-gari col busto lontano → incolla petto e testa all\'avversario, la gamba di falcio taglia all\'esterno come un pendolo',
+    'Presa (kumi-kata) subita → conquista per primo colletto e manica, controlla il gomito per spezzare la sua struttura',
+    'Uchi-mata col piede invece dell\'anca → solleva con l\'anca dentro la coscia avversaria, il contatto è di bacino non di gamba',
+    'Testa bassa entrando nella proiezione → tieni la schiena dritta e la testa su, guarda avanti, non tuffarti in ginocchio',
+    'Osae-komi appoggiato sulle ginocchia → distribuisci il peso sul petto dell\'avversario, fianchi bassi e gambe larghe per la base',
+    'Rilasciare la presa dopo la proiezione → mantieni kumi-kata e zanshin, controlla la transizione a ne-waza',
+  ],
+  kungfu: [
+    'Ma bu con le ginocchia che cedono dentro → spingi le ginocchia in fuori sopra le punte, schiena verticale, cosce verso il parallelo',
+    'Gong bu con peso mal distribuito → ~70% sul ginocchio anteriore sopra la caviglia, gamba posteriore tesa e piede a ~45°',
+    'Fa jing spinto di muscolo → genera l\'onda dai piedi al dantian fino alla mano, rilassato poi esplosione breve, non forza continua',
+    'Palm strike col polso flesso → colpisci col tallone del palmo, polso allineato all\'avambraccio, spinta dalla rotazione del busto',
+    'Sguardo che segue le mani → fissa il bersaglio, l\'intenzione (yi) precede la tecnica, gli occhi non cadono sui propri arti',
+    'Movimenti di forma affrettati e fusi → ogni tecnica ha inizio-centro-fine distinti, respira in sincronia col movimento',
+    'Crane/una gamba con equilibrio instabile → radica l\'avampiede, ginocchio portante morbido, braccia come contrappeso',
+    'Pugno a vite senza rotazione finale → ruota l\'avambraccio nell\'ultimo tratto, il colpo penetra oltre la superficie del bersaglio',
+  ],
+  wingchun: [
+    'Pugno fuori dalla linea centrale → parti e torna sulla centerline, pugno verticale che protegge il gomito',
+    'Bong sao col gomito basso → tieni il gomito alto come un\'ala, l\'avambraccio devia verso l\'esterno, non blocca di forza',
+    'Tan sao che spinge invece di deviare → l\'avambraccio ridireziona la forza a ~45° verso l\'esterno mantenendo il gomito basso',
+    'Chain punch di sola velocità senza struttura → allinea la struttura ossea dietro ogni pugno, rilassato poi rigido all\'impatto',
+    'Stance (yee chi kim yeung ma) con ginocchia larghe → ruota le ginocchia leggermente dentro, bacino retroverso, radicamento a terra',
+    'Chi sao che resiste alla pressione → segui e cedi al contatto, redirigi la forza, non contrapporti frontalmente',
+    'Spalle contratte che alzano i gomiti → tieni i gomiti bassi vicino al corpo (una distanza a pugno dal busto), spalle rilassate',
+    'Colpire con estensione completa a distanza sbagliata → scegli il percorso più corto al bersaglio, colpisci quando è a portata di gomito',
+  ],
+  calisthenics: [
+    'Lombare che collassa nel push-up → contrai glutei e core, corpo rigido come una tavola, bacino in linea con le spalle',
+    'Pull-up con scapole passive → deprimi e retrai le scapole prima di tirare, parti da dead hang controllato',
+    'Dip con le spalle che salgono alle orecchie → deprimi le scapole, scendi fino a omero parallelo, gomiti non sopra le spalle',
+    'L-sit coi fianchi bassi e gambe piegate → deprimi le spalle, solleva i fianchi e tieni le gambe parallele al suolo',
+    'Handstand inarcato con lombare aperta → chiudi le costole, spingi le scapole verso l\'alto, corpo in linea sopra i polsi, sguardo tra le mani',
+    'Muscle-up saltato senza transizione → esplodi nel pull fino allo sterno, poi ruota i polsi (false grip) e spingi in cima',
+    'Pistol squat col tallone che si stacca → tieni il tallone a terra, ginocchio sopra la punta, busto compatto in avanti come contrappeso',
+    'Front lever con anca flessa → estendi l\'anca in linea, retrai le scapole, corpo parallelo al suolo, glutei contratti',
+  ],
+  crossfit: [
+    'Deadlift con schiena curva → mantieni la colonna neutra, barra vicina alle tibie, spingi col pavimento coi talloni',
+    'Squat con ginocchia in valgo → spingi le ginocchia in fuori allineate con le punte, busto compatto, scendi sotto il parallelo',
+    'Kettlebell swing sollevato con le braccia → è uno snap d\'anca, le braccia sono corde, la potenza è la chiusura esplosiva del bacino',
+    'Kipping pull-up caotico senza ritmo → alterna hollow e arch controllati, l\'impulso parte dalle spalle non da gambe casuali',
+    'Box jump con atterraggio sulle punte → atterra a piede pieno e ginocchia morbide sopra la scatola, ammortizza il carico',
+    'Thruster spezzato in due movimenti → fondi la risalita dello squat col press, la spinta delle gambe lancia il bilanciere sopra la testa',
+    'Snatch/clean con barra che si allontana → tieni il bilanciere vicino al corpo lungo tutta la traiettoria, non curva in avanti',
+    'Respiro trattenuto nel metcon → imposta un pattern (es. espira ogni 2 rep), il fiato trattenuto anticipa il cedimento',
+  ],
+  yoga: [
+    'Lombare che collassa nel chaturanga → gomiti a ~90° stretti al busto, core attivo, corpo in linea',
+    'Warrior II col ginocchio anteriore verso l\'interno → allinea il ginocchio sopra la caviglia, aprilo verso il mignolo del piede',
+    'Downward dog con la schiena arrotondata → allunga la colonna, spingi i fianchi in alto e indietro, talloni verso il suolo',
+    'Collo compresso nella verticale sulla testa → carica il peso su avambracci e scapole, il collo resta libero, core attivo',
+    'Forward fold flesso dalla schiena → fai cerniera dalle anche mantenendo la colonna lunga, ginocchia morbide se serve',
+    'Respiro trattenuto nelle asana → mantieni ujjayi continuo, sincronizza inspiro ed espiro col movimento',
+    'Spalle sollevate verso le orecchie → deprimi e allontana le spalle dalle orecchie, apri il petto senza inarcare la lombare',
+    'Triangle che collassa in avanti → allunga entrambi i lati del busto, ruota il petto verso l\'alto, non piegarti verso il pavimento',
+  ],
+  running: [
+    'Overstriding, tallonata davanti al baricentro → atterra col mesopiede SOTTO l\'anca, cadenza ~180',
+    'Busto inclinato piegando la vita → inclinati leggermente in avanti dalle caviglie, colonna lunga, bacino sotto le spalle',
+    'Braccia che attraversano il petto → oscilla le braccia avanti-indietro con gomito a ~90°, mani rilassate vicino ai fianchi',
+    'Spalle alte e contratte → abbassa e rilassa le spalle lontano dalle orecchie, mani morbide non serrate',
+    'Contatto al suolo pesante e prolungato → rimbalza usando l\'elasticità dell\'Achille, minimizza il tempo di appoggio',
+    'Sguardo verso i piedi → guarda 10-15 metri avanti, mantiene collo e postura allineati',
+    'Cadenza bassa con passi lunghi → aumenta i passi al minuto verso ~180 accorciando la falcata, non allungandola',
+    'Anca che cede lateralmente (Trendelenburg) → attiva il gluteo medio, mantieni il bacino livellato ad ogni appoggio',
+  ],
+  stretching: [
+    'Rimbalzare nello stretching statico → mantieni la posizione ferma 30-60 secondi, il rimbalzo attiva il riflesso di contrazione',
+    'Trattenere il respiro nel range massimo → espira lentamente per approfondire, il sistema nervoso rilascia la tensione',
+    'Hamstring stretch curvando la schiena → fai cerniera dall\'anca con la colonna dritta, ginocchia leggermente morbide',
+    'Hip flexor stretch senza retroversione del bacino → retroverti il bacino e spingi l\'anca in avanti, senti lo stiramento nel psoas',
+    'Forzare oltre il dolore acuto → distingui tensione (ok) da dolore acuto (stop), lavora al limite non oltre',
+    'Quadricep stretch coi fianchi arretrati → porta il bacino in avanti e il tallone al gluteo, ginocchia vicine',
+    'Thoracic extension inarcando la lombare → apri il tratto toracico mantenendo il core attivo, non scaricare sulla lombare',
+    'Stretching a freddo prima dell\'attività → scalda 5 minuti prima, la fascia risponde solo a muscoli caldi',
+  ],
+  fitness: [
+    'Schiena inarcata nello shoulder press → attiva il core e la gabbia toracica, bacino neutro, non compensare con la lombare',
+    'Squat con ginocchia in valgo → spingi le ginocchia in fuori sopra le punte, peso sui talloni, busto compatto',
+    'Row coi gomiti che si allargano → tira coi gomiti indietro e stretti, spremi le scapole in fondo al movimento',
+    'Bicep curl con oscillazione del busto → fissa i gomiti ai fianchi, muovi solo l\'avambraccio, controlla l\'eccentrica',
+    'Push-up coi gomiti a 90° dal corpo → tieni i gomiti a ~45° dal busto, corpo rigido in linea, scapole controllate',
+    'Lunge col ginocchio anteriore oltre la punta → scendi in verticale col ginocchio posteriore verso il suolo, busto eretto',
+    'Range parziale sui fondamentali → esegui il rango completo (giù fino in fondo, su fino al lock morbido), non dimezzare',
+    'Respiro trattenuto ad ogni ripetizione → espira nella fase concentrica, inspira nell\'eccentrica, Valsalva solo su carichi massimali',
+  ],
+  general: [
+    'Schiena non neutra sotto sforzo → mantieni la curvatura naturale della colonna, né piatta né iper-arcuata',
+    'Core disattivato durante il movimento → crea tensione addominale a 360° per stabilizzare la colonna',
+    'Ginocchia che cedono verso l\'interno → allinea le ginocchia sopra le punte dei piedi, mai valgismo sotto carico',
+    'Respiro trattenuto nello sforzo → espira nella fase di spinta, inspira nel rilascio, non bloccare il fiato',
+    'Range di movimento dimezzato → esegui l\'ampiezza completa e controllata in entrambe le fasi',
+    'Asimmetria destra/sinistra → equilibra il lavoro tra i due lati, correggi il lato debole prima di aumentare il carico',
+    'Movimento frenetico e scomposto → rallenta e controlla concentrica ed eccentrica, la tecnica precede la velocità',
+    'Carico aumentato prima della tecnica → consolida la forma perfetta prima di aggiungere peso o difficoltà',
+  ],
+};
+
+// Costruisce il blocco rubrica errori per il cervello (vuoto se disciplina non coperta → retrocompat).
+const errorsRubric = (mode, label) => {
+  const list = COMMON_ERRORS[mode];
+  if (!list || !list.length) return '';
+  return `\nERRORI TIPICI DI ${label} DA CONTROLLARE (se ne vedi uno, correggilo con precisione; NON inventare errori non visibili):\n` + list.map((e) => `- ${e}`).join('\n');
+};
+
 // ─── CERVELLO GEMMA — orchestratore ──────────────────────────────────────────
 // Riceve le osservazioni dei due coach visivi (tecnico + biomeccanico) e, con la
 // conoscenza profonda della disciplina, le fonde in UN comando di coaching azionabile.
@@ -1151,7 +1355,7 @@ const BRAIN_PROVIDERS = [
   { key: () => process.env.MISTRAL_NVIDIA_API_KEY,  base: NVIDIA_BASE, model: 'mistralai/mistral-large-3-675b-instruct-2512', name: 'mistral-brain' },
 ];
 
-async function callBrainOrchestrator({ isSparring, disciplineLabel, techObs, biomechObs, antiRepeatContext }) {
+async function callBrainOrchestrator({ isSparring, disciplineLabel, techObs, biomechObs, antiRepeatContext, disciplineMode = '' }) {
   if (!techObs && !biomechObs) return null;
   const system = isSparring ? BRAIN_SPARRING : BRAIN_SOLO;
   const obsBlock = [
@@ -1159,6 +1363,7 @@ async function callBrainOrchestrator({ isSparring, disciplineLabel, techObs, bio
     techObs ? `\nOSSERVATORE TECNICO:\n${techObs}` : '',
     biomechObs ? `\nOSSERVATORE BIOMECCANICO:\n${biomechObs}` : '',
     antiRepeatContext ? `\n${antiRepeatContext}` : '',
+    errorsRubric(disciplineMode, disciplineLabel),
     `\nFondi e restituisci il comando di coaching nel formato richiesto.`,
   ].filter(Boolean).join('\n');
 
@@ -1228,13 +1433,14 @@ PROVA: <il prossimo COLPO o COMBO concreto da eseguire ORA, specifico per la dis
 PERCHÉ: <principio tecnico/biomeccanico in una frase — ometti se ovvio>
 Tono secco, professionale, esigente ma incoraggiante, in italiano. Dai SEMPRE sia il difetto sia ciò che va bene.`;
 
-async function callBrainVerdict({ disciplineLabel, observations, antiRepeatContext }) {
+async function callBrainVerdict({ disciplineLabel, observations, antiRepeatContext, disciplineMode = '' }) {
   if (!observations || observations.length === 0) return null;
   const user = [
     `DISCIPLINA: ${disciplineLabel}`,
     `\nHAI OSSERVATO L'ATLETA IN ${observations.length} MOMENTI CONSECUTIVI:`,
     ...observations.map((o, i) => `Momento ${i + 1}: ${o}`),
     antiRepeatContext ? `\n${antiRepeatContext}` : '',
+    errorsRubric(disciplineMode, disciplineLabel),
     `\nTrova il pattern ricorrente e restituisci il comando finale nel formato richiesto.`,
   ].filter(Boolean).join('\n');
 
@@ -1548,7 +1754,7 @@ PROSSIMO: <il prossimo combo da chiamare, specifico per la disciplina, DIVERSO d
     const antiRepeat = (prompt && /FEEDBACK RECENTI/i.test(prompt))
       ? 'FEEDBACK RECENTI (applica la REGOLA MEMORIA: se l\'errore persiste rincara, altrimenti cambia dettaglio):\n' + prompt.split(/FEEDBACK RECENTI[^\n]*\n/i)[1]
       : '';
-    const verdict = await callBrainVerdict({ disciplineLabel, observations, antiRepeatContext: antiRepeat });
+    const verdict = await callBrainVerdict({ disciplineLabel, observations, antiRepeatContext: antiRepeat, disciplineMode: mode });
     if (verdict) {
       res.setHeader('X-Visual-Provider', verdict.brain);
       res.setHeader('X-Visual-Mode', mode);
@@ -1618,6 +1824,7 @@ PROSSIMO: <il prossimo combo da chiamare, specifico per la disciplina, DIVERSO d
         techObs: groqText,
         biomechObs: cosmosText,
         antiRepeatContext: antiRepeat,
+        disciplineMode: mode,
       });
 
       if (brain) {
