@@ -946,6 +946,193 @@ function CurriculumCoach() {
   );
 }
 
+// ─── Combo Animator ────────────────────────────────────────────────────────────
+// Joints: [head, neck, hip, shL, elL, hndL, shR, elR, hndR, hipL, knL, ftL, hipR, knR, ftR]
+const POSES = {
+  stance:      [[50,14],[50,34],[50,86],[37,40],[28,58],[25,72],[63,40],[72,56],[70,70],[43,92],[40,122],[34,152],[57,92],[62,122],[68,152]],
+  jab:         [[47,14],[50,34],[50,86],[37,40],[22,52],[10,62],[63,40],[72,56],[70,70],[43,92],[40,122],[34,152],[57,92],[62,122],[68,152]],
+  cross:       [[45,14],[48,34],[50,86],[37,42],[30,60],[26,74],[60,40],[44,48],[28,56],[43,92],[40,122],[34,152],[57,92],[62,122],[68,152]],
+  hook:        [[52,14],[50,34],[50,86],[37,42],[18,50],[30,62],[63,40],[72,56],[70,70],[43,92],[40,122],[34,152],[57,92],[62,122],[68,152]],
+  uppercut:    [[50,14],[50,34],[50,86],[37,42],[28,58],[26,72],[63,40],[68,64],[62,48],[43,92],[40,122],[34,152],[57,92],[62,122],[68,152]],
+  low_kick:    [[50,16],[50,34],[50,86],[35,42],[26,60],[22,74],[63,40],[72,56],[70,70],[43,92],[60,116],[78,138],[57,92],[62,124],[68,154]],
+  body_kick:   [[50,16],[50,34],[50,86],[35,42],[26,60],[22,74],[63,40],[72,56],[70,70],[43,92],[62,106],[80,124],[57,92],[62,124],[68,154]],
+  roundhouse:  [[50,16],[50,34],[50,86],[34,44],[24,62],[20,78],[63,44],[72,62],[70,78],[43,92],[64,84],[82,68],[57,92],[62,124],[68,154]],
+  teep:        [[50,14],[52,34],[52,86],[38,42],[30,58],[26,72],[64,42],[73,58],[71,72],[45,92],[42,68],[44,50],[57,92],[62,122],[68,152]],
+  knee:        [[50,14],[50,34],[50,86],[34,40],[26,56],[26,72],[66,40],[74,56],[74,72],[43,92],[40,70],[44,88],[57,92],[62,122],[68,152]],
+  elbow:       [[50,14],[50,34],[50,86],[37,42],[26,52],[36,44],[63,40],[72,56],[70,70],[43,92],[40,122],[34,152],[57,92],[62,122],[68,152]],
+  side_kick:   [[50,14],[50,34],[50,86],[34,44],[24,60],[20,74],[63,44],[72,60],[70,74],[43,92],[65,92],[84,92],[57,92],[62,122],[68,152]],
+  spinning:    [[50,14],[50,34],[50,86],[37,42],[30,58],[26,72],[63,42],[72,58],[70,72],[43,92],[30,118],[18,146],[57,92],[62,122],[68,152]],
+  level_change:[[48,50],[48,65],[48,88],[36,68],[28,78],[22,88],[62,68],[70,78],[76,88],[42,94],[34,116],[28,146],[56,94],[64,116],[70,146]],
+  clinch:      [[50,14],[50,34],[50,86],[34,40],[26,52],[28,66],[66,40],[74,52],[72,66],[43,92],[40,122],[34,152],[57,92],[62,122],[68,152]],
+  sprawl:      [[50,22],[50,38],[50,80],[32,40],[22,54],[18,68],[68,40],[78,54],[82,68],[40,88],[32,112],[28,138],[60,88],[70,108],[76,136]],
+  meditation:  [[50,40],[50,58],[50,86],[38,62],[42,74],[46,88],[62,62],[58,74],[54,88],[38,92],[36,108],[38,128],[62,92],[64,108],[62,128]],
+};
+
+const TECH_TO_POSE = {
+  'jab':true,'Jab':true,'1':true,'Chok':true,'Kizami':true,'Double Jab':true,'Palm Strike':true,'Strike':true,'Chok-Teep':true,
+  'cross':true,'Cross':true,'2':true,'Oi Zuki':true,'Gyaku Zuki':true,'Counter':true,
+  'hook':true,'Hook':true,'3':true,'Gancio':true,'Gancio Corpo':true,
+  'uppercut':true,'Uppercut':true,
+  'low_kick':true,'Low Kick':true,'Tee Kha':true,
+  'body_kick':true,'Body Kick':true,
+  'roundhouse':true,'Roundhouse':true,'Mawashi Geri':true,'Dollyo':true,'High Kick':true,'Double Dollyo':true,'Dwi Chagi-Dollyo':true,'Jump Dollyo':true,'Ap-Dollyo':true,
+  'teep':true,'Teep':true,'Front Kick':true,'Mae Geri':true,'Ap':true,'Ap Chagi':true,'Bênção':true,'Deng Tui':true,
+  'side_kick':true,'Side Kick':true,'Yoko Geri':true,'Yeop Chagi':true,'Ce Deng Tui':true,
+  'knee':true,'Knee':true,'Ginocchio':true,'Ginocchiata':true,'Kao Tone':true,'Kao Dode':true,'Groin':true,
+  'elbow':true,'Elbow':true,'Gomitata':true,'Sok Ti':true,'Sok Tad':true,'Sok Ngad':true,
+  'spinning':true,'Spinning':true,'Spinning Back Kick':true,'Spinning Hook':true,'Salab Fan Pla':true,'Dwi Chagi':true,
+  'level_change':true,'Level Change':true,'Takedown':true,'Double Leg':true,'Doppia Gamba':true,'Burst':true,'Escape':true,
+  'clinch':true,'Clinch':true,'Forearm Block':true,'360 Defense':true,
+  'sprawl':true,'Sprawl':true,'Combo-Sprawl':true,
+  'meditation':true,'Respiro':true,'Meditazione':true,
+};
+
+function resolvePose(tech) {
+  const t = String(tech || '').trim();
+  // exact match on pose key
+  if (POSES[t]) return t;
+  // check TECH_TO_POSE — if entry exists, derive pose key by lookup
+  const poseMap = {
+    'Jab':'jab','1':'jab','Chok':'jab','Kizami':'jab','Double Jab':'jab','Palm Strike':'jab','Strike':'jab',
+    'Cross':'cross','2':'cross','Oi Zuki':'cross','Gyaku Zuki':'cross','Counter':'cross',
+    'Hook':'hook','3':'hook','Gancio':'hook','Gancio Corpo':'hook',
+    'Uppercut':'uppercut',
+    'Low Kick':'low_kick','Tee Kha':'low_kick',
+    'Body Kick':'body_kick',
+    'Roundhouse':'roundhouse','Mawashi Geri':'roundhouse','Dollyo':'roundhouse','High Kick':'roundhouse',
+    'Double Dollyo':'roundhouse','Jump Dollyo':'roundhouse','Ap-Dollyo':'roundhouse','Dwi Chagi-Dollyo':'roundhouse',
+    'Teep':'teep','Front Kick':'teep','Mae Geri':'teep','Ap':'teep','Ap Chagi':'teep','Bênção':'teep','Deng Tui':'teep',
+    'Side Kick':'side_kick','Yoko Geri':'side_kick','Yeop Chagi':'side_kick','Ce Deng Tui':'side_kick',
+    'Knee':'knee','Ginocchio':'knee','Ginocchiata':'knee','Kao Tone':'knee','Kao Dode':'knee','Groin':'knee',
+    'Elbow':'elbow','Gomitata':'elbow','Sok Ti':'elbow','Sok Tad':'elbow','Sok Ngad':'elbow',
+    'Spinning Back Kick':'spinning','Spinning Hook':'spinning','Salab Fan Pla':'spinning','Dwi Chagi':'spinning',
+    'Level Change':'level_change','Takedown':'level_change','Double Leg':'level_change','Doppia Gamba':'level_change','Burst':'level_change','Escape':'level_change',
+    'Clinch':'clinch','Forearm Block':'clinch','360 Defense':'clinch',
+    'Sprawl':'sprawl','Combo-Sprawl':'sprawl',
+  };
+  if (poseMap[t]) return poseMap[t];
+  // partial match (case insensitive)
+  const tl = t.toLowerCase();
+  if (tl.includes('jab') || tl.includes('punch') || tl.includes('palm') || tl.includes('zuki')) return 'jab';
+  if (tl.includes('cross')) return 'cross';
+  if (tl.includes('hook') || tl.includes('gancio')) return 'hook';
+  if (tl.includes('upper')) return 'uppercut';
+  if (tl.includes('low kick') || tl.includes('tee kha')) return 'low_kick';
+  if (tl.includes('body kick') || tl.includes('corpo')) return 'body_kick';
+  if (tl.includes('round') || tl.includes('mawashi') || tl.includes('dollyo') || tl.includes('high kick')) return 'roundhouse';
+  if (tl.includes('teep') || tl.includes('front kick') || tl.includes('mae geri') || tl.includes('bênção')) return 'teep';
+  if (tl.includes('side kick') || tl.includes('yoko') || tl.includes('yeop')) return 'side_kick';
+  if (tl.includes('knee') || tl.includes('ginoc') || tl.includes('kao')) return 'knee';
+  if (tl.includes('elbow') || tl.includes('gomit') || tl.includes('sok')) return 'elbow';
+  if (tl.includes('spin') || tl.includes('salab') || tl.includes('dwi')) return 'spinning';
+  if (tl.includes('level') || tl.includes('takedown') || tl.includes('double leg') || tl.includes('shot') || tl.includes('burst')) return 'level_change';
+  if (tl.includes('clinch') || tl.includes('sprawl') || tl.includes('clinch')) return 'clinch';
+  if (tl.includes('sprawl')) return 'sprawl';
+  return 'stance';
+}
+
+function StickFigure({ poseKey, color = '#00f2ff', size = 130, highlight }) {
+  const p = POSES[poseKey] || POSES.stance;
+  // segments: [from_idx, to_idx]
+  const segs = [
+    [0,1],[1,2],           // torso
+    [1,3],[3,4],[4,5],     // left arm
+    [1,6],[6,7],[7,8],     // right arm
+    [2,9],[9,10],[10,11],  // left leg
+    [2,12],[12,13],[13,14], // right leg
+  ];
+  const isStrike = (si) => {
+    if (!highlight) return false;
+    const pk = poseKey;
+    if ((pk === 'jab' || pk === 'elbow') && [2,3,4].includes(si)) return true;
+    if (pk === 'cross' && [5,6,7].includes(si)) return true;
+    if (pk === 'hook' && [2,3,4].includes(si)) return true;
+    if (pk === 'uppercut' && [5,6,7].includes(si)) return true;
+    if (['low_kick','body_kick','roundhouse','teep','side_kick','spinning'].includes(pk) && [8,9,10].includes(si)) return true;
+    if (pk === 'knee' && [8,9,10].includes(si)) return true;
+    if (pk === 'level_change' && [8,9,10].includes(si)) return true;
+    return false;
+  };
+  const glowId = `glow-${poseKey}-${color.replace('#','')}`;
+  return (
+    <svg width={size} height={size * 1.7} viewBox="0 0 100 180" style={{ overflow: 'visible' }}>
+      <defs>
+        <filter id={glowId} x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation="2.5" result="blur" />
+          <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+        </filter>
+      </defs>
+      {/* Body segments */}
+      {segs.map(([a, b], si) => {
+        const strike = isStrike(si);
+        return (
+          <line key={si}
+            x1={p[a][0]} y1={p[a][1]} x2={p[b][0]} y2={p[b][1]}
+            stroke={strike ? '#ff6b00' : color}
+            strokeWidth={strike ? 3.5 : 2.2}
+            strokeLinecap="round"
+            filter={strike ? `url(#${glowId})` : undefined}
+            style={{ transition: 'all 0.28s ease' }}
+          />
+        );
+      })}
+      {/* Head */}
+      <circle cx={p[0][0]} cy={p[0][1]} r={9} fill="none" stroke={color} strokeWidth={2.2}
+        style={{ transition: 'all 0.28s ease' }} />
+    </svg>
+  );
+}
+
+function ComboAnimator({ combo, color = '#00f2ff', mode: _mode }) {
+  const techniques = (combo || '').split('-').map((t) => t.trim()).filter(Boolean);
+  const [idx, setIdx] = useState(0);
+  const [visible, setVisible] = useState(true);
+
+  useEffect(() => {
+    setIdx(0); setVisible(true);
+  }, [combo]);
+
+  useEffect(() => {
+    if (techniques.length <= 1) return;
+    const advance = () => {
+      setVisible(false);
+      setTimeout(() => { setIdx((i) => (i + 1) % techniques.length); setVisible(true); }, 220);
+    };
+    const id = setInterval(advance, 1500);
+    return () => clearInterval(id);
+  }, [techniques.length, combo]);
+
+  const tech = techniques[idx] || '';
+  const poseKey = resolvePose(tech);
+
+  return (
+    <div className="flex flex-col items-center gap-2">
+      {/* Stick figure */}
+      <div style={{ opacity: visible ? 1 : 0, transition: 'opacity 0.2s ease', filter: `drop-shadow(0 0 12px ${color}55)` }}>
+        <StickFigure poseKey={poseKey} color={color} size={100} highlight />
+      </div>
+      {/* Technique name */}
+      <p className="text-sm font-black tracking-wide text-center leading-tight"
+        style={{ color, opacity: visible ? 1 : 0, transition: 'opacity 0.2s ease', textShadow: `0 0 12px ${color}` }}>
+        {tech}
+      </p>
+      {/* Sequence dots */}
+      <div className="flex items-center gap-1 flex-wrap justify-center max-w-[200px]">
+        {techniques.map((t, i) => (
+          <span key={i} className="text-[9px] font-bold px-1.5 py-0.5 rounded-full transition-all duration-200"
+            style={{
+              background: i === idx ? `${color}22` : 'transparent',
+              color: i === idx ? color : '#4b5563',
+              border: `1px solid ${i === idx ? color : '#374151'}`,
+            }}>
+            {t}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ─── Tab: Visual Live Coach ────────────────────────────────────────────────────
 const ALL_DISCIPLINES = DISCIPLINE_GROUPS.flatMap((g) => g.items);
 const isSparring = (id) => id.startsWith('sparring_') || id === 'partner_drills';
@@ -1997,15 +2184,21 @@ function VisualCoach() {
                 </div>
               </div>
               <div className="px-4 pb-4">
-                {/* CALLING — mostra il combo con countdown */}
+                {/* CALLING — mostra il combo con animazione + countdown */}
                 {comboPhase === 'calling' && (
-                  <div className="text-center space-y-2 py-2">
-                    <p className="text-[10px] uppercase tracking-widest text-gray-400">Esegui tra…</p>
-                    <motion.p key={comboCountdown} initial={{ scale: 1.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
-                      className="text-5xl font-black" style={{ color: '#f97316' }}>{comboCountdown}</motion.p>
-                    <motion.p
-                      initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
-                      className="text-xl font-black text-white tracking-tight leading-tight">{currentCombo}</motion.p>
+                  <div className="flex items-center gap-3 py-2">
+                    {/* Stick figure animator */}
+                    <div className="flex-shrink-0">
+                      <ComboAnimator combo={currentCombo} color={C.orange.hex} mode={mode} />
+                    </div>
+                    {/* Countdown + nome combo */}
+                    <div className="flex-1 text-center space-y-1">
+                      <p className="text-[9px] uppercase tracking-widest text-gray-400">Esegui tra…</p>
+                      <motion.p key={comboCountdown} initial={{ scale: 1.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+                        className="text-5xl font-black" style={{ color: '#f97316' }}>{comboCountdown}</motion.p>
+                      <motion.p initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
+                        className="text-base font-black text-white tracking-tight leading-tight">{currentCombo}</motion.p>
+                    </div>
                   </div>
                 )}
                 {/* GO! */}
