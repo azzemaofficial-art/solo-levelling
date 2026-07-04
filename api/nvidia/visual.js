@@ -1382,12 +1382,87 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, stored: capped.length, sample: row });
   }
 
+  // ── PAGELLA DI FINE SESSIONE (nessuna immagine) → salva stato per la progressione
+  // Il client manda a fine sessione: sessionReport=true, mode, durationMin, sampleCount,
+  // verdicts[] (le righe COMANDO chiave raccolte), context, level. Il Maestro produce una
+  // pagella strutturata, la persiste in KV coach_sessions:<chatId> (letta dal ponte Obsidian)
+  // e la restituisce. Così il coach "ricorda" e migliora giorno dopo giorno.
+  if (req.body?.sessionReport) {
+    const chatId = req.body?.chatId || process.env.SHADOW_BOT_CHAT_ID;
+    const durationMin = Math.max(0, Math.min(600, parseInt(req.body.durationMin) || 0));
+    const sampleCount = Math.max(0, Math.min(9999, parseInt(req.body.sampleCount) || 0));
+    const verdicts = Array.isArray(req.body.verdicts) ? req.body.verdicts.filter(Boolean).map((v) => String(v).slice(0, 220)).slice(-24) : [];
+    const context = String(req.body.context || '').slice(0, 300);
+    const level = String(req.body.level || '').slice(0, 40);
+
+    // storia recente per trend e anti-ripetizione focus
+    const SKEY = chatId ? `coach_sessions:${chatId}` : null;
+    const past = SKEY ? ((await kvGetRaw(SKEY)) || []) : [];
+    const pastArr = Array.isArray(past) ? past : [];
+    const recent = pastArr.slice(-5);
+    const histLine = recent.length
+      ? recent.map((s) => `- ${String(s.date || s.ts || '').slice(0, 10)} ${s.discipline || ''}: voto ${s.score ?? '-'}/100, focus→ ${(s.focusNext || []).join('; ') || '-'}`).join('\n')
+      : '(prima sessione registrata)';
+
+    const report = await callBrainJSON({
+      system: `Sei IL MAESTRO di ${disciplineLabel}, con conoscenza enciclopedica e tradizionale (anche le tecniche antiche e segrete). Valuti UNA sessione di allenamento appena conclusa basandoti SOLO sui dati reali forniti (i comandi che hai dato, la durata, i campioni). Vietato il generico. Dai una pagella onesta ed esigente ma motivante che aiuti l'atleta a migliorare nel tempo. Rispondi SOLO con JSON valido.`,
+      user: `DISCIPLINA: ${disciplineLabel}\nDurata: ${durationMin} min · Campioni analizzati: ${sampleCount} · Livello dichiarato: ${level || 'n/d'}\nContesto sessione: ${context || '-'}\n\nCOMANDI/CORREZIONI DATI DURANTE LA SESSIONE (${verdicts.length}):\n${verdicts.map((v, i) => `${i + 1}. ${v}`).join('\n') || '(nessuna correzione registrata)'}\n\nSTORICO ULTIME SESSIONI (per valutare i progressi e NON ripetere sempre lo stesso focus):\n${histLine}\n\nValuta questa sessione e pianifica il prossimo passo (progressione: se un errore ricorre dallo storico, insisti; se è stato risolto, alza l'asticella con qualcosa di più avanzato).\nRispondi SOLO con:\n{"score":0-100,"title":"titolo breve e incisivo della sessione","strengths":["punto di forza concreto con parte del corpo/tecnica, max 3"],"weaknesses":["debolezza concreta da correggere, max 3"],"focusNext":["1-3 focus SPECIFICI per la prossima sessione, progressivi"],"nextDrill":"UN esercizio/combo concreto e più avanzato da provare la prossima volta","techniqueSecret":"UNA tecnica o segreto della tradizione di ${disciplineLabel} da studiare, con il suo nome","coachNote":"1 frase da maestro, diretta e motivante","xp":numero 10-100 in base a impegno e qualità}`,
+      maxTokens: 900,
+      temperature: 0.5,
+    });
+
+    const clampArr = (x, n) => (Array.isArray(x) ? x.filter(Boolean).map((s) => String(s).slice(0, 160)).slice(0, n) : []);
+    const out = {
+      score: Math.max(0, Math.min(100, parseInt(report?.score) || 60)),
+      title: String(report?.title || 'Sessione completata').slice(0, 90),
+      strengths: clampArr(report?.strengths, 3),
+      weaknesses: clampArr(report?.weaknesses, 3),
+      focusNext: clampArr(report?.focusNext, 3),
+      nextDrill: String(report?.nextDrill || '').slice(0, 160),
+      techniqueSecret: String(report?.techniqueSecret || '').slice(0, 200),
+      coachNote: String(report?.coachNote || '').slice(0, 200),
+      xp: Math.max(5, Math.min(120, parseInt(report?.xp) || 30)),
+    };
+
+    // persisti lo stato per la progressione (letto dal ponte Obsidian)
+    if (SKEY) {
+      const record = {
+        ts: new Date().toISOString(),
+        date: new Date().toISOString().slice(0, 10),
+        discipline: disciplineLabel, mode,
+        durationMin, sampleCount, context,
+        score: out.score, title: out.title,
+        strengths: out.strengths, weaknesses: out.weaknesses,
+        focusNext: out.focusNext, nextDrill: out.nextDrill,
+        techniqueSecret: out.techniqueSecret, coachNote: out.coachNote, xp: out.xp,
+      };
+      pastArr.push(record);
+      await kvSetRaw(SKEY, pastArr.slice(-180)); // ~6 mesi di sessioni giornaliere
+    }
+    return res.status(200).json({ report: out, stored: Boolean(SKEY), sessions: pastArr.length });
+  }
+
   // ── GENERA CIRCUITO (piano drill su misura, nessuna immagine) ──────────────
   if (generatePlan) {
     const { goal = '', level = '', context = '' } = req.body;
+    // Progressione: usa lo storico sessioni per far crescere i drill giorno dopo giorno.
+    let histBlock = '';
+    if (Array.isArray(req.body.history) && req.body.history.length) {
+      const h = req.body.history.filter(Boolean).map((s) => String(s).slice(0, 200)).slice(-5);
+      histBlock = `\n\nSTORICO/PROGRESSI RECENTI (adatta la difficoltà: insisti sulle debolezze ricorrenti, alza l'asticella su ciò che è stato superato):\n${h.map((x) => `- ${x}`).join('\n')}`;
+    } else {
+      const chatId = req.body?.chatId || process.env.SHADOW_BOT_CHAT_ID;
+      if (chatId) {
+        const past = (await kvGetRaw(`coach_sessions:${chatId}`)) || [];
+        const recent = (Array.isArray(past) ? past : []).slice(-4);
+        if (recent.length) {
+          histBlock = `\n\nSTORICO/PROGRESSI RECENTI (adatta la difficoltà: insisti sulle debolezze ricorrenti, alza l'asticella su ciò che è stato superato):\n${recent.map((s) => `- ${s.date || ''} voto ${s.score}/100 · da migliorare: ${(s.weaknesses || []).join('; ') || '-'} · focus→ ${(s.focusNext || []).join('; ') || '-'}`).join('\n')}`;
+        }
+      }
+    }
     const plan = await callBrainJSON({
-      system: `Sei un coach d'élite di ${disciplineLabel}. Crei circuiti di allenamento PERSONALIZZATI, progressivi, specifici e sicuri. Rispondi SOLO con JSON valido.`,
-      user: `Disciplina: ${disciplineLabel}\nObiettivo: ${goal || 'migliorare la tecnica'}\nLivello: ${level || 'intermedio'}\nContesto: ${context || '-'}\n\nCrea un circuito di 4-6 drill progressivi e SPECIFICI per questa disciplina e obiettivo, eseguibili davanti a una camera.\nPer ogni drill:\n- name: nome breve e concreto\n- durationSec: durata sensata (tecnica 30-45, condizionamento 45-75)\n- focus: cosa allena, 1 frase\n- watchFor: cosa il coach osserva per valutarlo (parti del corpo, angoli), 1 frase\nRispondi SOLO con: {"drills":[{"name":"...","durationSec":40,"focus":"...","watchFor":"..."}]}`,
+      system: `Sei un coach d'élite di ${disciplineLabel}. Crei circuiti di allenamento PERSONALIZZATI, progressivi, specifici e sicuri. Tieni conto dello storico per far progredire l'atleta di sessione in sessione. Rispondi SOLO con JSON valido.`,
+      user: `Disciplina: ${disciplineLabel}\nObiettivo: ${goal || 'migliorare la tecnica'}\nLivello: ${level || 'intermedio'}\nContesto: ${context || '-'}${histBlock}\n\nCrea un circuito di 4-6 drill progressivi e SPECIFICI per questa disciplina e obiettivo, eseguibili davanti a una camera.\nPer ogni drill:\n- name: nome breve e concreto\n- durationSec: durata sensata (tecnica 30-45, condizionamento 45-75)\n- focus: cosa allena, 1 frase\n- watchFor: cosa il coach osserva per valutarlo (parti del corpo, angoli), 1 frase\nRispondi SOLO con: {"drills":[{"name":"...","durationSec":40,"focus":"...","watchFor":"..."}]}`,
       maxTokens: 800,
     });
     const drills = Array.isArray(plan?.drills)

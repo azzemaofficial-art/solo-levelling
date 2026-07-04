@@ -1031,54 +1031,117 @@ function resolvePose(tech) {
   return 'stance';
 }
 
-function StickFigure({ poseKey, color = '#00f2ff', size = 130, highlight }) {
+// Quale estremità colpisce, per pose → indice giunto (5 = mano SX, 8 = mano DX, 11 = piede SX)
+const STRIKE_ENDPOINT = {
+  jab: 5, hook: 5, elbow: 5,
+  cross: 8, uppercut: 8,
+  low_kick: 11, body_kick: 11, roundhouse: 11, teep: 11, side_kick: 11, spinning: 11, knee: 11, level_change: 11,
+};
+// giunti dell'arto che colpisce (per evidenziarlo tutto)
+const STRIKE_LIMB = { 5: [3, 4, 5], 8: [6, 7, 8], 11: [9, 10, 11] };
+
+function StickFigure({ poseKey, color = '#00f2ff', size = 130, highlight = false, showGhost }) {
   const p = POSES[poseKey] || POSES.stance;
-  // segments: [from_idx, to_idx]
+  const st = POSES.stance;
+  const isMove = poseKey !== 'stance' && poseKey !== 'meditation';
+  const ghost = (showGhost ?? size >= 78) && isMove;
+  const strikeIdx = highlight && isMove ? STRIKE_ENDPOINT[poseKey] : undefined;
+  const limb = strikeIdx != null ? STRIKE_LIMB[strikeIdx] : null;
+  const STRIKE = '#ff7a1a';
+  const uid = `${poseKey}-${color.replace('#', '')}-${Math.round(size)}`;
+
+  // segmenti [da, a]
   const segs = [
-    [0,1],[1,2],           // torso
-    [1,3],[3,4],[4,5],     // left arm
-    [1,6],[6,7],[7,8],     // right arm
-    [2,9],[9,10],[10,11],  // left leg
-    [2,12],[12,13],[13,14], // right leg
+    [0,1],[1,2],           // testa-collo, collo-bacino
+    [1,3],[3,4],[4,5],     // braccio SX
+    [1,6],[6,7],[7,8],     // braccio DX
+    [2,9],[9,10],[10,11],  // gamba SX
+    [2,12],[12,13],[13,14],// gamba DX
   ];
-  const isStrike = (si) => {
-    if (!highlight) return false;
-    const pk = poseKey;
-    if ((pk === 'jab' || pk === 'elbow') && [2,3,4].includes(si)) return true;
-    if (pk === 'cross' && [5,6,7].includes(si)) return true;
-    if (pk === 'hook' && [2,3,4].includes(si)) return true;
-    if (pk === 'uppercut' && [5,6,7].includes(si)) return true;
-    if (['low_kick','body_kick','roundhouse','teep','side_kick','spinning'].includes(pk) && [8,9,10].includes(si)) return true;
-    if (pk === 'knee' && [8,9,10].includes(si)) return true;
-    if (pk === 'level_change' && [8,9,10].includes(si)) return true;
-    return false;
-  };
-  const glowId = `glow-${poseKey}-${color.replace('#','')}`;
+  const isStrikeSeg = (a, b) => limb && limb.includes(a) && limb.includes(b);
+  const joints = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14];
+
+  // linea di terra sotto i piedi
+  const gy = Math.max(p[11][1], p[14][1], st[11][1], st[14][1]) + 6;
+
+  // freccia di traiettoria dell'estremità che colpisce (partenza stance → arrivo posa)
+  let arrow = null;
+  if (strikeIdx != null) {
+    const S = st[strikeIdx], E = p[strikeIdx];
+    const dx = E[0] - S[0], dy = E[1] - S[1];
+    const len = Math.hypot(dx, dy);
+    if (len > 8) {
+      const ux = dx / len, uy = dy / len;
+      const bx = E[0] - ux * 7, by = E[1] - uy * 7;   // base testa freccia (poco prima dell'arrivo)
+      const nx = -uy, ny = ux;                          // perpendicolare
+      arrow = {
+        x1: S[0], y1: S[1], x2: bx, y2: by,
+        head: `${E[0]},${E[1]} ${bx + nx * 3.5},${by + ny * 3.5} ${bx - nx * 3.5},${by - ny * 3.5}`,
+      };
+    }
+  }
+
+  const bodyW = size >= 78 ? 3 : 2.4;
   return (
     <svg width={size} height={size * 1.7} viewBox="0 0 100 180" style={{ overflow: 'visible' }}>
       <defs>
-        <filter id={glowId} x="-50%" y="-50%" width="200%" height="200%">
-          <feGaussianBlur stdDeviation="2.5" result="blur" />
-          <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+        <filter id={`glow-${uid}`} x="-60%" y="-60%" width="220%" height="220%">
+          <feGaussianBlur stdDeviation="2.4" result="b" />
+          <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
         </filter>
       </defs>
-      {/* Body segments */}
-      {segs.map(([a, b], si) => {
-        const strike = isStrike(si);
+
+      {/* Terra */}
+      <line x1={12} y1={gy} x2={88} y2={gy} stroke={color} strokeWidth={1} strokeDasharray="2 4" opacity={0.35} />
+      <ellipse cx={50} cy={gy} rx={30} ry={3} fill={color} opacity={0.06} />
+
+      {/* Fantasma della posizione di partenza (guardia) */}
+      {ghost && (
+        <g opacity={0.22}>
+          {segs.map(([a, b], i) => (
+            <line key={`g${i}`} x1={st[a][0]} y1={st[a][1]} x2={st[b][0]} y2={st[b][1]}
+              stroke="#9ca3af" strokeWidth={1.8} strokeLinecap="round" strokeDasharray="1.5 3" />
+          ))}
+          <circle cx={st[0][0]} cy={st[0][1]} r={8} fill="none" stroke="#9ca3af" strokeWidth={1.6} />
+        </g>
+      )}
+
+      {/* Freccia di traiettoria del colpo */}
+      {arrow && (
+        <g style={{ transition: 'all 0.28s ease' }}>
+          <line x1={arrow.x1} y1={arrow.y1} x2={arrow.x2} y2={arrow.y2}
+            stroke={STRIKE} strokeWidth={1.8} strokeLinecap="round" strokeDasharray="3 2.5" opacity={0.85} />
+          <polygon points={arrow.head} fill={STRIKE} opacity={0.95} filter={`url(#glow-${uid})`} />
+        </g>
+      )}
+
+      {/* Corpo — posa attuale */}
+      {segs.map(([a, b], i) => {
+        const strike = isStrikeSeg(a, b);
         return (
-          <line key={si}
-            x1={p[a][0]} y1={p[a][1]} x2={p[b][0]} y2={p[b][1]}
-            stroke={strike ? '#ff6b00' : color}
-            strokeWidth={strike ? 3.5 : 2.2}
-            strokeLinecap="round"
-            filter={strike ? `url(#${glowId})` : undefined}
-            style={{ transition: 'all 0.28s ease' }}
-          />
+          <line key={i} x1={p[a][0]} y1={p[a][1]} x2={p[b][0]} y2={p[b][1]}
+            stroke={strike ? STRIKE : color}
+            strokeWidth={strike ? bodyW + 1.6 : bodyW}
+            strokeLinecap="round" strokeLinejoin="round"
+            filter={strike ? `url(#glow-${uid})` : undefined}
+            style={{ transition: 'all 0.28s ease' }} />
         );
       })}
-      {/* Head */}
-      <circle cx={p[0][0]} cy={p[0][1]} r={9} fill="none" stroke={color} strokeWidth={2.2}
+
+      {/* Giunti */}
+      {joints.map((j) => {
+        const on = limb && limb.includes(j);
+        return <circle key={j} cx={p[j][0]} cy={p[j][1]} r={on ? 2.3 : 1.7}
+          fill={on ? STRIKE : color} opacity={on ? 1 : 0.9}
+          style={{ transition: 'all 0.28s ease' }} />;
+      })}
+
+      {/* Testa piena + baricentro */}
+      <circle cx={p[0][0]} cy={p[0][1]} r={8.5} fill={color} opacity={0.16}
         style={{ transition: 'all 0.28s ease' }} />
+      <circle cx={p[0][0]} cy={p[0][1]} r={8.5} fill="none" stroke={color} strokeWidth={bodyW}
+        style={{ transition: 'all 0.28s ease' }} />
+      <circle cx={p[2][0]} cy={p[2][1]} r={2} fill={color} opacity={0.85} />
     </svg>
   );
 }
@@ -1197,6 +1260,9 @@ function VisualCoach() {
   const guidedObsRef = useRef([]);       // osservazioni del drill corrente
   const [sessionAnalysis, setSessionAnalysis] = useState(null);
   const [analyzingSession, setAnalyzingSession] = useState(false);
+  // ── Pagella di fine sessione (voto + progressione salvata su Obsidian) ──
+  const sessionVerdictsRef = useRef([]);   // comandi chiave raccolti nella sessione
+  const [sessionReport, setSessionReport] = useState(null); // {report:{...}} | {loading:true}
 
   // ── Modalità COMBO A COMANDO ─────────────────────────────────────────────────
   const [comboOn, setComboOn] = useState(false);
@@ -1433,11 +1499,44 @@ function VisualCoach() {
 
   const startSession = async () => {
     sessionStartRef.current = Date.now();
+    sessionVerdictsRef.current = [];      // nuova sessione → azzera i verdetti accumulati
     unlockSpeech();                       // gesto utente: sblocca la voce per l'auto mode
     setScore({ a: 0, b: 0 }); setLastPoint(null);
     setStep('live'); setAnalysis(null);
     await startCamera();
   };
+
+  // Fine sessione → il Maestro genera la pagella, la salva su KV (→ Obsidian) e la mostra.
+  const requestSessionReport = useCallback(async ({ durationMin, verdicts, sampleCount: sc, context, discipline }) => {
+    setSessionReport({ loading: true });
+    try {
+      const r = await fetch('/api/nvidia/visual', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionReport: true, mode: discipline, durationMin, sampleCount: sc,
+          verdicts, context, level: guidedLevel,
+        }),
+      });
+      const data = await r.json();
+      if (r.ok && data.report) {
+        setSessionReport({ report: data.report, discipline });
+        // arricchisci lo storico locale con voto + focus (usato anche per la progressione dei drill)
+        try {
+          const rep = data.report;
+          const enriched = [{
+            date: new Date().toLocaleDateString('it-IT'), mode: discipline, context,
+            keyFeedback: rep.title, duration: durationMin,
+            score: rep.score, weaknesses: rep.weaknesses, focusNext: rep.focusNext,
+          }, ...loadSessions()].slice(0, 10);
+          saveSessions(enriched); setPastSessions(enriched);
+        } catch (_) {}
+      } else {
+        setSessionReport(null);
+      }
+    } catch (_) {
+      setSessionReport(null);
+    }
+  }, [guidedLevel]);
 
   const stopCamera = () => {
     streamRef.current?.getTracks().forEach((t) => t.stop());
@@ -1445,11 +1544,17 @@ function VisualCoach() {
     poseRef.current?.lm?.close();
     poseRef.current = null;
     timer.stop();
-    if (analysis?.content) {
-      const duration = sessionStartRef.current ? Math.round((Date.now() - sessionStartRef.current) / 60000) : 0;
+    const duration = sessionStartRef.current ? Math.round((Date.now() - sessionStartRef.current) / 60000) : 0;
+    const verdicts = sessionVerdictsRef.current.slice();
+    if (verdicts.length >= 2) {
+      // Sessione con abbastanza dati → il Maestro genera la pagella (salva su Obsidian via KV)
+      requestSessionReport({ durationMin: duration, verdicts, sampleCount, context: sessionContext, discipline: mode });
+    } else if (analysis?.content) {
+      // troppo poco per una pagella → salva solo il feedback chiave (comportamento precedente)
       const updated = [{ date: new Date().toLocaleDateString('it-IT'), mode, context: sessionContext, keyFeedback: analysis.content.slice(0, 200), duration }, ...pastSessions].slice(0, 10);
       saveSessions(updated); setPastSessions(updated);
     }
+    sessionVerdictsRef.current = [];
     setStreaming(false); setAnalysis(null); setAutoMode(false);
     setScore({ a: 0, b: 0 }); setLastPoint(null);
     setStep('setup');
@@ -1599,6 +1704,10 @@ function VisualCoach() {
       alerts: alerts || [],
       label: '',
     };
+    // Accumula la riga COMANDO/chiave per la pagella di fine sessione (max 40)
+    const lines = String(verdict || '').split('\n').map((l) => l.trim()).filter(Boolean);
+    const key = (lines.find((l) => /^COMANDO\s*:/i.test(l)) || lines[0] || '').replace(/^COMANDO\s*:\s*/i, '').slice(0, 220);
+    if (key) sessionVerdictsRef.current = [...sessionVerdictsRef.current, key].slice(-40);
     setSampleFeedback('shown');
   }, [mode, postSample]);
 
@@ -1812,16 +1921,21 @@ function VisualCoach() {
   const generateGuidedPlan = useCallback(async () => {
     setGuidedLoading(true); setGuidedReview(null); setGuidedPhase('gen');
     try {
+      // progressione: passa lo storico locale (voti + debolezze + focus) così i drill crescono
+      const history = pastSessions
+        .filter((s) => s.mode === mode && (s.score != null || s.focusNext?.length))
+        .slice(0, 5)
+        .map((s) => `${s.date} voto ${s.score ?? '-'}/100 · da migliorare: ${(s.weaknesses || []).join('; ') || '-'} · focus→ ${(s.focusNext || []).join('; ') || '-'}`);
       const res = await fetch('/api/nvidia/visual', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ generatePlan: true, mode, goal: sessionContext, level: guidedLevel, context: sessionContext }),
+        body: JSON.stringify({ generatePlan: true, mode, goal: sessionContext, level: guidedLevel, context: sessionContext, history }),
       });
       const data = await res.json();
       if (res.ok && data.drills?.length) {
         setGuidedPlan(data.drills); setGuidedIdx(0); setGuidedPhase('ready');
       } else { setGuidedPhase('idle'); alert(data.error || 'Circuito non disponibile, riprova.'); }
     } catch { setGuidedPhase('idle'); } finally { setGuidedLoading(false); }
-  }, [mode, sessionContext, guidedLevel]);
+  }, [mode, sessionContext, guidedLevel, pastSessions]);
 
   const finishDrillRef = useRef(() => {});
   const nextDrillRef = useRef(() => {});
@@ -2427,6 +2541,99 @@ function VisualCoach() {
               {sessionAnalysis.provider && (
                 <p className="text-[10px] font-mono mt-4" style={{ color: C.violet.hex, opacity: 0.6 }}>via {sessionAnalysis.provider} · {currentDisc?.label}</p>
               )}
+            </motion.div>
+          </motion.div>
+        )}
+
+        {/* ── PAGELLA DI FINE SESSIONE ─────────────────────────────────────── */}
+        {sessionReport && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[60] flex items-end"
+            style={{ background: 'rgba(0,0,0,0.88)' }}
+            onClick={() => !sessionReport.loading && setSessionReport(null)}>
+            <motion.div
+              initial={{ y: 80 }} animate={{ y: 0 }} exit={{ y: 80 }}
+              transition={{ type: 'spring', stiffness: 320, damping: 28 }}
+              className="w-full max-h-[88vh] overflow-y-auto rounded-t-3xl p-5"
+              style={{ background: '#08090f', border: '1px solid rgba(124,58,237,0.3)', borderBottom: 'none' }}
+              onClick={(e) => e.stopPropagation()}>
+              {sessionReport.loading ? (
+                <div className="py-10 flex flex-col items-center gap-4">
+                  <motion.div animate={{ rotate: 360 }} transition={{ duration: 1.1, repeat: Infinity, ease: 'linear' }}
+                    className="w-10 h-10 rounded-full" style={{ border: `3px solid ${C.violet.hex}33`, borderTopColor: C.violet.hex }} />
+                  <p className="text-sm font-bold text-white/80">Il Maestro sta valutando la sessione…</p>
+                  <p className="text-[11px] text-gray-500">Salvo i progressi per la prossima volta</p>
+                </div>
+              ) : sessionReport.report && (() => {
+                const R = sessionReport.report;
+                const sc = R.score;
+                const scColor = sc >= 80 ? C.emerald.hex : sc >= 60 ? C.amber.hex : sc >= 40 ? C.orange.hex : '#ef4444';
+                return (
+                  <>
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-sm font-black" style={{ color: C.violet.hex, fontFamily: 'Orbitron, sans-serif', letterSpacing: '0.06em' }}>🥋 PAGELLA SESSIONE</p>
+                      <button onClick={() => setSessionReport(null)} className="text-gray-500 font-black text-lg leading-none">✕</button>
+                    </div>
+                    {/* Voto + titolo */}
+                    <div className="flex items-center gap-4 mb-4 mt-2">
+                      <div className="relative flex-shrink-0" style={{ width: 78, height: 78 }}>
+                        <svg width={78} height={78} viewBox="0 0 78 78">
+                          <circle cx={39} cy={39} r={34} fill="none" stroke="#1f2937" strokeWidth={7} />
+                          <motion.circle cx={39} cy={39} r={34} fill="none" stroke={scColor} strokeWidth={7} strokeLinecap="round"
+                            strokeDasharray={2 * Math.PI * 34}
+                            initial={{ strokeDashoffset: 2 * Math.PI * 34 }}
+                            animate={{ strokeDashoffset: 2 * Math.PI * 34 * (1 - sc / 100) }}
+                            transition={{ duration: 1, ease: 'easeOut' }}
+                            transform="rotate(-90 39 39)" />
+                        </svg>
+                        <div className="absolute inset-0 flex flex-col items-center justify-center">
+                          <span className="text-2xl font-black" style={{ color: scColor }}>{sc}</span>
+                          <span className="text-[8px] text-gray-500 -mt-0.5">/100</span>
+                        </div>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-base font-black text-white leading-tight">{R.title}</p>
+                        <p className="text-[11px] mt-1" style={{ color: C.amber.hex }}>+{R.xp} XP · {currentDisc?.label}</p>
+                        {R.coachNote && <p className="text-[11px] text-violet-200/80 italic mt-1 leading-snug">"{R.coachNote}"</p>}
+                      </div>
+                    </div>
+                    {/* Punti di forza */}
+                    {R.strengths?.length > 0 && (
+                      <div className="mb-3">
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-400/90 mb-1">✅ Punti di forza</p>
+                        {R.strengths.map((s, i) => <p key={i} className="text-[12px] text-emerald-100/90 pl-1 leading-snug">· {s}</p>)}
+                      </div>
+                    )}
+                    {/* Da correggere */}
+                    {R.weaknesses?.length > 0 && (
+                      <div className="mb-3">
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-orange-400/90 mb-1">⚠️ Da correggere</p>
+                        {R.weaknesses.map((s, i) => <p key={i} className="text-[12px] text-orange-100/90 pl-1 leading-snug">· {s}</p>)}
+                      </div>
+                    )}
+                    {/* Focus prossima sessione */}
+                    {R.focusNext?.length > 0 && (
+                      <div className="mb-3 rounded-xl p-3" style={{ background: 'rgba(124,58,237,0.12)', border: '1px solid rgba(124,58,237,0.3)' }}>
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-violet-300 mb-1">🎯 La prossima volta</p>
+                        {R.focusNext.map((s, i) => <p key={i} className="text-[12px] text-white/90 pl-1 leading-snug">· {s}</p>)}
+                        {R.nextDrill && <p className="text-[12px] font-bold text-amber-200 mt-2 pl-1">🥊 Prova: {R.nextDrill}</p>}
+                      </div>
+                    )}
+                    {/* Segreto da studiare */}
+                    {R.techniqueSecret && (
+                      <div className="mb-4 rounded-xl p-3" style={{ background: 'rgba(245,158,11,0.10)', border: '1px solid rgba(245,158,11,0.28)' }}>
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-amber-300 mb-1">🥷 Segreto da studiare</p>
+                        <p className="text-[12px] text-amber-100/90 pl-1 leading-snug">{R.techniqueSecret}</p>
+                      </div>
+                    )}
+                    <p className="text-[10px] font-mono text-center" style={{ color: C.violet.hex, opacity: 0.5 }}>salvato nell'alveare · migliorerai giorno dopo giorno</p>
+                    <button onClick={() => setSessionReport(null)}
+                      className="w-full mt-3 py-3 rounded-xl text-white text-sm font-black"
+                      style={{ background: `linear-gradient(135deg, ${C.violet.hex}, #4f46e5)` }}>Continua</button>
+                  </>
+                );
+              })()}
             </motion.div>
           </motion.div>
         )}

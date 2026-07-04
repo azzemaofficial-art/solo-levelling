@@ -59,6 +59,23 @@ async function main() {
   const diet = dietSummary(meals);
   const P = data.profile || {};
 
+  // 2d) SESSIONI COACH → dataset/sessions.csv (dedup per ts) + progressione allenamento.md
+  const sessions = Array.isArray(data.sessions) ? data.sessions : [];
+  if (sessions.length) {
+    ensureHeader('dataset/sessions.csv', 'ts,date,discipline,durationMin,sampleCount,score,xp,strengths,weaknesses,focusNext,nextDrill,techniqueSecret');
+    const have = existingKeys('dataset/sessions.csv', 0);
+    for (const s of sessions) {
+      if (have.has(String(s.ts))) continue;
+      appendCsv('dataset/sessions.csv',
+        [s.ts || '', s.date || '', csv(s.discipline || s.mode || ''), s.durationMin ?? '', s.sampleCount ?? '',
+         s.score ?? '', s.xp ?? '', csv((s.strengths || []).join('; ')), csv((s.weaknesses || []).join('; ')),
+         csv((s.focusNext || []).join('; ')), csv(s.nextDrill || ''), csv(s.techniqueSecret || '')].join(','));
+    }
+  }
+  const train = trainSummary(sessions);
+  writeTrainingJournal(sessions, train);
+  console.log(`🥋 Sessioni coach: ${sessions.length} (${train.count ? `voto medio ${train.avgScore}, ultimo ${train.lastScore}` : 'nessuna pagella'})`);
+
   // 3) dashboard.md
   const gateRows = (L.gates || []).map((g) => {
     const pct = g.size ? Math.min(100, Math.round((g.done / g.size) * 100)) : 0;
@@ -85,8 +102,14 @@ aggiornato: ${stamp}
 |---|---|---|---|
 ${gateRows || '| — | — | — | — |'}
 
-## 🥋 Coach dataset
-- Campioni raccolti: **${Math.max(0, countLines('dataset/coach-samples.csv') - 1)}** (file \`dataset/coach-samples.csv\`)
+## 🥋 Allenamento
+${train.count ? `- Sessioni: **${train.count}**  ·  Voto medio: **${train.avgScore}/100**  ·  Ultima: **${train.lastScore}/100** ${train.trendIcon}  ·  XP coach: **${train.xpTotal}**
+- Ultima disciplina: **${train.lastDiscipline}** (${train.lastDate})
+- 🎯 Focus prossima sessione: ${train.focusNext.length ? train.focusNext.map((f) => `**${f}**`).join(' · ') : '—'}
+- ⚠️ Debolezze ricorrenti: ${train.topWeak.length ? train.topWeak.join(' · ') : '—'}
+- 🥷 Da studiare: ${train.techniqueSecret || '—'}
+- Campioni frame: **${Math.max(0, countLines('dataset/coach-samples.csv') - 1)}** · Diario: \`allenamento.md\`` : `- *(ancora nessuna sessione col Coach Live — apri il coach e allenati)*
+- Campioni frame: **${Math.max(0, countLines('dataset/coach-samples.csv') - 1)}**`}
 
 ## 🍝 Dieta
 ${diet.days ? `- Giorni tracciati: **${diet.days}**  ·  Pasti: **${diet.count}**
@@ -105,6 +128,7 @@ ${profileLine(P) || '- *(nessuna misurazione — scrivi al bot es. "peso 78kg")*
   const ctx = `Livello ${L.level}, ${L.xp} XP, streak ${L.streak} giorni, precisione ${acc}%. Gate: ` +
     (L.gates || []).map((g) => `${g.name} ${g.total ? Math.round((g.correct / g.total) * 100) : 0}% (${g.done}/${g.size})`).join(', ') +
     `. Campioni coach: ${data.samples?.length || 0}.` +
+    (train.count ? ` Allenamento: ${train.count} sessioni, voto medio ${train.avgScore}/100 (ultima ${train.lastScore}, ${train.lastDiscipline}), trend ${train.trendWord}. Debolezze ricorrenti: ${train.topWeak.join(', ') || '-'}. Focus prossima: ${train.focusNext.join(', ') || '-'}.` : ' Nessuna sessione col coach.') +
     (diet.days ? ` Dieta (${diet.days}gg, ${diet.count} pasti): media ${diet.kcal} kcal/die, ${diet.protein}g proteine, ${diet.carbs}g carbo, ${diet.fat}g grassi; ultimi 7gg ${diet.kcal7} kcal/die.` : ' Nessun pasto registrato.') +
     (profileLine(P) ? ` Profilo: ${profileLine(P).replace(/\n?- /g, ' ').trim()}.` : '');
   let memory = '';
@@ -160,6 +184,78 @@ function dietSummary(meals) {
     kcal7: avg(last7, 'kcal'), protein7: avg(last7, 'protein'),
   };
 }
+// Sintesi allenamento: trend voti, debolezze ricorrenti, focus e segreto correnti
+function trainSummary(sessions) {
+  if (!Array.isArray(sessions) || !sessions.length) return { count: 0, focusNext: [], topWeak: [] };
+  const arr = sessions.slice();
+  const scores = arr.map((s) => +s.score || 0);
+  const avgScore = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
+  const last = arr[arr.length - 1];
+  const lastScore = +last.score || 0;
+  const xpTotal = arr.reduce((a, s) => a + (+s.xp || 0), 0);
+  // trend: ultima vs media delle precedenti
+  const prev = scores.slice(0, -1);
+  const prevAvg = prev.length ? Math.round(prev.reduce((a, b) => a + b, 0) / prev.length) : lastScore;
+  const delta = lastScore - prevAvg;
+  const trendIcon = delta > 3 ? '📈' : delta < -3 ? '📉' : '➡️';
+  const trendWord = delta > 3 ? 'in miglioramento' : delta < -3 ? 'in calo' : 'stabile';
+  // debolezze ricorrenti (frequenza sulle ultime 8 sessioni)
+  const freq = {};
+  for (const s of arr.slice(-8)) for (const w of (s.weaknesses || [])) {
+    const k = String(w).toLowerCase().slice(0, 60); freq[k] = (freq[k] || 0) + 1;
+  }
+  const topWeak = Object.entries(freq).filter(([, n]) => n >= 2).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k]) => k);
+  return {
+    count: arr.length, avgScore, lastScore, xpTotal,
+    lastDiscipline: last.discipline || last.mode || '—', lastDate: (last.date || last.ts || '').slice(0, 10),
+    trendIcon, trendWord,
+    focusNext: (last.focusNext || []).slice(0, 3),
+    nextDrill: last.nextDrill || '',
+    techniqueSecret: last.techniqueSecret || '',
+    topWeak,
+    spark: sparkline(scores.slice(-16)),
+  };
+}
+function sparkline(nums) {
+  if (!nums || !nums.length) return '';
+  const bars = '▁▂▃▄▅▆▇█';
+  const lo = Math.min(...nums), hi = Math.max(...nums), span = hi - lo || 1;
+  return nums.map((n) => bars[Math.min(7, Math.round(((n - lo) / span) * 7))]).join('');
+}
+function writeTrainingJournal(sessions, train) {
+  if (!train.count) return;
+  const rows = sessions.slice(-20).reverse().map((s) => {
+    const d = (s.date || s.ts || '').slice(0, 10);
+    return `| ${d} | ${csv(s.discipline || s.mode || '')} | ${s.durationMin ?? '-'}m | **${s.score ?? '-'}** | ${mdCell((s.strengths || []).join('; '))} | ${mdCell((s.weaknesses || []).join('; '))} | ${mdCell((s.focusNext || []).join('; '))} |`;
+  }).join('\n');
+  write('allenamento.md',
+`---
+tipo: allenamento
+aggiornato: ${stamp}
+---
+
+# 🥋 Diario Allenamento — Shadow Coach
+
+> Il coach ricorda ogni sessione e alza l'asticella. Aggiornato dal ponte il ${stamp}
+
+## 📈 Progressione
+- **Sessioni:** ${train.count}  ·  **Voto medio:** ${train.avgScore}/100  ·  **Ultima:** ${train.lastScore}/100 ${train.trendIcon} (${train.trendWord})  ·  **XP coach:** ${train.xpTotal}
+- **Andamento voti:** \`${train.spark}\`
+- **🎯 Focus prossima sessione:** ${train.focusNext.length ? train.focusNext.map((f) => `**${f}**`).join(' · ') : '—'}
+- **⚠️ Debolezze ricorrenti:** ${train.topWeak.length ? train.topWeak.join(' · ') : '—'}
+- **🥷 Prossimo drill:** ${train.nextDrill || '—'}
+- **📜 Da studiare:** ${train.techniqueSecret || '—'}
+
+## 📓 Log sessioni (ultime 20)
+| Data | Disciplina | Durata | Voto | Punti di forza | Da correggere | Focus prossima |
+|---|---|---|---|---|---|---|
+${rows}
+
+---
+*Fonte: Coach Live → KV \`coach_sessions\` → ponte \`tools/obsidian-hive.mjs\`*
+`);
+}
+function mdCell(v) { return String(v ?? '').replace(/\|/g, '/').replace(/\n/g, ' ').slice(0, 90) || '—'; }
 function profileLine(P) {
   if (!P || typeof P !== 'object') return '';
   const bits = [];
