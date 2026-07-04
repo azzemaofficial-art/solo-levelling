@@ -27,15 +27,26 @@ const TASK_DEFAULT = {
 const KEY_GLOBAL = 'shadow_monarch_ai_model_global';
 const keyFor = (task) => `shadow_monarch_ai_model_${task}`;
 
+const VALID_IDS = new Set(AI_MODELS.map((m) => m.id));
+
 const read = (k) => {
   if (typeof window === 'undefined') return '';
   try { return String(window.localStorage.getItem(k) || '').trim(); } catch { return ''; }
 };
 
-export const getGlobalModel = () => read(KEY_GLOBAL);
+const readValidated = (k) => {
+  const val = read(k);
+  if (!val) return '';
+  if (VALID_IDS.has(val)) return val;
+  // modello non più in lista (rimosso da NIM, ecc.) → cancella e usa fallback
+  try { window.localStorage.removeItem(k); } catch {}
+  return '';
+};
+
+export const getGlobalModel = () => readValidated(KEY_GLOBAL);
 export const setGlobalModel = (id) => { try { window.localStorage.setItem(KEY_GLOBAL, String(id || '')); } catch {} };
 
-export const getTaskOverride = (task) => read(keyFor(task));
+export const getTaskOverride = (task) => readValidated(keyFor(task));
 export const setTaskOverride = (task, id) => { try { window.localStorage.setItem(keyFor(task), String(id || '')); } catch {} };
 
 // Modello effettivo per una funzione: override funzione → globale → default funzione.
