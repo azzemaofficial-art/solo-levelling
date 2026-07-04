@@ -1417,6 +1417,7 @@ function VisualCoach() {
   const [score, setScore] = useState({ a: 0, b: 0 });
   const [lastPoint, setLastPoint] = useState(null);
   const [voiceOn, setVoiceOn] = useState(true);
+  const [voiceSlow, setVoiceSlow] = useState(true);   // voce lenta e scandita (default: più facile da seguire)
   const [skeletonOn, setSkeletonOn] = useState(true);
   const [centered, setCentered] = useState(null);
   const [facingMode, setFacingMode] = useState('environment');
@@ -1554,15 +1555,15 @@ function VisualCoach() {
       setTimeout(() => speakNextRef.current(), 150);
     };
     const utt = new SpeechSynthesisUtterance(clean);
-    utt.lang = 'it-IT'; utt.rate = 1.1; utt.pitch = 1;
+    utt.lang = 'it-IT'; utt.rate = voiceSlow ? 0.82 : 1.05; utt.pitch = 1;
     const itVoice = voicesRef.current.find((v) => v.lang === 'it-IT' || v.lang.startsWith('it'));
     if (itVoice) utt.voice = itVoice;
     utt.onend = advance;
     utt.onerror = advance;
     window.speechSynthesis.speak(utt);
     // Watchdog iOS Safari: se onend non scatta, avanza comunque dopo durata stimata
-    setTimeout(advance, Math.min(15000, Math.max(3500, clean.length * 90)));
-  }, [voiceOn]);
+    setTimeout(advance, Math.min(18000, Math.max(3800, clean.length * (voiceSlow ? 125 : 95))));
+  }, [voiceOn, voiceSlow]);
   speakNextRef.current = speakNext;
 
   // Accoda solo il TESTO per la voce. Cap a 2: evita backlog stantio in auto mode.
@@ -2130,8 +2131,54 @@ function VisualCoach() {
     clearInterval(guidedTickRef.current); guidedTickRef.current = null;
   }, []);
 
+  // Piano LOCALE garantito — usato se l'AI non risponde: così il circuito parte SEMPRE.
+  const buildLocalPlan = useCallback(() => {
+    const scene = sceneFor(mode);
+    const shuffle = (arr) => arr.map((v) => [Math.random(), v]).sort((a, b) => a[0] - b[0]).map((x) => x[1]);
+    if (scene === 'solo') {
+      if (mode === 'yoga' || mode === 'stretching') return [
+        { name: 'Respiro e centratura', durationSec: 40, focus: 'In piedi, respira lento dal naso e allunga la colonna', watchFor: 'spalle basse e rilassate' },
+        { name: 'Forward Fold', durationSec: 45, focus: 'Piega in avanti dall\'anca, ginocchia morbide', watchFor: 'schiena lunga, non curva' },
+        { name: 'Warrior II', durationSec: 45, focus: 'Affondo laterale, braccia parallele a terra', watchFor: 'ginocchio anteriore sopra la caviglia' },
+        { name: 'Tree — equilibrio', durationSec: 40, focus: 'Un piede sull\'interno coscia, sguardo fisso', watchFor: 'bacino stabile, respiro calmo' },
+        { name: 'Bridge', durationSec: 40, focus: 'Spingi coi talloni, apri il petto', watchFor: 'glutei attivi, collo libero' },
+        { name: 'Respiro finale', durationSec: 45, focus: 'Respiro 4-7-8, rilascia le tensioni', watchFor: 'pancia che si gonfia nell\'inspiro' },
+      ];
+      if (mode === 'running') return [
+        { name: 'Corsa sul posto', durationSec: 45, focus: 'Cadenza alta, piedi leggeri', watchFor: 'mesopiede sotto il baricentro' },
+        { name: 'Skip alto', durationSec: 30, focus: 'Ginocchia su, braccia a 90°', watchFor: 'busto leggermente avanti' },
+        { name: 'Affondi in camminata', durationSec: 40, focus: 'Passi lunghi e controllati', watchFor: 'ginocchio non oltre la punta' },
+        { name: 'Corsa cadenza 180', durationSec: 50, focus: 'Passi rapidi e corti', watchFor: 'contatto breve col suolo' },
+        { name: 'Defaticamento e respiro', durationSec: 40, focus: 'Rallenta e respira 1:2', watchFor: 'spalle rilassate' },
+      ];
+      if (mode === 'breathing') return [
+        { name: 'Respiro diaframmatico', durationSec: 45, focus: 'Mano sull\'ombelico, gonfia la pancia', watchFor: 'petto fermo, pancia che sale' },
+        { name: 'Box breathing 4-4-4-4', durationSec: 50, focus: 'Inspira, tieni, espira, tieni — 4 secondi ciascuno', watchFor: 'ritmo costante' },
+        { name: 'Respiro 4-7-8', durationSec: 50, focus: 'Inspira 4, tieni 7, espira 8', watchFor: 'espiro lungo e lento' },
+        { name: 'Respiro di potenza', durationSec: 40, focus: '3 respiri rapidi, poi espiro forte', watchFor: 'core che si attiva' },
+        { name: 'Calma finale', durationSec: 45, focus: 'Respiro naturale, mente vuota', watchFor: 'battito che rallenta' },
+      ];
+      return [
+        { name: 'Squat', durationSec: 45, focus: 'Scendi lento, petto alto', watchFor: 'ginocchia in linea coi piedi' },
+        { name: 'Push-up', durationSec: 40, focus: 'Corpo rigido, gomiti a 45°', watchFor: 'niente cedimento lombare' },
+        { name: 'Plank', durationSec: 40, focus: 'Linea retta testa-bacino-talloni', watchFor: 'core attivo, bacino stabile' },
+        { name: 'Affondi', durationSec: 45, focus: 'Alterna le gambe, busto dritto', watchFor: 'ginocchio posteriore quasi a terra' },
+        { name: 'Corsa sul posto', durationSec: 45, focus: 'Cardio finale, cadenza alta', watchFor: 'respiro ritmico' },
+      ];
+    }
+    // strike / opponent → usa i combo della disciplina
+    const combos = COMBO_LIBRARY[mode] || COMBO_LIBRARY.default;
+    const picks = shuffle(combos).slice(0, 4);
+    return [
+      { name: 'Riscaldamento: guardia e movimento', durationSec: 40, focus: 'Muoviti sui piedi, mani alte, sciogli le spalle', watchFor: 'guardia alta, baricentro basso' },
+      ...picks.map((c) => ({ name: c, durationSec: 40, focus: 'Esegui lento e pulito, torna sempre in guardia', watchFor: 'tecnica precisa, ritorno in guardia' })),
+      { name: 'Combo libera', durationSec: 45, focus: 'Concatena le tecniche a tuo ritmo', watchFor: 'respiro e fluidità' },
+    ];
+  }, [mode]);
+
   const generateGuidedPlan = useCallback(async () => {
     setGuidedLoading(true); setGuidedReview(null); setGuidedPhase('gen');
+    let drills = null;
     try {
       // progressione: passa lo storico locale (voti + debolezze + focus) così i drill crescono
       const history = pastSessions
@@ -2143,11 +2190,12 @@ function VisualCoach() {
         body: JSON.stringify({ generatePlan: true, mode, goal: sessionContext, level: guidedLevel, context: sessionContext, history }),
       });
       const data = await res.json();
-      if (res.ok && data.drills?.length) {
-        setGuidedPlan(data.drills); setGuidedIdx(0); setGuidedPhase('ready');
-      } else { setGuidedPhase('idle'); alert(data.error || 'Circuito non disponibile, riprova.'); }
-    } catch { setGuidedPhase('idle'); } finally { setGuidedLoading(false); }
-  }, [mode, sessionContext, guidedLevel, pastSessions]);
+      if (res.ok && Array.isArray(data.drills) && data.drills.length) drills = data.drills;
+    } catch (_) { /* rete/AI giù → fallback locale */ }
+    // Fallback GARANTITO: se l'AI non produce nulla, usa il piano locale della disciplina.
+    if (!drills || !drills.length) drills = buildLocalPlan();
+    setGuidedPlan(drills); setGuidedIdx(0); setGuidedPhase('ready'); setGuidedLoading(false);
+  }, [mode, sessionContext, guidedLevel, pastSessions, buildLocalPlan]);
 
   const finishDrillRef = useRef(() => {});
   const nextDrillRef = useRef(() => {});
@@ -2418,12 +2466,31 @@ function VisualCoach() {
 
             {guidedPhase === 'ready' && guidedPlan[guidedIdx] && (
               <div className="space-y-3">
+                {/* stepper del circuito */}
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-mono tracking-widest text-gray-500">DRILL {guidedIdx + 1}/{guidedPlan.length}</span>
+                  <span className="text-[10px] font-mono tracking-widest text-gray-500">ESERCIZIO {guidedIdx + 1}/{guidedPlan.length}</span>
                   <span className="text-[10px] font-mono px-2 py-0.5 rounded" style={{ background: 'rgba(16,185,129,0.15)', color: C.emerald.hex }}>{guidedPlan[guidedIdx].durationSec}s</span>
                 </div>
-                <p className="text-lg font-black text-white leading-tight">{guidedPlan[guidedIdx].name}</p>
-                {guidedPlan[guidedIdx].focus && <p className="text-xs text-gray-400">{guidedPlan[guidedIdx].focus}</p>}
+                <div className="flex gap-1">
+                  {guidedPlan.map((_, i) => (
+                    <div key={i} className="flex-1 h-1 rounded-full" style={{ background: i < guidedIdx ? C.emerald.hex : i === guidedIdx ? '#fbbf24' : '#1f2937' }} />
+                  ))}
+                </div>
+                {/* anteprima animata del movimento */}
+                <div className="flex items-center gap-3">
+                  <div className="shrink-0 rounded-xl p-1" style={{ background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.18)' }}>
+                    <StickFigure poseKey={resolvePose((guidedPlan[guidedIdx].name || '').split(/[-–—,]/)[0].trim())} color={C.emerald.hex} size={88} highlight scene={sceneFor(mode)} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-lg font-black text-white leading-tight">{guidedPlan[guidedIdx].name}</p>
+                    {guidedPlan[guidedIdx].focus && (
+                      <p className="text-[12px] text-emerald-200/90 mt-1 leading-snug"><b className="uppercase text-[9px] tracking-wider opacity-70">Cosa fare</b><br />{guidedPlan[guidedIdx].focus}</p>
+                    )}
+                  </div>
+                </div>
+                {guidedPlan[guidedIdx].watchFor && (
+                  <p className="text-[11px] text-amber-200/90 flex items-start gap-1.5 rounded-lg px-2 py-1.5" style={{ background: 'rgba(245,158,11,0.10)', border: '1px solid rgba(245,158,11,0.25)' }}><Eye size={13} className="shrink-0 mt-0.5" /> <span><b className="uppercase text-[9px] tracking-wider opacity-70">Tieni d'occhio</b> · {guidedPlan[guidedIdx].watchFor}</span></p>
+                )}
                 <motion.button whileTap={{ scale: 0.95 }} onClick={startDrill}
                   className="w-full py-3.5 rounded-xl text-white font-black text-sm"
                   style={{ background: `linear-gradient(135deg, ${C.emerald.hex}, #047857)`, boxShadow: '0 4px 18px rgba(16,185,129,0.4)' }}>
@@ -2434,8 +2501,17 @@ function VisualCoach() {
 
             {guidedPhase === 'running' && guidedPlan[guidedIdx] && (
               <div className="text-center space-y-2">
-                <p className="text-xs font-bold" style={{ color: C.emerald.hex }}>{guidedPlan[guidedIdx].name}</p>
-                <div className="flex items-center justify-center gap-5">
+                <p className="text-[10px] font-mono tracking-widest text-gray-500">ESERCIZIO {guidedIdx + 1}/{guidedPlan.length}</p>
+                {/* movimento animato ben visibile */}
+                <div className="flex justify-center" style={{ filter: `drop-shadow(0 0 14px ${C.emerald.hex}55)` }}>
+                  <StickFigure poseKey={resolvePose((guidedPlan[guidedIdx].name || '').split(/[-–—,]/)[0].trim())} color={C.emerald.hex} size={104} highlight scene={sceneFor(mode)} />
+                </div>
+                <p className="text-lg font-black text-white leading-tight">{guidedPlan[guidedIdx].name}</p>
+                {/* COSA FARE — grande e chiaro */}
+                {guidedPlan[guidedIdx].focus && (
+                  <p className="text-[13px] font-semibold text-emerald-200 leading-snug px-2">{guidedPlan[guidedIdx].focus}</p>
+                )}
+                <div className="flex items-center justify-center gap-5 pt-1">
                   <div>
                     <p className="text-5xl font-black text-white tabular-nums leading-none" style={{ fontFamily: 'Orbitron, sans-serif' }}>{Math.floor(guidedTimeLeft / 60)}:{String(guidedTimeLeft % 60).padStart(2, '0')}</p>
                     <p className="text-[8px] tracking-widest uppercase text-gray-500 mt-1">tempo</p>
@@ -2449,7 +2525,7 @@ function VisualCoach() {
                 <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.08)' }}>
                   <div style={{ height: '100%', width: `${guidedPlan[guidedIdx].durationSec ? (guidedTimeLeft / guidedPlan[guidedIdx].durationSec) * 100 : 0}%`, background: C.emerald.hex, transition: 'width 1s linear' }} />
                 </div>
-                {guidedPlan[guidedIdx].watchFor && <p className="text-[11px] text-gray-400 flex items-center justify-center gap-1.5"><Eye size={12} /> {guidedPlan[guidedIdx].watchFor}</p>}
+                {guidedPlan[guidedIdx].watchFor && <p className="text-[11px] text-amber-200/80 flex items-center justify-center gap-1.5"><Eye size={12} /> {guidedPlan[guidedIdx].watchFor}</p>}
                 <button onClick={() => finishDrillRef.current()} className="text-[11px] text-gray-500 underline">termina ora</button>
               </div>
             )}
@@ -2713,6 +2789,12 @@ function VisualCoach() {
                 ? { background: 'linear-gradient(135deg, #059669, #047857)', boxShadow: '0 4px 16px rgba(5,150,105,0.4)' }
                 : { background: 'rgba(55,65,81,0.6)', border: '1px solid rgba(255,255,255,0.08)' }}>
               {voiceOn ? <Volume2 size={14} /> : <VolumeX size={14} />} Voce {voiceOn ? 'ON' : 'OFF'}
+            </motion.button>
+            <motion.button whileTap={{ scale: 0.9 }} onClick={() => setVoiceSlow((v) => !v)}
+              title={voiceSlow ? 'Voce lenta e scandita' : 'Voce a velocità normale'} aria-label="Velocità voce"
+              className="px-3 py-2.5 rounded-xl text-sm transition-all flex items-center justify-center"
+              style={{ background: 'rgba(55,65,81,0.6)', border: '1px solid rgba(255,255,255,0.08)' }}>
+              {voiceSlow ? '🐢' : '🐇'}
             </motion.button>
             <motion.button whileTap={{ scale: 0.9 }} onClick={() => setSkeletonOn((v) => !v)}
               className="flex-1 py-2.5 rounded-xl text-white font-bold text-xs transition-all flex items-center justify-center gap-1.5"
