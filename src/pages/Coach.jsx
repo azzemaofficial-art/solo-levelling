@@ -1055,14 +1055,47 @@ const _throwT = (ms) => {
 const _prefersReducedMotion = () =>
   typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
 
-// Figura combattente volumetrica e ANIMATA: interpola guardia↔tecnica (sferra e ritrae)
-// così il MOVIMENTO rende leggibile la tecnica. Torso pieno, arti spessi, guantoni, testa.
+// ── Pose RIVOLTE AL SACCO (fighter a sinistra, sacco a destra) ────────────────
+// 15 giunti: [testa,collo,bacino, shL,elL,hndL, shR,elR,hndR, hipL,knL,ftL, hipR,knR,ftR]
+// L'arto che colpisce raggiunge sempre il sacco a destra (x≈80) → tecnica leggibile.
+const BAG_POSES = {
+  guard:        [[34,16],[36,33],[38,84],[41,39],[47,52],[52,42],[31,39],[35,52],[45,42],[42,86],[45,116],[48,150],[34,86],[31,118],[28,152]],
+  jab:          [[34,16],[36,33],[38,84],[41,39],[58,48],[78,46],[31,39],[35,52],[45,42],[42,86],[45,116],[48,150],[34,86],[31,118],[28,152]],
+  cross:        [[35,16],[37,33],[38,84],[41,39],[47,50],[50,44],[34,40],[56,50],[80,48],[42,86],[45,116],[48,150],[34,86],[31,118],[28,152]],
+  hook:         [[34,16],[36,33],[38,84],[41,39],[62,44],[76,54],[31,39],[35,52],[45,42],[42,86],[45,116],[48,150],[34,86],[31,118],[28,152]],
+  uppercut:     [[34,16],[36,33],[38,84],[41,39],[47,52],[52,42],[33,44],[58,66],[74,50],[42,86],[45,116],[48,150],[34,86],[31,118],[28,152]],
+  elbow:        [[34,16],[36,33],[38,84],[41,39],[72,48],[60,40],[31,39],[35,52],[45,42],[42,86],[45,116],[48,150],[34,86],[31,118],[28,152]],
+  knee:         [[34,16],[36,33],[38,82],[41,39],[47,48],[54,52],[31,39],[35,48],[50,54],[42,86],[45,116],[48,150],[36,84],[62,90],[50,112]],
+  teep:         [[33,16],[35,33],[37,84],[41,39],[47,52],[52,42],[31,39],[35,52],[45,42],[42,86],[54,84],[80,84],[34,86],[31,118],[28,152]],
+  low_kick:     [[33,16],[35,33],[37,84],[41,39],[47,52],[52,42],[31,39],[35,52],[45,42],[42,86],[45,116],[48,150],[34,84],[52,106],[82,122]],
+  body_kick:    [[32,18],[35,34],[37,84],[41,39],[47,52],[52,42],[31,39],[35,52],[45,42],[42,86],[45,116],[48,150],[34,82],[54,90],[84,92]],
+  roundhouse:   [[32,18],[35,34],[37,84],[41,39],[47,52],[52,42],[31,39],[35,52],[45,42],[42,86],[45,116],[48,150],[34,80],[52,72],[86,60]],
+  side_kick:    [[30,20],[33,36],[37,84],[30,40],[34,54],[38,64],[31,39],[35,52],[45,42],[42,86],[54,86],[84,86],[34,88],[30,120],[27,152]],
+  spinning:     [[34,16],[36,33],[38,84],[41,39],[47,52],[52,44],[31,39],[35,52],[45,44],[42,86],[45,116],[48,150],[34,80],[54,74],[86,66]],
+  level_change: [[34,40],[36,54],[38,92],[41,60],[54,74],[64,84],[31,60],[52,76],[62,86],[42,94],[46,120],[48,150],[34,94],[32,122],[28,152]],
+  clinch:       [[34,16],[36,33],[38,84],[41,38],[54,44],[70,40],[31,38],[48,46],[68,44],[42,86],[45,116],[48,150],[34,86],[31,118],[28,152]],
+  sprawl:       [[30,30],[33,44],[40,78],[38,50],[50,70],[58,86],[30,50],[46,72],[54,88],[42,84],[46,116],[54,150],[34,86],[30,120],[30,152]],
+  meditation:   [[38,40],[38,56],[38,86],[30,62],[34,74],[44,80],[46,62],[42,74],[46,80],[30,90],[28,108],[40,120],[46,90],[48,108],[36,120]],
+};
+BAG_POSES.stance = BAG_POSES.guard;
+// e = giunto che impatta, l = giunti dell'arto da evidenziare
+const BAG_STRIKE = {
+  jab: { e: 5, l: [3,4,5] }, cross: { e: 8, l: [6,7,8] }, hook: { e: 5, l: [3,4,5] },
+  uppercut: { e: 8, l: [6,7,8] }, elbow: { e: 4, l: [3,4] }, knee: { e: 13, l: [12,13] },
+  teep: { e: 11, l: [9,10,11] }, side_kick: { e: 11, l: [9,10,11] }, low_kick: { e: 14, l: [12,13,14] },
+  body_kick: { e: 14, l: [12,13,14] }, roundhouse: { e: 14, l: [12,13,14] }, spinning: { e: 14, l: [12,13,14] },
+  clinch: { e: 5, l: [3,4,5] }, level_change: { e: 8, l: [6,7,8] },
+};
+
+// Scena ALLENAMENTO: un combattente che colpisce un SACCO. Il colpo raggiunge il sacco,
+// che rincula con impatto → si CAPISCE la tecnica. Torso pieno, arti spessi, guantoni.
 function StickFigure({ poseKey, color = '#00f2ff', size = 130, highlight = false, animate = true }) {
-  const target = POSES[poseKey] || POSES.stance;
-  const guard = POSES.stance;
-  const isMove = poseKey !== 'stance' && poseKey !== 'meditation';
-  const strikeIdx = highlight && isMove ? STRIKE_ENDPOINT[poseKey] : undefined;
-  const throwing = animate && strikeIdx != null && !_prefersReducedMotion();
+  const key = BAG_POSES[poseKey] ? poseKey : 'guard';
+  const target = BAG_POSES[key];
+  const guard = BAG_POSES.guard;
+  const strike = BAG_STRIKE[key];                  // null per guardia/sprawl/meditazione
+  const throwing = animate && !!strike && !_prefersReducedMotion();
+  const showBag = !!strike;
 
   const [t, setT] = useState(throwing ? 0 : 1);
   const rafRef = useRef(0);
@@ -1078,75 +1111,68 @@ function StickFigure({ poseKey, color = '#00f2ff', size = 130, highlight = false
     };
     rafRef.current = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(rafRef.current);
-  }, [throwing, poseKey]);
+  }, [throwing, key]);
 
   const p = throwing ? _lerpPose(guard, target, t) : target;
-  const limb = strikeIdx != null ? STRIKE_LIMB[strikeIdx] : null;
+  const limb = strike ? strike.l : null;
   const STRIKE = '#ff7a1a';
-  const uid = `${poseKey}-${color.replace('#', '')}-${Math.round(size)}`;
-  const gy = Math.max(guard[11][1], guard[14][1], target[11][1], target[14][1]) + 7;
+  const uid = `${key}-${color.replace('#', '')}-${Math.round(size)}`;
   const big = size >= 74;
+  const gy = 158;
+  const pulse = showBag ? Math.max(0, Math.min(1, (t - 0.64) / 0.34)) : 0; // 0→1 all'impatto
 
   const arms = [[3,4],[4,5],[6,7],[7,8]];
   const legs = [[9,10],[10,11],[12,13],[13,14]];
   const isStrikeSeg = (a, b) => limb && limb.includes(a) && limb.includes(b);
   const hands = [5, 8], feet = [11, 14];
-
-  // arco di traiettoria (guardia → bersaglio) dell'estremità che colpisce
-  let arc = null;
-  if (strikeIdx != null) {
-    const S = guard[strikeIdx], E = target[strikeIdx];
-    const dx = E[0] - S[0], dy = E[1] - S[1], len = Math.hypot(dx, dy);
-    if (len > 10) {
-      const mx = (S[0] + E[0]) / 2, my = (S[1] + E[1]) / 2;
-      const nx = -dy / len, ny = dx / len;
-      const cx = mx + nx * len * 0.18, cy = my + ny * len * 0.18;
-      const ux = (E[0] - cx), uy = (E[1] - cy), ul = Math.hypot(ux, uy) || 1;
-      const hx = ux / ul, hy = uy / ul, px = -hy, py = hx;
-      arc = {
-        d: `M ${S[0]} ${S[1]} Q ${cx} ${cy} ${E[0]} ${E[1]}`,
-        head: `${E[0]},${E[1]} ${E[0] - hx * 8 + px * 4},${E[1] - hy * 8 + py * 4} ${E[0] - hx * 8 - px * 4},${E[1] - hy * 8 - py * 4}`,
-      };
-    }
-  }
-
   const torso = `${p[3][0]},${p[3][1]} ${p[6][0]},${p[6][1]} ${p[12][0]},${p[12][1]} ${p[9][0]},${p[9][1]}`;
   const limbW = big ? 4.6 : 4;
   const legW = big ? 5.4 : 4.6;
   const gloveR = big ? 5.2 : 4.4;
 
+  // punto d'impatto sul sacco
+  const E = strike ? target[strike.e] : null;
+  // sacco che rincula VIA dal colpo (verso destra) attorno all'aggancio in alto
+  const bagRot = -pulse * 4, bagDx = pulse * 3.5;
+
   return (
-    <svg width={size} height={size * 1.7} viewBox="0 0 100 180" style={{ overflow: 'visible' }}>
+    <svg width={size} height={size * 1.5} viewBox="0 0 112 168" style={{ overflow: 'visible' }}>
       <defs>
         <filter id={`glow-${uid}`} x="-60%" y="-60%" width="220%" height="220%">
           <feGaussianBlur stdDeviation="2.6" result="b" />
           <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
         </filter>
         <radialGradient id={`sh-${uid}`} cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="#000" stopOpacity="0.4" />
-          <stop offset="100%" stopColor="#000" stopOpacity="0" />
+          <stop offset="0%" stopColor="#000" stopOpacity="0.4" /><stop offset="100%" stopColor="#000" stopOpacity="0" />
         </radialGradient>
+        <linearGradient id={`bag-${uid}`} x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stopColor="#b45309" /><stop offset="45%" stopColor="#92400e" /><stop offset="100%" stopColor="#5b2c08" />
+        </linearGradient>
       </defs>
 
       {/* Ombra + terra */}
-      <ellipse cx={50} cy={gy} rx={26} ry={4} fill={`url(#sh-${uid})`} />
-      <line x1={16} y1={gy} x2={84} y2={gy} stroke={color} strokeWidth={1} strokeDasharray="2 5" opacity={0.3} />
+      <ellipse cx={44} cy={gy} rx={30} ry={4} fill={`url(#sh-${uid})`} />
+      <line x1={8} y1={gy} x2={108} y2={gy} stroke={color} strokeWidth={1} strokeDasharray="2 5" opacity={0.28} />
+
+      {/* SACCO da boxe (bersaglio) */}
+      {showBag && (
+        <g transform={`rotate(${bagRot} 88 6) translate(${bagDx} 0)`} style={{ transition: 'transform 0.05s linear' }}>
+          {big && <line x1={88} y1={0} x2={88} y2={30} stroke="#6b7280" strokeWidth={1.6} />}
+          {big && <path d="M82 26 L94 26 L91 32 L85 32 Z" fill="#4b5563" />}
+          <rect x={79} y={30} width={18} height={118} rx={8} fill={`url(#bag-${uid})`} stroke="#3a1d05" strokeWidth={1.2} />
+          <line x1={79} y1={52} x2={97} y2={52} stroke="#3a1d05" strokeWidth={1.4} opacity={0.6} />
+          <line x1={79} y1={112} x2={97} y2={112} stroke="#3a1d05" strokeWidth={1.4} opacity={0.6} />
+          <rect x={82} y={34} width={5} height={110} rx={3} fill="#fff" opacity={0.10} />
+        </g>
+      )}
 
       {/* Fantasma guardia (statico) */}
       {big && throwing && (
-        <g opacity={0.16} stroke="#94a3b8" fill="none" strokeLinecap="round">
+        <g opacity={0.14} stroke="#94a3b8" fill="none" strokeLinecap="round">
           {[...arms, ...legs].map(([a, b], i) => (
             <line key={i} x1={guard[a][0]} y1={guard[a][1]} x2={guard[b][0]} y2={guard[b][1]} strokeWidth={3} />
           ))}
           <circle cx={guard[0][0]} cy={guard[0][1]} r={8} />
-        </g>
-      )}
-
-      {/* Arco di traiettoria */}
-      {arc && (
-        <g opacity={0.9}>
-          <path d={arc.d} fill="none" stroke={STRIKE} strokeWidth={1.6} strokeDasharray="3 3" strokeLinecap="round" opacity={0.7} />
-          <polygon points={arc.head} fill={STRIKE} filter={`url(#glow-${uid})`} />
         </g>
       )}
 
@@ -1157,10 +1183,9 @@ function StickFigure({ poseKey, color = '#00f2ff', size = 130, highlight = false
           stroke={s ? STRIKE : color} strokeWidth={s ? legW + 1.4 : legW} strokeLinecap="round"
           filter={s ? `url(#glow-${uid})` : undefined} opacity={0.96} />;
       })}
-      {/* Piedi */}
       {feet.map((j) => {
         const s = limb && limb.includes(j);
-        return <ellipse key={`f${j}`} cx={p[j][0] + 2} cy={p[j][1]} rx={4.2} ry={2.4}
+        return <ellipse key={`f${j}`} cx={p[j][0] + 2} cy={p[j][1]} rx={4.4} ry={2.5}
           fill={s ? STRIKE : color} opacity={0.95} />;
       })}
 
@@ -1175,18 +1200,30 @@ function StickFigure({ poseKey, color = '#00f2ff', size = 130, highlight = false
           stroke={s ? STRIKE : color} strokeWidth={s ? limbW + 1.6 : limbW} strokeLinecap="round"
           filter={s ? `url(#glow-${uid})` : undefined} />;
       })}
-      {/* Guantoni */}
       {hands.map((j) => {
         const s = limb && limb.includes(j);
         return <circle key={`h${j}`} cx={p[j][0]} cy={p[j][1]} r={s ? gloveR + 0.8 : gloveR}
-          fill={s ? STRIKE : color} filter={s ? `url(#glow-${uid})` : undefined}
-          stroke="#0b0e14" strokeWidth={0.8} />;
+          fill={s ? STRIKE : color} filter={s ? `url(#glow-${uid})` : undefined} stroke="#0b0e14" strokeWidth={0.8} />;
       })}
 
-      {/* Collo + Testa piena */}
+      {/* Collo + Testa piena, sguardo verso il sacco */}
       <line x1={p[0][0]} y1={p[0][1] + 6} x2={p[1][0]} y2={p[1][1]} stroke={color} strokeWidth={legW - 1} strokeLinecap="round" opacity={0.85} />
       <circle cx={p[0][0]} cy={p[0][1]} r={9} fill={color} opacity={0.28} stroke={color} strokeWidth={1.6} />
-      <circle cx={p[0][0] + 3} cy={p[0][1] - 1} r={1.6} fill="#0b0e14" opacity={0.7} />
+      <circle cx={p[0][0] + 4} cy={p[0][1] - 1} r={1.7} fill="#0b0e14" opacity={0.75} />
+
+      {/* IMPATTO sul sacco */}
+      {E && pulse > 0.18 && (
+        <g style={{ pointerEvents: 'none' }}>
+          {[0, 60, 120, 180, 240, 300].map((deg) => {
+            const r = deg * Math.PI / 180;
+            return <line key={deg} x1={E[0]} y1={E[1]}
+              x2={E[0] + Math.cos(r) * 8 * pulse} y2={E[1] + Math.sin(r) * 8 * pulse}
+              stroke="#fde68a" strokeWidth={1.6} strokeLinecap="round" opacity={pulse} />;
+          })}
+          <circle cx={E[0]} cy={E[1]} r={4 + pulse * 5} fill="none" stroke={STRIKE} strokeWidth={1.6} opacity={1 - pulse} />
+          <circle cx={E[0]} cy={E[1]} r={2.5 * pulse} fill="#fff" opacity={pulse * 0.9} />
+        </g>
+      )}
     </svg>
   );
 }
@@ -2480,7 +2517,7 @@ function VisualCoach() {
                           return (
                             <div className="mt-1.5 rounded-lg px-1.5 py-1 flex items-center gap-2" style={{ background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.3)' }}>
                               <div className="shrink-0" style={{ opacity: 0.92 }}>
-                                <StickFigure poseKey={poseKey} color="#fbbf24" size={54} highlight />
+                                <StickFigure poseKey={poseKey} color="#fbbf24" size={68} highlight />
                               </div>
                               <p className="text-[12px] font-bold text-amber-200 flex items-start gap-1.5"><span className="shrink-0">🥊</span> <span><b className="uppercase text-[9px] tracking-wider opacity-80">Prova ora</b> · {parts.PROVA}</span></p>
                             </div>
