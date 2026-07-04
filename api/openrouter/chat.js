@@ -1,51 +1,97 @@
+// Proxy universale AI — gestisce groq: / nvidia: / modelli OpenRouter.
+// VITE_SYSTEM_AI_PROXY punta qui; il prefisso nel model ID determina il provider.
+
+const GROQ_BASE    = 'https://api.groq.com/openai/v1';
+const NVIDIA_BASE  = 'https://integrate.api.nvidia.com/v1';
+const OR_BASE      = 'https://openrouter.ai/api/v1';
+
+const firstKey = (...names) => {
+  for (const n of names) { const v = process.env[n]; if (v && String(v).trim()) return String(v).trim(); }
+  return '';
+};
+
+// Mapping modello NVIDIA → chiave specifica (stessa logica di api/ai/chat.js)
+const NVIDIA_MODEL_KEY = {
+  'nvidia/nemotron-3-ultra-550b-a55b':           () => firstKey('NVIDIA_550B_API_KEY'),
+  'deepseek-ai/deepseek-v4-pro':                 () => firstKey('DEEPSEEK_PRO_API_KEY'),
+  'moonshotai/kimi-k2.6':                        () => firstKey('KIMI_NVIDIA_API_KEY'),
+  'meta/llama-3.1-70b-instruct':                 () => firstKey('LLAMA_NVIDIA_API_KEY'),
+  'microsoft/phi-4-mini-instruct':               () => firstKey('PHI_NVIDIA_API_KEY'),
+  'mistralai/mistral-large-3-675b-instruct-2512':() => firstKey('MISTRAL_NVIDIA_API_KEY'),
+  'mistralai/mistral-medium-3.5-128b':           () => firstKey('MISTRAL_MEDIUM3_NVIDIA_API_KEY'),
+};
+const NVIDIA_KEY_DEFAULT = () => firstKey('NVIDIA_API_KEY', 'LLAMA_NVIDIA_API_KEY', 'KIMI_NVIDIA_API_KEY');
+
+// Groq fallback chain (sempre disponibili)
+const GROQ_FALLBACK = ['groq:llama-3.3-70b-versatile', 'groq:llama-3.1-8b-instant'];
+
 const unique = (items) => {
-  const out = [];
-  const seen = new Set();
+  const out = []; const seen = new Set();
   for (const item of items) {
-    const value = String(item || '').trim();
-    if (!value || seen.has(value)) continue;
-    seen.add(value);
-    out.push(value);
+    const v = String(item || '').trim();
+    if (!v || seen.has(v)) continue;
+    seen.add(v); out.push(v);
   }
   return out;
 };
 
-const extractUpstreamReason = (status, data) => {
-  const raw = data?.error?.message || data?.error || data?.message || '';
-  const text = String(raw || '').trim();
-  const lower = text.toLowerCase();
-  if (status === 429 || lower.includes('rate limit')) return 'Rate limit provider: riprova tra pochi secondi';
-  if (status === 401 || lower.includes('invalid key') || lower.includes('unauthorized')) return 'API key non valida o senza accesso al modello';
-  if (status === 408 || lower.includes('timeout')) return 'Provider timeout';
-  if (lower.includes('provider returned error')) return 'Provider AI occupato o temporaneamente non disponibile';
-  return text || `Errore upstream (${status})`;
-};
+// Risolve prefisso → { base, key, model } oppure null se non supportato
+function resolveProvider(modelId) {
+  const id = String(modelId || '').trim();
+  if (!id) return null;
+
+  if (id.startsWith('groq:')) {
+    const key = firstKey('GROQ_API_KEY');
+    return key ? { base: GROQ_BASE, key, model: id.slice(5) } : null;
+  }
+
+  if (id.startsWith('nvidia:')) {
+    const modelName = id.slice(7);
+    const key = (NVIDIA_MODEL_KEY[modelName] || NVIDIA_KEY_DEFAULT)();
+    return key ? { base: NVIDIA_BASE, key, model: modelName } : null;
+  }
+
+  // Modello senza prefisso → OpenRouter
+  const key = firstKey('OPENROUTER_API_KEY');
+  return key ? { base: OR_BASE, key, model: id, isOpenRouter: true } : null;
+}
+
+async function callProvider(prov, body, isOpenRouter) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 28000);
+  try {
+    const headers = { Authorization: `Bearer ${prov.key}`, 'Content-Type': 'application/json' };
+    if (isOpenRouter) {
+      headers['HTTP-Referer'] = process.env.OPENROUTER_APP_URL || 'https://solo-levelling-gold.vercel.app';
+      headers['X-Title'] = process.env.OPENROUTER_APP_TITLE || 'solo-leveling-fit';
+    }
+    const upstream = await fetch(`${prov.base}/chat/completions`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ ...body, model: prov.model }),
+      signal: controller.signal,
+    });
+    const text = await upstream.text();
+    let data; try { data = JSON.parse(text); } catch { data = { raw: text }; }
+    return { ok: upstream.ok, status: upstream.status, data };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 export default async function handler(req, res) {
-  const forcedModel = String(process.env.OPENROUTER_MODEL || '').trim();
-  const paidFallbackModel = String(process.env.OPENROUTER_PAID_FALLBACK_MODEL || '').trim();
-  const freeFallbackModel = String(process.env.OPENROUTER_FREE_FALLBACK_MODEL || '').trim();
-  const modelCandidatesEnv = String(process.env.OPENROUTER_MODEL_CANDIDATES || '').trim();
-  const defaultModel = forcedModel || 'openai/gpt-4o-mini';
-
   if (req.method === 'GET') {
-    const healthCandidates = unique([
-      ...(modelCandidatesEnv ? modelCandidatesEnv.split(',') : []),
-      forcedModel,
-      defaultModel,
-      freeFallbackModel,
-      paidFallbackModel
-    ]);
     return res.status(200).json({
       ok: true,
       endpoint: '/api/openrouter/chat',
-      hasApiKey: Boolean(process.env.OPENROUTER_API_KEY),
-      forcedModel: forcedModel || null,
-      defaultModel,
-      paidFallbackModel: paidFallbackModel || null,
-      freeFallbackModel: freeFallbackModel || null,
-      modelCandidates: healthCandidates,
-      fallbackEnabled: healthCandidates.length > 1
+      providers: {
+        groq: Boolean(firstKey('GROQ_API_KEY')),
+        nvidia: Boolean(NVIDIA_KEY_DEFAULT()),
+        openrouter: Boolean(firstKey('OPENROUTER_API_KEY')),
+      },
+      fallback: GROQ_FALLBACK,
     });
   }
 
@@ -54,99 +100,48 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const apiKey = process.env.OPENROUTER_API_KEY;
-  if (!apiKey) {
-    return res.status(500).json({ error: 'OPENROUTER_API_KEY non configurata lato server' });
-  }
-
   const body = req.body || {};
-  const { messages } = body;
+  const { messages, model: requestModel } = body;
   if (!Array.isArray(messages) || messages.length === 0) {
-    return res.status(400).json({ error: 'Payload non valido: messages obbligatorio' });
+    return res.status(400).json({ error: 'messages obbligatorio' });
   }
 
-  const requestModel = String(body?.model || '').trim();
-  const modelCandidates = unique([
-    ...(modelCandidatesEnv ? modelCandidatesEnv.split(',') : []),
-    forcedModel,
-    requestModel,
-    defaultModel,
-    freeFallbackModel,
-    paidFallbackModel
-  ]);
-  const model = modelCandidates[0] || defaultModel;
+  // Catena: modello richiesto → groq fallback
+  const candidates = unique([requestModel, ...GROQ_FALLBACK]);
+  const { model: _m, ...rest } = body;
 
-  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-  const callOpenRouter = async (selectedModel) => {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 20000);
-    try {
-      const upstream = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-          'HTTP-Referer': process.env.OPENROUTER_APP_URL || 'https://example.vercel.app',
-          'X-Title': process.env.OPENROUTER_APP_TITLE || 'solo-leveling-fit'
-        },
-        body: JSON.stringify({ ...body, model: selectedModel, messages }),
-        signal: controller.signal
-      });
-      const data = await upstream.json();
-      return { upstream, data };
-    } finally {
-      clearTimeout(timeout);
-    }
-  };
+  let lastErr = null;
+  const tried = [];
 
-  try {
-    let upstream = null;
-    let data = null;
-    let lastErr = null;
-    let usedModel = model;
-    const triedModels = [];
+  for (const cand of candidates) {
+    const prov = resolveProvider(cand);
+    if (!prov) { tried.push(`${cand}(no-key)`); continue; }
 
-    for (let modelIndex = 0; modelIndex < modelCandidates.length; modelIndex += 1) {
-      const candidateModel = modelCandidates[modelIndex];
-      triedModels.push(candidateModel);
-      for (let attempt = 0; attempt < 3; attempt += 1) {
-        try {
-          const result = await callOpenRouter(candidateModel);
-          upstream = result.upstream;
-          data = result.data;
-          usedModel = candidateModel;
-          if (upstream.ok) break;
-          const retryable = [408, 409, 425, 429, 500, 502, 503, 504].includes(upstream.status);
-          if (retryable && attempt < 2) {
-            await sleep(350 * (attempt + 1));
-            continue;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const r = await callProvider(prov, rest, prov.isOpenRouter);
+        tried.push(`${cand}:${r.status}`);
+
+        if (r.ok && r.data?.choices?.[0]?.message) {
+          const msg = r.data.choices[0].message;
+          if (typeof msg.content === 'string') {
+            msg.content = msg.content.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
           }
-          break;
-        } catch (err) {
-          lastErr = err;
-          if (attempt < 2) {
-            await sleep(350 * (attempt + 1));
-            continue;
-          }
+          res.setHeader('X-Shadow-Model', cand);
+          return res.status(200).json({ ...r.data, _shadowMeta: { model: cand, tried } });
         }
+
+        lastErr = r.data?.error?.message || r.data?.error || `HTTP ${r.status}`;
+        const retryable = [429, 500, 502, 503].includes(r.status);
+        if (retryable && attempt < 1) { await sleep(400); continue; }
+        break;
+      } catch (e) {
+        lastErr = e?.message || 'fetch error';
+        tried.push(`${cand}:ERR`);
+        if (attempt < 1) { await sleep(400); continue; }
       }
-      if (upstream?.ok) break;
     }
-
-    if (!upstream && lastErr) throw lastErr;
-    const fallbackUsed = usedModel !== model;
-    if (!upstream.ok) {
-      const reason = extractUpstreamReason(upstream.status, data);
-      return res.status(upstream.status).json({ error: reason, triedModels });
-    }
-
-    res.setHeader('X-Shadow-Model', usedModel);
-    res.setHeader('X-Shadow-Fallback-Used', fallbackUsed ? '1' : '0');
-    return res.status(200).json({
-      ...data,
-      _shadowMeta: { model: usedModel, fallbackUsed, primaryModel: model, modelCandidates }
-    });
-  } catch (error) {
-    return res.status(500).json({ error: error?.message || 'Errore sconosciuto' });
   }
+
+  return res.status(502).json({ error: String(lastErr || 'Nessun provider disponibile'), tried });
 }
