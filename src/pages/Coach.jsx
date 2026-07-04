@@ -1040,155 +1040,210 @@ const STRIKE_ENDPOINT = {
 // giunti dell'arto che colpisce (per evidenziarlo tutto)
 const STRIKE_LIMB = { 5: [3, 4, 5], 8: [6, 7, 8], 11: [9, 10, 11] };
 
-function StickFigure({ poseKey, color = '#00f2ff', size = 130, highlight = false, showGhost }) {
-  const p = POSES[poseKey] || POSES.stance;
-  const st = POSES.stance;
+const _lerp = (a, b, f) => a + (b - a) * f;
+const _lerpPose = (A, B, f) => A.map((pt, i) => [_lerp(pt[0], B[i][0], f), _lerp(pt[1], B[i][1], f)]);
+const _easeOut = (x) => 1 - Math.pow(1 - x, 3);
+const _easeIn = (x) => x * x * x;
+// timeline del colpo su un ciclo (ms): scatta fuori → tiene → ritrae → guardia
+const _throwT = (ms) => {
+  const P = 1250, t = ms % P;
+  if (t < 170) return _easeOut(t / 170);            // sferra (rapido)
+  if (t < 400) return 1;                            // impatto (tiene)
+  if (t < 640) return 1 - _easeIn((t - 400) / 240); // ritrae
+  return 0;                                         // in guardia
+};
+const _prefersReducedMotion = () =>
+  typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+
+// Figura combattente volumetrica e ANIMATA: interpola guardia↔tecnica (sferra e ritrae)
+// così il MOVIMENTO rende leggibile la tecnica. Torso pieno, arti spessi, guantoni, testa.
+function StickFigure({ poseKey, color = '#00f2ff', size = 130, highlight = false, animate = true }) {
+  const target = POSES[poseKey] || POSES.stance;
+  const guard = POSES.stance;
   const isMove = poseKey !== 'stance' && poseKey !== 'meditation';
-  const ghost = (showGhost ?? size >= 78) && isMove;
   const strikeIdx = highlight && isMove ? STRIKE_ENDPOINT[poseKey] : undefined;
+  const throwing = animate && strikeIdx != null && !_prefersReducedMotion();
+
+  const [t, setT] = useState(throwing ? 0 : 1);
+  const rafRef = useRef(0);
+  const lastRef = useRef(-1);
+  useEffect(() => {
+    if (!throwing) { setT(1); return; }
+    let start = 0;
+    const loop = (now) => {
+      if (!start) start = now;
+      const v = _throwT(now - start);
+      if (Math.abs(v - lastRef.current) > 0.012) { lastRef.current = v; setT(v); }
+      rafRef.current = requestAnimationFrame(loop);
+    };
+    rafRef.current = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(rafRef.current);
+  }, [throwing, poseKey]);
+
+  const p = throwing ? _lerpPose(guard, target, t) : target;
   const limb = strikeIdx != null ? STRIKE_LIMB[strikeIdx] : null;
   const STRIKE = '#ff7a1a';
   const uid = `${poseKey}-${color.replace('#', '')}-${Math.round(size)}`;
+  const gy = Math.max(guard[11][1], guard[14][1], target[11][1], target[14][1]) + 7;
+  const big = size >= 74;
 
-  // segmenti [da, a]
-  const segs = [
-    [0,1],[1,2],           // testa-collo, collo-bacino
-    [1,3],[3,4],[4,5],     // braccio SX
-    [1,6],[6,7],[7,8],     // braccio DX
-    [2,9],[9,10],[10,11],  // gamba SX
-    [2,12],[12,13],[13,14],// gamba DX
-  ];
+  const arms = [[3,4],[4,5],[6,7],[7,8]];
+  const legs = [[9,10],[10,11],[12,13],[13,14]];
   const isStrikeSeg = (a, b) => limb && limb.includes(a) && limb.includes(b);
-  const joints = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14];
+  const hands = [5, 8], feet = [11, 14];
 
-  // linea di terra sotto i piedi
-  const gy = Math.max(p[11][1], p[14][1], st[11][1], st[14][1]) + 6;
-
-  // freccia di traiettoria dell'estremità che colpisce (partenza stance → arrivo posa)
-  let arrow = null;
+  // arco di traiettoria (guardia → bersaglio) dell'estremità che colpisce
+  let arc = null;
   if (strikeIdx != null) {
-    const S = st[strikeIdx], E = p[strikeIdx];
-    const dx = E[0] - S[0], dy = E[1] - S[1];
-    const len = Math.hypot(dx, dy);
-    if (len > 8) {
-      const ux = dx / len, uy = dy / len;
-      const bx = E[0] - ux * 7, by = E[1] - uy * 7;   // base testa freccia (poco prima dell'arrivo)
-      const nx = -uy, ny = ux;                          // perpendicolare
-      arrow = {
-        x1: S[0], y1: S[1], x2: bx, y2: by,
-        head: `${E[0]},${E[1]} ${bx + nx * 3.5},${by + ny * 3.5} ${bx - nx * 3.5},${by - ny * 3.5}`,
+    const S = guard[strikeIdx], E = target[strikeIdx];
+    const dx = E[0] - S[0], dy = E[1] - S[1], len = Math.hypot(dx, dy);
+    if (len > 10) {
+      const mx = (S[0] + E[0]) / 2, my = (S[1] + E[1]) / 2;
+      const nx = -dy / len, ny = dx / len;
+      const cx = mx + nx * len * 0.18, cy = my + ny * len * 0.18;
+      const ux = (E[0] - cx), uy = (E[1] - cy), ul = Math.hypot(ux, uy) || 1;
+      const hx = ux / ul, hy = uy / ul, px = -hy, py = hx;
+      arc = {
+        d: `M ${S[0]} ${S[1]} Q ${cx} ${cy} ${E[0]} ${E[1]}`,
+        head: `${E[0]},${E[1]} ${E[0] - hx * 8 + px * 4},${E[1] - hy * 8 + py * 4} ${E[0] - hx * 8 - px * 4},${E[1] - hy * 8 - py * 4}`,
       };
     }
   }
 
-  const bodyW = size >= 78 ? 3 : 2.4;
+  const torso = `${p[3][0]},${p[3][1]} ${p[6][0]},${p[6][1]} ${p[12][0]},${p[12][1]} ${p[9][0]},${p[9][1]}`;
+  const limbW = big ? 4.6 : 4;
+  const legW = big ? 5.4 : 4.6;
+  const gloveR = big ? 5.2 : 4.4;
+
   return (
     <svg width={size} height={size * 1.7} viewBox="0 0 100 180" style={{ overflow: 'visible' }}>
       <defs>
         <filter id={`glow-${uid}`} x="-60%" y="-60%" width="220%" height="220%">
-          <feGaussianBlur stdDeviation="2.4" result="b" />
+          <feGaussianBlur stdDeviation="2.6" result="b" />
           <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
         </filter>
+        <radialGradient id={`sh-${uid}`} cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stopColor="#000" stopOpacity="0.4" />
+          <stop offset="100%" stopColor="#000" stopOpacity="0" />
+        </radialGradient>
       </defs>
 
-      {/* Terra */}
-      <line x1={12} y1={gy} x2={88} y2={gy} stroke={color} strokeWidth={1} strokeDasharray="2 4" opacity={0.35} />
-      <ellipse cx={50} cy={gy} rx={30} ry={3} fill={color} opacity={0.06} />
+      {/* Ombra + terra */}
+      <ellipse cx={50} cy={gy} rx={26} ry={4} fill={`url(#sh-${uid})`} />
+      <line x1={16} y1={gy} x2={84} y2={gy} stroke={color} strokeWidth={1} strokeDasharray="2 5" opacity={0.3} />
 
-      {/* Fantasma della posizione di partenza (guardia) */}
-      {ghost && (
-        <g opacity={0.22}>
-          {segs.map(([a, b], i) => (
-            <line key={`g${i}`} x1={st[a][0]} y1={st[a][1]} x2={st[b][0]} y2={st[b][1]}
-              stroke="#9ca3af" strokeWidth={1.8} strokeLinecap="round" strokeDasharray="1.5 3" />
+      {/* Fantasma guardia (statico) */}
+      {big && throwing && (
+        <g opacity={0.16} stroke="#94a3b8" fill="none" strokeLinecap="round">
+          {[...arms, ...legs].map(([a, b], i) => (
+            <line key={i} x1={guard[a][0]} y1={guard[a][1]} x2={guard[b][0]} y2={guard[b][1]} strokeWidth={3} />
           ))}
-          <circle cx={st[0][0]} cy={st[0][1]} r={8} fill="none" stroke="#9ca3af" strokeWidth={1.6} />
+          <circle cx={guard[0][0]} cy={guard[0][1]} r={8} />
         </g>
       )}
 
-      {/* Freccia di traiettoria del colpo */}
-      {arrow && (
-        <g style={{ transition: 'all 0.28s ease' }}>
-          <line x1={arrow.x1} y1={arrow.y1} x2={arrow.x2} y2={arrow.y2}
-            stroke={STRIKE} strokeWidth={1.8} strokeLinecap="round" strokeDasharray="3 2.5" opacity={0.85} />
-          <polygon points={arrow.head} fill={STRIKE} opacity={0.95} filter={`url(#glow-${uid})`} />
+      {/* Arco di traiettoria */}
+      {arc && (
+        <g opacity={0.9}>
+          <path d={arc.d} fill="none" stroke={STRIKE} strokeWidth={1.6} strokeDasharray="3 3" strokeLinecap="round" opacity={0.7} />
+          <polygon points={arc.head} fill={STRIKE} filter={`url(#glow-${uid})`} />
         </g>
       )}
 
-      {/* Corpo — posa attuale */}
-      {segs.map(([a, b], i) => {
-        const strike = isStrikeSeg(a, b);
-        return (
-          <line key={i} x1={p[a][0]} y1={p[a][1]} x2={p[b][0]} y2={p[b][1]}
-            stroke={strike ? STRIKE : color}
-            strokeWidth={strike ? bodyW + 1.6 : bodyW}
-            strokeLinecap="round" strokeLinejoin="round"
-            filter={strike ? `url(#glow-${uid})` : undefined}
-            style={{ transition: 'all 0.28s ease' }} />
-        );
+      {/* Gambe */}
+      {legs.map(([a, b], i) => {
+        const s = isStrikeSeg(a, b);
+        return <line key={`l${i}`} x1={p[a][0]} y1={p[a][1]} x2={p[b][0]} y2={p[b][1]}
+          stroke={s ? STRIKE : color} strokeWidth={s ? legW + 1.4 : legW} strokeLinecap="round"
+          filter={s ? `url(#glow-${uid})` : undefined} opacity={0.96} />;
+      })}
+      {/* Piedi */}
+      {feet.map((j) => {
+        const s = limb && limb.includes(j);
+        return <ellipse key={`f${j}`} cx={p[j][0] + 2} cy={p[j][1]} rx={4.2} ry={2.4}
+          fill={s ? STRIKE : color} opacity={0.95} />;
       })}
 
-      {/* Giunti */}
-      {joints.map((j) => {
-        const on = limb && limb.includes(j);
-        return <circle key={j} cx={p[j][0]} cy={p[j][1]} r={on ? 2.3 : 1.7}
-          fill={on ? STRIKE : color} opacity={on ? 1 : 0.9}
-          style={{ transition: 'all 0.28s ease' }} />;
+      {/* Torso pieno + colonna */}
+      <polygon points={torso} fill={color} opacity={0.22} stroke={color} strokeWidth={1.4} strokeLinejoin="round" />
+      <line x1={p[1][0]} y1={p[1][1]} x2={p[2][0]} y2={p[2][1]} stroke={color} strokeWidth={legW} strokeLinecap="round" opacity={0.9} />
+
+      {/* Braccia */}
+      {arms.map(([a, b], i) => {
+        const s = isStrikeSeg(a, b);
+        return <line key={`a${i}`} x1={p[a][0]} y1={p[a][1]} x2={p[b][0]} y2={p[b][1]}
+          stroke={s ? STRIKE : color} strokeWidth={s ? limbW + 1.6 : limbW} strokeLinecap="round"
+          filter={s ? `url(#glow-${uid})` : undefined} />;
+      })}
+      {/* Guantoni */}
+      {hands.map((j) => {
+        const s = limb && limb.includes(j);
+        return <circle key={`h${j}`} cx={p[j][0]} cy={p[j][1]} r={s ? gloveR + 0.8 : gloveR}
+          fill={s ? STRIKE : color} filter={s ? `url(#glow-${uid})` : undefined}
+          stroke="#0b0e14" strokeWidth={0.8} />;
       })}
 
-      {/* Testa piena + baricentro */}
-      <circle cx={p[0][0]} cy={p[0][1]} r={8.5} fill={color} opacity={0.16}
-        style={{ transition: 'all 0.28s ease' }} />
-      <circle cx={p[0][0]} cy={p[0][1]} r={8.5} fill="none" stroke={color} strokeWidth={bodyW}
-        style={{ transition: 'all 0.28s ease' }} />
-      <circle cx={p[2][0]} cy={p[2][1]} r={2} fill={color} opacity={0.85} />
+      {/* Collo + Testa piena */}
+      <line x1={p[0][0]} y1={p[0][1] + 6} x2={p[1][0]} y2={p[1][1]} stroke={color} strokeWidth={legW - 1} strokeLinecap="round" opacity={0.85} />
+      <circle cx={p[0][0]} cy={p[0][1]} r={9} fill={color} opacity={0.28} stroke={color} strokeWidth={1.6} />
+      <circle cx={p[0][0] + 3} cy={p[0][1] - 1} r={1.6} fill="#0b0e14" opacity={0.7} />
     </svg>
   );
 }
 
-function ComboAnimator({ combo, color = '#00f2ff', mode: _mode }) {
+// Durata per tecnica: abbastanza perché la figura sferri e ritragga il colpo, poi avanza.
+const COMBO_MOVE_MS = 1550;
+function ComboAnimator({ combo, color = '#00f2ff', mode: _mode, size = 108 }) {
   const techniques = (combo || '').split('-').map((t) => t.trim()).filter(Boolean);
   const [idx, setIdx] = useState(0);
-  const [visible, setVisible] = useState(true);
+  const [phase, setPhase] = useState('in'); // in | out (breve dissolvenza al cambio)
 
-  useEffect(() => {
-    setIdx(0); setVisible(true);
-  }, [combo]);
+  useEffect(() => { setIdx(0); setPhase('in'); }, [combo]);
 
   useEffect(() => {
     if (techniques.length <= 1) return;
-    const advance = () => {
-      setVisible(false);
-      setTimeout(() => { setIdx((i) => (i + 1) % techniques.length); setVisible(true); }, 220);
-    };
-    const id = setInterval(advance, 1500);
+    const id = setInterval(() => {
+      setPhase('out');
+      setTimeout(() => { setIdx((i) => (i + 1) % techniques.length); setPhase('in'); }, 180);
+    }, COMBO_MOVE_MS);
     return () => clearInterval(id);
   }, [techniques.length, combo]);
 
   const tech = techniques[idx] || '';
   const poseKey = resolvePose(tech);
+  const vis = phase === 'in';
 
   return (
-    <div className="flex flex-col items-center gap-2">
-      {/* Stick figure */}
-      <div style={{ opacity: visible ? 1 : 0, transition: 'opacity 0.2s ease', filter: `drop-shadow(0 0 12px ${color}55)` }}>
-        <StickFigure poseKey={poseKey} color={color} size={100} highlight />
+    <div className="flex flex-col items-center gap-1.5">
+      {/* Contatore colpo */}
+      {techniques.length > 1 && (
+        <p className="text-[9px] font-bold tracking-widest uppercase" style={{ color: `${color}bb` }}>
+          Colpo {idx + 1}/{techniques.length}
+        </p>
+      )}
+      {/* Figura combattente animata */}
+      <div style={{ opacity: vis ? 1 : 0, transform: `scale(${vis ? 1 : 0.94})`, transition: 'opacity 0.18s ease, transform 0.18s ease', filter: `drop-shadow(0 0 14px ${color}66)` }}>
+        <StickFigure poseKey={poseKey} color={color} size={size} highlight />
       </div>
-      {/* Technique name */}
-      <p className="text-sm font-black tracking-wide text-center leading-tight"
-        style={{ color, opacity: visible ? 1 : 0, transition: 'opacity 0.2s ease', textShadow: `0 0 12px ${color}` }}>
+      {/* Nome tecnica */}
+      <p className="text-base font-black tracking-wide text-center leading-tight"
+        style={{ color, opacity: vis ? 1 : 0, transition: 'opacity 0.18s ease', textShadow: `0 0 14px ${color}` }}>
         {tech}
       </p>
-      {/* Sequence dots */}
-      <div className="flex items-center gap-1 flex-wrap justify-center max-w-[200px]">
-        {techniques.map((t, i) => (
-          <span key={i} className="text-[9px] font-bold px-1.5 py-0.5 rounded-full transition-all duration-200"
-            style={{
-              background: i === idx ? `${color}22` : 'transparent',
-              color: i === idx ? color : '#4b5563',
-              border: `1px solid ${i === idx ? color : '#374151'}`,
-            }}>
-            {t}
+      {/* Sequenza combo con freccia tra i colpi */}
+      <div className="flex items-center gap-0.5 flex-wrap justify-center max-w-[240px]">
+        {techniques.map((tk, i) => (
+          <span key={i} className="inline-flex items-center gap-0.5">
+            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full transition-all duration-200"
+              style={{
+                background: i === idx ? color : 'transparent',
+                color: i === idx ? '#0b0e14' : '#6b7280',
+                border: `1px solid ${i === idx ? color : '#374151'}`,
+                transform: i === idx ? 'scale(1.08)' : 'scale(1)',
+              }}>
+              {tk}
+            </span>
+            {i < techniques.length - 1 && <span className="text-[9px]" style={{ color: '#4b5563' }}>›</span>}
           </span>
         ))}
       </div>
@@ -1381,39 +1436,50 @@ function VisualCoach() {
     setComboResult(null);
     setComboPhase('calling');
     comboPhaseRef.current = 'calling';
-    setComboCountdown(3);
-    enqueueSpeak(`Esegui: ${combo}`, true);
-    let c = 2;
-    const tick = () => {
-      setComboCountdown(c);
-      if (c <= 0) {
-        setComboPhase('go');
-        comboPhaseRef.current = 'go';
-        enqueueSpeak('Via!', true);
-        comboTimerRef.current = setTimeout(async () => {
-          if (comboPhaseRef.current !== 'go') return;
-          setComboPhase('judging');
-          comboPhaseRef.current = 'judging';
-          const result = await runComboJudge(combo);
-          if (comboPhaseRef.current !== 'judging') return;
-          const grade = result?.grade || 'good';
-          setComboResult({ grade, feedback: result?.feedback || '', nextCombo: result?.nextCombo || '' });
-          setComboScore((prev) => ({ ...prev, [grade]: (prev[grade] || 0) + 1 }));
-          setComboPhase('result');
-          comboPhaseRef.current = 'result';
-          const ttsMsg = grade === 'perfect' ? `Perfetto! ${result?.feedback || ''}` : grade === 'good' ? `Buono. ${result?.feedback || ''}` : `Riprova. ${result?.feedback || ''}`;
-          enqueueSpeak(ttsMsg, true);
-          comboTimerRef.current = setTimeout(() => {
-            if (comboPhaseRef.current !== 'result') return;
-            nextComboRoundRef.current?.(result?.nextCombo || '');
-          }, 3200);
-        }, 2500);
-        return;
-      }
-      c--;
-      comboTimerRef.current = setTimeout(tick, 800);
+    const nTech = Math.max(1, combo.split('-').filter(Boolean).length);
+    setComboCountdown(null);                 // fase DEMO: mostra la combo intera, nessun numero
+    enqueueSpeak(`Guarda: ${combo}`, true);
+    // 1) DEMO: lascia scorrere l'intera combo almeno una volta sulla figura animata
+    const demoMs = Math.max(3400, nTech * COMBO_MOVE_MS + 500);
+    // avvia il GO + giudizio quando finisce il conto alla rovescia
+    const go = () => {
+      setComboPhase('go');
+      comboPhaseRef.current = 'go';
+      enqueueSpeak('Via!', true);
+      const execMs = Math.max(2400, nTech * 950);   // tempo d'esecuzione proporzionale ai colpi
+      comboTimerRef.current = setTimeout(async () => {
+        if (comboPhaseRef.current !== 'go') return;
+        setComboPhase('judging');
+        comboPhaseRef.current = 'judging';
+        const result = await runComboJudge(combo);
+        if (comboPhaseRef.current !== 'judging') return;
+        const grade = result?.grade || 'good';
+        setComboResult({ grade, feedback: result?.feedback || '', nextCombo: result?.nextCombo || '' });
+        setComboScore((prev) => ({ ...prev, [grade]: (prev[grade] || 0) + 1 }));
+        setComboPhase('result');
+        comboPhaseRef.current = 'result';
+        const ttsMsg = grade === 'perfect' ? `Perfetto! ${result?.feedback || ''}` : grade === 'good' ? `Buono. ${result?.feedback || ''}` : `Riprova. ${result?.feedback || ''}`;
+        enqueueSpeak(ttsMsg, true);
+        comboTimerRef.current = setTimeout(() => {
+          if (comboPhaseRef.current !== 'result') return;
+          nextComboRoundRef.current?.(result?.nextCombo || '');
+        }, 3200);
+      }, execMs);
     };
-    comboTimerRef.current = setTimeout(tick, 1000);
+    // 2) dopo la demo → conto alla rovescia 3-2-1 → VIA
+    comboTimerRef.current = setTimeout(() => {
+      if (comboPhaseRef.current !== 'calling') return;
+      enqueueSpeak(`Esegui tra tre`, true);
+      let c = 3;
+      const tick = () => {
+        if (comboPhaseRef.current !== 'calling') return;
+        if (c === 0) { go(); return; }
+        setComboCountdown(c);
+        c--;
+        comboTimerRef.current = setTimeout(tick, 650);
+      };
+      tick();
+    }, demoMs);
   }, [pickCombo, enqueueSpeak, runComboJudge]);
 
   nextComboRoundRef.current = nextComboRound;
@@ -2298,21 +2364,28 @@ function VisualCoach() {
                 </div>
               </div>
               <div className="px-4 pb-4">
-                {/* CALLING — mostra il combo con animazione + countdown */}
+                {/* CALLING — DEMO (mostra la combo intera) poi conto alla rovescia */}
                 {comboPhase === 'calling' && (
-                  <div className="flex items-center gap-3 py-2">
-                    {/* Stick figure animator */}
-                    <div className="flex-shrink-0">
-                      <ComboAnimator combo={currentCombo} color={C.orange.hex} mode={mode} />
-                    </div>
-                    {/* Countdown + nome combo */}
-                    <div className="flex-1 text-center space-y-1">
-                      <p className="text-[9px] uppercase tracking-widest text-gray-400">Esegui tra…</p>
-                      <motion.p key={comboCountdown} initial={{ scale: 1.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
-                        className="text-5xl font-black" style={{ color: '#f97316' }}>{comboCountdown}</motion.p>
-                      <motion.p initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
-                        className="text-base font-black text-white tracking-tight leading-tight">{currentCombo}</motion.p>
-                    </div>
+                  <div className="flex flex-col items-center py-2">
+                    {/* Figura combattente animata al centro, ben grande */}
+                    <ComboAnimator combo={currentCombo} color={C.orange.hex} mode={mode} size={128} />
+                    {/* Fase demo vs conto alla rovescia */}
+                    {comboCountdown == null ? (
+                      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mt-2 flex flex-col items-center gap-1">
+                        <span className="text-[10px] font-black uppercase tracking-[0.2em] px-3 py-1 rounded-full"
+                          style={{ color: '#0b0e14', background: C.orange.hex }}>👁 Memorizza la combo</span>
+                        <div className="flex gap-1 mt-1">{[0,1,2].map((i) => (
+                          <motion.span key={i} className="w-1.5 h-1.5 rounded-full" style={{ background: C.orange.hex }}
+                            animate={{ opacity: [0.25, 1, 0.25] }} transition={{ duration: 0.9, repeat: Infinity, delay: i * 0.18 }} />
+                        ))}</div>
+                      </motion.div>
+                    ) : (
+                      <div className="mt-1 flex flex-col items-center">
+                        <p className="text-[9px] uppercase tracking-widest text-gray-400">Esegui tra…</p>
+                        <motion.p key={comboCountdown} initial={{ scale: 1.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+                          className="text-6xl font-black leading-none" style={{ color: '#f97316', textShadow: '0 0 24px rgba(249,115,22,0.5)' }}>{comboCountdown}</motion.p>
+                      </div>
+                    )}
                   </div>
                 )}
                 {/* GO! */}
