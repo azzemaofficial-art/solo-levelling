@@ -1025,9 +1025,26 @@ function resolvePose(tech) {
   if (tl.includes('knee') || tl.includes('ginoc') || tl.includes('kao')) return 'knee';
   if (tl.includes('elbow') || tl.includes('gomit') || tl.includes('sok')) return 'elbow';
   if (tl.includes('spin') || tl.includes('salab') || tl.includes('dwi')) return 'spinning';
-  if (tl.includes('level') || tl.includes('takedown') || tl.includes('double leg') || tl.includes('shot') || tl.includes('burst')) return 'level_change';
-  if (tl.includes('clinch') || tl.includes('sprawl') || tl.includes('clinch')) return 'clinch';
+  // grappling / atterramenti / proiezioni
+  if (tl.includes('throw') || tl.includes('proiez') || tl.includes('proiett') || tl.includes('seoi') || tl.includes('nage') || tl.includes('toss') || tl.includes('sweep') || tl.includes('goshi') || tl.includes('sgamb')) return 'throw';
+  if (tl.includes('shoot') || tl.includes('double leg') || tl.includes('single leg') || tl.includes('takedown') || tl.includes('doppia gamba') || tl.includes('penetr')) return 'shoot';
+  if (tl.includes('level') || tl.includes('burst')) return 'level_change';
+  if (tl.includes('guard') || tl.includes('mount') || tl.includes('armbar') || tl.includes('choke') || tl.includes('strangol') || tl.includes('leva') || tl.includes('kimura') || tl.includes('triangle') || tl.includes('submission') || tl.includes('back take')) return 'clinch';
   if (tl.includes('sprawl')) return 'sprawl';
+  if (tl.includes('clinch') || tl.includes('collar') || tl.includes('kumi')) return 'clinch';
+  // fitness / flow / yoga / respiro
+  if (tl.includes('squat') || tl.includes('accosc') || tl.includes('air squat') || tl.includes('pistol')) return 'squat';
+  if (tl.includes('push') || tl.includes('piegament') || tl.includes('dip')) return 'pushup';
+  if (tl.includes('plank') || tl.includes('hollow') || tl.includes('dragon')) return 'plank';
+  if (tl.includes('lunge') || tl.includes('affond')) return 'lunge';
+  if (tl.includes('warrior') || tl.includes('guerrier') || tl.includes('virabhadra')) return 'warrior';
+  if (tl.includes('tree') || tl.includes('albero') || tl.includes('vrks') || tl.includes('equilibr') || tl.includes('balance')) return 'tree';
+  if (tl.includes('fold') || tl.includes('uttanasana') || tl.includes('avanti') || tl.includes('hamstring') || tl.includes('pinza')) return 'forward_fold';
+  if (tl.includes('bridge') || tl.includes('ponte') || tl.includes('glute') || tl.includes('wheel') || tl.includes('cobra') || tl.includes('ruota')) return 'bridge';
+  if (tl.includes('respir') || tl.includes('breath') || tl.includes('pranayam') || tl.includes('medita') || tl.includes('box breathing') || tl.includes('wim hof') || tl.includes('tummo')) return 'breathe';
+  if (tl.includes('run') || tl.includes('cors') || tl.includes('sprint') || tl.includes('scatto') || tl.includes('jog') || tl.includes('cadenza')) return 'run';
+  if (tl.includes('burpee') || tl.includes('thruster') || tl.includes('wall ball')) return 'squat';
+  if (tl.includes('stretch') || tl.includes('allung') || tl.includes('mobilit') || tl.includes('pnf')) return 'forward_fold';
   return 'stance';
 }
 
@@ -1087,25 +1104,69 @@ const BAG_STRIKE = {
   clinch: { e: 5, l: [3,4,5] }, level_change: { e: 8, l: [6,7,8] },
 };
 
-// Scena ALLENAMENTO: un combattente che colpisce un SACCO. Il colpo raggiunge il sacco,
-// che rincula con impatto → si CAPISCE la tecnica. Torso pieno, arti spessi, guantoni.
-function StickFigure({ poseKey, color = '#00f2ff', size = 130, highlight = false, animate = true }) {
-  const key = BAG_POSES[poseKey] ? poseKey : 'guard';
+// Movimenti SOLO (fitness/flow/yoga) — figura senza bersaglio. Base = 'ready'.
+Object.assign(BAG_POSES, {
+  ready:        [[38,16],[38,33],[38,86],[31,40],[29,56],[30,72],[45,40],[47,56],[46,72],[42,88],[42,118],[42,152],[34,88],[34,118],[34,152]],
+  squat:        [[38,40],[38,54],[38,92],[40,56],[48,64],[58,70],[36,56],[46,64],[56,72],[42,94],[52,116],[50,150],[34,94],[30,116],[28,150]],
+  pushup:       [[20,98],[30,100],[54,106],[30,100],[28,112],[26,124],[32,102],[30,114],[28,126],[54,106],[70,112],[86,118],[54,108],[70,114],[86,120]],
+  plank:        [[20,96],[30,98],[56,104],[30,98],[26,110],[24,122],[32,100],[28,112],[26,124],[56,104],[72,110],[88,116],[56,106],[72,112],[88,118]],
+  lunge:        [[40,20],[40,36],[40,88],[33,44],[31,60],[32,74],[47,44],[49,60],[48,74],[44,90],[52,120],[54,150],[36,90],[22,120],[18,150]],
+  warrior:      [[40,22],[40,38],[40,86],[46,42],[58,42],[70,42],[34,42],[22,42],[10,42],[46,88],[56,118],[62,152],[34,88],[24,118],[18,152]],
+  tree:         [[40,24],[40,40],[40,88],[36,44],[38,32],[40,20],[44,44],[42,32],[40,20],[42,90],[42,120],[42,152],[38,90],[26,104],[40,110]],
+  forward_fold: [[40,60],[40,74],[40,86],[38,72],[38,90],[38,110],[42,72],[42,90],[42,110],[42,90],[42,120],[42,152],[38,90],[38,120],[38,152]],
+  bridge:       [[18,120],[26,118],[50,104],[26,118],[22,128],[20,140],[28,118],[24,128],[22,140],[50,104],[64,116],[70,140],[50,106],[66,116],[72,140]],
+  breathe:      [[40,18],[40,34],[40,88],[34,44],[38,64],[44,80],[46,44],[42,64],[36,80],[43,90],[43,120],[43,152],[37,90],[37,120],[37,152]],
+  run:          [[42,18],[41,34],[40,86],[34,42],[28,52],[24,44],[47,42],[54,54],[60,48],[43,88],[36,112],[28,132],[37,88],[50,110],[62,128]],
+  throw:        [[36,30],[38,44],[42,78],[44,44],[58,44],[72,52],[34,46],[30,60],[26,74],[46,80],[50,110],[54,140],[38,80],[30,110],[26,140]],
+  shoot:        [[52,64],[46,72],[40,92],[50,74],[62,84],[74,92],[42,74],[52,86],[64,94],[42,94],[50,118],[58,148],[36,94],[34,120],[30,150]],
+});
+const SOLO_POSES = new Set(['ready','squat','pushup','plank','lunge','warrior','tree','forward_fold','bridge','breathe','run']);
+const SOLO_STATIC = new Set(['plank','pushup','warrior','tree','bridge','forward_fold','ready']);
+// grapple/atterramenti che raggiungono l'avversario
+const GRAPPLE_STRIKE = { throw: { e: 5, l: [3,4,5] }, shoot: { e: 8, l: [6,7,8] } };
+// Avversario che subisce (guardia rivolta all'attaccante, lato destro)
+const OPPONENT_POSE = [[86,20],[85,36],[84,86],[84,40],[82,54],[80,44],[88,40],[90,54],[92,44],[82,88],[82,120],[82,152],[88,88],[89,120],[92,152]];
+// Scena per disciplina: 'bag' (colpi) | 'opponent' (partner/grappling) | 'solo' (movimento)
+const DISCIPLINE_SCENE = {
+  muaythai:'bag', boxing:'bag', kickboxing:'bag', muayboran:'bag', kravmaga:'bag', sanda:'bag',
+  karate:'opponent', taekwondo:'opponent', mma:'opponent', judo:'opponent', wrestling:'opponent',
+  bjj:'opponent', sambo:'opponent', lutalivre:'opponent', capoeira:'opponent', hapkido:'opponent',
+  wingchun:'opponent', kungfu:'opponent', silat:'opponent', kendo:'opponent', pankration:'opponent',
+  systema:'opponent', kalaripayattu:'opponent',
+  yoga:'solo', stretching:'solo', calisthenics:'solo', crossfit:'solo', running:'solo',
+  breathing:'solo', fitness:'solo', general:'solo',
+};
+const sceneFor = (mode) => DISCIPLINE_SCENE[mode] || (/sparring|partner|drill/.test(mode || '') ? 'opponent' : 'bag');
+// timeline "ripetizione" (fitness/flow): scendi → tieni → risali → pausa
+const _repT = (ms) => { const P = 1700, t = ms % P; if (t < 620) return _easeOut(t / 620); if (t < 900) return 1; if (t < 1500) return 1 - _easeIn((t - 900) / 600); return 0; };
+
+// ── SCENA UNIVERSALE: attaccante + (sacco | avversario | nessuno) ─────────────
+// Ogni disciplina ha la scena giusta. Colpo→bersaglio con impatto; fitness→ripetizioni;
+// yoga/respiro→posa. Torso pieno, arti spessi, trail di movimento, griglia prospettica.
+function StickFigure({ poseKey, color = '#00f2ff', size = 130, highlight = false, animate = true, scene = 'bag' }) {
+  let key = BAG_POSES[poseKey] ? poseKey : (scene === 'solo' ? 'ready' : 'guard');
+  if (scene === 'solo' && (key === 'guard' || key === 'stance')) key = 'ready';
+  const strike = BAG_STRIKE[key] || GRAPPLE_STRIKE[key] || null;
+  const isSolo = SOLO_POSES.has(key);
   const target = BAG_POSES[key];
-  const guard = BAG_POSES.guard;
-  const strike = BAG_STRIKE[key];                  // null per guardia/sprawl/meditazione
-  const throwing = animate && !!strike && !_prefersReducedMotion();
-  const showBag = !!strike;
+  const base = BAG_POSES[isSolo ? 'ready' : 'guard'];
+  const dynamic = !!strike || (isSolo && !SOLO_STATIC.has(key));
+  const throwing = animate && dynamic && !_prefersReducedMotion();
+  const hasTarget = !!strike && scene !== 'solo';
+  const showBag = hasTarget && scene === 'bag';
+  const showOpp = hasTarget && scene === 'opponent';
+  const isBreath = key === 'breathe';
 
   const [t, setT] = useState(throwing ? 0 : 1);
   const rafRef = useRef(0);
   const lastRef = useRef(-1);
   useEffect(() => {
     if (!throwing) { setT(1); return; }
+    const tl = BAG_STRIKE[key] || GRAPPLE_STRIKE[key] ? _throwT : _repT;
     let start = 0;
     const loop = (now) => {
       if (!start) start = now;
-      const v = _throwT(now - start);
+      const v = tl(now - start);
       if (Math.abs(v - lastRef.current) > 0.012) { lastRef.current = v; setT(v); }
       rafRef.current = requestAnimationFrame(loop);
     };
@@ -1113,13 +1174,13 @@ function StickFigure({ poseKey, color = '#00f2ff', size = 130, highlight = false
     return () => cancelAnimationFrame(rafRef.current);
   }, [throwing, key]);
 
-  const p = throwing ? _lerpPose(guard, target, t) : target;
+  const p = throwing ? _lerpPose(base, target, t) : target;
   const limb = strike ? strike.l : null;
   const STRIKE = '#ff7a1a';
-  const uid = `${key}-${color.replace('#', '')}-${Math.round(size)}`;
+  const uid = `${key}-${color.replace('#', '')}-${Math.round(size)}-${scene}`;
   const big = size >= 74;
   const gy = 158;
-  const pulse = showBag ? Math.max(0, Math.min(1, (t - 0.64) / 0.34)) : 0; // 0→1 all'impatto
+  const pulse = hasTarget ? Math.max(0, Math.min(1, (t - 0.64) / 0.34)) : 0;
 
   const arms = [[3,4],[4,5],[6,7],[7,8]];
   const legs = [[9,10],[10,11],[12,13],[13,14]];
@@ -1130,10 +1191,15 @@ function StickFigure({ poseKey, color = '#00f2ff', size = 130, highlight = false
   const legW = big ? 5.4 : 4.6;
   const gloveR = big ? 5.2 : 4.4;
 
-  // punto d'impatto sul sacco
-  const E = strike ? target[strike.e] : null;
-  // sacco che rincula VIA dal colpo (verso destra) attorno all'aggancio in alto
+  const E = strike ? target[strike.e] : null;          // punto d'impatto
   const bagRot = -pulse * 4, bagDx = pulse * 3.5;
+  const oppRot = pulse * 7;                              // avversario che arretra
+  const zoom = 1 + pulse * 0.03;                         // micro-zoom all'impatto
+
+  // ghost dell'arto che colpisce a t precedenti → scia di velocità
+  const trail = (throwing && strike && t > 0.18)
+    ? [0.14, 0.28].map((d) => strike.l.map((j) => _lerpPose(base, target, Math.max(0, t - d))[j]))
+    : [];
 
   return (
     <svg width={size} height={size * 1.5} viewBox="0 0 112 168" style={{ overflow: 'visible' }}>
@@ -1150,11 +1216,17 @@ function StickFigure({ poseKey, color = '#00f2ff', size = 130, highlight = false
         </linearGradient>
       </defs>
 
+      {/* Griglia prospettica del pavimento */}
+      <g opacity={0.12} stroke={color} strokeWidth={0.6}>
+        <line x1={4} y1={152} x2={108} y2={152} />
+        <line x1={-6} y1={166} x2={118} y2={166} />
+        {[16, 40, 64, 88].map((x, i) => <line key={i} x1={x} y1={152} x2={x - 10 + i * 2} y2={166} />)}
+      </g>
       {/* Ombra + terra */}
       <ellipse cx={44} cy={gy} rx={30} ry={4} fill={`url(#sh-${uid})`} />
       <line x1={8} y1={gy} x2={108} y2={gy} stroke={color} strokeWidth={1} strokeDasharray="2 5" opacity={0.28} />
 
-      {/* SACCO da boxe (bersaglio) */}
+      {/* SACCO da boxe */}
       {showBag && (
         <g transform={`rotate(${bagRot} 88 6) translate(${bagDx} 0)`} style={{ transition: 'transform 0.05s linear' }}>
           {big && <line x1={88} y1={0} x2={88} y2={30} stroke="#6b7280" strokeWidth={1.6} />}
@@ -1165,63 +1237,87 @@ function StickFigure({ poseKey, color = '#00f2ff', size = 130, highlight = false
           <rect x={82} y={34} width={5} height={110} rx={3} fill="#fff" opacity={0.10} />
         </g>
       )}
-
-      {/* Fantasma guardia (statico) */}
-      {big && throwing && (
-        <g opacity={0.14} stroke="#94a3b8" fill="none" strokeLinecap="round">
-          {[...arms, ...legs].map(([a, b], i) => (
-            <line key={i} x1={guard[a][0]} y1={guard[a][1]} x2={guard[b][0]} y2={guard[b][1]} strokeWidth={3} />
+      {/* AVVERSARIO che subisce */}
+      {showOpp && (
+        <g transform={`rotate(${oppRot} 86 152)`} style={{ transition: 'transform 0.05s linear' }} opacity={0.6}>
+          <polygon points={`${OPPONENT_POSE[3][0]},${OPPONENT_POSE[3][1]} ${OPPONENT_POSE[6][0]},${OPPONENT_POSE[6][1]} ${OPPONENT_POSE[12][0]},${OPPONENT_POSE[12][1]} ${OPPONENT_POSE[9][0]},${OPPONENT_POSE[9][1]}`} fill="#64748b" opacity={0.5} />
+          {[[1,2],[3,4],[4,5],[6,7],[7,8],[9,10],[10,11],[12,13],[13,14]].map(([a, b], i) => (
+            <line key={i} x1={OPPONENT_POSE[a][0]} y1={OPPONENT_POSE[a][1]} x2={OPPONENT_POSE[b][0]} y2={OPPONENT_POSE[b][1]} stroke="#94a3b8" strokeWidth={3.6} strokeLinecap="round" />
           ))}
-          <circle cx={guard[0][0]} cy={guard[0][1]} r={8} />
+          <circle cx={OPPONENT_POSE[0][0]} cy={OPPONENT_POSE[0][1]} r={8} fill="#64748b" stroke="#94a3b8" strokeWidth={1.4} />
         </g>
       )}
 
-      {/* Gambe */}
-      {legs.map(([a, b], i) => {
-        const s = isStrikeSeg(a, b);
-        return <line key={`l${i}`} x1={p[a][0]} y1={p[a][1]} x2={p[b][0]} y2={p[b][1]}
-          stroke={s ? STRIKE : color} strokeWidth={s ? legW + 1.4 : legW} strokeLinecap="round"
-          filter={s ? `url(#glow-${uid})` : undefined} opacity={0.96} />;
-      })}
-      {feet.map((j) => {
-        const s = limb && limb.includes(j);
-        return <ellipse key={`f${j}`} cx={p[j][0] + 2} cy={p[j][1]} rx={4.4} ry={2.5}
-          fill={s ? STRIKE : color} opacity={0.95} />;
-      })}
+      {/* Fantasma della base (statico) */}
+      {big && throwing && strike && (
+        <g opacity={0.13} stroke="#94a3b8" fill="none" strokeLinecap="round">
+          {[...arms, ...legs].map(([a, b], i) => (
+            <line key={i} x1={base[a][0]} y1={base[a][1]} x2={base[b][0]} y2={base[b][1]} strokeWidth={3} />
+          ))}
+          <circle cx={base[0][0]} cy={base[0][1]} r={8} />
+        </g>
+      )}
 
-      {/* Torso pieno + colonna */}
-      <polygon points={torso} fill={color} opacity={0.22} stroke={color} strokeWidth={1.4} strokeLinejoin="round" />
-      <line x1={p[1][0]} y1={p[1][1]} x2={p[2][0]} y2={p[2][1]} stroke={color} strokeWidth={legW} strokeLinecap="round" opacity={0.9} />
+      {/* Corpo (con micro-zoom all'impatto) */}
+      <g transform={`translate(${44 * (1 - zoom)}, ${gy * (1 - zoom)}) scale(${zoom})`}>
+        {/* Scia di velocità dell'arto */}
+        {trail.map((pts, ti) => (
+          <polyline key={`tr${ti}`} points={pts.map((q) => `${q[0]},${q[1]}`).join(' ')}
+            fill="none" stroke={STRIKE} strokeWidth={limbW} strokeLinecap="round" opacity={0.22 - ti * 0.08} />
+        ))}
 
-      {/* Braccia */}
-      {arms.map(([a, b], i) => {
-        const s = isStrikeSeg(a, b);
-        return <line key={`a${i}`} x1={p[a][0]} y1={p[a][1]} x2={p[b][0]} y2={p[b][1]}
-          stroke={s ? STRIKE : color} strokeWidth={s ? limbW + 1.6 : limbW} strokeLinecap="round"
-          filter={s ? `url(#glow-${uid})` : undefined} />;
-      })}
-      {hands.map((j) => {
-        const s = limb && limb.includes(j);
-        return <circle key={`h${j}`} cx={p[j][0]} cy={p[j][1]} r={s ? gloveR + 0.8 : gloveR}
-          fill={s ? STRIKE : color} filter={s ? `url(#glow-${uid})` : undefined} stroke="#0b0e14" strokeWidth={0.8} />;
-      })}
+        {/* Gambe */}
+        {legs.map(([a, b], i) => {
+          const s = isStrikeSeg(a, b);
+          return <line key={`l${i}`} x1={p[a][0]} y1={p[a][1]} x2={p[b][0]} y2={p[b][1]}
+            stroke={s ? STRIKE : color} strokeWidth={s ? legW + 1.4 : legW} strokeLinecap="round"
+            filter={s ? `url(#glow-${uid})` : undefined} opacity={0.96} />;
+        })}
+        {feet.map((j) => {
+          const s = limb && limb.includes(j);
+          return <ellipse key={`f${j}`} cx={p[j][0] + 2} cy={p[j][1]} rx={4.4} ry={2.5} fill={s ? STRIKE : color} opacity={0.95} />;
+        })}
 
-      {/* Collo + Testa piena, sguardo verso il sacco */}
-      <line x1={p[0][0]} y1={p[0][1] + 6} x2={p[1][0]} y2={p[1][1]} stroke={color} strokeWidth={legW - 1} strokeLinecap="round" opacity={0.85} />
-      <circle cx={p[0][0]} cy={p[0][1]} r={9} fill={color} opacity={0.28} stroke={color} strokeWidth={1.6} />
-      <circle cx={p[0][0] + 4} cy={p[0][1] - 1} r={1.7} fill="#0b0e14" opacity={0.75} />
+        {/* Torso + colonna */}
+        <polygon points={torso} fill={color} opacity={0.22} stroke={color} strokeWidth={1.4} strokeLinejoin="round" />
+        <line x1={p[1][0]} y1={p[1][1]} x2={p[2][0]} y2={p[2][1]} stroke={color} strokeWidth={legW} strokeLinecap="round" opacity={0.9} />
 
-      {/* IMPATTO sul sacco */}
+        {/* Braccia */}
+        {arms.map(([a, b], i) => {
+          const s = isStrikeSeg(a, b);
+          return <line key={`a${i}`} x1={p[a][0]} y1={p[a][1]} x2={p[b][0]} y2={p[b][1]}
+            stroke={s ? STRIKE : color} strokeWidth={s ? limbW + 1.6 : limbW} strokeLinecap="round"
+            filter={s ? `url(#glow-${uid})` : undefined} />;
+        })}
+        {hands.map((j) => {
+          const s = limb && limb.includes(j);
+          return <circle key={`h${j}`} cx={p[j][0]} cy={p[j][1]} r={s ? gloveR + 0.8 : gloveR}
+            fill={s ? STRIKE : color} filter={s ? `url(#glow-${uid})` : undefined} stroke="#0b0e14" strokeWidth={0.8} />;
+        })}
+
+        {/* Collo + Testa */}
+        <line x1={p[0][0]} y1={p[0][1] + 6} x2={p[1][0]} y2={p[1][1]} stroke={color} strokeWidth={legW - 1} strokeLinecap="round" opacity={0.85} />
+        <circle cx={p[0][0]} cy={p[0][1]} r={9} fill={color} opacity={0.28} stroke={color} strokeWidth={1.6} />
+        <circle cx={p[0][0] + 4} cy={p[0][1] - 1} r={1.7} fill="#0b0e14" opacity={0.75} />
+      </g>
+
+      {/* Anello del respiro (breathing) */}
+      {isBreath && (
+        <circle cx={p[2][0]} cy={(p[1][1] + p[2][1]) / 2} r={14 + t * 10} fill="none" stroke={color}
+          strokeWidth={1.6} opacity={0.4 - t * 0.15} />
+      )}
+
+      {/* IMPATTO sul bersaglio */}
       {E && pulse > 0.18 && (
         <g style={{ pointerEvents: 'none' }}>
-          {[0, 60, 120, 180, 240, 300].map((deg) => {
+          {[0, 45, 90, 135, 180, 225, 270, 315].map((deg) => {
             const r = deg * Math.PI / 180;
             return <line key={deg} x1={E[0]} y1={E[1]}
-              x2={E[0] + Math.cos(r) * 8 * pulse} y2={E[1] + Math.sin(r) * 8 * pulse}
+              x2={E[0] + Math.cos(r) * 9 * pulse} y2={E[1] + Math.sin(r) * 9 * pulse}
               stroke="#fde68a" strokeWidth={1.6} strokeLinecap="round" opacity={pulse} />;
           })}
-          <circle cx={E[0]} cy={E[1]} r={4 + pulse * 5} fill="none" stroke={STRIKE} strokeWidth={1.6} opacity={1 - pulse} />
-          <circle cx={E[0]} cy={E[1]} r={2.5 * pulse} fill="#fff" opacity={pulse * 0.9} />
+          <circle cx={E[0]} cy={E[1]} r={4 + pulse * 7} fill="none" stroke={STRIKE} strokeWidth={2} opacity={1 - pulse} />
+          <circle cx={E[0]} cy={E[1]} r={3 * pulse} fill="#fff" opacity={pulse * 0.9} />
         </g>
       )}
     </svg>
@@ -1230,10 +1326,11 @@ function StickFigure({ poseKey, color = '#00f2ff', size = 130, highlight = false
 
 // Durata per tecnica: abbastanza perché la figura sferri e ritragga il colpo, poi avanza.
 const COMBO_MOVE_MS = 1550;
-function ComboAnimator({ combo, color = '#00f2ff', mode: _mode, size = 108 }) {
+function ComboAnimator({ combo, color = '#00f2ff', mode, size = 108 }) {
   const techniques = (combo || '').split('-').map((t) => t.trim()).filter(Boolean);
   const [idx, setIdx] = useState(0);
   const [phase, setPhase] = useState('in'); // in | out (breve dissolvenza al cambio)
+  const scene = sceneFor(mode);
 
   useEffect(() => { setIdx(0); setPhase('in'); }, [combo]);
 
@@ -1249,41 +1346,53 @@ function ComboAnimator({ combo, color = '#00f2ff', mode: _mode, size = 108 }) {
   const tech = techniques[idx] || '';
   const poseKey = resolvePose(tech);
   const vis = phase === 'in';
+  const multi = techniques.length > 1;
 
   return (
-    <div className="flex flex-col items-center gap-1.5">
-      {/* Contatore colpo */}
-      {techniques.length > 1 && (
-        <p className="text-[9px] font-bold tracking-widest uppercase" style={{ color: `${color}bb` }}>
-          Colpo {idx + 1}/{techniques.length}
-        </p>
+    <div className="flex flex-col items-center gap-1.5 w-full">
+      {/* STEP tracker + barra di avanzamento */}
+      {multi && (
+        <div className="w-full max-w-[240px] flex flex-col items-center gap-1">
+          <p className="text-[10px] font-black tracking-[0.18em] uppercase" style={{ color }}>
+            Step {idx + 1}<span style={{ color: '#6b7280' }}> / {techniques.length}</span>
+          </p>
+          <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ background: '#1f2937' }}>
+            <div className="h-full rounded-full transition-all duration-300"
+              style={{ width: `${((idx + 1) / techniques.length) * 100}%`, background: color, boxShadow: `0 0 8px ${color}` }} />
+          </div>
+        </div>
       )}
-      {/* Figura combattente animata */}
+      {/* Scena animata (fighter + bersaglio secondo la disciplina) */}
       <div style={{ opacity: vis ? 1 : 0, transform: `scale(${vis ? 1 : 0.94})`, transition: 'opacity 0.18s ease, transform 0.18s ease', filter: `drop-shadow(0 0 14px ${color}66)` }}>
-        <StickFigure poseKey={poseKey} color={color} size={size} highlight />
+        <StickFigure poseKey={poseKey} color={color} size={size} highlight scene={scene} />
       </div>
       {/* Nome tecnica */}
-      <p className="text-base font-black tracking-wide text-center leading-tight"
+      <p className="text-lg font-black tracking-wide text-center leading-tight"
         style={{ color, opacity: vis ? 1 : 0, transition: 'opacity 0.18s ease', textShadow: `0 0 14px ${color}` }}>
         {tech}
       </p>
-      {/* Sequenza combo con freccia tra i colpi */}
-      <div className="flex items-center gap-0.5 flex-wrap justify-center max-w-[240px]">
-        {techniques.map((tk, i) => (
-          <span key={i} className="inline-flex items-center gap-0.5">
-            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full transition-all duration-200"
-              style={{
-                background: i === idx ? color : 'transparent',
-                color: i === idx ? '#0b0e14' : '#6b7280',
-                border: `1px solid ${i === idx ? color : '#374151'}`,
-                transform: i === idx ? 'scale(1.08)' : 'scale(1)',
-              }}>
-              {tk}
-            </span>
-            {i < techniques.length - 1 && <span className="text-[9px]" style={{ color: '#4b5563' }}>›</span>}
-          </span>
-        ))}
-      </div>
+      {/* Stepper numerato con connettori */}
+      {multi && (
+        <div className="flex items-center justify-center flex-wrap gap-0.5 max-w-[250px]">
+          {techniques.map((tk, i) => {
+            const done = i < idx, active = i === idx;
+            return (
+              <span key={i} className="inline-flex items-center gap-0.5">
+                <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full transition-all duration-200"
+                  style={{
+                    background: active ? color : done ? `${color}33` : 'transparent',
+                    color: active ? '#0b0e14' : done ? color : '#6b7280',
+                    border: `1px solid ${active ? color : done ? `${color}66` : '#374151'}`,
+                    transform: active ? 'scale(1.1)' : 'scale(1)',
+                  }}>
+                  <span className="opacity-70">{i + 1}</span>{tk}
+                </span>
+                {i < techniques.length - 1 && <span className="text-[10px]" style={{ color: done ? color : '#4b5563' }}>›</span>}
+              </span>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -2517,7 +2626,7 @@ function VisualCoach() {
                           return (
                             <div className="mt-1.5 rounded-lg px-1.5 py-1 flex items-center gap-2" style={{ background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.3)' }}>
                               <div className="shrink-0" style={{ opacity: 0.92 }}>
-                                <StickFigure poseKey={poseKey} color="#fbbf24" size={68} highlight />
+                                <StickFigure poseKey={poseKey} color="#fbbf24" size={68} highlight scene={sceneFor(mode)} />
                               </div>
                               <p className="text-[12px] font-bold text-amber-200 flex items-start gap-1.5"><span className="shrink-0">🥊</span> <span><b className="uppercase text-[9px] tracking-wider opacity-80">Prova ora</b> · {parts.PROVA}</span></p>
                             </div>
