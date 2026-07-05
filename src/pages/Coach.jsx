@@ -1086,6 +1086,16 @@ function matchPose(a, key) {
   if (!a) return null;
   const J = {}; const hints = [];
   const mark = (name, ok, hint) => { J[name] = a[name] == null ? 'na' : (ok ? 'ok' : 'off'); if (a[name] != null && !ok && hint) hints.push(hint); };
+  // Come mark(), ma il messaggio dipende dalla DIREZIONE dell'errore (troppo chiuso vs troppo aperto)
+  // — evita correzioni ambigue tipo "piega il gomito" quando il gomito è già troppo piegato.
+  const markDir = (name, lo, hi, hintLow, hintHigh) => {
+    const v = a[name];
+    if (v == null) { J[name] = 'na'; return; }
+    const ok = v >= lo && v <= hi;
+    J[name] = ok ? 'ok' : 'off';
+    const h = v < lo ? hintLow : hintHigh;
+    if (!ok && h) hints.push(h);
+  };
   const extKey = (a.eL ?? -1) >= (a.eR ?? -1) ? 'eL' : 'eR';
   const gKey = extKey === 'eL' ? 'eR' : 'eL';
   const eMax = Math.max(a.eL ?? -1, a.eR ?? -1), eMin = Math.min(a.eL ?? 999, a.eR ?? 999);
@@ -1104,15 +1114,18 @@ function matchPose(a, key) {
     mark(extKey, _rng(eMax, 45, 110), 'montante: piega il gomito e sali dal basso');
     mark(gKey, eMin <= 120, 'guardia su'); kneesSoft(); torsoUp();
   } else if (fam === 'guard') {
-    mark('eL', _rng(a.eL, 55, 118), 'mani su: gomiti piegati a guardia'); mark('eR', _rng(a.eR, 55, 118), null);
+    markDir('eL', 55, 118, 'apri leggermente il gomito, non serrarlo sul viso', 'piega di più il gomito, pugno vicino al mento');
+    markDir('eR', 55, 118, null, null);
     kneesSoft(); torsoUp();
   } else if (fam === 'squat') {
-    mark('kL', _rng(a.kL, 60, 120), 'scendi di più, cosce verso il parallelo'); mark('kR', _rng(a.kR, 60, 120), null);
+    markDir('kL', 60, 120, 'scendi di più, cosce verso il parallelo', 'non scendere oltre, resta sul parallelo');
+    markDir('kR', 60, 120, null, null);
     if (a.hL != null || a.hR != null) mark(a.hL <= a.hR ? 'hL' : 'hR', _rng(Math.min(a.hL ?? 999, a.hR ?? 999), 50, 130), 'fianchi indietro e giù');
     torsoUp(45);
   } else if (fam === 'lunge') {
     const kf = a.kL <= a.kR ? 'kL' : 'kR';
-    mark(kf, _rng(a[kf], 70, 120), 'ginocchio anteriore a circa 90°'); torsoUp(30);
+    markDir(kf, 70, 120, 'scendi di più con il ginocchio anteriore', 'non scendere oltre i 90°, rischi il ginocchio');
+    torsoUp(30);
   } else if (fam === 'kick') {
     const kk = (a.kL ?? -1) >= (a.kR ?? -1) ? 'kL' : 'kR';
     mark(kk, (a[kk] ?? 0) >= 150, 'estendi la gamba che calcia');
@@ -1942,7 +1955,14 @@ function VisualCoach() {
           numPoses: 1,
         });
         if (!active) return;
-        poseRef.current = { lm, DrawingUtils, PoseLandmarker };
+        // Solo connessioni/punti dal corpo in giù (indici 11+): esclude naso/occhi/orecchie/bocca
+        // (indici 0-10) che altrimenti affollano il volto di puntini inutili al coaching, specie
+        // in selfie ravvicinato con le mani in guardia vicino al viso.
+        const bodyConnections = (PoseLandmarker.POSE_CONNECTIONS || []).filter((c) => {
+          const a = c.start ?? c[0], b = c.end ?? c[1];
+          return a >= 11 && b >= 11;
+        });
+        poseRef.current = { lm, DrawingUtils, PoseLandmarker, bodyConnections };
         const loop = () => {
           if (!active) return;
           const video = videoRef.current;
@@ -1968,9 +1988,11 @@ function VisualCoach() {
           const result = lm.detectForVideo(video, performance.now());
           if (result.landmarks.length > 0) {
             const du = new DrawingUtils(ctx);
-            du.drawConnectors(result.landmarks[0], PoseLandmarker.POSE_CONNECTIONS,
+            const bodyConns = poseRef.current?.bodyConnections || PoseLandmarker.POSE_CONNECTIONS;
+            du.drawConnectors(result.landmarks[0], bodyConns,
               { color: 'rgba(0,255,136,0.8)', lineWidth: 2 });
-            du.drawLandmarks(result.landmarks[0],
+            // Disegna i punti solo dal corpo in giù (indice 11+) — niente naso/occhi/orecchie/bocca
+            du.drawLandmarks(result.landmarks[0].filter((_, i) => i >= 11),
               { color: '#FF6B35', lineWidth: 1, radius: 4 });
             lastLandmarksRef.current = result.landmarks[0];   // per la precisione AI (angoli reali)
             // ── SPECCHIO: colora i giunti verde/rosso confrontando con la tecnica target ──
