@@ -1025,13 +1025,17 @@ function resolvePose(tech) {
   if (tl.includes('knee') || tl.includes('ginoc') || tl.includes('kao')) return 'knee';
   if (tl.includes('elbow') || tl.includes('gomit') || tl.includes('sok')) return 'elbow';
   if (tl.includes('spin') || tl.includes('salab') || tl.includes('dwi')) return 'spinning';
-  // grappling / atterramenti / proiezioni
-  if (tl.includes('throw') || tl.includes('proiez') || tl.includes('proiett') || tl.includes('seoi') || tl.includes('nage') || tl.includes('toss') || tl.includes('sweep') || tl.includes('goshi') || tl.includes('sgamb')) return 'throw';
+  // grappling / atterramenti / proiezioni (incl. judo: gari/otoshi/uchimata, capoeira: rasteira)
+  if (tl.includes('throw') || tl.includes('proiez') || tl.includes('proiett') || tl.includes('seoi') || tl.includes('nage') || tl.includes('toss') || tl.includes('sweep') || tl.includes('goshi') || tl.includes('sgamb') || tl.includes('gari') || tl.includes('otoshi') || tl.includes('uchimata') || tl.includes('uchi mata') || tl.includes('rasteira') || tl.includes('sapuan') || tl.includes('banting') || tl.includes('barai') || tl.includes('harai')) return 'throw';
   if (tl.includes('shoot') || tl.includes('double leg') || tl.includes('single leg') || tl.includes('takedown') || tl.includes('doppia gamba') || tl.includes('penetr')) return 'shoot';
   if (tl.includes('level') || tl.includes('burst')) return 'level_change';
-  if (tl.includes('guard') || tl.includes('mount') || tl.includes('armbar') || tl.includes('choke') || tl.includes('strangol') || tl.includes('leva') || tl.includes('kimura') || tl.includes('triangle') || tl.includes('submission') || tl.includes('back take')) return 'clinch';
+  if (tl.includes('guard') || tl.includes('mount') || tl.includes('armbar') || tl.includes('choke') || tl.includes('strangol') || tl.includes('leva') || tl.includes('kimura') || tl.includes('triangle') || tl.includes('submission') || tl.includes('back take') || tl.includes('kuncian') || tl.includes('headlock') || tl.includes('leg lock')) return 'clinch';
   if (tl.includes('sprawl')) return 'sprawl';
-  if (tl.includes('clinch') || tl.includes('collar') || tl.includes('kumi')) return 'clinch';
+  // Wing Chun sticky-hands (tan/bong/pak/fook/wu sao) = mani da guardia/deviazione
+  if (tl.includes('clinch') || tl.includes('collar') || tl.includes('kumi') || tl.includes('sao')) return 'clinch';
+  // Capoeira: calci circolari specifici
+  if (tl.includes('queixada') || tl.includes('martelo') || tl.includes('meia lua')) return 'roundhouse';
+  if (tl.includes('armada')) return 'spinning';
   // fitness / flow / yoga / respiro
   if (tl.includes('squat') || tl.includes('accosc') || tl.includes('air squat') || tl.includes('pistol')) return 'squat';
   if (tl.includes('push') || tl.includes('piegament') || tl.includes('dip')) return 'pushup';
@@ -1126,14 +1130,20 @@ function matchPose(a, key) {
   return { score, joint: J, hints: hints.slice(0, 2) };
 }
 
-// Quale estremità colpisce, per pose → indice giunto (5 = mano SX, 8 = mano DX, 11 = piede SX)
-const STRIKE_ENDPOINT = {
-  jab: 5, hook: 5, elbow: 5,
-  cross: 8, uppercut: 8,
-  low_kick: 11, body_kick: 11, roundhouse: 11, teep: 11, side_kick: 11, spinning: 11, knee: 11, level_change: 11,
+// Superficie di contatto ESATTA per tecnica: con cosa/dove colpisci — precisione chirurgica.
+const STRIKE_SURFACE = {
+  jab: 'nocche (indice-medio), braccio quasi dritto', cross: 'nocche, ruota il piede posteriore',
+  hook: 'prime due nocche, gomito a 90°', uppercut: 'nocche, colpo dal basso verso il mento',
+  elbow: 'punta del gomito (osso), non l\'avambraccio',
+  knee: 'punto dell\'osso del ginocchio, non la coscia',
+  teep: 'pianta/tallone del piede, gamba distesa', side_kick: 'tallone o lato esterno del piede',
+  low_kick: 'terzo inferiore della tibia, non il piede', body_kick: 'terzo inferiore della tibia',
+  roundhouse: 'collo del piede o tibia, ruota l\'anca', spinning: 'tallone, occhi sul bersaglio nel giro',
+  clinch: 'presa salda, controlla non stringere', level_change: 'spalla nel busto avversario',
+  throw: 'presa su manica/bavero + anca sotto il baricentro', shoot: 'spalla nell\'addome, mani dietro le ginocchia',
+  sprawl: 'anche a terra, peso sulla schiena avversaria',
 };
-// giunti dell'arto che colpisce (per evidenziarlo tutto)
-const STRIKE_LIMB = { 5: [3, 4, 5], 8: [6, 7, 8], 11: [9, 10, 11] };
+const strikeSurfaceFor = (poseKey) => STRIKE_SURFACE[poseKey] || '';
 
 const _lerp = (a, b, f) => a + (b - a) * f;
 const _lerpPose = (A, B, f) => A.map((pt, i) => [_lerp(pt[0], B[i][0], f), _lerp(pt[1], B[i][1], f)]);
@@ -1449,6 +1459,13 @@ function ComboAnimator({ combo, color = '#00f2ff', mode, size = 108 }) {
         style={{ color, opacity: vis ? 1 : 0, transition: 'opacity 0.18s ease', textShadow: `0 0 14px ${color}` }}>
         {tech}
       </p>
+      {/* COLPISCI CON — superficie di contatto esatta, precisione chirurgica */}
+      {strikeSurfaceFor(poseKey) && (
+        <p className="text-[11px] font-semibold text-center leading-snug px-2 max-w-[230px]"
+          style={{ opacity: vis ? 0.95 : 0, transition: 'opacity 0.18s ease', color: '#fde68a' }}>
+          🎯 <b className="uppercase tracking-wide" style={{ color: '#fbbf24' }}>Colpisci con:</b> {strikeSurfaceFor(poseKey)}
+        </p>
+      )}
       {/* Stepper numerato con connettori */}
       {multi && (
         <div className="flex items-center justify-center flex-wrap gap-0.5 max-w-[250px]">
@@ -1573,11 +1590,37 @@ function VisualCoach() {
     taekwondo:  ['Dollyo-Ap-Dollyo', 'Yeop Chagi-Dollyo', 'Double Dollyo', 'Spinning Hook-Dollyo', 'Jump Dollyo-Dollyo', 'Dwi Chagi-Dollyo Chagi'],
     muayboran:  ['Jab-Cross-Tee Kha', 'Teep-Salab Fan Pla', 'Sok Ti-Sok Tad', 'Kao Tone-Kao Dode', 'Chok-Teep-Sok Ngad'],
     kravmaga:   ['Burst-Strike-Move', 'Palm Strike-Knee-Push', 'Eye Gouge-Groin-Disengage', 'Forearm Block-Counter-Disengage', '360 Defense-Counter-Escape'],
+    // ── Grappling / lotta a terra ──────────────────────────────────────────
+    bjj:        ['Guardia-Kimura', 'Passaggio-Mount-Armbar', 'Triangolo-Sweep', 'Guardia-Triangle-Armbar', 'Mount-Back take-Choke', 'Spider guard-Sweep-Mount', 'Guardia-Berimbolo-Back take'],
+    wrestling:  ['Livello-Shot-Takedown', 'Collar tie-Snap down-Sprawl', 'Single leg-Takedown', 'Double leg-Takedown-Controllo', 'Sprawl-Headlock', 'Underhook-Hip Throw'],
+    judo:       ['Kumikata-O-soto-gari', 'Kuzushi-Seoi-nage', 'Uchi mata-Controllo', 'Ko-uchi-gari-Tai-otoshi', 'Harai-goshi-Controllo', 'De-ashi-barai-Seoi-nage'],
+    sambo:      ['Kurtka grip-Hip Throw', 'Leg pick-Takedown', 'Leg sweep-Controllo', 'Ashi-garami-Leg lock', 'Sacrifice Throw-Controllo', 'Ankle pick-Sgambetto'],
+    lutalivre:  ['Guillotine-Controllo', 'Heel hook-Leg lock', 'Takedown-Mount-Choke', 'Guardia-Sweep-Back take', 'Kneebar-Leva'],
+    hapkido:    ['Leva al polso-Proiezione', 'Devia-Leva al gomito', 'Calcio basso-Leva alla spalla', 'Contropresa-Proiezione', 'Circolare-Leva-Immobilizzazione'],
+    // ── Striking tradizionale / arti miste ─────────────────────────────────
+    capoeira:   ['Ginga-Meia lua-Queixada', 'Armada-Martelo', 'Au-Rasteira', 'Queixada-Esquiva-Armada', 'Bênção-Meia lua de compasso', 'Ginga-Rasteira'],
+    wingchun:   ['Chain Punch-Chain Punch', 'Tan sao-Cross', 'Bong sao-Contropugno', 'Pak sao-Palm Strike', 'Chi sao-Chain Punch-Elbow', 'Wu sao-Tan sao-Palm Strike'],
+    kungfu:     ['Horse stance-Palm Strike', 'Spear hand-Cross', 'Crane kick-Roundhouse', 'Pugno a vite-Gancio', 'Iron palm-Palm Strike-Elbow', 'Jab-Cross-Roundhouse'],
+    silat:      ['Kuda-kuda-Sapuan', 'Harimau-Kuncian', 'Langkah-Elbow-Kuncian', 'Deviazione-Palm Strike-Sapuan', 'Sapuan-Kuncian-Proiezione'],
+    kendo:      ['Men jab', 'Kote hook-Men jab', 'Do cross', 'Tsuki jab', 'Kote hook-Men jab-Do cross', 'Debana kote hook'],
+    sanda:      ['Jab-Cross-Sgambetto', 'Roundhouse-Catch-Takedown', 'Low Kick-Cross-Clinch', 'Jab-Roundhouse-Shoot', 'Cross-Hook-Sgambetto'],
+    pankration: ['Jab-Cross-Shoot', 'Low Kick-Clinch-Choke', 'Knee-Takedown-Controllo', 'Cross-Knee-Strangolamento', 'Teep-Cross-Sprawl'],
+    systema:    ['Palm Strike-Devia-Leva al polso', 'Palm Strike-Proiezione', 'Devia-Colpo-Controllo', 'Palm Strike-Elbow-Proiezione'],
+    // ── Fitness / flow / movimento (senza bersaglio) ───────────────────────
+    calisthenics: ['Squat-Push-up-Plank', 'Affondo-Squat-Plank', 'Push-up-Plank-Squat', 'Squat-Affondo-Push-up-Plank'],
+    crossfit:     ['Squat-Push-up-Corsa', 'Affondo-Squat-Plank', 'Push-up-Squat-Corsa', 'Burpee-Squat-Push-up'],
+    yoga:         ['Guerriero-Albero-Ponte', 'Piega in avanti-Guerriero-Albero', 'Respiro-Guerriero-Ponte', 'Albero-Piega in avanti-Ponte'],
+    running:      ['Affondo-Corsa', 'Corsa-Sprint-Affondo', 'Affondo-Corsa-Sprint'],
+    stretching:   ['Piega in avanti-Ponte', 'Affondo-Piega in avanti', 'Ponte-Piega in avanti-Albero'],
+    fitness:      ['Squat-Push-up-Plank-Corsa', 'Affondo-Squat-Plank', 'Push-up-Squat-Corsa'],
+    general:      ['Squat-Affondo-Plank', 'Corsa-Squat-Plank'],
     default:    ['Jab-Cross', 'Jab-Cross-Hook', 'Hook-Cross-Hook', 'Cross-Hook-Cross', 'Jab-Jab-Cross-Hook', 'Combo veloce 4 colpi'],
   };
 
   const pickCombo = useCallback((exclude = '') => {
-    const list = COMBO_LIBRARY[mode] || COMBO_LIBRARY.default;
+    // sparring_X / partner_drills usano il combo set della disciplina base (es. sparring_muaythai → muaythai)
+    const baseMode = String(mode || '').replace(/^sparring_/, '');
+    const list = COMBO_LIBRARY[mode] || COMBO_LIBRARY[baseMode] || COMBO_LIBRARY.default;
     const filtered = list.filter((c) => c !== exclude);
     return filtered[Math.floor(Math.random() * filtered.length)] || list[0];
   }, [mode]);
@@ -2626,6 +2669,9 @@ function VisualCoach() {
                     {guidedPlan[guidedIdx].focus && (
                       <p className="text-[12px] text-emerald-200/90 mt-1 leading-snug"><b className="uppercase text-[9px] tracking-wider opacity-70">Cosa fare</b><br />{guidedPlan[guidedIdx].focus}</p>
                     )}
+                    {strikeSurfaceFor(resolvePose((guidedPlan[guidedIdx].name || '').split(/[-–—,]/)[0].trim())) && (
+                      <p className="text-[11px] font-semibold mt-1 leading-snug" style={{ color: '#fbbf24' }}>🎯 Colpisci con: {strikeSurfaceFor(resolvePose((guidedPlan[guidedIdx].name || '').split(/[-–—,]/)[0].trim()))}</p>
+                    )}
                   </div>
                 </div>
                 {guidedPlan[guidedIdx].watchFor && (
@@ -2650,6 +2696,9 @@ function VisualCoach() {
                 {/* COSA FARE — grande e chiaro */}
                 {guidedPlan[guidedIdx].focus && (
                   <p className="text-[13px] font-semibold text-emerald-200 leading-snug px-2">{guidedPlan[guidedIdx].focus}</p>
+                )}
+                {strikeSurfaceFor(resolvePose((guidedPlan[guidedIdx].name || '').split(/[-–—,]/)[0].trim())) && (
+                  <p className="text-[12px] font-semibold" style={{ color: '#fbbf24' }}>🎯 Colpisci con: {strikeSurfaceFor(resolvePose((guidedPlan[guidedIdx].name || '').split(/[-–—,]/)[0].trim()))}</p>
                 )}
                 <div className="flex items-center justify-center gap-5 pt-1">
                   <div>
@@ -2844,7 +2893,10 @@ function VisualCoach() {
                               <div className="shrink-0" style={{ opacity: 0.92 }}>
                                 <StickFigure poseKey={poseKey} color="#fbbf24" size={68} highlight scene={sceneFor(mode)} />
                               </div>
-                              <p className="text-[12px] font-bold text-amber-200 flex items-start gap-1.5"><span className="shrink-0">🥊</span> <span><b className="uppercase text-[9px] tracking-wider opacity-80">Prova ora</b> · {parts.PROVA}</span></p>
+                              <div>
+                                <p className="text-[12px] font-bold text-amber-200 flex items-start gap-1.5"><span className="shrink-0">🥊</span> <span><b className="uppercase text-[9px] tracking-wider opacity-80">Prova ora</b> · {parts.PROVA}</span></p>
+                                {strikeSurfaceFor(poseKey) && <p className="text-[10px] font-semibold mt-1 pl-4 leading-snug" style={{ color: '#fde68a' }}>🎯 Colpisci con: {strikeSurfaceFor(poseKey)}</p>}
+                              </div>
                             </div>
                           );
                         })()}
