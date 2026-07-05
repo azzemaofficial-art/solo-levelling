@@ -1048,6 +1048,84 @@ function resolvePose(tech) {
   return 'stance';
 }
 
+// ── SPECCHIO: confronta gli angoli REALI (MediaPipe) con quelli ideali della tecnica ──
+// Deterministico e istantaneo: nessuna AI. Giunti ok/off + correzioni concrete.
+const POSE_FAMILY = {
+  jab: 'straight', cross: 'straight',
+  hook: 'hook', uppercut: 'uppercut', elbow: 'hook',
+  guard: 'guard', stance: 'guard', ready: 'guard', clinch: 'guard',
+  squat: 'squat', lunge: 'lunge',
+  teep: 'kick', roundhouse: 'kick', low_kick: 'kick', body_kick: 'kick', side_kick: 'kick', spinning: 'kick',
+  knee: 'knee',
+};
+const jointAngle = (L, a, b, c) => {
+  const A = L[a], B = L[b], C = L[c];
+  if (!A || !B || !C) return null;
+  const v1x = A.x - B.x, v1y = A.y - B.y, v2x = C.x - B.x, v2y = C.y - B.y;
+  const d = Math.hypot(v1x, v1y) * Math.hypot(v2x, v2y);
+  if (!d) return null;
+  return Math.round((Math.acos(Math.max(-1, Math.min(1, (v1x * v2x + v1y * v2y) / d))) * 180) / Math.PI);
+};
+const anglesFromLandmarks = (L) => {
+  if (!L || L.length < 29) return null;
+  const mid = (a, b, k) => (L[a] && L[b] ? (L[a][k] + L[b][k]) / 2 : null);
+  const sx = mid(11, 12, 'x'), sy = mid(11, 12, 'y'), hx = mid(23, 24, 'x'), hy = mid(23, 24, 'y');
+  const lean = (sx != null && hx != null) ? Math.round((Math.atan2(Math.abs(sx - hx), Math.abs(hy - sy) || 0.001) * 180) / Math.PI) : null;
+  return {
+    eL: jointAngle(L, 11, 13, 15), eR: jointAngle(L, 12, 14, 16),
+    kL: jointAngle(L, 23, 25, 27), kR: jointAngle(L, 24, 26, 28),
+    hL: jointAngle(L, 11, 23, 25), hR: jointAngle(L, 12, 24, 26), lean,
+  };
+};
+const _rng = (v, lo, hi) => v != null && v >= lo && v <= hi;
+function matchPose(a, key) {
+  if (!a) return null;
+  const J = {}; const hints = [];
+  const mark = (name, ok, hint) => { J[name] = a[name] == null ? 'na' : (ok ? 'ok' : 'off'); if (a[name] != null && !ok && hint) hints.push(hint); };
+  const extKey = (a.eL ?? -1) >= (a.eR ?? -1) ? 'eL' : 'eR';
+  const gKey = extKey === 'eL' ? 'eR' : 'eL';
+  const eMax = Math.max(a.eL ?? -1, a.eR ?? -1), eMin = Math.min(a.eL ?? 999, a.eR ?? 999);
+  const kneesSoft = () => { mark('kL', _rng(a.kL, 148, 178), 'piega un filo le ginocchia, non bloccarle'); mark('kR', _rng(a.kR, 148, 178), null); };
+  const torsoUp = (lim = 28) => { if (a.lean != null) { J.lean = a.lean <= lim ? 'ok' : 'off'; if (a.lean > lim) hints.push('raddrizza il busto'); } };
+  const fam = POSE_FAMILY[key] || 'posture';
+
+  if (fam === 'straight') {
+    mark(extKey, eMax >= 150, 'estendi di più il braccio che colpisce, quasi dritto');
+    mark(gKey, eMin <= 120, 'tieni l\'altra mano a guardia, gomito piegato');
+    kneesSoft(); torsoUp();
+  } else if (fam === 'hook') {
+    mark(extKey, _rng(eMax, 70, 130), 'gancio: gomito a circa 90°, parallelo a terra');
+    mark(gKey, eMin <= 120, 'guardia su con l\'altra mano'); kneesSoft(); torsoUp();
+  } else if (fam === 'uppercut') {
+    mark(extKey, _rng(eMax, 45, 110), 'montante: piega il gomito e sali dal basso');
+    mark(gKey, eMin <= 120, 'guardia su'); kneesSoft(); torsoUp();
+  } else if (fam === 'guard') {
+    mark('eL', _rng(a.eL, 55, 118), 'mani su: gomiti piegati a guardia'); mark('eR', _rng(a.eR, 55, 118), null);
+    kneesSoft(); torsoUp();
+  } else if (fam === 'squat') {
+    mark('kL', _rng(a.kL, 60, 120), 'scendi di più, cosce verso il parallelo'); mark('kR', _rng(a.kR, 60, 120), null);
+    if (a.hL != null || a.hR != null) mark(a.hL <= a.hR ? 'hL' : 'hR', _rng(Math.min(a.hL ?? 999, a.hR ?? 999), 50, 130), 'fianchi indietro e giù');
+    torsoUp(45);
+  } else if (fam === 'lunge') {
+    const kf = a.kL <= a.kR ? 'kL' : 'kR';
+    mark(kf, _rng(a[kf], 70, 120), 'ginocchio anteriore a circa 90°'); torsoUp(30);
+  } else if (fam === 'kick') {
+    const kk = (a.kL ?? -1) >= (a.kR ?? -1) ? 'kL' : 'kR';
+    mark(kk, (a[kk] ?? 0) >= 150, 'estendi la gamba che calcia');
+    if (a.lean != null) { J.lean = a.lean <= 48 ? 'ok' : 'off'; if (a.lean > 48) hints.push('resta in equilibrio, non sbilanciarti troppo'); }
+    mark(gKey, eMin <= 125, 'tieni le mani su mentre calci');
+  } else if (fam === 'knee') {
+    const hk = (a.hL ?? 999) <= (a.hR ?? 999) ? 'hL' : 'hR';
+    mark(hk, (a[hk] ?? 999) <= 105, 'alza di più il ginocchio verso il bersaglio'); torsoUp(40);
+  } else { // posture — utile per qualsiasi movimento/asana
+    kneesSoft(); torsoUp(35);
+  }
+
+  const vals = Object.values(J).filter((s) => s !== 'na');
+  const score = vals.length ? Math.round((vals.filter((s) => s === 'ok').length / vals.length) * 100) : 0;
+  return { score, joint: J, hints: hints.slice(0, 2) };
+}
+
 // Quale estremità colpisce, per pose → indice giunto (5 = mano SX, 8 = mano DX, 11 = piede SX)
 const STRIKE_ENDPOINT = {
   jab: 5, hook: 5, elbow: 5,
@@ -1434,6 +1512,16 @@ function VisualCoach() {
   const speakQueueRef = useRef([]);   // coda comandi da mostrare/leggere uno alla volta
   const presentingRef = useRef(false); // true mentre un comando è a schermo + in lettura
   const lastLandmarksRef = useRef(null); // ultimi landmark MediaPipe → angoli reali per l'AI
+  // ── SPECCHIO (corpo vs ideale) — feedback deterministico dallo scheletro ──
+  const [mirrorOn, setMirrorOn] = useState(false);
+  const [mirrorTech, setMirrorTech] = useState('guard');   // tecnica da rispecchiare (manuale)
+  const [mirrorState, setMirrorState] = useState(null);    // {score, joint, hints}
+  const [mirrorTargetKey, setMirrorTargetKey] = useState('guard');
+  const mirrorOnRef = useRef(false);
+  const mirrorTargetRef = useRef('guard');
+  const mirrorMatchRef = useRef(null);
+  const mirrorStateAtRef = useRef(0);
+  const mirrorSpeakRef = useRef({ t: 0, msg: '' });
   const observationsRef = useRef([]);  // osservazioni accumulate in auto (osserva N → 1 verdetto)
   const [observeProgress, setObserveProgress] = useState(0);
   // ── Cattura dati per l'alveare: ogni verdetto = 1 campione (angoli + esito + 👍/👎) ──
@@ -1842,6 +1930,31 @@ function VisualCoach() {
             du.drawLandmarks(result.landmarks[0],
               { color: '#FF6B35', lineWidth: 1, radius: 4 });
             lastLandmarksRef.current = result.landmarks[0];   // per la precisione AI (angoli reali)
+            // ── SPECCHIO: colora i giunti verde/rosso confrontando con la tecnica target ──
+            if (mirrorOnRef.current) {
+              const Lm = result.landmarks[0];
+              const m = matchPose(anglesFromLandmarks(Lm), mirrorTargetRef.current || 'guard');
+              mirrorMatchRef.current = m;
+              if (m) {
+                const JI = { eL: 13, eR: 14, kL: 25, kR: 26, hL: 23, hR: 24 };
+                for (const jn in JI) {
+                  const st = m.joint[jn]; if (!st || st === 'na') continue;
+                  const P = Lm[JI[jn]]; if (!P) continue;
+                  ctx.beginPath();
+                  ctx.arc(P.x * canvas.width, P.y * canvas.height, 9, 0, Math.PI * 2);
+                  ctx.fillStyle = st === 'ok' ? 'rgba(16,185,129,0.85)' : 'rgba(239,68,68,0.9)';
+                  ctx.fill(); ctx.lineWidth = 2.5; ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.stroke();
+                }
+                if (m.joint.lean && m.joint.lean !== 'na' && Lm[11] && Lm[12] && Lm[23] && Lm[24]) {
+                  const sX = ((Lm[11].x + Lm[12].x) / 2) * canvas.width, sY = ((Lm[11].y + Lm[12].y) / 2) * canvas.height;
+                  const hX = ((Lm[23].x + Lm[24].x) / 2) * canvas.width, hY = ((Lm[23].y + Lm[24].y) / 2) * canvas.height;
+                  ctx.beginPath(); ctx.moveTo(sX, sY); ctx.lineTo(hX, hY);
+                  ctx.strokeStyle = m.joint.lean === 'ok' ? 'rgba(16,185,129,0.9)' : 'rgba(239,68,68,0.9)'; ctx.lineWidth = 5; ctx.stroke();
+                }
+                const now = performance.now();
+                if (now - mirrorStateAtRef.current > 180) { mirrorStateAtRef.current = now; setMirrorState(m); }
+              }
+            }
             // Conta-ripetizioni (guidato): oscillazione angolo ginocchio/gomito
             if (guidedRunningRef.current) {
               const L = result.landmarks[0];
@@ -1883,6 +1996,33 @@ function VisualCoach() {
       setCentered(null);
     };
   }, [streaming, skeletonOn]);
+
+  // Specchio: sincronizza il ref on/off e reset stato
+  useEffect(() => { mirrorOnRef.current = mirrorOn; if (!mirrorOn) setMirrorState(null); }, [mirrorOn]);
+  // Specchio: la tecnica da rispecchiare segue il guidato/combo, altrimenti la scelta manuale
+  useEffect(() => {
+    let key;
+    if (guidedOn && (guidedPhase === 'running' || guidedPhase === 'ready') && guidedPlan[guidedIdx]) {
+      key = resolvePose((guidedPlan[guidedIdx].name || '').split(/[-–—,]/)[0].trim());
+    } else if (comboOn && currentCombo) {
+      key = resolvePose(currentCombo.split('-')[0].trim());
+    } else {
+      key = mirrorTech;
+    }
+    mirrorTargetRef.current = key; setMirrorTargetKey(key);
+  }, [guidedOn, guidedPhase, guidedIdx, guidedPlan, comboOn, currentCombo, mirrorTech]);
+
+  // Specchio: legge a voce la correzione principale (max ogni 6s, solo se punteggio basso)
+  useEffect(() => {
+    if (!mirrorOn || !voiceOn || !mirrorState) return;
+    const h = mirrorState.hints?.[0];
+    if (!h || (mirrorState.score ?? 0) >= 70) return;
+    const now = Date.now();
+    if (now - mirrorSpeakRef.current.t > 6000 && h !== mirrorSpeakRef.current.msg) {
+      mirrorSpeakRef.current = { t: now, msg: h };
+      enqueueSpeak(h);
+    }
+  }, [mirrorState, mirrorOn, voiceOn, enqueueSpeak]);
 
   const buildPrompt = useCallback((basePrompt) => {
     let p = basePrompt || '';
@@ -2748,6 +2888,75 @@ function VisualCoach() {
 
         {/* COMANDI principali */}
         <div className="px-3 pt-3 flex flex-col gap-2">
+          {/* ── SPECCHIO: il tuo corpo vs l'ideale ──────────────────────────── */}
+          <motion.button whileTap={{ scale: 0.97 }} onClick={() => { setMirrorOn((v) => !v); if (!mirrorOn) { setSkeletonOn(true); unlockSpeech(); } }}
+            className="w-full py-2.5 rounded-xl text-white text-sm font-black flex items-center justify-center gap-2"
+            style={mirrorOn
+              ? { background: 'linear-gradient(135deg, #10b981, #0ea5e9)', boxShadow: '0 4px 18px rgba(14,165,233,0.4)' }
+              : { background: 'rgba(55,65,81,0.7)', border: '1px solid rgba(255,255,255,0.1)' }}>
+            🪞 Specchio {mirrorOn ? 'ON' : 'OFF'}
+          </motion.button>
+          {mirrorOn && (() => {
+            const sc = mirrorState?.score ?? 0;
+            const scColor = sc >= 80 ? C.emerald.hex : sc >= 55 ? C.amber.hex : '#ef4444';
+            const LBL = { guard: 'Guardia', jab: 'Jab', cross: 'Cross', hook: 'Gancio', uppercut: 'Montante', teep: 'Teep', roundhouse: 'Calcio', knee: 'Ginocchio', side_kick: 'Side kick', low_kick: 'Low kick', body_kick: 'Body kick', squat: 'Squat', pushup: 'Push-up', plank: 'Plank', lunge: 'Affondo', warrior: 'Warrior', tree: 'Albero', forward_fold: 'Piega', breathe: 'Respiro', run: 'Corsa', bridge: 'Ponte' };
+            const chips = sceneFor(mode) === 'solo'
+              ? ['squat', 'pushup', 'plank', 'lunge', 'warrior', 'tree', 'forward_fold', 'breathe']
+              : ['guard', 'jab', 'cross', 'hook', 'uppercut', 'teep', 'roundhouse', 'knee'];
+            const following = (guidedOn && (guidedPhase === 'running' || guidedPhase === 'ready')) || comboOn;
+            return (
+              <div className="rounded-2xl p-3 space-y-2.5" style={{ background: 'linear-gradient(135deg, rgba(16,185,129,0.12), rgba(14,165,233,0.10))', border: '1px solid rgba(16,185,129,0.3)' }}>
+                <div className="flex items-center gap-3">
+                  {/* anello punteggio */}
+                  <div className="relative flex-shrink-0" style={{ width: 62, height: 62 }}>
+                    <svg width={62} height={62} viewBox="0 0 62 62">
+                      <circle cx={31} cy={31} r={26} fill="none" stroke="#1f2937" strokeWidth={6} />
+                      <circle cx={31} cy={31} r={26} fill="none" stroke={scColor} strokeWidth={6} strokeLinecap="round"
+                        strokeDasharray={2 * Math.PI * 26} strokeDashoffset={2 * Math.PI * 26 * (1 - sc / 100)}
+                        transform="rotate(-90 31 31)" style={{ transition: 'stroke-dashoffset 0.2s linear, stroke 0.2s' }} />
+                    </svg>
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <span className="text-lg font-black" style={{ color: scColor }}>{sc}<span className="text-[9px]">%</span></span>
+                    </div>
+                  </div>
+                  {/* figura target + nome */}
+                  <div className="flex-shrink-0" style={{ opacity: 0.95 }}>
+                    <StickFigure poseKey={mirrorTargetKey} color={C.emerald.hex} size={58} highlight scene={sceneFor(mode)} />
+                  </div>
+                  {/* correzioni */}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[9px] uppercase tracking-widest text-emerald-300/80">Rispecchi: <b className="text-emerald-200">{LBL[mirrorTargetKey] || mirrorTargetKey}</b></p>
+                    {!mirrorState ? (
+                      <p className="text-[11px] text-gray-400 mt-1">Inquadrati tutto e muoviti…</p>
+                    ) : sc >= 82 ? (
+                      <p className="text-[13px] font-bold text-emerald-300 mt-1">✓ Perfetto, tieni così!</p>
+                    ) : mirrorState.hints?.length ? (
+                      mirrorState.hints.map((h, i) => <p key={i} className="text-[12px] font-semibold text-red-300 mt-1 leading-snug">→ {h}</p>)
+                    ) : (
+                      <p className="text-[12px] text-amber-300 mt-1">Aggiusta i giunti rossi</p>
+                    )}
+                  </div>
+                </div>
+                {/* selettore tecnica (solo se non stai seguendo guidato/combo) */}
+                {following ? (
+                  <p className="text-[10px] text-center text-gray-400">Segue automaticamente l'esercizio in corso</p>
+                ) : (
+                  <div className="flex items-center gap-1 overflow-x-auto pb-0.5">
+                    {chips.map((k) => (
+                      <button key={k} onClick={() => setMirrorTech(k)}
+                        className="text-[10px] font-bold px-2 py-1 rounded-full whitespace-nowrap flex-shrink-0 transition-all"
+                        style={mirrorTech === k
+                          ? { background: C.emerald.hex, color: '#0b0e14' }
+                          : { background: 'rgba(255,255,255,0.06)', color: '#9ca3af', border: '1px solid rgba(255,255,255,0.1)' }}>
+                        {LBL[k] || k}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <p className="text-[9px] text-center text-emerald-300/60">🟢 giunto corretto · 🔴 da aggiustare — usa la fotocamera frontale (Gira)</p>
+              </div>
+            );
+          })()}
           <div className="flex gap-2">
             <motion.button whileTap={{ scale: 0.93 }} onClick={captureAndAnalyze} disabled={analyzing}
               className="flex-1 py-3.5 rounded-xl text-white text-sm font-black transition-all disabled:opacity-40 relative overflow-hidden"
