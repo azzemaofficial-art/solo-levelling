@@ -1536,13 +1536,17 @@ const STRIKE_KEY_MATCH = [
   ['sprawl', /sprawl/i],
 ];
 
-// Costruisce la rubrica di conoscenza da maestro sulle tecniche riconosciute in un testo libero
-// (es. targetCombo). Vuota se nulla matcha → retrocompatibile, nessun effetto sui call site esistenti.
-function strikeMasteryRubric(text) {
+// Costruisce la rubrica di conoscenza da maestro sulle tecniche riconosciute in un testo.
+// `strict`: usa pattern più stretti per il TESTO LIBERO (osservazioni AI in italiano), dove
+// pattern larghi come \b2\b/\b3\b o "guard"/"round" nudi colliderebbero con parole comuni
+// ("angolo di 2°", "guardia", "il primo round") — nel targetCombo (stringa breve e controllata
+// tipo "Jab-Cross-Hook" o "1-2-3") quei pattern sono invece sicuri e voluti.
+function strikeMasteryRubric(text, strict = false) {
   const t = String(text || '');
   const found = [];
   for (const [key, re] of STRIKE_KEY_MATCH) {
-    if (re.test(t) && STRIKE_MASTERY[key] && !found.includes(key)) found.push(key);
+    const pattern = (strict && STRIKE_KEY_MATCH_STRICT[key]) || re;
+    if (pattern.test(t) && STRIKE_MASTERY[key] && !found.includes(key)) found.push(key);
   }
   if (!found.length) return '';
   const lines = found.slice(0, 4).map((k) => {
@@ -1551,6 +1555,15 @@ function strikeMasteryRubric(text) {
   });
   return `\nCONOSCENZA DA MAESTRO sulle tecniche chiamate (usala per giudicare con precisione chirurgica, senza inventare ciò che non è visibile nel frame):\n${lines.join('\n')}`;
 }
+// Override stretti SOLO per il testo libero (osservazioni AI): niente cifre nude (2/3) e niente
+// "guard"/"round" nudi — troppo comuni nella prosa italiana ("guardia", "il primo round", angoli in gradi).
+// Nel targetCombo (stringa breve e controllata) restano invece i pattern larghi originali.
+const STRIKE_KEY_MATCH_STRICT = {
+  cross: /\bcross\b|oi zuki|gyaku zuki/i,
+  hook: /\bhook\b|gancio/i,
+  roundhouse: /roundhouse|mawashi|dollyo|high kick/i,
+  clinch: /clinch|mount|kimura|choke|leva|submission/i,
+};
 
 // Costruisce il blocco rubrica errori per il cervello (vuoto se disciplina non coperta → retrocompat).
 const errorsRubric = (mode, label) => {
@@ -1624,6 +1637,7 @@ async function callBrainOrchestrator({ isSparring, disciplineLabel, techObs, bio
     biomechObs ? `\nOSSERVATORE BIOMECCANICO:\n${biomechObs}` : '',
     antiRepeatContext ? `\n${antiRepeatContext}` : '',
     errorsRubric(disciplineMode, disciplineLabel),
+    strikeMasteryRubric(`${techObs || ''} ${biomechObs || ''}`, true),
     `\nFondi e restituisci il comando di coaching nel formato richiesto.`,
   ].filter(Boolean).join('\n');
 
@@ -1701,6 +1715,7 @@ async function callBrainVerdict({ disciplineLabel, observations, antiRepeatConte
     ...observations.map((o, i) => `Momento ${i + 1}: ${o}`),
     antiRepeatContext ? `\n${antiRepeatContext}` : '',
     errorsRubric(disciplineMode, disciplineLabel),
+    strikeMasteryRubric(observations.join(' '), true),
     `\nTrova il pattern ricorrente e restituisci il comando finale nel formato richiesto.`,
   ].filter(Boolean).join('\n');
 
