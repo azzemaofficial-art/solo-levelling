@@ -1413,6 +1413,145 @@ const COMMON_ERRORS = {
   ],
 };
 
+// ─── STRIKE_MASTERY — conoscenza da maestro per TIPO DI COLPO (trasversale a tutte le discipline) ───
+// Un jab è biomeccanicamente lo stesso gesto in boxe, muay thai, MMA, karate: qui la catena cinetica,
+// il segreto da campione, il riferimento angolare e il respiro per ogni tecnica, indipendenti dallo stile.
+const STRIKE_MASTERY = {
+  jab: {
+    chain: 'Parte dal piede anteriore che spinge a terra, sale al fianco che ruota appena, spalla che si estende per ultima — il braccio è l\'ultimo anello, non il motore',
+    secret: 'I campioni non "lanciano" il jab: lo fanno scattare come un elastico e lo ritraggono ALLA STESSA velocità con cui esce — è la retrazione, non l\'estensione, che fa la differenza in un vero match',
+    angle: 'Gomito quasi in estensione completa (~170°) al momento dell\'impatto, mai bloccato oltre i 175° (rischio iperestensione)',
+    breath: 'Sbuffo secco dal naso o dalla bocca ESATTAMENTE all\'impatto — mai trattenuto, mai prima del colpo',
+  },
+  cross: {
+    chain: 'Il vero motore è la rotazione del tallone posteriore che si solleva e ruota, trascina l\'anca, poi la spalla, il pugno arriva per ultimo già "caricato" dalla rotazione',
+    secret: 'Il tallone posteriore deve girare come se stessi spegnendo un mozzicone di sigaretta — se il tallone non ruota, il colpo è solo braccio e perde il 60% della potenza potenziale',
+    angle: 'Rotazione anca ~45-60° rispetto alla posizione di guardia, spalla che segue a ruota, gomito esteso ma non bloccato',
+    breath: 'Espirazione esplosiva dal diaframma, non dal petto — il suono è un "sss" o "hff" secco',
+  },
+  hook: {
+    chain: 'Parte dalla rotazione del piede anteriore che perno sull\'avampiede, sale al ginocchio che ruota verso l\'interno, l\'anca segue, il busto ruota come un\'elica e il pugno arriva perpendicolare al bersaglio per ultimo',
+    secret: 'Il segreto è il perno del piede, non la rotazione del braccio: i campioni "avvitano" il tallone anteriore verso l\'esterno mentre il pugno viaggia in orizzontale — il gomito resta fisso a ~90°, è il busto che gira attorno ad esso, non il braccio che sferza',
+    angle: 'Gomito flesso a ~90° per tutta la traiettoria, avambraccio parallelo al pavimento al momento dell\'impatto, mai a pendolo verticale',
+    breath: 'Espirazione breve e tagliente sincronizzata col picco della rotazione del busto, non con l\'apertura del braccio',
+  },
+  uppercut: {
+    chain: 'Nasce dalla flessione delle ginocchia che abbassano il baricentro di pochi centimetri, poi l\'estensione esplosiva delle gambe spinge l\'anca in avanti e verso l\'alto, il pugno sale in linea retta per ultimo lungo la verticale',
+    secret: 'I principianti spingono con la spalla dall\'alto verso il basso poi risalgono: il campione invece carica nelle gambe e lascia che sia la spinta verticale del corpo a "sparare" il pugno dal basso, il braccio è quasi passivo fino all\'ultimo istante',
+    angle: 'Ginocchia flesse ~15-20° in caricamento, gomito che parte a ~45° e si chiude a ~70-80° all\'impatto, pugno che sale su traiettoria verticale non ad arco largo',
+    breath: 'Inspirazione breve nel caricamento delle gambe, espirazione esplosiva sincronizzata con l\'estensione verso l\'alto',
+  },
+  elbow: {
+    chain: 'La spinta nasce dalla rotazione del busto guidata dall\'anca, la spalla si proietta in avanti e il gomito arriva per ultimo come punta — mai il tricipite come motore primario',
+    secret: 'Il campione guida il colpo con la spalla, non con l\'avambraccio: se guardi il gomito come "punta di lancia" e lasci che tutto il peso del corpo lo segua nella rotazione, il taglio è devastante; chi usa solo il braccio produce solo una spinta debole',
+    angle: 'Gomito piegato a meno di 90° (angolo acuto, ~60-80°) per massimizzare la densità dell\'impatto sulla punta ossea, busto ruotato ~30-45°',
+    breath: 'Espirazione secca e corta esattamente al contatto, tipica di un colpo a corta distanza, mai un respiro lungo',
+  },
+  knee: {
+    chain: 'Parte dall\'anca del lato che colpisce che si flette e sale, il ginocchio d\'appoggio si piega leggermente per abbassare il baricentro e generare spinta verticale, le mani (in clinch) tirano la testa dell\'avversario verso il ginocchio in arrivo — è un movimento di incontro, non solo di spinta',
+    secret: 'Il vero potere non è "alzare il ginocchio" ma tirare il bersaglio verso il ginocchio mentre sale: in clinch i campioni agganciano la nuca e strappano la testa in basso nello stesso istante in cui il ginocchio sale, raddoppiando la velocità relativa d\'impatto',
+    angle: 'Ginocchio che sale a ~90° o oltre rispetto al busto, anca completamente flessa, gamba d\'appoggio con ginocchio morbido non rigido',
+    breath: 'Espirazione forte dal core sincronizzata con la trazione delle mani e la salita del ginocchio, un unico impulso non due tempi',
+  },
+  teep: {
+    chain: 'Il ginocchio sale al petto prima dell\'estensione della gamba, l\'anca del lato che calcia spinge in avanti, il tallone o la pianta del piede si estendono per ultimi lungo una linea retta verso il bersaglio, il busto fa un leggero lean-back per bilanciare',
+    secret: 'Non è un calcio, è una spinta: il campione pensa "spingo una porta con la pianta del piede" non "calcio in avanti" — l\'anca deve completare l\'estensione PRIMA che il piede tocchi, altrimenti è solo il peso della gamba a colpire e l\'avversario non vola indietro',
+    angle: 'Ginocchio che sale oltre ~90° prima dell\'estensione, gamba quasi completamente distesa all\'impatto, lean-back del busto ~10-15° per non perdere equilibrio',
+    breath: 'Espirazione esplosiva dal diaframma nel momento esatto dell\'estensione della gamba, non prima',
+  },
+  low_kick: {
+    chain: 'Il piede d\'appoggio ruota per primo di ~45-90° verso il bersaglio, l\'anca segue ruotando completamente, la gamba calciante viaggia rilassata come una frusta e la tibia arriva per ultima già accelerata dalla rotazione dell\'anca',
+    secret: 'Il segreto è la rotazione totale del piede e dell\'anca d\'appoggio: se il piede portante resta fisso a terra, il calcio è solo il 30% della potenza possibile; i campioni "vuotano" completamente l\'anca ruotando il bacino oltre il bersaglio, non fermandosi su di esso',
+    angle: 'Piede d\'appoggio ruotato ~90° (tallone che punta verso il bersaglio), anca ruotata ~45-90°, contatto con il terzo inferiore della tibia non con il collo del piede',
+    breath: 'Espirazione tagliente sincronizzata col momento dell\'impatto della tibia, non con l\'inizio del movimento della gamba',
+  },
+  body_kick: {
+    chain: 'Stesso principio del roundhouse ma con traiettoria più orizzontale: piede d\'appoggio ruota, anca ruota completamente portando il ginocchio all\'altezza delle costole, la gamba si estende e la tibia arriva parallela al pavimento',
+    secret: 'Il campione mira ATTRAVERSO il bersaglio, non sulla superficie: l\'intenzione è far arrivare la tibia a 15-20cm oltre le costole dell\'avversario, questo garantisce che la velocità massima si esprima proprio al momento del contatto e non prima',
+    angle: 'Ginocchio che sale all\'altezza delle costole prima dell\'estensione, anca ruotata quasi completamente (~90°), busto che si inclina leggermente dal lato opposto per bilanciare',
+    breath: 'Espirazione profonda ed esplosiva dal core, più lunga rispetto al low kick data la maggiore massa muscolare coinvolta nella rotazione',
+  },
+  roundhouse: {
+    chain: 'Il piede d\'appoggio ruota per primo, il ginocchio sale piegato verso il bersaglio (camera), poi la gamba si estende a frusta mentre l\'anca completa la rotazione, il piede o la tibia arrivano per ultimi già alla massima velocità',
+    secret: 'I campioni "caricano" sempre il ginocchio prima di estendere: alzare il ginocchio a 90° in camera crea l\'effetto frusta, chi estende la gamba troppo presto perde tutta l\'accelerazione angolare e colpisce con la sola forza del quadricipite',
+    angle: 'Ginocchio in camera a ~90-100° prima dell\'estensione, anca ruotata ~90° a fine movimento, gamba d\'appoggio con tallone che punta verso il bersaglio',
+    breath: 'Espirazione esplosiva sincronizzata con l\'estensione finale della gamba, mai con il sollevamento del ginocchio',
+  },
+  side_kick: {
+    chain: 'Il ginocchio sale piegato lateralmente al petto, l\'anca ruota di taglio (fianco verso il bersaglio) e il piede si estende in linea retta spingendo dal tallone, tutto il peso del busto segue leggermente all\'indietro nella direzione opposta come contrappeso',
+    secret: 'Il campione spinge col tallone come un pistone, mai con la punta: la rotazione dell\'anca deve mettere il fianco perpendicolare al bersaglio PRIMA dell\'estensione, altrimenti il colpo perde penetrazione e diventa solo una spinta laterale debole',
+    angle: 'Anca ruotata a ~90° (fianco rivolto al bersaglio), ginocchio in camera stretta prima dell\'estensione, piede con tallone avanti e punta verso il basso all\'impatto',
+    breath: 'Espirazione lunga e controllata durante l\'estensione, più prolungata rispetto ai calci circolari per via della maggiore distanza di spinta',
+  },
+  spinning: {
+    chain: 'Il movimento inizia dalla rotazione della testa che individua il bersaglio (spotting), seguita dal busto e poi dai piedi che perno in sequenza, il colpo (calcio o gomito) arriva per ultimo dopo che la rotazione ha già raggiunto la massima velocità angolare',
+    secret: 'Il segreto è "spottare" con gli occhi il bersaglio per primo, prima ancora che il corpo inizi a girare: i principianti girano alla cieca e perdono l\'allineamento; i campioni fissano il bersaglio, girano la testa per ultima solo per il tempo minimo necessario e la ritrovano subito dopo il colpo per non perdere l\'equilibrio',
+    angle: 'Rotazione completa del busto di ~180-360° a seconda della tecnica, ginocchio o gomito che arriva a fine rotazione con la massima velocità angolare accumulata, baricentro basso per tutta la rotazione',
+    breath: 'Apnea breve controllata durante la rotazione per stabilizzare il core, espirazione esplosiva solo nell\'istante finale dell\'impatto',
+  },
+  throw: {
+    chain: 'Prima il kuzushi (sbilanciamento) tramite trazione delle braccia e spostamento del proprio peso, poi il tsukuri (entrata, abbassamento del baricentro sotto quello dell\'avversario), infine il kake (esecuzione) dove le gambe e le anche completano la proiezione',
+    secret: 'Il campione proietta con le gambe e l\'anca, non con le braccia: le braccia servono solo a controllare la direzione e il kuzushi iniziale — se senti di "tirare" con le braccia per far cadere l\'avversario, la proiezione fallirà contro chi ha più forza; il kuzushi deve precedere sempre l\'entrata',
+    angle: 'Ginocchia flesse e baricentro abbassato sotto quello dell\'avversario durante il tsukuri, schiena dritta non curva, anca che spinge contro il bacino avversario nel momento del kake',
+    breath: 'Espirazione concentrata e continua durante tutto il kake (esecuzione), mai trattenuta — il respiro trattenuto irrigidisce e rallenta la rotazione delle anche',
+  },
+  shoot: {
+    chain: 'Parte da un abbassamento di livello con le ginocchia (level change), seguito da un penetration step esplosivo in avanti con il ginocchio quasi a terra, la testa va al fianco esterno dell\'avversario mai al centro, le mani chiudono dietro le ginocchia o le anche per completare la presa',
+    secret: 'Il segreto è il level change PRIMA del passo, non durante: il campione abbassa il baricentro un istante prima di esplodere in avanti, così l\'avversario non riesce a sprawlare in tempo; chi scende e avanza nello stesso movimento perde l\'elemento sorpresa e viene sprawlato facilmente',
+    angle: 'Ginocchio anteriore che arriva quasi a terra nel penetration step, schiena dritta non curva in avanti, testa posizionata al fianco esterno dell\'avversario a circa 30-45° dal centro',
+    breath: 'Inspirazione rapida nel level change, espirazione esplosiva durante l\'esplosione in avanti del penetration step',
+  },
+  clinch: {
+    chain: 'Le mani agganciano prima la posizione dominante (nuca, colletto, manica a seconda della disciplina), i gomiti si stringono verso il centro per creare leva, poi il busto e le anche applicano la pressione o la trazione per controllare la struttura avversaria',
+    secret: 'Il campione vince il clinch con la struttura non con la forza bruta: gomiti stretti al corpo e polsi mai isolati creano leva meccanica; chi tiene i gomiti larghi o le braccia distese perde immediatamente il controllo perché l\'avversario può spezzare la presa con un solo strappo',
+    angle: 'Gomiti raccolti vicino al busto (non oltre ~30-40cm dal corpo), polsi allineati con l\'avambraccio senza flessione laterale, testa e collo dell\'avversario tirati verso il basso e in dentro',
+    breath: 'Respirazione corta e continua, mai trattenuta a lungo — il clinch è uno sforzo isometrico prolungato e l\'apnea porta rapidamente a esaurimento',
+  },
+  sprawl: {
+    chain: 'Le anche si sparano indietro e verso il basso mentre le gambe scattano all\'indietro allargando la base, il petto scende a schiacciare sulla schiena o le spalle dell\'avversario, il peso del corpo cade in verticale sopra il collo/schiena del compagno',
+    secret: 'Il segreto è sparare le ANCHE indietro, non solo arretrare i piedi: il campione lascia cadere il proprio peso di petto sulla schiena dell\'avversario nello stesso istante in cui le gambe allargano la base, così l\'avversario si ritrova schiacciato e senza spazio per completare il takedown',
+    angle: 'Anche che scendono quasi a terra dietro le gambe allargate a base larga, petto che preme sulla parte alta della schiena avversaria, gambe distese all\'indietro non raccolte sotto il busto',
+    breath: 'Espirazione forte ed esplosiva nell\'istante dello sparo delle anche, seguita da respirazione corta per mantenere la pressione del petto',
+  },
+};
+
+// Riconosce le tecniche/combo chiamate (in italiano, inglese o nel gergo delle varie discipline) dentro
+// un testo libero come targetCombo, per iniettare la conoscenza da maestro pertinente nel giudice.
+const STRIKE_KEY_MATCH = [
+  ['jab', /jab|\bpunch\b|palm strike|zuki|chok\b/i],
+  ['cross', /\bcross\b|\b2\b|oi zuki|gyaku zuki/i],
+  ['hook', /\bhook\b|\b3\b|gancio/i],
+  ['uppercut', /uppercut|montante/i],
+  ['elbow', /elbow|gomit|sok/i],
+  ['knee', /\bknee\b|ginocch|kao/i],
+  ['teep', /\bteep\b|front kick|mae geri|b[eê]n[cç][aã]o/i],
+  ['low_kick', /low kick|tee kha/i],
+  ['body_kick', /body kick/i],
+  ['roundhouse', /round|mawashi|dollyo|high kick/i],
+  ['side_kick', /side kick|yoko|yeop/i],
+  ['spinning', /spin|salab|dwi chagi/i],
+  ['throw', /throw|proiez|seoi|nage|goshi|gari|otoshi|sgamb|sweep|rasteira/i],
+  ['shoot', /shoot|double leg|single leg|takedown|penetr/i],
+  ['clinch', /clinch|guard|mount|kimura|choke|leva|submission/i],
+  ['sprawl', /sprawl/i],
+];
+
+// Costruisce la rubrica di conoscenza da maestro sulle tecniche riconosciute in un testo libero
+// (es. targetCombo). Vuota se nulla matcha → retrocompatibile, nessun effetto sui call site esistenti.
+function strikeMasteryRubric(text) {
+  const t = String(text || '');
+  const found = [];
+  for (const [key, re] of STRIKE_KEY_MATCH) {
+    if (re.test(t) && STRIKE_MASTERY[key] && !found.includes(key)) found.push(key);
+  }
+  if (!found.length) return '';
+  const lines = found.slice(0, 4).map((k) => {
+    const m = STRIKE_MASTERY[k];
+    return `${k.toUpperCase()}: catena cinetica: ${m.chain}. Segreto da maestro: ${m.secret}. Riferimento angolare: ${m.angle}. Respiro: ${m.breath}.`;
+  });
+  return `\nCONOSCENZA DA MAESTRO sulle tecniche chiamate (usala per giudicare con precisione chirurgica, senza inventare ciò che non è visibile nel frame):\n${lines.join('\n')}`;
+}
+
 // Costruisce il blocco rubrica errori per il cervello (vuoto se disciplina non coperta → retrocompat).
 const errorsRubric = (mode, label) => {
   const list = COMMON_ERRORS[mode];
@@ -1819,7 +1958,7 @@ FORMATO (esatto, NO markdown, NO emoji, 3 righe):
 VOTO: perfetto | buono | riprova
 FEEDBACK: <1 frase — se buono/perfetto: la cosa migliore fatta. Se riprova: il principale errore con parte del corpo>
 PROSSIMO: <il prossimo combo da chiamare, specifico per la disciplina, DIVERSO dall'attuale, es. "cross-gancio-low kick">`;
-    const userMsg = `L'atleta doveva eseguire: "${targetCombo}". ${poseHint ? `Dati scheletro: ${poseHint}.` : ''}\nGuarda il frame e giudica l'esecuzione.`;
+    const userMsg = `L'atleta doveva eseguire: "${targetCombo}". ${poseHint ? `Dati scheletro: ${poseHint}.` : ''}\nGuarda il frame e giudica l'esecuzione.${strikeMasteryRubric(targetCombo)}`;
     let judgeResult = null;
     if (_groqKey) {
       try {
