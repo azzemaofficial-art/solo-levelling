@@ -1513,6 +1513,78 @@ const STRIKE_MASTERY = {
     angle: 'Anche che scendono quasi a terra dietro le gambe allargate a base larga, petto che preme sulla parte alta della schiena avversaria, gambe distese all\'indietro non raccolte sotto il busto',
     breath: 'Espirazione forte ed esplosiva nell\'istante dello sparo delle anche, seguita da respirazione corta per mantenere la pressione del petto',
   },
+  armbar: {
+    chain: "Il controllo parte dall'anca che si solleva e blocca la spalla dell'avversario, le gambe si chiudono a tenaglia sul bicipite, l'estensione del bacino verso l'alto crea la leva finale sul gomito",
+    secret: "I campioni non tirano il braccio: sollevano il BACINO verso il soffitto mantenendo il gomito fisso al centro del petto — è l'anca che crea la pressione, mai le braccia che strappano",
+    angle: "Gomito dell'avversario iperesteso oltre i 180° (leva ottimale a partire da ~185-190°), bacino sollevato a ~30-40° dal tappeto",
+    breath: "Espirazione lenta e continua durante la pressione crescente — mai un'esplosione improvvisa, la leva cresce con calma e controllo",
+  },
+  triangle: {
+    chain: "Le gambe si chiudono a triangolo attorno al collo e a un braccio dell'avversario, il bacino si solleva e ruota lateralmente per stringere la carotide contro il proprio stinco, le mani tirano la testa verso il basso per chiudere l'angolo",
+    secret: "Il campione non stringe le gambe come una tenaglia semplice: angola il bacino di lato e tira la testa dell'avversario verso il basso con le mani, così lo stinco comprime la carotide invece che le gambe si stanchino a stringere senza risultato",
+    angle: "Angolo tra le due cosce inferiore a 90° per creare la compressione, bacino ruotato di circa 45° verso il lato del braccio intrappolato",
+    breath: "Respirazione controllata e continua durante il posizionamento, apnea breve solo nell'istante finale della stretta",
+  },
+  kimura: {
+    chain: "La presa parte dal polso dell'avversario bloccato dietro la schiena, il gomito libero si aggancia sopra il suo gomito, la rotazione avviene ruotando l'intero busto e non solo il braccio, la spalla dell'avversario ruota internamente oltre il limite naturale",
+    secret: "Il campione ruota con tutto il corpo, non con la sola presa: tirare solo con le braccia rende la leva debole, mentre ruotare anca e busto insieme alla presa fa salire il polso dietro la schiena con potenza molto superiore e la spalla cede rapidamente",
+    angle: "Rotazione interna della spalla oltre i 90° rispetto alla posizione neutra, gomito dell'avversario piegato a circa 90° per tutta la leva",
+    breath: "Espirazione lenta e crescente durante l'applicazione della leva, mai un respiro trattenuto che irrigidisce le spalle",
+  },
+  guillotine: {
+    chain: "Il braccio avvolge la gola dell'avversario da davanti durante l'ingresso in clinch o dopo uno sprawl, la mano libera afferra il polso o il bicipite per chiudere la presa, le anche arretrano e si flettono per creare trazione mentre le gambe eventualmente si chiudono a guardia per bloccare la struttura",
+    secret: "Il campione stringe con le anche che arretrano, non con il solo bicipite: tirare indietro il bacino mentre il braccio resta fermo attorno al collo genera una compressione molto più forte di quanto qualsiasi bicipite possa fare da solo",
+    angle: "Avambraccio a diretto contatto con la trachea a circa 90° rispetto al busto dell'avversario, anche arretrate di 20-30cm rispetto alla posizione neutra per la trazione",
+    breath: "Espirazione continua e progressiva durante la trazione, mai un'esplosione improvvisa che fa perdere la presa",
+  },
+  rear_naked_choke: {
+    chain: "Il braccio avvolge il collo da dietro con il gomito sotto il mento dell'avversario, la mano libera si aggancia al bicipite dell'altro braccio, la mano dell'altro braccio preme dietro la nuca a chiudere il triangolo di compressione, le gambe agganciano i fianchi per impedire la fuga",
+    secret: "Il campione non stringe il bicipite con forza bruta: preme la testa dell'avversario in avanti con la mano dietro la nuca mentre il gomito resta fisso sotto il mento, così la compressione arriva dalla geometria della presa e non dalla fatica del bicipite",
+    angle: "Gomito posizionato esattamente sotto il mento per bloccare la trachea al centro, non lateralmente sulla gola, presa delle gambe attorno ai fianchi a circa 90°",
+    breath: "Respirazione controllata e regolare per mantenere la presa a lungo, mai un'apnea prolungata che affatica le braccia prima della sottomissione",
+  },
+  heel_hook: {
+    chain: "La gamba dell'avversario viene bloccata tra le cosce con il piede agganciato sotto il tallone, la rotazione parte dal bacino che ruota lateralmente mentre il busto si inclina all'indietro, creando torsione sul ginocchio e sulla caviglia insieme",
+    secret: "Il campione sa che questa è la leva più pericolosa perché non fa male finché il legamento non è già rotto: la torsione va applicata con lentezza estrema e va fermata al primo segno di resistenza del compagno, mai forzata con uno strappo secco",
+    angle: "Rotazione del piede e della caviglia oltre i 45° rispetto all'asse naturale del ginocchio, bacino ruotato lateralmente di circa 30-45° per generare la coppia di torsione",
+    breath: "Respirazione lentissima e controllata, quasi silenziosa, per percepire con precisione la resistenza del compagno prima di aumentare la torsione",
+  },
+  hip_throw: {
+    chain: "Il kuzushi iniziale sbilancia l'avversario in avanti tirando con le braccia, l'anca ruota ed entra sotto il baricentro avversario con la schiena dritta, poi le gambe si estendono spingendo il bacino contro quello dell'avversario per sollevarlo e farlo ruotare sopra il fianco",
+    secret: "Il campione entra con l'anca PIÙ BASSA del baricentro avversario, non semplicemente vicina: se il proprio bacino non scende sotto quello dell'avversario, la proiezione diventa una spinta di braccia che fallisce contro un peso maggiore",
+    angle: "Ginocchia flesse a circa 90° durante l'entrata, bacino ruotato di 90° rispetto alla direzione iniziale dell'avversario, schiena mantenuta dritta non curva in avanti",
+    breath: "Inspirazione breve durante il kuzushi e l'entrata, espirazione esplosiva e continua durante l'estensione delle gambe nella fase finale",
+  },
+  shoulder_throw: {
+    chain: "Le braccia tirano la manica e il bavero (o il braccio) dell'avversario verso il basso mentre il corpo entra ruotando di spalle, le ginocchia si flettono profondamente per scendere sotto il centro di gravità avversario, poi le gambe si estendono sollevando l'avversario sopra la spalla per farlo ruotare in avanti",
+    secret: "Il campione scende molto più in basso rispetto a una proiezione d'anca: le ginocchia devono piegarsi quasi completamente per portare la spalla sotto l'ascella avversaria, altrimenti il peso ricade sulla schiena invece che sulle gambe e la proiezione fallisce",
+    angle: "Flessione delle ginocchia molto profonda (~120-130°) per abbassare il baricentro, spalla posizionata sotto l'ascella dell'avversario a contatto pieno, busto inclinato in avanti di circa 45°",
+    breath: "Inspirazione nella fase di abbassamento profondo, espirazione esplosiva sincronizzata con l'estensione delle gambe che completa il sollevamento",
+  },
+  axe_kick: {
+    chain: "La gamba calciante si solleva quasi in verticale davanti al corpo con il ginocchio semi-esteso, l'anca del lato che calcia si flette al massimo, poi la gamba ricade con forza dall'alto verso il basso guidata dal tallone o dal bordo del piede, il busto resta eretto o leggermente inclinato indietro per l'equilibrio",
+    secret: "Il campione non lascia cadere la gamba per gravità: accelera attivamente la discesa contraendo i flessori dell'anca verso il basso, così l'impatto è molto più forte di un semplice calcio ad arco che sfrutta solo il peso della gamba",
+    angle: "Sollevamento della gamba oltre i 90-100° rispetto al busto nella fase di caricamento, discesa verticale quasi a 90° rispetto al pavimento nel punto di impatto",
+    breath: "Inspirazione durante il sollevamento della gamba, espirazione secca ed esplosiva sincronizzata con la discesa e l'impatto finale",
+  },
+  spinning_hook: {
+    chain: "Gli occhi individuano il bersaglio per primi, il busto ruota di 180° in perno sul piede d'appoggio, il tallone arriva per ultimo viaggiando dall'alto verso il bersaglio in una traiettoria discendente e laterale, diversa dal calcio rotante frontale",
+    secret: "Il campione distingue questo colpo dal generico calcio rotante perché il tallone deve arrivare in traiettoria discendente a uncino, non orizzontale: se il piede viaggia piatto invece che ad uncino dall'alto, il colpo perde l'effetto sorpresa e la potenza tipica della tecnica",
+    angle: "Rotazione del busto di circa 180°, tallone che arriva con traiettoria discendente a circa 30-45° rispetto all'orizzontale nel punto di contatto",
+    breath: "Apnea breve durante la rotazione per stabilizzare il core, espirazione esplosiva nell'istante dell'impatto del tallone",
+  },
+  superman_punch: {
+    chain: "Il movimento parte da un finto calcio o da una spinta della gamba posteriore che stacca il corpo da terra in un salto in avanti, mentre il corpo è sospeso il braccio opposto scatta in un cross classico, l'atterraggio avviene con la gamba anteriore che assorbe il peso subito dopo l'impatto del pugno",
+    secret: "Il campione genera potenza dallo slancio del salto in avanti, non dal solo braccio: il corpo deve essere ancora in volo nel momento in cui il pugno parte, così tutta la massa corporea in movimento si trasferisce nel colpo invece di essere frenata dall'atterraggio",
+    angle: "Stacco da terra della gamba posteriore con anca che si estende a circa 45°, braccio del pugno esteso quasi completamente (~170°) mentre il corpo è ancora in aria",
+    breath: "Inspirazione nello stacco e nel salto, espirazione esplosiva sincronizzata con l'estensione del pugno a mezz'aria",
+  },
+  flying_knee: {
+    chain: "Le gambe spingono da terra in un salto verticale o in avanti, l'anca del lato che colpisce si flette portando il ginocchio verso il petto, il corpo intero converge sul ginocchio nell'istante dell'impatto mentre l'altra gamba resta raccolta per l'atterraggio",
+    secret: "Il campione salta per chiudere la distanza in modo esplosivo, non per guadagnare altezza: il ginocchio deve arrivare mentre il corpo è ancora in fase ascendente o al culmine del salto, mai in discesa, altrimenti il colpo perde tutta la potenza dello slancio verticale",
+    angle: "Flessione dell'anca del lato calciante oltre i 90°, ginocchio che sale in linea quasi verticale, gamba d'appoggio raccolta sotto il bacino durante la fase di volo",
+    breath: "Inspirazione rapida nello stacco da terra, espirazione esplosiva sincronizzata con l'impatto del ginocchio a mezz'aria",
+  },
 };
 
 // Riconosce le tecniche/combo chiamate (in italiano, inglese o nel gergo delle varie discipline) dentro
@@ -1533,6 +1605,18 @@ const STRIKE_KEY_MATCH = [
   ['throw', /throw|proiez|seoi|nage|goshi|gari|otoshi|sgamb|sweep|rasteira/i],
   ['shoot', /shoot|double leg|single leg|takedown|penetr/i],
   ['clinch', /clinch|guard|mount|kimura|choke|leva|submission/i],
+  ['armbar', /armbar|juji.?gatame|leva al gomito/i],
+  ['triangle', /triangle|triangolo/i],
+  ['kimura', /kimura/i],
+  ['guillotine', /guillotine|ghigliottina/i],
+  ['rear_naked_choke', /rear naked|\brnc\b|hadaka.?jime/i],
+  ['heel_hook', /heel hook/i],
+  ['hip_throw', /hip throw|o.?goshi|harai.?goshi/i],
+  ['shoulder_throw', /shoulder throw|seoi.?nage|ippon seoi/i],
+  ['axe_kick', /axe kick|naeryeo/i],
+  ['spinning_hook', /spinning hook|spinning back kick/i],
+  ['superman_punch', /superman/i],
+  ['flying_knee', /flying knee/i],
   ['sprawl', /sprawl/i],
 ];
 
@@ -1563,6 +1647,8 @@ const STRIKE_KEY_MATCH_STRICT = {
   hook: /\bhook\b|gancio/i,
   roundhouse: /roundhouse|mawashi|dollyo|high kick/i,
   clinch: /clinch|mount|kimura|choke|leva|submission/i,
+  triangle: /triangle choke|triangolo choke|triangolo di gambe|triangolo dalle gambe|soffocamento a triangolo/i,
+  rear_naked_choke: /rear naked|hadaka.?jime/i,
 };
 
 // Costruisce il blocco rubrica errori per il cervello (vuoto se disciplina non coperta → retrocompat).
