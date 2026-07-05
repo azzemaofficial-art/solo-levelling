@@ -2509,10 +2509,10 @@ function VisualCoach() {
   // invece che al viewport. Il portal li àncora al viewport reale.
   return createPortal(
     <div className="coach-live-fs fixed inset-0 z-[100] bg-black overflow-hidden" style={{ touchAction: 'none', overscrollBehavior: 'none' }}>
-      {/* VIDEO — sfondo a tutto schermo */}
-      <video ref={videoRef} className="absolute inset-0 w-full h-full" style={{ objectFit: 'cover' }} playsInline muted />
+      {/* VIDEO — sfondo a tutto schermo. Frontale = speculare (come un vero specchio) */}
+      <video ref={videoRef} className="absolute inset-0 w-full h-full" style={{ objectFit: 'cover', transform: facingMode === 'user' ? 'scaleX(-1)' : 'none' }} playsInline muted />
       <canvas ref={canvasRef} className="hidden" />
-      <canvas ref={overlayRef} className="absolute pointer-events-none" style={{ opacity: skeletonOn ? 1 : 0 }} />
+      <canvas ref={overlayRef} className="absolute pointer-events-none" style={{ opacity: skeletonOn ? 1 : 0, transform: facingMode === 'user' ? 'scaleX(-1)' : 'none' }} />
 
       {/* TOP BAR — sovrapposta in alto */}
       <div className="absolute top-0 inset-x-0 z-20 flex items-center gap-2.5 px-3 pb-3"

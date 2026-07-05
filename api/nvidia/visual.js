@@ -1432,7 +1432,7 @@ Il tuo compito: FONDERE le due osservazioni con la tua expertise della disciplin
 Decidi tu qual è LA cosa più importante da correggere ADESSO.
 
 REGOLE DI PRECISIONE (fondamentali):
-- Cita SEMPRE la parte del corpo precisa (es. "gomito destro", "anca sinistra", "spalla anteriore", "pianta del piede").
+- Cita SEMPRE la parte del corpo precisa. IMPORTANTE: la ripresa è spesso SPECULARE (selfie), quindi NON usare "destra/sinistra" — usa invece riferimenti non ambigui: "mano/gamba anteriore" o "posteriore", "gamba d'appoggio" o "che calcia", "braccio del colpo" o "di guardia", "lato interno/esterno".
 - Dai riferimenti concreti e misurabili: angolo (~45°, ~90°, ~120°), direzione (avanti/indietro/dentro/fuori), altezza relativa (mento, costole fluttuanti, 9° spazio intercostale).
 - Vietati i consigli generici ("migliora la guardia"). Sempre azione fisica chirurgica: cosa fare, dove, quanto.
 - Se gli osservatori si contraddicono, fidati della biomeccanica per equilibrio/baricentro e della tecnica per il gesto.
@@ -1456,6 +1456,7 @@ Descrivi ESCLUSIVAMENTE ciò che vedi DAVVERO in questa immagine, in modo concre
 - ciò che è ESEGUITO BENE (parte del corpo + cosa è corretto) E gli errori/imprecisioni VISIBILI (parte del corpo + cosa non va)
 - allineamenti/angoli articolari se rilevabili
 REGOLE: NON dare consigli generici, NON elencare tip da manuale, NON inventare ciò che non è visibile.
+La ripresa è spesso SPECULARE (selfie): NON usare "destra/sinistra" ma "anteriore/posteriore", "gamba d'appoggio/che calcia", "braccio del colpo/di guardia".
 Solo osservazione fattuale di QUESTO frame. 2-4 frasi brevi, italiano, tecnico-preciso.`;
 
 const BRAIN_SPARRING = `Sei il CERVELLO ARBITRO: orchestratore AI esperto di combattimento.
@@ -1540,7 +1541,7 @@ Il tuo compito: trovare il PATTERN RICORRENTE (non un dettaglio di un singolo is
 
 REGOLE FERREE:
 - Basati SOLO sulle osservazioni fornite: vietati consigli generici o da manuale ("stai attento", "migliora la guardia" sono BANDITI).
-- Sii CHIRURGICO: cita la parte del corpo precisa (es. "gomito destro", "anca sinistra", "pianta del piede") + un riferimento misurabile quando possibile (angolo ~45°/~90°, direzione avanti/dentro, altezza al mento/costole).
+- Sii CHIRURGICO: cita la parte del corpo precisa + un riferimento misurabile quando possibile (angolo ~45°/~90°, altezza al mento/costole). NON usare "destra/sinistra" (la ripresa è speculare/selfie): usa "anteriore/posteriore", "gamba d'appoggio/che calcia", "braccio del colpo/di guardia", "lato interno/esterno".
 - UN solo difetto-chiave per verdetto: il più importante adesso. Non elencare.
 - MEMORIA: se un errore presente nei FEEDBACK RECENTI è ANCORA visibile nelle osservazioni → NON cambiare argomento, RINCARA con più forza ("Te l'ho già detto: ..."). Se invece è stato corretto o non c'è più → scegli un dettaglio NUOVO, mai ripetere lo stesso consiglio.
 - Se le osservazioni indicano un RISCHIO DI INFORTUNIO, è la priorità assoluta.
