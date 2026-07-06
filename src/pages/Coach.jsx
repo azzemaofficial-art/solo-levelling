@@ -64,6 +64,7 @@ const DISCIPLINE_GROUPS = [
   ]},
   { label: '💪 Altro', items: [
     { id: 'fitness', emoji: '🏋️', label: 'Palestra', prompt: 'Guida il mio allenamento in palestra. Analizza forma ed esercizi.' },
+    { id: 'breathing', emoji: '🌬️', label: 'Respiro', prompt: 'Guidami in una sessione di respirazione/meditazione. Scegli un protocollo e correggi la mia postura e il ritmo.' },
     { id: 'general', emoji: '👁',  label: 'Generale', prompt: 'Analizza il movimento e guidami. Feedback libero.' },
   ]},
 ];
@@ -1061,6 +1062,8 @@ const POSE_FAMILY = {
   squat: 'squat', lunge: 'lunge',
   teep: 'kick', roundhouse: 'kick', low_kick: 'kick', body_kick: 'kick', side_kick: 'kick', spinning: 'kick',
   knee: 'knee',
+  plank: 'plank', pushup: 'pushup', bridge: 'bridge', tree: 'tree', warrior: 'warrior',
+  forward_fold: 'forward_fold', run: 'run',
 };
 const jointAngle = (L, a, b, c) => {
   const A = L[a], B = L[b], C = L[c];
@@ -1134,6 +1137,65 @@ function matchPose(a, key) {
   } else if (fam === 'knee') {
     const hk = (a.hL ?? 999) <= (a.hR ?? 999) ? 'hL' : 'hR';
     mark(hk, (a[hk] ?? 999) <= 105, 'alza di più il ginocchio verso il bersaglio'); torsoUp(40);
+  } else if (fam === 'plank') {
+    // Plank su avambracci: gomito piegato a circa 90°, sotto la spalla.
+    markDir('eL', 70, 110, 'gomito troppo chiuso, apri leggermente: deve restare sotto la spalla', 'gomito troppo aperto, portalo sotto la spalla (circa 90°)');
+    markDir('eR', 70, 110, null, null);
+    // L'anca (spalla-anca-ginocchio) misura quanto ci si allontana dalla linea retta, ma NON
+    // distingue se il cedimento è verso il basso o un pike verso l'alto (in entrambi i casi
+    // l'angolo si allontana da 180° in modo simile) — un solo hint non direzionale.
+    const hk = (a.hL ?? 999) <= (a.hR ?? 999) ? 'hL' : 'hR';
+    mark(hk, _rng(a[hk], 155, 180), 'allinea i fianchi: non farli cadere né alzarli troppo, corpo una linea retta');
+  } else if (fam === 'pushup') {
+    // Nota: il vero angolo di "tuck" del gomito rispetto al busto (~45° vs 90° a T) richiede
+    // l'angolo di abduzione della spalla (anca-spalla-gomito), non disponibile in questo set
+    // di angoli (eL/eR = solo spalla-gomito-polso). Approssimo con la profondità di
+    // piegamento del gomito nella fase bassa della flessione.
+    markDir('eL', 60, 100, 'non scendere troppo in basso, evita di schiacciare le spalle', 'scendi di più, petto vicino al pavimento');
+    markDir('eR', 60, 100, null, null);
+    const hk = (a.hL ?? 999) <= (a.hR ?? 999) ? 'hL' : 'hR';
+    mark(hk, _rng(a[hk], 155, 180), 'tieni i fianchi allineati, corpo una linea retta');
+  } else if (fam === 'bridge') {
+    // Estensione dell'anca verso l'alto: più l'angolo si avvicina a 180° più il bacino è
+    // sollevato. Il limite superiore (180°) è già il massimo matematico, quindi non serve un
+    // hint per "troppo in alto".
+    const hk = (a.hL ?? 999) <= (a.hR ?? 999) ? 'hL' : 'hR';
+    markDir(hk, 150, 180, 'spingi di più con i talloni, alza il bacino verso l\'alto', null);
+    const kf = (a.kL ?? 999) <= (a.kR ?? 999) ? 'kL' : 'kR';
+    markDir(kf, 70, 110, 'ginocchia troppo chiuse, allarga leggermente l\'appoggio dei piedi', 'piega di più le ginocchia, piedi vicino ai glutei');
+  } else if (fam === 'tree') {
+    // Equilibrio su una gamba: la gamba d'appoggio è quella più distesa (angolo maggiore).
+    const kStand = (a.kL ?? -1) >= (a.kR ?? -1) ? 'kL' : 'kR';
+    mark(kStand, _rng(a[kStand], 160, 180), 'raddrizza di più la gamba d\'appoggio, quasi dritta per l\'equilibrio');
+    torsoUp(16); // soglia stretta: l'equilibrio richiede un busto ben verticale
+  } else if (fam === 'warrior') {
+    // Ginocchio anteriore a ~90° come nell'affondo, ma qui il busto resta ERETTO (non
+    // inclinato come in 'lunge').
+    const kf = (a.kL ?? 999) <= (a.kR ?? 999) ? 'kL' : 'kR';
+    markDir(kf, 70, 120, 'piega di più il ginocchio anteriore, cerca i 90°', 'non scendere oltre i 90°, proteggi il ginocchio');
+    torsoUp(20);
+    // Braccia distese lateralmente (se rilevabili): gomiti quasi dritti
+    mark('eL', _rng(a.eL, 150, 180), 'braccia più tese, allineate alle spalle');
+    mark('eR', _rng(a.eR, 150, 180), null);
+  } else if (fam === 'forward_fold') {
+    // Qui l'obiettivo è l'OPPOSTO di torsoUp: vogliamo il busto piegato in avanti sulle
+    // gambe, non verticale — quindi non riusiamo torsoUp(), verifichiamo l'hip hinge
+    // direttamente sull'angolo anca (hL/hR): più piccolo = più piegato in avanti.
+    const hk = (a.hL ?? 999) <= (a.hR ?? 999) ? 'hL' : 'hR';
+    markDir(hk, 20, 90, 'non forzare troppo in avanti, allunga la schiena invece di accartocciarti', 'piega di più sui fianchi, avvicina il busto alle gambe');
+    kneesSoft();
+  } else if (fam === 'run') {
+    // Un solo frame non permette di sapere con certezza quale gamba è in appoggio e quale in
+    // sospensione, quindi non alterniamo kL/kR come in una vera falcata: verifichiamo solo
+    // che ci sia un'asimmetria netta tra le ginocchia (segno di corsa in corso, non di corpo
+    // fermo).
+    if (a.kL != null && a.kR != null) {
+      const kf = a.kL <= a.kR ? 'kL' : 'kR';
+      mark(kf, Math.abs(a.kL - a.kR) >= 20, 'solleva di più il ginocchio della gamba libera, cerca una falcata più marcata');
+    }
+    // In corsa una leggera inclinazione in avanti è CORRETTA (non un errore come nel
+    // torsoUp standard): troppo verticale frena il passo, troppo inclinato sbilancia.
+    markDir('lean', 3, 15, 'raddrizza leggermente il busto, non stare troppo verticale in corsa', 'piegati meno in avanti, rischi di sbilanciarti');
   } else { // posture — utile per qualsiasi movimento/asana
     kneesSoft(); torsoUp(35);
   }
@@ -1243,6 +1305,31 @@ const DISCIPLINE_SCENE = {
   breathing:'solo', fitness:'solo', general:'solo',
 };
 const sceneFor = (mode) => DISCIPLINE_SCENE[mode] || (/sparring|partner|drill/.test(mode || '') ? 'opponent' : 'bag');
+
+// ── OBIETTIVO dichiarato → template mirato (fallback locale, niente AI) ────────
+// Parole chiave semplici: dal testo libero dell'utente (o dallo storico debolezze/focus)
+// deriviamo un "obiettivo" che sceglie un circuito diverso, non solo un nome diverso.
+const GOAL_KEYWORDS = [
+  ['potenza',  /potenza|esplosiv|power|forza esplosiva|massima forza/i],
+  ['cardio',   /cardio|resistenza|fiato|endurance|resistenz|no[\s-]?stop/i],
+  ['tecnica',  /tecnica|precision|forma|coordinazione|allineamento/i],
+  ['mobilita', /mobilit|recupero|flessibilit|rigidit|stretch|allunga/i],
+  ['difesa',   /guardia|difesa|copertura|contropiede|counter|schivata|equilibrio|bilanciamento/i],
+];
+const resolveGoal = (text) => {
+  const t = String(text || '').toLowerCase();
+  if (!t.trim()) return null;
+  for (const [tag, re] of GOAL_KEYWORDS) if (re.test(t)) return tag;
+  return null;
+};
+// Debolezza ricorrente più recente per la disciplina corrente → stesso set di tag "obiettivo",
+// così il circuito locale può indirizzarla anche senza input esplicito nella sessione attuale.
+const resolveGoalFromHistory = (pastSessions, mode) => {
+  const recent = (pastSessions || []).find((s) => s.mode === mode && ((s.weaknesses || []).length || (s.focusNext || []).length));
+  if (!recent) return null;
+  const text = [...(recent.weaknesses || []), ...(recent.focusNext || [])].join(' ; ');
+  return resolveGoal(text);
+};
 // timeline "ripetizione" (fitness/flow): scendi → tieni → risali → pausa
 const _repT = (ms) => { const P = 1700, t = ms % P; if (t < 620) return _easeOut(t / 620); if (t < 900) return 1; if (t < 1500) return 1 - _easeIn((t - 900) / 600); return 0; };
 
@@ -1523,6 +1610,208 @@ function ComboAnimator({ combo, color = '#00f2ff', mode, size = 108 }) {
 const ALL_DISCIPLINES = DISCIPLINE_GROUPS.flatMap((g) => g.items);
 const isSparring = (id) => id.startsWith('sparring_') || id === 'partner_drills';
 
+// ─── Protocolli di respirazione guidata ────────────────────────────────────────
+// Ogni protocollo = fasi temporizzate (label + secondi). sec:0 = fase assente
+// (es. niente ritenzione). `rounds` = quante volte ripetere il ciclo di fasi.
+const BREATHING_PROTOCOLS = [
+  {
+    id: 'box',
+    name: 'Box Breathing',
+    subtitle: 'Calma e controllo sotto pressione (Navy SEAL)',
+    phases: [
+      { label: 'Inspira', sec: 4 },
+      { label: 'Trattieni', sec: 4 },
+      { label: 'Espira', sec: 4 },
+      { label: 'Trattieni', sec: 4 },
+    ],
+    rounds: 6,
+    when: 'Prima di uno sparring, in un momento di stress, per abbassare il battito rapidamente',
+    cue: 'Respira come se stessi disegnando i quattro lati di un quadrato',
+  },
+  {
+    id: '478',
+    name: '4-7-8',
+    subtitle: 'Calma profonda, pre-sonno, pre-gara',
+    phases: [
+      { label: 'Inspira', sec: 4 },
+      { label: 'Trattieni', sec: 7 },
+      { label: 'Espira', sec: 8 },
+      { label: 'Pausa', sec: 0 },
+    ],
+    rounds: 4,
+    when: 'Prima di dormire, prima di una gara/verifica, o quando la mente corre e serve staccare',
+    cue: 'Espira dalla bocca con un leggero soffio, come se spegnessi una candela lontana',
+  },
+  {
+    id: 'wimhof',
+    name: 'Wim Hof (semplificato)',
+    subtitle: 'Iperventilazione controllata + ritenzione',
+    phases: [
+      { label: 'Respira veloce', sec: 30 },
+      { label: 'Espira e trattieni', sec: 15 },
+      { label: 'Inspira e trattieni 10s', sec: 10 },
+      { label: 'Recupero', sec: 5 },
+    ],
+    rounds: 3,
+    when: 'Al mattino a stomaco vuoto, per energia e resistenza al freddo/stress — mai in acqua o alla guida',
+    cue: '30 respiri profondi e veloci (pieno-vuoto), poi svuota i polmoni e resta in apnea finché senti il bisogno di respirare',
+  },
+  {
+    id: 'nadishodhana',
+    name: 'Nadi Shodhana',
+    subtitle: 'Respirazione alternata, equilibrio yoga',
+    phases: [
+      { label: 'Inspira narice sx', sec: 4 },
+      { label: 'Trattieni (chiudi entrambe)', sec: 4 },
+      { label: 'Espira narice dx', sec: 4 },
+      { label: 'Inspira narice dx', sec: 4 },
+    ],
+    rounds: 5,
+    when: 'A inizio o fine sessione yoga, per riequilibrare mente e sistema nervoso',
+    cue: 'Pollice destro chiude la narice destra, anulare la sinistra — alterna a ogni fase',
+  },
+  {
+    id: 'warrior',
+    name: 'Respiro del guerriero',
+    subtitle: 'Carica pre-combattimento (Muay Thai)',
+    phases: [
+      { label: 'Sbuffo corto', sec: 2 },
+      { label: 'Sbuffo corto', sec: 2 },
+      { label: 'Inspira e carica', sec: 3 },
+      { label: 'Espira esplosiva', sec: 1 },
+    ],
+    rounds: 8,
+    when: 'Nel corner prima della campana, o subito prima di un round di sparring, per attivare il sistema nervoso',
+    cue: 'Due sbuffi corti dal naso come un toro, poi carica e libera l\'aria con un colpo secco, come su un pao',
+  },
+  {
+    id: 'coherence',
+    name: 'Coerenza cardiaca 5-5',
+    subtitle: 'Uso quotidiano, recupero, baseline',
+    phases: [
+      { label: 'Inspira', sec: 5 },
+      { label: 'Espira', sec: 5 },
+    ],
+    rounds: 6,
+    when: 'Ogni giorno, 3 volte al giorno (mattina, pranzo, sera) — o nei minuti dopo l\'allenamento per il recupero',
+    cue: 'Nessuna ritenzione: un flusso continuo, come un\'onda che sale e scende senza pause',
+  },
+];
+
+// Classifica la fase per l'animazione dell'anello: espande su "inspira",
+// contrae su "espira", resta ferma per ritenzioni/pause/altro.
+const classifyBreathPhase = (label = '') => {
+  const l = label.toLowerCase();
+  if (l.includes('inspira') || l.includes('respira veloce') || l.includes('carica')) return 'in';
+  if (l.includes('espira') || l.includes('sbuffo')) return 'out';
+  return 'hold';
+};
+
+// ─── Guida visiva alla respirazione: anello che si espande/contrae a schermo
+// pieno, seguendo le fasi temporizzate del protocollo selezionato. ─────────────
+function BreathingGuide({ protocol, onExit, voiceOn, enqueueSpeak }) {
+  const phases = React.useMemo(() => (protocol?.phases || []).filter((p) => (p.sec || 0) > 0), [protocol]);
+  const totalRounds = Math.max(1, protocol?.rounds || 1);
+  const [state, setState] = useState(() => ({ phaseIdx: 0, round: 1, secLeft: phases[0]?.sec || 1, done: phases.length === 0 }));
+  const timerRef = useRef(null);
+  const spokenKeyRef = useRef('');
+
+  // reset quando cambia protocollo
+  useEffect(() => {
+    setState({ phaseIdx: 0, round: 1, secLeft: phases[0]?.sec || 1, done: phases.length === 0 });
+    spokenKeyRef.current = '';
+  }, [protocol, phases]);
+
+  // countdown 1s — avanza fase/round quando il tempo scade
+  useEffect(() => {
+    clearInterval(timerRef.current);
+    if (state.done || phases.length === 0) return undefined;
+    timerRef.current = setInterval(() => {
+      setState((prev) => {
+        if (prev.done) return prev;
+        if (prev.secLeft > 1) return { ...prev, secLeft: prev.secLeft - 1 };
+        let nextPhaseIdx = prev.phaseIdx + 1;
+        let nextRound = prev.round;
+        if (nextPhaseIdx >= phases.length) {
+          nextPhaseIdx = 0;
+          nextRound = prev.round + 1;
+        }
+        if (nextRound > totalRounds) return { ...prev, done: true };
+        return { phaseIdx: nextPhaseIdx, round: nextRound, secLeft: phases[nextPhaseIdx]?.sec || 1, done: false };
+      });
+    }, 1000);
+    return () => clearInterval(timerRef.current);
+  }, [state.done, phases, totalRounds]);
+
+  // annuncio vocale del cambio fase (best-effort — richiede voiceOn + enqueueSpeak passati dal chiamante)
+  useEffect(() => {
+    if (state.done || phases.length === 0) return;
+    const key = `${state.round}-${state.phaseIdx}`;
+    if (spokenKeyRef.current === key) return;
+    spokenKeyRef.current = key;
+    // TODO: se in futuro serve una voce dedicata (più breve/diversa dal coach), separare la coda qui.
+    if (voiceOn && typeof enqueueSpeak === 'function') {
+      enqueueSpeak(phases[state.phaseIdx]?.label || '');
+    }
+  }, [state.phaseIdx, state.round, state.done, phases, voiceOn, enqueueSpeak]);
+
+  useEffect(() => () => clearInterval(timerRef.current), []);
+
+  if (!protocol) return null;
+  const curPhase = phases[state.phaseIdx];
+  const phaseKind = classifyBreathPhase(curPhase?.label);
+  const phaseSec = curPhase?.sec || 1;
+  const progress = Math.min(1, Math.max(0, (phaseSec - state.secLeft + 1) / phaseSec));
+  const R_MIN = 46, R_MAX = 92;
+  const r = phaseKind === 'in' ? R_MIN + (R_MAX - R_MIN) * progress
+    : phaseKind === 'out' ? R_MAX - (R_MAX - R_MIN) * progress
+    : R_MAX;
+
+  return (
+    <div className="fixed inset-0 z-[200] flex flex-col items-center justify-center px-6"
+      style={{ background: 'radial-gradient(circle at 50% 40%, rgba(6,20,18,0.97), rgba(4,8,10,0.99))', backdropFilter: 'blur(6px)' }}>
+      <button onClick={onExit}
+        className="absolute top-5 right-5 px-4 py-2 rounded-xl text-xs font-bold"
+        style={{ background: 'rgba(55,65,81,0.5)', color: '#e5e7eb', border: '1px solid rgba(255,255,255,0.12)' }}>
+        ✕ Esci
+      </button>
+
+      <p className="text-[11px] font-black tracking-widest mb-1 text-center" style={{ color: C.emerald.hex, fontFamily: 'Orbitron, sans-serif' }}>
+        {protocol.name?.toUpperCase()}
+      </p>
+      <p className="text-xs text-center mb-6 max-w-xs" style={{ color: '#6b7280' }}>{protocol.subtitle}</p>
+
+      <svg width={220} height={220} viewBox="0 0 220 220" className="mb-6">
+        <circle cx={110} cy={110} r={R_MAX + 8} fill="none" stroke="rgba(16,185,129,0.12)" strokeWidth={1.5} />
+        <circle cx={110} cy={110} r={r} fill="rgba(16,185,129,0.14)" stroke={C.emerald.hex} strokeWidth={2.5}
+          style={{ transition: 'r 1s linear' }} />
+        <text x={110} y={104} textAnchor="middle" fontSize={15} fontWeight={800} fill="#e5f7f0" style={{ fontFamily: 'Orbitron, sans-serif' }}>
+          {(curPhase?.label || 'FINE').toUpperCase()}
+        </text>
+        <text x={110} y={132} textAnchor="middle" fontSize={30} fontWeight={900} fill={C.emerald.hex}>
+          {state.done ? '✓' : state.secLeft}
+        </text>
+      </svg>
+
+      <p className="text-xs font-bold mb-1" style={{ color: '#9ca3af' }}>
+        {state.done ? 'Sessione completata' : `Round ${state.round} / ${totalRounds}`}
+      </p>
+      {!state.done && curPhase && (
+        <p className="text-[11px] text-center max-w-xs mb-2" style={{ color: '#4b5563' }}>{protocol.cue}</p>
+      )}
+      <p className="text-[10px] text-center max-w-xs" style={{ color: '#374151' }}>{protocol.when}</p>
+
+      {state.done && (
+        <button onClick={onExit}
+          className="mt-6 px-6 py-3 rounded-xl text-white font-black text-sm"
+          style={{ background: `linear-gradient(135deg, ${C.emerald.hex}, #0d9488)` }}>
+          Fatto
+        </button>
+      )}
+    </div>
+  );
+}
+
 function VisualCoach() {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
@@ -1541,6 +1830,9 @@ function VisualCoach() {
   const [voiceOn, setVoiceOn] = useState(true);
   const [voiceSlow, setVoiceSlow] = useState(true);   // voce lenta e scandita (default: più facile da seguire)
   const [skeletonOn, setSkeletonOn] = useState(true);
+  // ── Respirazione guidata (protocolli con fasi temporizzate) ─────────────────
+  const [breathingProtocolId, setBreathingProtocolId] = useState(BREATHING_PROTOCOLS[0].id);
+  const [showBreathingGuide, setShowBreathingGuide] = useState(false);
   const [centered, setCentered] = useState(null);
   const [facingMode, setFacingMode] = useState('environment');
   const autoTimerRef = useRef(null);
@@ -2536,6 +2828,34 @@ function VisualCoach() {
           <RoundConfig rounds={rounds} onRounds={setRounds} roundDuration={roundDuration} onRoundDuration={setRoundDuration} />
         )}
 
+        {mode === 'breathing' && (
+          <div className="p-3 rounded-xl" style={{ background: C.emerald.bg, border: `1px solid ${C.emerald.border}` }}>
+            <p className="text-[10px] font-black text-gray-500 mb-2 tracking-widest" style={{ fontFamily: 'Orbitron, sans-serif' }}>🌬️ PROTOCOLLO DI RESPIRAZIONE</p>
+            <div className="flex flex-wrap gap-1.5 mb-3">
+              {BREATHING_PROTOCOLS.map((p) => {
+                const isActive = breathingProtocolId === p.id;
+                return (
+                  <motion.button key={p.id} whileTap={{ scale: 0.91 }} whileHover={{ scale: 1.04 }} onClick={() => setBreathingProtocolId(p.id)}
+                    className="px-3 py-1.5 rounded-xl text-xs font-bold transition-all"
+                    style={isActive
+                      ? { background: `linear-gradient(135deg, ${C.emerald.hex}33, ${C.emerald.hex}11)`, color: C.emerald.hex, boxShadow: `0 0 0 1px ${C.emerald.border}`, border: `1px solid ${C.emerald.border}` }
+                      : { background: 'rgba(55,65,81,0.35)', color: '#9ca3af', border: '1px solid rgba(255,255,255,0.05)' }}>
+                    {p.name}
+                  </motion.button>
+                );
+              })}
+            </div>
+            <p className="text-[11px] mb-3" style={{ color: '#6b7280' }}>
+              {BREATHING_PROTOCOLS.find((p) => p.id === breathingProtocolId)?.when}
+            </p>
+            <motion.button whileTap={{ scale: 0.97 }} whileHover={{ scale: 1.01 }} onClick={() => setShowBreathingGuide(true)}
+              className="w-full py-2.5 rounded-xl text-white font-bold text-xs"
+              style={{ background: `linear-gradient(135deg, ${C.emerald.hex}, #0d9488)` }}>
+              🫁 Avvia guida visiva (senza camera)
+            </motion.button>
+          </div>
+        )}
+
         <div>
           <p className="text-[10px] text-gray-600 mb-1.5 font-mono tracking-widest">DESCRIVI LA SESSIONE <span className="text-gray-700">(OPZIONALE)</span></p>
           <textarea value={sessionContext} onChange={(e) => setSessionContext(e.target.value)} rows={2}
@@ -2575,6 +2895,16 @@ function VisualCoach() {
             {isPartnerMode ? `👥 INIZIA MATCH — ${rounds}×${roundDuration/60}MIN` : '📷 INIZIA SESSIONE LIVE'}
           </span>
         </motion.button>
+
+        {showBreathingGuide && createPortal(
+          <BreathingGuide
+            protocol={BREATHING_PROTOCOLS.find((p) => p.id === breathingProtocolId) || BREATHING_PROTOCOLS[0]}
+            voiceOn={voiceOn}
+            enqueueSpeak={enqueueSpeak}
+            onExit={() => setShowBreathingGuide(false)}
+          />,
+          document.body
+        )}
       </div>
     );
   }
