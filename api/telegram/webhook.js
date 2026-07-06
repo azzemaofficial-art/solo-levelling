@@ -150,8 +150,9 @@ Se la durata non è chiara, stimala. La "kcal" di riserva serve solo se l'attivi
 
 Quando l'utente descrive un PASTO:
 NON calcolare tu i totali. Il tuo compito è SOLO estrarre gli alimenti.
-- Scomponi i piatti composti nei singoli ingredienti con grammi stimati (es. "pollo con verdure 250g" → pollo 200g + verdure 50g; "pasta al ragù 300g" → pasta cotta 220g + ragù di carne 80g).
-- Se l'utente dà un peso, usalo. Altrimenti stima una porzione realistica in grammi.
+- SCOMPONI SEMPRE i piatti "X al/alla/con Y" in DUE (o più) voci separate: la base (pasta/riso/gnocchi/couscous) E il condimento/sugo (pesto, ragù, pomodoro, carbonara, panna, aglio e olio, formaggio...) come voci DISTINTE dell'array "items", MAI un'unica voce con il nome composto. Il condimento ha calorie importanti (es. il pesto è molto calorico per i grassi dell'olio/pinoli) e va sempre pesato a parte.
+  Esempi: "pollo con verdure 250g" → pollo 200g + verdure 50g. "pasta al ragù 300g" → pasta cotta 220g + ragù di carne 80g. "pasta al pesto 300g" → pasta cotta 250g + pesto 50g. "pasta al pomodoro" → pasta cotta 250g + sugo di pomodoro 60g. "riso alla carbonara" → riso cotto 220g + carbonara 60g.
+- Se l'utente dà un peso, usalo (dividendolo tra base e condimento con proporzioni realistiche, es. ~80-85% base / ~15-20% condimento). Altrimenti stima una porzione realistica in grammi.
 - Includi "cotto"/"cotta" o "crudo"/"cruda" nel nome SOLO se l'utente lo specifica o è ovvio.
 - Per ogni alimento dai anche una stima di riserva dei macro (verrà usata solo se l'alimento non è nel database nutrizionale).
 Rispondi con questo JSON esatto:
@@ -323,6 +324,7 @@ const FOOD_DB = [
   { kw: ['whey', 'proteine in polvere', 'proteine polvere'], v: { kcal: 380, p: 75, c: 8, f: 6 } },
   { kw: ['barretta proteica', 'barretta'], v: { kcal: 350, p: 30, c: 35, f: 12 } },
   { kw: ['ragù', 'ragu'], v: { kcal: 150, p: 10, c: 4, f: 10 } },
+  { kw: ['carbonara'], v: { kcal: 380, p: 14, c: 3, f: 34 } },
   // Extra ad alta frequenza
   { kw: ['quinoa'], v: { kcal: 120, p: 4.4, c: 21, f: 1.9 } },
   { kw: ['polenta'], v: { kcal: 85, p: 2, c: 18, f: 0.4 } },
@@ -353,9 +355,25 @@ const offCache = new Map();
 const normalize = (s) => String(s || '').toLowerCase()
   .normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
 
+// Basi (carboidrati) e condimenti/sughi che nei piatti italiani vanno quasi sempre insieme.
+// Se il prompt AI non li scompone in due voci separate (es. arriva UNA voce "pasta al pesto"
+// invece di "pasta cotta" + "pesto"), il lookup sotto li rileva ENTRAMBI e li pesa insieme —
+// altrimenti il primo match nel DB vince e il condimento (spesso più calorico della base per
+// via dei grassi) sparisce silenziosamente dal conteggio.
+const BASE_CARB_KW = ['pasta cotta', 'pasta', 'riso cotto', 'riso', 'gnocchi', 'couscous', 'farro cotto', 'farro'];
+const CONDIMENT_KW = ['pesto', 'ragù', 'ragu', 'carbonara', 'pomodoro'];
+
 // Cerca un alimento nel DB interno (match per parola chiave, dalla più specifica)
 function lookupLocal(food) {
   const n = normalize(food);
+  const findByKw = (list) => FOOD_DB.find((e) => e.kw.some((kw) => list.includes(kw) && n.includes(normalize(kw))));
+  const baseHit = findByKw(BASE_CARB_KW);
+  const condHit = findByKw(CONDIMENT_KW);
+  if (baseHit && condHit && baseHit !== condHit) {
+    // piatto composto non scomposto: ~82% base + ~18% condimento (proporzione realistica pasta/sugo)
+    const blend = (k) => baseHit.v[k] * 0.82 + condHit.v[k] * 0.18;
+    return { v: { kcal: blend('kcal'), p: blend('p'), c: blend('c'), f: blend('f') }, source: 'db-blend' };
+  }
   for (const entry of FOOD_DB) {
     for (const kw of entry.kw) {
       if (n.includes(normalize(kw))) return { v: entry.v, source: 'db' };
