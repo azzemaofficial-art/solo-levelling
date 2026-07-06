@@ -1158,11 +1158,12 @@ function matchPose(a, key) {
   } else if (fam === 'bridge') {
     // Estensione dell'anca verso l'alto: più l'angolo si avvicina a 180° più il bacino è
     // sollevato. Il limite superiore (180°) è già il massimo matematico, quindi non serve un
-    // hint per "troppo in alto".
-    const hk = (a.hL ?? 999) <= (a.hR ?? 999) ? 'hL' : 'hR';
-    markDir(hk, 150, 180, 'spingi di più con i talloni, alza il bacino verso l\'alto', null);
-    const kf = (a.kL ?? 999) <= (a.kR ?? 999) ? 'kL' : 'kR';
-    markDir(kf, 70, 110, 'ginocchia troppo chiuse, allarga leggermente l\'appoggio dei piedi', 'piega di più le ginocchia, piedi vicino ai glutei');
+    // hint per "troppo in alto". Movimento bilaterale (come lo squat): controlliamo entrambi
+    // i lati, non solo uno, per non perdere l'errore sul fianco/ginocchio che sta peggio.
+    markDir('hL', 150, 180, 'spingi di più con i talloni, alza il bacino verso l\'alto', null);
+    markDir('hR', 150, 180, null, null);
+    markDir('kL', 70, 110, 'ginocchia troppo chiuse, allarga leggermente l\'appoggio dei piedi', 'piega di più le ginocchia, piedi vicino ai glutei');
+    markDir('kR', 70, 110, null, null);
   } else if (fam === 'tree') {
     // Equilibrio su una gamba: la gamba d'appoggio è quella più distesa (angolo maggiore).
     const kStand = (a.kL ?? -1) >= (a.kR ?? -1) ? 'kL' : 'kR';
@@ -1172,7 +1173,9 @@ function matchPose(a, key) {
     // Ginocchio anteriore a ~90° come nell'affondo, ma qui il busto resta ERETTO (non
     // inclinato come in 'lunge').
     const kf = (a.kL ?? 999) <= (a.kR ?? 999) ? 'kL' : 'kR';
-    markDir(kf, 70, 120, 'piega di più il ginocchio anteriore, cerca i 90°', 'non scendere oltre i 90°, proteggi il ginocchio');
+    // Angolo piccolo = ginocchio più piegato del target (~90°) → rischio; angolo grande =
+    // gamba troppo tesa, non abbastanza piegata.
+    markDir(kf, 70, 120, 'non scendere oltre i 90°, proteggi il ginocchio', 'piega di più il ginocchio anteriore, cerca i 90°');
     torsoUp(20);
     // Braccia distese lateralmente (se rilevabili): gomiti quasi dritti
     mark('eL', _rng(a.eL, 150, 180), 'braccia più tese, allineate alle spalle');
@@ -1195,7 +1198,7 @@ function matchPose(a, key) {
     }
     // In corsa una leggera inclinazione in avanti è CORRETTA (non un errore come nel
     // torsoUp standard): troppo verticale frena il passo, troppo inclinato sbilancia.
-    markDir('lean', 3, 15, 'raddrizza leggermente il busto, non stare troppo verticale in corsa', 'piegati meno in avanti, rischi di sbilanciarti');
+    markDir('lean', 3, 15, 'inclinati leggermente in avanti, busto troppo verticale frena la falcata', 'piegati meno in avanti, rischi di sbilanciarti');
   } else { // posture — utile per qualsiasi movimento/asana
     kneesSoft(); torsoUp(35);
   }
@@ -1330,6 +1333,199 @@ const resolveGoalFromHistory = (pastSessions, mode) => {
   const text = [...(recent.weaknesses || []), ...(recent.focusNext || [])].join(' ; ');
   return resolveGoal(text);
 };
+
+// ── Template striking/grappling (scena 'bag' | 'opponent') per obiettivo ───────
+// picks: 3-4 combo pescati da COMBO_LIBRARY, già mischiati — ogni obiettivo li usa
+// con un framing e un ritmo diversi, non solo rinominati.
+function buildStrikeTemplate(goal, picks) {
+  const c = (i, fallback) => picks[i] || fallback || 'Combo libera';
+  if (goal === 'potenza') return [
+    { name: 'Riscaldamento: sciolto e reattivo', durationSec: 30, focus: 'Muoviti sui piedi, scarica le spalle', watchFor: 'guardia alta, respiro libero' },
+    { name: `${c(0)} — colpo singolo max potenza`, durationSec: 35, focus: 'Un colpo alla volta, tutta la catena cinetica', watchFor: 'radicamento a terra, anca che ruota' },
+    { name: `${c(1)} — carico pesante`, durationSec: 45, focus: 'Esegui carico e scarico, cerca il colpo più duro', watchFor: 'espirazione secca ad ogni colpo' },
+    { name: `${c(2, c(0))} — combo di potenza`, durationSec: 50, focus: 'Concatena a piena potenza, torna in guardia', watchFor: "niente colpi 'a vuoto', sempre stabile" },
+    { name: 'Serie esplosiva finale', durationSec: 50, focus: 'Raffica di colpi al massimo sforzo, poi recupero', watchFor: 'tecnica che regge anche sotto sforzo' },
+    { name: 'Scarico spalle e braccia', durationSec: 30, focus: 'Scuoti gli arti, respira lento', watchFor: 'spalle rilassate' },
+  ];
+  if (goal === 'cardio') return [
+    { name: 'Riscaldamento in movimento', durationSec: 30, focus: 'Passo leggero continuo, mani alte', watchFor: 'fiato regolare' },
+    { name: `${c(0)} — leggero e continuo`, durationSec: 40, focus: 'Colpi leggeri senza fermarti mai', watchFor: 'gambe sempre in movimento' },
+    { name: `${c(1)} — ripetizioni no-stop`, durationSec: 45, focus: 'Alto volume, poca potenza per colpo', watchFor: 'respiro ritmico, niente apnea' },
+    { name: `${c(2, c(0))} — cardio a onde`, durationSec: 45, focus: 'Alterna 10s intenso / 10s leggero', watchFor: 'recupero attivo, non fermarti' },
+    { name: 'Round cardio no-stop', durationSec: 60, focus: 'Colpisci in continuo per tutto il round', watchFor: 'gestione del fiato' },
+    { name: 'Defaticamento e respiro', durationSec: 35, focus: 'Rallenta gradualmente, respiro 1:2', watchFor: 'battito che scende' },
+  ];
+  if (goal === 'tecnica') return [
+    { name: 'Riscaldamento tecnico', durationSec: 30, focus: 'Movimento lento, guardia curata', watchFor: 'postura pulita' },
+    { name: `${c(0)} — isolato e lento`, durationSec: 40, focus: 'Ogni colpo al 50%, controlla la forma', watchFor: 'traiettoria dritta, ritorno in guardia' },
+    { name: `${c(1)} — davanti allo specchio mentale`, durationSec: 45, focus: 'Immagina lo specchio, correggi ogni imprecisione', watchFor: 'allineamento anca-spalla-colpo' },
+    { name: `${c(2, c(0))} — precisione crescente`, durationSec: 45, focus: 'Aumenta gradualmente la velocità mantenendo la forma', watchFor: 'nessun colpo impreciso' },
+    { name: 'Combo a velocità controllata', durationSec: 45, focus: 'Concatena tutto con massima pulizia tecnica', watchFor: 'fluidità, zero tensione inutile' },
+    { name: 'Mobilità e allineamento finale', durationSec: 30, focus: 'Sciogli anche e spalle', watchFor: 'range di movimento pieno' },
+  ];
+  if (goal === 'difesa') return [
+    { name: 'Riscaldamento: guardia e passo', durationSec: 30, focus: 'Muoviti mantenendo sempre la guardia', watchFor: 'mani alte, mento basso' },
+    { name: 'Guardia e parata', durationSec: 40, focus: 'Para colpi immaginari, resta compatto', watchFor: 'gomiti stretti al corpo' },
+    { name: 'Schivata e contro', durationSec: 45, focus: 'Schiva lateralmente poi rispondi con un colpo', watchFor: 'testa fuori linea, contro immediato' },
+    { name: `${c(0)} — con enfasi sul rientro in guardia`, durationSec: 45, focus: 'Dopo ogni tecnica torna subito in guardia solida', watchFor: 'zero pause scoperte' },
+    { name: 'Difesa-contro in sequenza', durationSec: 50, focus: 'Alterna blocco/schivata e contrattacco rapido', watchFor: 'equilibrio durante il contro' },
+    { name: 'Respiro e rilascio tensione', durationSec: 30, focus: 'Rilassa collo e spalle', watchFor: 'respiro lento e profondo' },
+  ];
+  // default: circuito misto (nessun obiettivo dichiarato) — come prima ma più ricco
+  return [
+    { name: 'Riscaldamento: guardia e movimento', durationSec: 35, focus: 'Muoviti sui piedi, mani alte, sciogli le spalle', watchFor: 'guardia alta, baricentro basso' },
+    { name: c(0), durationSec: 40, focus: 'Esegui lento e pulito, torna sempre in guardia', watchFor: 'tecnica precisa, ritorno in guardia' },
+    { name: c(1), durationSec: 40, focus: 'Aumenta leggermente il ritmo mantenendo la forma', watchFor: 'tecnica precisa, ritorno in guardia' },
+    { name: c(2, c(0)), durationSec: 45, focus: 'Esegui con più intensità', watchFor: 'guardia sempre coperta' },
+    { name: 'Combo libera', durationSec: 45, focus: 'Concatena le tecniche a tuo ritmo', watchFor: 'respiro e fluidità' },
+    { name: 'Defaticamento', durationSec: 30, focus: 'Rallenta e respira profondamente', watchFor: 'spalle rilassate' },
+  ];
+}
+
+// ── Template scena 'solo' (yoga/running/breathing/fitness...) per obiettivo ────
+function buildYogaTemplate(goal) {
+  if (goal === 'potenza') return [
+    { name: 'Respiro e attivazione', durationSec: 30, focus: 'In piedi, attiva il core con qualche respiro profondo', watchFor: 'spalle basse' },
+    { name: 'Chair Pose — tenuta', durationSec: 40, focus: 'Piega le ginocchia come su una sedia, braccia su', watchFor: 'peso sui talloni, schiena lunga' },
+    { name: 'Plank alto — tenuta forza', durationSec: 45, focus: 'Corpo rigido, spingi le mani a terra', watchFor: 'niente cedimento lombare' },
+    { name: 'Warrior III — equilibrio+forza', durationSec: 45, focus: 'Bilanciati su una gamba, tronco parallelo a terra', watchFor: 'core attivo, bacino in linea' },
+    { name: 'Boat Pose — tenuta addominale', durationSec: 45, focus: 'V con corpo, gambe tese, petto alto', watchFor: 'schiena lunga non curva' },
+    { name: 'Bridge — spinta glutei', durationSec: 40, focus: 'Spingi coi talloni, apri il petto', watchFor: 'glutei attivi' },
+    { name: 'Respiro finale', durationSec: 35, focus: 'Rilascia le tensioni con respiro lento', watchFor: 'muscoli che si sciolgono' },
+  ];
+  if (goal === 'cardio') return [
+    { name: 'Respiro dinamico', durationSec: 25, focus: 'Respiro rapido di attivazione', watchFor: 'petto e pancia si muovono insieme' },
+    { name: 'Saluto al sole — flow lento', durationSec: 40, focus: 'Collega i movimenti al respiro', watchFor: 'transizioni fluide' },
+    { name: 'Saluto al sole — flow veloce', durationSec: 45, focus: 'Stesso flow ma ritmo continuo, senza pause', watchFor: 'respiro che segue il ritmo' },
+    { name: 'Warrior a Warrior — flow continuo', durationSec: 45, focus: "Passa da un lato all'altro senza fermarti", watchFor: 'fluidità, gambe attive' },
+    { name: 'Vinyasa ripetuto', durationSec: 50, focus: 'Ripeti la sequenza flow al massimo ritmo sostenibile', watchFor: 'respiro che non si blocca' },
+    { name: 'Defaticamento e respiro', durationSec: 35, focus: 'Rallenta gradualmente il flow', watchFor: 'battito che scende' },
+  ];
+  if (goal === 'tecnica') return [
+    { name: 'Centratura e allineamento', durationSec: 30, focus: 'In piedi, allinea caviglie-anche-spalle', watchFor: 'peso distribuito equamente' },
+    { name: 'Forward Fold — allineamento', durationSec: 40, focus: 'Piega dall\'anca, colonna lunga', watchFor: 'schiena lunga, non curva' },
+    { name: 'Warrior II — precisione angoli', durationSec: 45, focus: 'Ginocchio esattamente sopra la caviglia, anche aperte', watchFor: 'angolo di 90° al ginocchio' },
+    { name: 'Tree — equilibrio e postura', durationSec: 40, focus: "Un piede sull'interno coscia, bacino livellato", watchFor: 'bacino stabile, sguardo fisso' },
+    { name: 'Triangle — allineamento laterale', durationSec: 40, focus: 'Fianco lungo, sguardo verso l\'alto', watchFor: 'busto su un solo piano' },
+    { name: 'Bridge — controllo', durationSec: 40, focus: 'Sali e scendi con controllo, non di scatto', watchFor: 'movimento lento e guidato' },
+    { name: 'Respiro finale', durationSec: 30, focus: 'Osserva l\'allineamento a occhi chiusi', watchFor: 'respiro calmo' },
+  ];
+  // default / mobilita: flessibilità (come prima, leggermente esteso)
+  return [
+    { name: 'Respiro e centratura', durationSec: 35, focus: 'In piedi, respira lento dal naso e allunga la colonna', watchFor: 'spalle basse e rilassate' },
+    { name: 'Forward Fold', durationSec: 45, focus: 'Piega in avanti dall\'anca, ginocchia morbide', watchFor: 'schiena lunga, non curva' },
+    { name: 'Warrior II', durationSec: 45, focus: 'Affondo laterale, braccia parallele a terra', watchFor: 'ginocchio anteriore sopra la caviglia' },
+    { name: 'Tree — equilibrio', durationSec: 40, focus: "Un piede sull'interno coscia, sguardo fisso", watchFor: 'bacino stabile, respiro calmo' },
+    { name: 'Bridge', durationSec: 40, focus: 'Spingi coi talloni, apri il petto', watchFor: 'glutei attivi, collo libero' },
+    { name: 'Respiro finale', durationSec: 40, focus: 'Respiro 4-7-8, rilascia le tensioni', watchFor: 'pancia che si gonfia nell\'inspiro' },
+  ];
+}
+function buildRunningTemplate(goal) {
+  if (goal === 'potenza') return [
+    { name: 'Riscaldamento articolare', durationSec: 30, focus: 'Caviglie e anche, movimenti ampi', watchFor: 'corpo sciolto' },
+    { name: 'Skip alto', durationSec: 30, focus: 'Ginocchia su, braccia a 90°', watchFor: 'busto leggermente avanti' },
+    { name: 'Balzi in avanti', durationSec: 35, focus: 'Spingi forte a ogni balzo', watchFor: 'atterraggio morbido sul mesopiede' },
+    { name: 'Sprint breve massimale', durationSec: 30, focus: 'Massima velocità per pochi secondi', watchFor: 'braccia che spingono forte' },
+    { name: 'Sprint ripetuti', durationSec: 45, focus: 'Alterna sprint corti e recupero camminato', watchFor: 'esplosività ad ogni partenza' },
+    { name: 'Defaticamento e respiro', durationSec: 35, focus: 'Cammina e rallenta il battito', watchFor: 'respiro che si calma' },
+  ];
+  if (goal === 'cardio') return [
+    { name: 'Riscaldamento leggero', durationSec: 30, focus: 'Corsa lenta sul posto', watchFor: 'respiro regolare' },
+    { name: 'Corsa cadenza 180', durationSec: 45, focus: 'Passi rapidi e corti, ritmo costante', watchFor: 'contatto breve col suolo' },
+    { name: 'Corsa a ritmo costante', durationSec: 50, focus: 'Mantieni un ritmo sostenibile e continuo', watchFor: 'respiro controllato, non affannoso' },
+    { name: 'Fartlek leggero', durationSec: 50, focus: 'Alterna tratti più veloci e più lenti senza fermarti', watchFor: 'gestione del fiato' },
+    { name: 'Corsa lunga a ritmo blando', durationSec: 55, focus: 'Resisti a ritmo basso ma costante', watchFor: 'postura che regge nel tempo' },
+    { name: 'Defaticamento e respiro', durationSec: 40, focus: 'Rallenta e respira 1:2', watchFor: 'spalle rilassate' },
+  ];
+  if (goal === 'tecnica') return [
+    { name: 'Attivazione mesopiede', durationSec: 30, focus: "Piccoli saltelli sul posto sull'avampiede", watchFor: 'appoggio leggero' },
+    { name: 'Skip basso — cadenza', durationSec: 35, focus: 'Passi piccoli e rapidissimi', watchFor: 'cadenza alta, niente rimbalzo verticale' },
+    { name: 'Corsa a braccia controllate', durationSec: 40, focus: "Concentrati solo sull'oscillazione delle braccia", watchFor: 'braccia a 90°, non incrociano il corpo' },
+    { name: 'Corsa cadenza 180 — focus tecnico', durationSec: 45, focus: 'Passi rapidi e corti, mesopiede sotto il baricentro', watchFor: 'nessun rimbalzo, busto stabile' },
+    { name: 'Corsa con controllo posturale', durationSec: 45, focus: 'Busto leggermente avanti, sguardo lontano', watchFor: 'postura che non collassa' },
+    { name: 'Defaticamento e respiro', durationSec: 30, focus: 'Rallenta gradualmente', watchFor: 'respiro regolare' },
+  ];
+  // default / mobilita: come prima
+  return [
+    { name: 'Corsa sul posto', durationSec: 45, focus: 'Cadenza alta, piedi leggeri', watchFor: 'mesopiede sotto il baricentro' },
+    { name: 'Skip alto', durationSec: 30, focus: 'Ginocchia su, braccia a 90°', watchFor: 'busto leggermente avanti' },
+    { name: 'Affondi in camminata', durationSec: 40, focus: 'Passi lunghi e controllati', watchFor: 'ginocchio non oltre la punta' },
+    { name: 'Corsa cadenza 180', durationSec: 50, focus: 'Passi rapidi e corti', watchFor: 'contatto breve col suolo' },
+    { name: 'Defaticamento e respiro', durationSec: 40, focus: 'Rallenta e respira 1:2', watchFor: 'spalle rilassate' },
+  ];
+}
+function buildBreathingTemplate(goal) {
+  if (goal === 'potenza') return [
+    { name: 'Respiro diaframmatico', durationSec: 35, focus: "Mano sull'ombelico, gonfia la pancia", watchFor: 'petto fermo, pancia che sale' },
+    { name: 'Respiro di potenza — attivazione', durationSec: 40, focus: '3 respiri rapidi e profondi, poi espiro forte', watchFor: 'core che si attiva ad ogni espiro' },
+    { name: 'Respiro tipo Wim Hof — 20 atti', durationSec: 45, focus: 'Respira rapido e profondo per 20 atti, poi trattieni', watchFor: 'niente tensione al collo' },
+    { name: 'Espiro esplosivo ripetuto', durationSec: 40, focus: 'Inspira normale, espira con forza e suono', watchFor: 'addome che si contrae di scatto' },
+    { name: 'Respiro di potenza — ripetizione', durationSec: 40, focus: 'Ripeti il ciclo rapido con più energia', watchFor: 'ritmo che resta controllato' },
+    { name: 'Calma finale', durationSec: 35, focus: 'Respiro naturale, lascia scendere il battito', watchFor: 'battito che rallenta' },
+  ];
+  if (goal === 'cardio') return [
+    { name: 'Respiro diaframmatico', durationSec: 30, focus: "Mano sull'ombelico, gonfia la pancia", watchFor: 'petto fermo, pancia che sale' },
+    { name: 'Respiro ritmico 3:2', durationSec: 40, focus: 'Inspira 3 tempi, espira 2 — cammina o marcia sul posto', watchFor: 'ritmo che non si spezza' },
+    { name: 'Respiro sotto sforzo leggero', durationSec: 45, focus: 'Sali le scale immaginarie mantenendo il respiro ritmico', watchFor: 'niente apnea sotto sforzo' },
+    { name: 'Respiro di recupero attivo', durationSec: 45, focus: 'Alterna 20s intenso e respiro controllato, 20s calmo', watchFor: 'recupero rapido tra le fasi' },
+    { name: 'Respiro a resistenza crescente', durationSec: 45, focus: "Allunga gradualmente l'espiro mantenendo il ritmo", watchFor: 'fiato che regge fino alla fine' },
+    { name: 'Calma finale', durationSec: 35, focus: 'Respiro naturale, rallenta', watchFor: 'battito che scende' },
+  ];
+  if (goal === 'tecnica') return [
+    { name: 'Osservazione del respiro', durationSec: 30, focus: 'Nota dove va naturalmente il tuo respiro', watchFor: 'nessuno sforzo, solo osservazione' },
+    { name: 'Box breathing 4-4-4-4', durationSec: 45, focus: 'Inspira, tieni, espira, tieni — 4 secondi ciascuno', watchFor: 'ritmo costante e preciso' },
+    { name: 'Respiro 4-7-8 — precisione conteggio', durationSec: 45, focus: 'Inspira 4, tieni 7, espira 8, conta con precisione', watchFor: 'espiro lungo e lento fino alla fine' },
+    { name: 'Respiro alternato (nadi shodhana)', durationSec: 45, focus: 'Alterna le narici con le dita, ritmo regolare', watchFor: 'transizioni fluide tra le narici' },
+    { name: 'Box breathing — conteggio esteso', durationSec: 40, focus: 'Stesso schema ma 5 secondi per fase', watchFor: 'precisione anche con conteggio più lungo' },
+    { name: 'Calma finale', durationSec: 30, focus: 'Torna al respiro naturale osservandolo', watchFor: 'mente calma' },
+  ];
+  // default / mobilita: rilassante (come prima)
+  return [
+    { name: 'Respiro diaframmatico', durationSec: 40, focus: "Mano sull'ombelico, gonfia la pancia", watchFor: 'petto fermo, pancia che sale' },
+    { name: 'Box breathing 4-4-4-4', durationSec: 45, focus: 'Inspira, tieni, espira, tieni — 4 secondi ciascuno', watchFor: 'ritmo costante' },
+    { name: 'Respiro 4-7-8', durationSec: 45, focus: 'Inspira 4, tieni 7, espira 8', watchFor: 'espiro lungo e lento' },
+    { name: 'Respiro di potenza', durationSec: 35, focus: '3 respiri rapidi, poi espiro forte', watchFor: 'core che si attiva' },
+    { name: 'Calma finale', durationSec: 40, focus: 'Respiro naturale, mente vuota', watchFor: 'battito che rallenta' },
+  ];
+}
+function buildFitnessTemplate(goal) {
+  if (goal === 'potenza') return [
+    { name: 'Riscaldamento articolare', durationSec: 30, focus: 'Mobilizza caviglie, anche e spalle', watchFor: 'corpo sciolto' },
+    { name: 'Squat con salto', durationSec: 40, focus: "Scendi in squat, esplodi verso l'alto", watchFor: 'atterraggio morbido sulle ginocchia' },
+    { name: 'Push-up esplosivo', durationSec: 40, focus: 'Spingi con forza da staccare le mani da terra (o massimo sforzo)', watchFor: 'core rigido, niente cedimento' },
+    { name: 'Affondi con salto', durationSec: 45, focus: "Cambia gamba a mezz'aria con salto", watchFor: 'atterraggio controllato' },
+    { name: 'Plank con spinta', durationSec: 45, focus: 'Da plank, spingi in alto ad ogni ripetizione', watchFor: 'bacino stabile durante lo sforzo' },
+    { name: 'Serie esplosiva finale', durationSec: 45, focus: 'Combina squat-jump e push-up al massimo sforzo', watchFor: 'tecnica che regge sotto fatica' },
+    { name: 'Defaticamento', durationSec: 30, focus: 'Scuoti gli arti, respira lento', watchFor: 'muscoli che si rilassano' },
+  ];
+  if (goal === 'cardio') return [
+    { name: 'Riscaldamento cardio leggero', durationSec: 30, focus: 'Corsa sul posto leggera', watchFor: 'respiro che si scalda gradualmente' },
+    { name: 'Mountain climber', durationSec: 40, focus: 'Ginocchia al petto alternate, ritmo veloce', watchFor: 'bacino stabile, non ondeggia' },
+    { name: 'Burpee', durationSec: 45, focus: 'Squat-plank-push-up-salto, ritmo continuo', watchFor: 'fiato regolare tra le fasi' },
+    { name: 'Corsa sul posto ad alta cadenza', durationSec: 45, focus: 'Ginocchia alte, braccia attive', watchFor: 'cadenza costante' },
+    { name: 'Jumping jack ripetuti', durationSec: 45, focus: 'Ritmo continuo senza pause', watchFor: 'respiro che segue il movimento' },
+    { name: 'Round cardio no-stop', durationSec: 50, focus: 'Alterna gli esercizi precedenti senza fermarti', watchFor: 'gestione del fiato' },
+    { name: 'Defaticamento e respiro', durationSec: 35, focus: 'Rallenta e respira 1:2', watchFor: 'battito che scende' },
+  ];
+  if (goal === 'tecnica') return [
+    { name: 'Attivazione e allineamento', durationSec: 30, focus: 'Controlla postura di base in piedi', watchFor: 'colonna neutra' },
+    { name: 'Squat tempo lento (3-1-3)', durationSec: 40, focus: 'Scendi in 3 secondi, tieni 1, risali in 3', watchFor: 'ginocchia in linea coi piedi' },
+    { name: 'Push-up controllato', durationSec: 40, focus: 'Scendi lento, gomiti a 45°, nessun rimbalzo', watchFor: 'corpo rigido tutto il tempo' },
+    { name: 'Plank con attivazione core', durationSec: 45, focus: 'Contrai addome e glutei consapevolmente', watchFor: 'linea retta testa-bacino-talloni' },
+    { name: 'Affondo con controllo', durationSec: 45, focus: "Scendi lento, verifica l'allineamento del ginocchio", watchFor: 'ginocchio posteriore quasi a terra, controllato' },
+    { name: 'Sequenza a bassa velocità, alta precisione', durationSec: 40, focus: 'Ripeti gli esercizi a metà velocità curando la forma', watchFor: 'zero compensi' },
+    { name: 'Defaticamento', durationSec: 30, focus: 'Respira e rilassa i muscoli lavorati', watchFor: 'tensione che si scioglie' },
+  ];
+  // default / mobilita: misto forza-cardio come prima, con mobilità finale
+  return [
+    { name: 'Squat', durationSec: 40, focus: 'Scendi lento, petto alto', watchFor: 'ginocchia in linea coi piedi' },
+    { name: 'Push-up', durationSec: 40, focus: 'Corpo rigido, gomiti a 45°', watchFor: 'niente cedimento lombare' },
+    { name: 'Plank', durationSec: 40, focus: 'Linea retta testa-bacino-talloni', watchFor: 'core attivo, bacino stabile' },
+    { name: 'Affondi', durationSec: 45, focus: 'Alterna le gambe, busto dritto', watchFor: 'ginocchio posteriore quasi a terra' },
+    { name: 'Corsa sul posto', durationSec: 45, focus: 'Cardio finale, cadenza alta', watchFor: 'respiro ritmico' },
+    { name: 'Mobilità e stretching finale', durationSec: 35, focus: 'Allunga gambe e schiena con calma', watchFor: 'respiro lento' },
+  ];
+}
 // timeline "ripetizione" (fitness/flow): scendi → tieni → risali → pausa
 const _repT = (ms) => { const P = 1700, t = ms % P; if (t < 620) return _easeOut(t / 620); if (t < 900) return 1; if (t < 1500) return 1 - _easeIn((t - 900) / 600); return 0; };
 
@@ -2643,49 +2839,27 @@ function VisualCoach() {
   }, []);
 
   // Piano LOCALE garantito — usato se l'AI non risponde: così il circuito parte SEMPRE.
+  // Varia per obiettivo dichiarato (sessionContext) e, in assenza di un obiettivo esplicito,
+  // considera le debolezze/focus delle sessioni precedenti per la stessa disciplina (progressione
+  // che prima avveniva solo lato AI — qui il fallback locale non era mai stato personalizzato).
   const buildLocalPlan = useCallback(() => {
     const scene = sceneFor(mode);
     const shuffle = (arr) => arr.map((v) => [Math.random(), v]).sort((a, b) => a[0] - b[0]).map((x) => x[1]);
+    // obiettivo: priorità all'input esplicito della sessione corrente, altrimenti storico recente
+    const goal = resolveGoal(sessionContext) || resolveGoalFromHistory(pastSessions, mode);
     if (scene === 'solo') {
-      if (mode === 'yoga' || mode === 'stretching') return [
-        { name: 'Respiro e centratura', durationSec: 40, focus: 'In piedi, respira lento dal naso e allunga la colonna', watchFor: 'spalle basse e rilassate' },
-        { name: 'Forward Fold', durationSec: 45, focus: 'Piega in avanti dall\'anca, ginocchia morbide', watchFor: 'schiena lunga, non curva' },
-        { name: 'Warrior II', durationSec: 45, focus: 'Affondo laterale, braccia parallele a terra', watchFor: 'ginocchio anteriore sopra la caviglia' },
-        { name: 'Tree — equilibrio', durationSec: 40, focus: 'Un piede sull\'interno coscia, sguardo fisso', watchFor: 'bacino stabile, respiro calmo' },
-        { name: 'Bridge', durationSec: 40, focus: 'Spingi coi talloni, apri il petto', watchFor: 'glutei attivi, collo libero' },
-        { name: 'Respiro finale', durationSec: 45, focus: 'Respiro 4-7-8, rilascia le tensioni', watchFor: 'pancia che si gonfia nell\'inspiro' },
-      ];
-      if (mode === 'running') return [
-        { name: 'Corsa sul posto', durationSec: 45, focus: 'Cadenza alta, piedi leggeri', watchFor: 'mesopiede sotto il baricentro' },
-        { name: 'Skip alto', durationSec: 30, focus: 'Ginocchia su, braccia a 90°', watchFor: 'busto leggermente avanti' },
-        { name: 'Affondi in camminata', durationSec: 40, focus: 'Passi lunghi e controllati', watchFor: 'ginocchio non oltre la punta' },
-        { name: 'Corsa cadenza 180', durationSec: 50, focus: 'Passi rapidi e corti', watchFor: 'contatto breve col suolo' },
-        { name: 'Defaticamento e respiro', durationSec: 40, focus: 'Rallenta e respira 1:2', watchFor: 'spalle rilassate' },
-      ];
-      if (mode === 'breathing') return [
-        { name: 'Respiro diaframmatico', durationSec: 45, focus: 'Mano sull\'ombelico, gonfia la pancia', watchFor: 'petto fermo, pancia che sale' },
-        { name: 'Box breathing 4-4-4-4', durationSec: 50, focus: 'Inspira, tieni, espira, tieni — 4 secondi ciascuno', watchFor: 'ritmo costante' },
-        { name: 'Respiro 4-7-8', durationSec: 50, focus: 'Inspira 4, tieni 7, espira 8', watchFor: 'espiro lungo e lento' },
-        { name: 'Respiro di potenza', durationSec: 40, focus: '3 respiri rapidi, poi espiro forte', watchFor: 'core che si attiva' },
-        { name: 'Calma finale', durationSec: 45, focus: 'Respiro naturale, mente vuota', watchFor: 'battito che rallenta' },
-      ];
-      return [
-        { name: 'Squat', durationSec: 45, focus: 'Scendi lento, petto alto', watchFor: 'ginocchia in linea coi piedi' },
-        { name: 'Push-up', durationSec: 40, focus: 'Corpo rigido, gomiti a 45°', watchFor: 'niente cedimento lombare' },
-        { name: 'Plank', durationSec: 40, focus: 'Linea retta testa-bacino-talloni', watchFor: 'core attivo, bacino stabile' },
-        { name: 'Affondi', durationSec: 45, focus: 'Alterna le gambe, busto dritto', watchFor: 'ginocchio posteriore quasi a terra' },
-        { name: 'Corsa sul posto', durationSec: 45, focus: 'Cardio finale, cadenza alta', watchFor: 'respiro ritmico' },
-      ];
+      if (mode === 'yoga' || mode === 'stretching') return buildYogaTemplate(goal === 'difesa' ? 'mobilita' : goal);
+      if (mode === 'running') return buildRunningTemplate(goal === 'difesa' ? null : goal);
+      if (mode === 'breathing') return buildBreathingTemplate(goal === 'difesa' ? 'mobilita' : goal);
+      // calisthenics / crossfit / fitness / general → template forza/cardio/tecnica
+      return buildFitnessTemplate(goal === 'difesa' ? null : goal);
     }
-    // strike / opponent → usa i combo della disciplina
-    const combos = COMBO_LIBRARY[mode] || COMBO_LIBRARY.default;
+    // strike / opponent → usa i combo della disciplina (gestisce anche sparring_<disciplina>)
+    const baseMode = String(mode || '').replace(/^sparring_/, '');
+    const combos = COMBO_LIBRARY[mode] || COMBO_LIBRARY[baseMode] || COMBO_LIBRARY.default;
     const picks = shuffle(combos).slice(0, 4);
-    return [
-      { name: 'Riscaldamento: guardia e movimento', durationSec: 40, focus: 'Muoviti sui piedi, mani alte, sciogli le spalle', watchFor: 'guardia alta, baricentro basso' },
-      ...picks.map((c) => ({ name: c, durationSec: 40, focus: 'Esegui lento e pulito, torna sempre in guardia', watchFor: 'tecnica precisa, ritorno in guardia' })),
-      { name: 'Combo libera', durationSec: 45, focus: 'Concatena le tecniche a tuo ritmo', watchFor: 'respiro e fluidità' },
-    ];
-  }, [mode]);
+    return buildStrikeTemplate(goal, picks);
+  }, [mode, sessionContext, pastSessions]);
 
   const generateGuidedPlan = useCallback(async () => {
     setGuidedLoading(true); setGuidedReview(null); setGuidedPhase('gen');
