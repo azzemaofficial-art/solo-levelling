@@ -1585,6 +1585,66 @@ const STRIKE_MASTERY = {
     angle: "Flessione dell'anca del lato calciante oltre i 90°, ginocchio che sale in linea quasi verticale, gamba d'appoggio raccolta sotto il bacino durante la fase di volo",
     breath: "Inspirazione rapida nello stacco da terra, espirazione esplosiva sincronizzata con l'impatto del ginocchio a mezz'aria",
   },
+  squat: {
+    chain: 'Il movimento parte dall\'anca che si spinge indietro (hip hinge), le ginocchia seguono in avanti solo quanto basta, il core si irrigidisce per trasferire la forza dalle gambe alla colonna senza dispersioni',
+    secret: 'I principianti pensano "scendo con le ginocchia": i maestri pensano "mi siedo su una sedia invisibile dietro di me" — questo singolo pensiero sposta il carico dai quadricipiti (che si affaticano) ai glutei e posteriore (che sono più forti e proteggono il ginocchio)',
+    angle: 'Ginocchia flesse fino a coscia parallela al suolo (~90-100°) o oltre se la mobilità lo permette, mai oltre il punto in cui la lombare inizia a incurvarsi',
+    breath: 'Inspirazione profonda nel diaframma PRIMA di scendere (crea pressione intra-addominale, protegge la schiena), espirazione controllata durante la risalita, mai trattenuta oltre il necessario',
+  },
+  pushup: {
+    chain: 'Il corpo resta un\'unica linea rigida da testa a talloni (plancia attiva), la discesa è guidata dalla flessione simultanea di gomiti e spalle, il core e i glutei restano contratti per impedire che il bacino ceda verso il basso o si alzi a "tetto"',
+    secret: 'Il campione non pensa "spingo con le braccia" ma "spingo il pavimento via da me con tutto il corpo": mantenendo scapole leggermente retratte e stabili a inizio movimento, la spinta si distribuisce su petto-spalle-tricipiti invece di caricare solo le spalle, che è la causa più comune di infortunio',
+    angle: 'Gomiti che si flettono a circa 45° rispetto al busto (non 90° a "T", che sovraccarica la cuffia dei rotatori), petto che scende fino a pochi centimetri dal suolo, gomito quasi esteso ma non bloccato in alto',
+    breath: 'Inspirazione durante la discesa controllata, espirazione esplosiva durante la spinta verso l\'alto, mai trattenuta nel punto più basso',
+  },
+  plank: {
+    chain: 'La tensione si irradia da un punto centrale del core verso testa e talloni in linea retta, gli avambracci o le mani ancorano la struttura, i glutei e il retto addominale lavorano insieme per impedire che il bacino ceda o si alzi',
+    secret: 'I principianti "spengono" i glutei e lasciano cadere il bacino: i maestri contraggono attivamente glutei e addome come se dovessero incassare un pugno allo stomaco — questa co-contrazione trasforma una plank statica passiva in un esercizio di stabilizzazione reale della colonna',
+    angle: 'Corpo allineato su un\'unica retta da orecchie a caviglie (né bacino alto a "tetto" né basso a "V"), gomiti in verticale sotto le spalle a ~90°',
+    breath: 'Respirazione toracica bassa e continua, mai apnea prolungata — trattenere il respiro fa perdere la tensione del core molto più velocemente che respirare con ritmo costante',
+  },
+  lunge: {
+    chain: 'Il passo (in avanti, indietro o laterale) porta il ginocchio anteriore sopra la caviglia, il bacino scende in verticale mantenendo il busto eretto, il ginocchio posteriore si abbassa quasi a sfiorare il suolo mentre entrambe le gambe condividono il carico',
+    secret: 'Il campione pensa "scendo dritto verso il basso" non "scendo in avanti": se il ginocchio anteriore avanza oltre la punta del piede, il carico si sposta pericolosamente sull\'articolazione invece che sui muscoli — la traiettoria verticale del bacino protegge il ginocchio e aumenta l\'attivazione del gluteo',
+    angle: 'Ginocchio anteriore flesso a ~90°, allineato sopra la caviglia e mai oltre la punta del piede, ginocchio posteriore che scende a pochi centimetri dal suolo con angolo simile',
+    breath: 'Inspirazione durante la discesa nel passo, espirazione durante la spinta di ritorno alla posizione eretta',
+  },
+  warrior: {
+    chain: 'Il radicamento parte dal piede posteriore ben ancorato a terra e ruotato, il bacino si apre verso il lato del piede anteriore mantenendo entrambi i fianchi il più possibile paralleli al bordo corto del tappetino, le braccia si estendono in linea con le spalle mentre il busto resta verticale sopra il bacino',
+    secret: 'L\'insegnante sa che l\'errore più comune è lasciare che il ginocchio anteriore collassi verso l\'interno: il pensiero guida corretto è "spingo il ginocchio verso il mignolo del piede", questo attiva il medio gluteo e stabilizza tutta la postura invece di scaricare il peso sul legamento collaterale',
+    angle: 'Ginocchio anteriore flesso a ~90° e allineato sopra la caviglia, gamba posteriore distesa e ferma con piede angolato a ~45-60°, braccia parallele al pavimento a 180° tra loro',
+    breath: 'Respirazione ujjayi lenta e sonora (leggera costrizione alla gola), inspirazioni ed espirazioni di uguale durata per sostenere la posizione senza tensione superflua',
+  },
+  tree: {
+    chain: 'L\'equilibrio nasce dal radicamento attivo del piede d\'appoggio che si "aggrappa" al pavimento allargando le dita, la gamba sollevata preme il piede contro la coscia o la caviglia opposta (mai sul ginocchio) generando una spinta isometrica reciproca, il bacino resta neutro e il busto si allunga verso l\'alto',
+    secret: 'L\'insegnante di yoga sa che l\'equilibrio non è statico ma un continuo micro-aggiustamento: fissare lo sguardo su un punto fisso (drishti) a distanza costante riduce drasticamente le oscillazioni molto più di qualsiasi correzione muscolare cosciente',
+    angle: 'Anca della gamba sollevata aperta verso l\'esterno quanto la mobilità lo permette senza inclinare il bacino, piede d\'appoggio con le tre dita cardinali (alluce, mignolo, tallone) ben distribuite a terra',
+    breath: 'Respirazione diaframmatica lenta e regolare, ogni inspirazione allunga leggermente la colonna verso l\'alto, ogni espirazione consolida il radicamento senza perdere l\'altezza raggiunta',
+  },
+  forward_fold: {
+    chain: 'Il movimento parte da un hip hinge puro all\'anca con la schiena che resta lunga e neutra il più a lungo possibile, il busto si piega in avanti ruotando attorno alle teste femorali, solo nell\'ultima fase la colonna si arrotonda leggermente se la mobilità degli ischiocrurali lo richiede',
+    secret: 'L\'insegnante corregge sempre chi "si piega con la schiena": il pensiero corretto è "porto lo sterno verso le gambe mantenendo la colonna lunga", questo protegge i dischi lombari e concentra lo stiramento dove serve, sui femorali, non sulla zona lombare già vulnerabile in flessione',
+    angle: 'Flessione dell\'anca il più ampia possibile mantenendo la schiena neutra, ginocchia leggermente morbide (mai bloccate in iperestensione) per ridurre la tensione posteriore sulla catena cinetica',
+    breath: 'Espirazione lunga e profonda mentre si scende ad approfondire gradualmente la posizione, inspirazione per allungare leggermente la colonna prima di ogni nuova discesa',
+  },
+  bridge: {
+    chain: 'Il movimento parte dalla spinta dei talloni a terra che attiva i glutei per primi, il bacino si solleva in estensione d\'anca controllata, la parte alta della schiena e le spalle restano ancorate al suolo mentre la colonna si distribuisce in un arco uniforme senza piegarsi solo sulla lombare',
+    secret: 'L\'insegnante corregge chi "spinge con la schiena": il pensiero corretto è "stringo i glutei e spingo i talloni nel pavimento", questo sposta il lavoro dai glutei (dove deve stare) e previene la compressione eccessiva e il fastidio tipico sulla zona lombare di chi iperestende solo la colonna',
+    angle: 'Estensione dell\'anca fino a bacino e cosce allineati (ginocchia piegate a ~90°), mai oltre il punto in cui la lombare inizia a incurvarsi eccessivamente invece che i glutei a lavorare',
+    breath: 'Inspirazione prima di sollevare, espirazione durante la salita del bacino sincronizzata con la contrazione dei glutei, respirazione regolare nel mantenimento della posizione',
+  },
+  breathe: {
+    chain: 'Il respiro corretto parte dal diaframma che si contrae e scende, la pancia si espande in avanti e lateralmente (non il petto che si solleva), l\'espirazione è un rilascio controllato che risale dal basso addome fino a svuotare completamente i polmoni',
+    secret: 'La maggior parte delle persone respira col petto in modo corto e superficiale sotto stress: il maestro insegna a "gonfiare la pancia come un palloncino" ad ogni inspirazione — questo attiva il sistema nervoso parasimpatico e abbassa la frequenza cardiaca molto più velocemente di qualsiasi tentativo cosciente di "rilassarsi"',
+    angle: 'Nessun riferimento angolare articolare: il parametro chiave è il rapporto tempo inspirazione/espirazione (es. tecnica 4-7-8: inspira 4, trattieni 7, espira 8; o box breathing: 4-4-4-4 con apnea piena e vuota)',
+    breath: 'Inspirazione nasale lenta e profonda che espande l\'addome, breve pausa in apnea piena, espirazione ancora più lunga (idealmente dalla bocca socchiusa o dal naso) che attiva il rilassamento, ritmo costante senza scatti',
+  },
+  run: {
+    chain: 'L\'appoggio del piede avviene idealmente sotto il baricentro (non davanti al corpo, che frena ad ogni passo), il ginocchio si flette per assorbire l\'impatto, l\'anca si estende a spingere il corpo in avanti, il busto resta leggermente inclinato in avanti come un unico blocco dalle caviglie in su',
+    secret: 'Il coach d\'élite corregge sempre l\'overstriding (appoggio troppo avanti rispetto al bacino): aumentare la cadenza (passi al minuto, target ~170-180) senza allungare la falcata riduce automaticamente l\'impatto frenante e il rischio di infortunio molto più di qualsiasi correzione cosciente dell\'appoggio del piede',
+    angle: 'Inclinazione del busto in avanti di circa 5-10° dalle caviglie (mai piegando solo la vita), ginocchio che si flette a ~90-100° in fase di volo, appoggio del piede quasi sotto il ginocchio',
+    breath: 'Respirazione ritmica sincronizzata con la falcata (es. 3:2 o 2:2 passi per ciclo respiratorio), respirazione addominale profonda anche a ritmo elevato, mai respiro toracico corto che affatica precocemente',
+  },
 };
 
 // Riconosce le tecniche/combo chiamate (in italiano, inglese o nel gergo delle varie discipline) dentro
@@ -1618,6 +1678,16 @@ const STRIKE_KEY_MATCH = [
   ['superman_punch', /superman/i],
   ['flying_knee', /flying knee/i],
   ['sprawl', /sprawl/i],
+  ['squat', /\bsquat\b|accosciata/i],
+  ['pushup', /push.?up|piegamento sulle braccia|flession[ei] sulle braccia/i],
+  ['plank', /\bplank\b/i],
+  ['lunge', /\blunge\b|affondo/i],
+  ['warrior', /guerriero|warrior pose/i],
+  ['tree', /posizione dell.?albero|tree pose|\balbero\b/i],
+  ['forward_fold', /piega in avanti|forward fold|uttanasana/i],
+  ['bridge', /posizione del ponte|bridge pose|\bponte\b/i],
+  ['breathe', /respir|breath|pranayam|box breathing|4.7.8/i],
+  ['run', /\bcorsa\b|running|cadenza di corsa|falcata/i],
 ];
 
 // Costruisce la rubrica di conoscenza da maestro sulle tecniche riconosciute in un testo.
@@ -1649,6 +1719,16 @@ const STRIKE_KEY_MATCH_STRICT = {
   clinch: /clinch|mount|kimura|choke|leva|submission/i,
   triangle: /triangle choke|triangolo choke|triangolo di gambe|triangolo dalle gambe|soffocamento a triangolo/i,
   rear_naked_choke: /rear naked|hadaka.?jime/i,
+  // 'affondo' nudo compare anche in scherma/footwork generico ("l'affondo del passo di attacco"):
+  // richiede un composto specifico dell'esercizio di fitness/yoga.
+  lunge: /\blunge\b|affondo alternato|posizione di affondo|walking lunge|reverse lunge|split squat/i,
+  // 'albero' nudo è un sostantivo comunissimo (metafore, ambientazione): richiede il riferimento esplicito alla posizione yoga.
+  tree: /posizione dell.?albero|tree pose/i,
+  // 'ponte' nudo è comunissimo (wrestling bridge generico, metafore, strutture): richiede il riferimento esplicito alla posizione.
+  bridge: /posizione del ponte|bridge pose/i,
+  // 'corsa' nuda può comparire in espressioni idiomatiche o generiche non legate alla disciplina del running:
+  // richiede un composto specifico della corsa come allenamento/tecnica.
+  run: /running|cadenza di corsa|falcata|corsa a piedi|allenamento di corsa|tecnica di corsa/i,
 };
 
 // Costruisce il blocco rubrica errori per il cervello (vuoto se disciplina non coperta → retrocompat).
