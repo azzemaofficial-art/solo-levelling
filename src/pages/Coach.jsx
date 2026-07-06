@@ -1202,8 +1202,13 @@ const BAG_STRIKE = {
   uppercut: { e: 8, l: [6,7,8] }, elbow: { e: 4, l: [3,4] }, knee: { e: 13, l: [12,13] },
   teep: { e: 11, l: [9,10,11] }, side_kick: { e: 11, l: [9,10,11] }, low_kick: { e: 14, l: [12,13,14] },
   body_kick: { e: 14, l: [12,13,14] }, roundhouse: { e: 14, l: [12,13,14] }, spinning: { e: 14, l: [12,13,14] },
-  clinch: { e: 5, l: [3,4,5] }, level_change: { e: 8, l: [6,7,8] },
+  // clinch (leva/kimura/sao/kuncian...): presa con ENTRAMBE le braccia, non un pugno con una sola
+  clinch: { e: 5, l: [3,4,5,6,7,8] }, level_change: { e: 8, l: [6,7,8] },
 };
+// Tecniche di PRESA/PROIEZIONE (grappling): grammatica visiva diversa dallo strike —
+// entrambe le braccia evidenziate, avversario sbilanciato con forza, niente scintilla da pugno
+// (che leggerebbe come un colpo percussivo invece che una leva/controllo).
+const GRIP_TECH = new Set(['throw', 'clinch', 'shoot']);
 
 // Movimenti SOLO (fitness/flow/yoga) — figura senza bersaglio. Base = 'ready'.
 Object.assign(BAG_POSES, {
@@ -1223,8 +1228,8 @@ Object.assign(BAG_POSES, {
 });
 const SOLO_POSES = new Set(['ready','squat','pushup','plank','lunge','warrior','tree','forward_fold','bridge','breathe','run']);
 const SOLO_STATIC = new Set(['plank','pushup','warrior','tree','bridge','forward_fold','ready']);
-// grapple/atterramenti che raggiungono l'avversario
-const GRAPPLE_STRIKE = { throw: { e: 5, l: [3,4,5] }, shoot: { e: 8, l: [6,7,8] } };
+// grapple/atterramenti che raggiungono l'avversario — presa a due mani, non un colpo con una sola
+const GRAPPLE_STRIKE = { throw: { e: 5, l: [3,4,5,6,7,8] }, shoot: { e: 8, l: [3,4,5,6,7,8] } };
 // Avversario che subisce (guardia rivolta all'attaccante, lato destro)
 const OPPONENT_POSE = [[86,20],[85,36],[84,86],[84,40],[82,54],[80,44],[88,40],[90,54],[92,44],[82,88],[82,120],[82,152],[88,88],[89,120],[92,152]];
 // Scena per disciplina: 'bag' (colpi) | 'opponent' (partner/grappling) | 'solo' (movimento)
@@ -1292,9 +1297,10 @@ function StickFigure({ poseKey, color = '#00f2ff', size = 130, highlight = false
   const legW = big ? 5.4 : 4.6;
   const gloveR = big ? 5.2 : 4.4;
 
-  const E = strike ? target[strike.e] : null;          // punto d'impatto
+  const isGrip = GRIP_TECH.has(key);
+  const E = strike ? target[strike.e] : null;          // punto d'impatto/presa
   const bagRot = -pulse * 4, bagDx = pulse * 3.5;
-  const oppRot = pulse * 7;                              // avversario che arretra
+  const oppRot = isGrip ? pulse * 24 : pulse * 7;        // presa/proiezione sbilancia MOLTO di più di un colpo
   const zoom = 1 + pulse * 0.03;                         // micro-zoom all'impatto
 
   // ghost dell'arto che colpisce a t precedenti → scia di velocità
@@ -1408,8 +1414,8 @@ function StickFigure({ poseKey, color = '#00f2ff', size = 130, highlight = false
           strokeWidth={1.6} opacity={0.4 - t * 0.15} />
       )}
 
-      {/* IMPATTO sul bersaglio */}
-      {E && pulse > 0.18 && (
+      {/* IMPATTO (colpo) vs CONTROLLO (presa/proiezione) — grammatica visiva diversa */}
+      {E && pulse > 0.18 && !isGrip && (
         <g style={{ pointerEvents: 'none' }}>
           {[0, 45, 90, 135, 180, 225, 270, 315].map((deg) => {
             const r = deg * Math.PI / 180;
@@ -1419,6 +1425,14 @@ function StickFigure({ poseKey, color = '#00f2ff', size = 130, highlight = false
           })}
           <circle cx={E[0]} cy={E[1]} r={4 + pulse * 7} fill="none" stroke={STRIKE} strokeWidth={2} opacity={1 - pulse} />
           <circle cx={E[0]} cy={E[1]} r={3 * pulse} fill="#fff" opacity={pulse * 0.9} />
+        </g>
+      )}
+      {E && pulse > 0.18 && isGrip && (
+        <g style={{ pointerEvents: 'none' }}>
+          {/* anello di leva/controllo — non percussivo, ruota per suggerire torsione/proiezione */}
+          <circle cx={E[0]} cy={E[1]} r={7 + pulse * 5} fill="none" stroke={STRIKE} strokeWidth={2.2}
+            strokeDasharray="5 4" opacity={0.85} transform={`rotate(${pulse * 140} ${E[0]} ${E[1]})`} />
+          <circle cx={E[0]} cy={E[1]} r={2.2} fill={STRIKE} opacity={pulse} />
         </g>
       )}
     </svg>
