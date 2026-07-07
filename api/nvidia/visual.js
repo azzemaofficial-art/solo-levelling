@@ -2029,6 +2029,56 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, stored: capped.length, sample: row });
   }
 
+  // ── PREFERENZE WEB (SystemHub/Recipe Forge) → KV web_prefs:<chatId>, letto dal ponte Obsidian ──
+  // Il client manda: webPrefs:{ foodPrefs, recipeFeedback? } — recipeFeedback è UNA voce da
+  // accodare (non l'intero array), così ogni 👍/👎 è una singola chiamata leggera.
+  if (req.body?.webPrefs) {
+    const chatId = req.body?.chatId || process.env.SHADOW_BOT_CHAT_ID;
+    if (!chatId) return res.status(400).json({ ok: false, error: 'chatId mancante' });
+    const KEY = `web_prefs:${chatId}`;
+    const cur = (await kvGetRaw(KEY)) || {};
+    const wp = req.body.webPrefs;
+    const next = { ...cur };
+    if (wp.foodPrefs && typeof wp.foodPrefs === 'object') {
+      const f = wp.foodPrefs;
+      next.foodPrefs = {
+        diet: String(f.diet || '').slice(0, 60),
+        allergies: String(f.allergies || '').slice(0, 200),
+        dislikes: String(f.dislikes || '').slice(0, 200),
+        likes: String(f.likes || '').slice(0, 200),
+        cuisine: String(f.cuisine || '').slice(0, 100),
+        spice: String(f.spice || 'normale').slice(0, 20),
+        maxPrepMin: Math.max(0, Math.min(180, parseInt(f.maxPrepMin) || 0)),
+      };
+    }
+    if (wp.recipeFeedback && typeof wp.recipeFeedback === 'object') {
+      const rf = wp.recipeFeedback;
+      const row = {
+        ts: new Date().toISOString(),
+        title: String(rf.title || '').slice(0, 80),
+        tags: Array.isArray(rf.tags) ? rf.tags.slice(0, 8).map((x) => String(x).slice(0, 30)) : [],
+        liked: rf.liked === true || rf.liked === 'up' ? 'up' : rf.liked === false || rf.liked === 'down' ? 'down' : '',
+      };
+      const arr = Array.isArray(cur.recipeFeedback) ? cur.recipeFeedback : [];
+      arr.push(row);
+      next.recipeFeedback = arr.slice(-200); // ultime 200 voci di feedback
+    }
+    if (wp.comboFocus && typeof wp.comboFocus === 'object') {
+      const cf = wp.comboFocus;
+      const row = {
+        ts: new Date().toISOString(),
+        mode: String(cf.mode || '').slice(0, 40),
+        focus: String(cf.focus || '').slice(0, 30),
+        grade: ['perfect', 'good', 'redo'].includes(cf.grade) ? cf.grade : 'good',
+      };
+      const arr = Array.isArray(cur.comboFocusHistory) ? cur.comboFocusHistory : [];
+      arr.push(row);
+      next.comboFocusHistory = arr.slice(-400); // ultime 400 voci focus→voto
+    }
+    await kvSetRaw(KEY, next);
+    return res.status(200).json({ ok: true, stored: true });
+  }
+
   // ── PAGELLA DI FINE SESSIONE (nessuna immagine) → salva stato per la progressione
   // Il client manda a fine sessione: sessionReport=true, mode, durationMin, sampleCount,
   // verdicts[] (le righe COMANDO chiave raccolte), context, level. Il Maestro produce una

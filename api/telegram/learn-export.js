@@ -29,6 +29,7 @@ export default async function handler(req, res) {
   const sessions = (await kvGet(`coach_sessions:${chatId}`)) || [];
   const meals = (await kvGet(`tg_meals:${chatId}`)) || [];
   const profile = (await kvGet(`tg_profile:${chatId}`)) || {};
+  const webPrefs = (await kvGet(`web_prefs:${chatId}`)) || {};
 
   const gates = GATE_IDS.map((g) => {
     const p = learn.prog?.[g] || { done: 0, correct: 0, total: 0 };
@@ -43,5 +44,6 @@ export default async function handler(req, res) {
     sessions: Array.isArray(sessions) ? sessions : [],
     meals: Array.isArray(meals) ? meals : [],
     profile: profile && typeof profile === 'object' ? profile : {},
+    webPrefs: webPrefs && typeof webPrefs === 'object' ? webPrefs : {},
   });
 }
