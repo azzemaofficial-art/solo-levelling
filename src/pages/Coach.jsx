@@ -2095,6 +2095,10 @@ function VisualCoach() {
   const [comboScore, setComboScore] = useState({ perfect: 0, good: 0, redo: 0 });
   const comboPhaseRef = useRef('idle');
   const comboTimerRef = useRef(null);
+  // Pausa combo: congela la demo/il countdown senza avanzare, per studiare la tecnica con calma.
+  const [comboPaused, setComboPaused] = useState(false);
+  const comboPausedRef = useRef(false);
+  useEffect(() => { comboPausedRef.current = comboPaused; }, [comboPaused]);
 
   // Ogni combo è ora { c: stringa combo, lvl: 'base'|'intermedio'|'avanzato', focus: 'potenza'|'velocità'|'difesa'|'counter'|'clinch' }
   // pickCombo (sotto) continua a restituire SEMPRE una stringa semplice — nessun consumer va toccato.
@@ -2703,6 +2707,7 @@ function VisualCoach() {
     comboPhaseRef.current = 'idle';
     setCurrentCombo('');
     setComboResult(null);
+    setComboPaused(false); comboPausedRef.current = false;
   }, []);
 
   const runComboJudge = useCallback(async (combo) => {
@@ -2809,32 +2814,38 @@ function VisualCoach() {
         comboPhaseRef.current = 'result';
         const ttsMsg = grade === 'perfect' ? `Perfetto! ${result?.feedback || ''}` : grade === 'good' ? `Buono. ${result?.feedback || ''}` : `Riprova. ${result?.feedback || ''}`;
         enqueueSpeak(ttsMsg, true);
-        comboTimerRef.current = setTimeout(() => {
+        const advanceToNext = () => {
           if (comboPhaseRef.current !== 'result') return;
+          if (comboPausedRef.current) { comboTimerRef.current = setTimeout(advanceToNext, 400); return; } // in pausa: ricontrolla, non avanzare
           nextComboRoundRef.current?.(result?.nextCombo || '');
-        }, 3200);
+        };
+        comboTimerRef.current = setTimeout(advanceToNext, 3200);
       }, execMs);
     };
-    // 2) dopo la demo → conto alla rovescia 3-2-1 → VIA
-    comboTimerRef.current = setTimeout(() => {
+    // 2) dopo la demo → conto alla rovescia 3-2-1 → VIA (in pausa resta in demo, non parte il countdown)
+    const startCountdownWhenReady = () => {
       if (comboPhaseRef.current !== 'calling') return;
+      if (comboPausedRef.current) { comboTimerRef.current = setTimeout(startCountdownWhenReady, 400); return; }
       enqueueSpeak(`Esegui tra tre`, true);
       let c = 3;
       const tick = () => {
         if (comboPhaseRef.current !== 'calling') return;
+        if (comboPausedRef.current) { comboTimerRef.current = setTimeout(tick, 400); return; } // pausa durante il countdown
         if (c === 0) { go(); return; }
         setComboCountdown(c);
         c--;
         comboTimerRef.current = setTimeout(tick, 650);
       };
       tick();
-    }, demoMs);
+    };
+    comboTimerRef.current = setTimeout(startCountdownWhenReady, demoMs);
   }, [pickCombo, enqueueSpeak, runComboJudge]);
 
   nextComboRoundRef.current = nextComboRound;
 
   const startCombo = useCallback(() => {
     setComboScore({ perfect: 0, good: 0, redo: 0 });
+    setComboPaused(false); comboPausedRef.current = false;
     setComboOn(true);
     comboPhaseRef.current = 'calling';
     nextComboRound('');
@@ -3880,19 +3891,27 @@ function VisualCoach() {
                     {comboCountdown == null ? (
                       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mt-2 flex flex-col items-center gap-1">
                         <span className="text-[10px] font-black uppercase tracking-[0.2em] px-3 py-1 rounded-full"
-                          style={{ color: '#0b0e14', background: C.orange.hex }}>👁 Memorizza la combo</span>
-                        <div className="flex gap-1 mt-1">{[0,1,2].map((i) => (
+                          style={{ color: '#0b0e14', background: C.orange.hex }}>{comboPaused ? '⏸ In pausa' : '👁 Memorizza la combo'}</span>
+                        {!comboPaused && <div className="flex gap-1 mt-1">{[0,1,2].map((i) => (
                           <motion.span key={i} className="w-1.5 h-1.5 rounded-full" style={{ background: C.orange.hex }}
                             animate={{ opacity: [0.25, 1, 0.25] }} transition={{ duration: 0.9, repeat: Infinity, delay: i * 0.18 }} />
-                        ))}</div>
+                        ))}</div>}
                       </motion.div>
                     ) : (
                       <div className="mt-1 flex flex-col items-center">
-                        <p className="text-[9px] uppercase tracking-widest text-gray-400">Esegui tra…</p>
+                        <p className="text-[9px] uppercase tracking-widest text-gray-400">{comboPaused ? 'In pausa' : 'Esegui tra…'}</p>
                         <motion.p key={comboCountdown} initial={{ scale: 1.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
                           className="text-6xl font-black leading-none" style={{ color: '#f97316', textShadow: '0 0 24px rgba(249,115,22,0.5)' }}>{comboCountdown}</motion.p>
                       </div>
                     )}
+                    {/* Pausa: congela demo/countdown per studiare la tecnica con calma */}
+                    <motion.button whileTap={{ scale: 0.93 }} onClick={() => setComboPaused((v) => !v)}
+                      className="mt-3 px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5"
+                      style={comboPaused
+                        ? { background: `linear-gradient(135deg, ${C.orange.hex}, #b45309)`, color: '#fff' }
+                        : { background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', color: '#e5e7eb' }}>
+                      {comboPaused ? <><Play size={13} /> Riprendi</> : <><Pause size={13} /> Pausa</>}
+                    </motion.button>
                   </div>
                 )}
                 {/* GO! */}
