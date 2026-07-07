@@ -379,6 +379,22 @@ const SystemHub = ({ systemLogs, setSystemLogs, dailyGoal, setDailyGoal, hydrati
   const [mealAnalysisErrorSnapshot, setMealAnalysisErrorSnapshot] = useState(null);
   const [recipePrompt, setRecipePrompt] = useState(() => localStorage.getItem('shadow_monarch_recipe_prompt') || '');
   const [isGeneratingRecipe, setIsGeneratingRecipe] = useState(false);
+  // Preferenze alimentari — persistite, iniettate in OGNI ricetta generata (vincolo, non suggerimento)
+  const [foodPrefs, setFoodPrefs] = useState(() => {
+    try {
+      const raw = JSON.parse(localStorage.getItem('shadow_monarch_food_prefs') || '{}');
+      return {
+        diet: raw.diet || '',            // 'vegetariano'|'vegano'|'pescetariano'|'no_maiale'|'senza_glutine'|'senza_lattosio'|''
+        allergies: raw.allergies || '',  // testo libero — VINCOLO ASSOLUTO, mai violare
+        dislikes: raw.dislikes || '',    // testo libero — evita fortemente
+        likes: raw.likes || '',          // testo libero — favorisci quando ha senso
+        cuisine: raw.cuisine || '',      // stile cucina preferito, testo libero
+        spice: raw.spice || 'normale',   // 'delicato'|'normale'|'piccante'
+        maxPrepMin: Number(raw.maxPrepMin) || 0, // 0 = nessun limite
+      };
+    } catch { return { diet: '', allergies: '', dislikes: '', likes: '', cuisine: '', spice: 'normale', maxPrepMin: 0 }; }
+  });
+  const [showFoodPrefs, setShowFoodPrefs] = useState(false);
   // Selettore modelli AI (globale + override per funzione)
   const [aiModelGlobal, setAiModelGlobal] = useState(() => getGlobalModel());
   const [aiModelMeal, setAiModelMeal] = useState(() => getTaskOverride('meal'));
@@ -576,6 +592,9 @@ const SystemHub = ({ systemLogs, setSystemLogs, dailyGoal, setDailyGoal, hydrati
   useEffect(() => {
     localStorage.setItem('shadow_monarch_generated_recipe', JSON.stringify(generatedRecipe || null));
   }, [generatedRecipe]);
+  useEffect(() => {
+    localStorage.setItem('shadow_monarch_food_prefs', JSON.stringify(foodPrefs));
+  }, [foodPrefs]);
   useEffect(() => {
     localStorage.setItem('shadow_monarch_supplement_plan_settings', JSON.stringify(supplementPlanSettings || {}));
   }, [supplementPlanSettings]);
@@ -2800,7 +2819,10 @@ Italiano, diretto, esigente. Niente markdown pesante, usa i titoli con emoji com
     try {
       const pesoKg = Number(playerStats?.currentWeightKg || 0) || 80;
       const altezzaCm = Number(playerStats?.heightCm || metabolicProfile?.heightCm || 178);
-      const ctx = `Atleta: ${pesoKg}kg, ${altezzaCm}cm, ${playerStats?.age || metabolicProfile?.age || 25} anni, ${(playerStats?.sex || 'male') === 'male' ? 'uomo' : 'donna'}. Obiettivo: ${playerStats?.objective || 'recomp'}. Allenamento regolare (forza + arti marziali). Vuole sapere quali INTEGRATORI prendere, con priorità basata sull'evidenza.`;
+      const suppPrefLines = [];
+      if (foodPrefs.allergies?.trim()) suppPrefLines.push(`ALLERGIE (vincolo assoluto): ${foodPrefs.allergies.trim()} — escludi qualsiasi integratore derivato da questi allergeni.`);
+      if (foodPrefs.diet?.trim()) suppPrefLines.push(`Regime alimentare: ${foodPrefs.diet.trim()} — se vegano/vegetariano, preferisci fonti non animali (es. omega-3 da alghe invece che olio di pesce, creatina è già vegan-safe).`);
+      const ctx = `Atleta: ${pesoKg}kg, ${altezzaCm}cm, ${playerStats?.age || metabolicProfile?.age || 25} anni, ${(playerStats?.sex || 'male') === 'male' ? 'uomo' : 'donna'}. Obiettivo: ${playerStats?.objective || 'recomp'}. Allenamento regolare (forza + arti marziali).${suppPrefLines.length ? '\n' + suppPrefLines.join('\n') : ''} Vuole sapere quali INTEGRATORI prendere, con priorità basata sull'evidenza.`;
       // recupero i principi rilevanti agli integratori dalla knowledge base
       const suppQuery = 'integratori creatina proteine whey leucina caseina omega-3 vitamina D K2 magnesio zinco glicina ashwagandha beta-alanina citrullina caffeina curcumina berberina sonno testosterone recupero';
       const suppRes = await fetch('/api/nvidia/coach', {
@@ -2817,6 +2839,7 @@ Struttura così:
 🥈 UTILI (evidenza buona/contesto-dipendente) — idem
 🧪 OPZIONALI/SPERIMENTALI (evidenza debole) — segnala l'incertezza
 ⚠️ NOTA: gli integratori vengono DOPO sonno, dieta e allenamento; consulta un medico per condizioni/farmaci.
+VINCOLO ASSOLUTO: se sono indicate allergie o un regime alimentare, NON consigliare MAI integratori che li violano (priorità su tutto il resto).
 Italiano, conciso, niente markdown pesante. Dosi concrete (anche per ${pesoKg}kg quando rilevante).${knowledgePromptFor(suppQuery, 3200)}`,
         }),
         signal: AbortSignal.timeout(45000),
@@ -2875,6 +2898,17 @@ ${deltaKg ? `- Obiettivo peso: ${pesoTarget}kg (${Number(deltaKg) > 0 ? '-' : '+
 - Media 7gg: ${avgKcal7} kcal/die | ${avgProt7}g prot/die (target ${Math.round(Number(adaptiveMacroTargets?.protein || macroGoals?.protein || 150))}g)
 - Kcal target giornaliero: ${Math.round(Number(effectiveDailyGoal || dailyGoal || 2400))} kcal`;
 
+      // Preferenze alimentari — le allergie sono un vincolo di SICUREZZA, mai un suggerimento.
+      const prefLines = [];
+      if (foodPrefs.allergies?.trim()) prefLines.push(`- ⚠️ ALLERGIE (VINCOLO ASSOLUTO, NON NEGOZIABILE): ${foodPrefs.allergies.trim()} — NON usare questi ingredienti in NESSUNA forma, nemmeno tracce o derivati. Se un ingrediente li contiene, escludilo e basta.`);
+      if (foodPrefs.diet?.trim()) prefLines.push(`- Regime alimentare (vincolo): ${foodPrefs.diet.trim()}`);
+      if (foodPrefs.dislikes?.trim()) prefLines.push(`- Non gradisce (evita fortemente): ${foodPrefs.dislikes.trim()}`);
+      if (foodPrefs.likes?.trim()) prefLines.push(`- Preferisce/adora (favorisci quando ha senso): ${foodPrefs.likes.trim()}`);
+      if (foodPrefs.cuisine?.trim()) prefLines.push(`- Stile di cucina preferito: ${foodPrefs.cuisine.trim()}`);
+      if (foodPrefs.spice && foodPrefs.spice !== 'normale') prefLines.push(`- Livello piccantezza: ${foodPrefs.spice}`);
+      if (foodPrefs.maxPrepMin > 0) prefLines.push(`- Tempo totale (prep+cottura) MASSIMO: ${foodPrefs.maxPrepMin} minuti — non superarlo`);
+      const prefsCtx = prefLines.length ? `\n\nPREFERENZE ALIMENTARI:\n${prefLines.join('\n')}` : '';
+
       const systemPrompt = `Sei uno chef nutrizionale d'élite specializzato in FITPORN — cibo che è allo stesso tempo ESTETICAMENTE PERFETTO e ultra-ottimizzato per le performance atletiche. Le tue ricette devono far venire l'acquolina in bocca solo a leggerle.
 
 STILE OBBLIGATORIO:
@@ -2886,13 +2920,14 @@ STILE OBBLIGATORIO:
 - Note: 1 hack nutrizionale o variante fitporn
 
 VINCOLO FERRO: la ricetta DEVE rispettare i macro residui del profilo. Se le proteine residue sono basse, fai una ricetta low-protein. Se è giorno di allenamento, priorità a carbs + proteine.
+VINCOLO ASSOLUTO DI SICUREZZA: se sono indicate allergie, la ricetta NON deve MAI contenere quegli ingredienti o loro derivati — questo vincolo ha priorità su tutto il resto, incluso lo stile e la richiesta dell'utente.
 
 Rispondi SOLO JSON valido:
 {"title":"string","emoji":"emoji","tagline":"string appetitosa max 15 parole","prepMin":numero,"cookMin":numero,"difficulty":"facile|medio|avanzato","mood":"performance|recovery|comfort|light","ingredients":[{"item":"string","amount":"string"}],"steps":["string con emoji"],"kcal":numero,"protein":numero,"carbs":numero,"fat":numero,"fiber":numero,"fitScore":numero_1_10,"notes":"string hack nutrizionale"}`;
 
       const userMsg = autoMode
-        ? `${profileCtx}\n\nCrea LA ricetta fitporn perfetta per questo momento. Sorprendimi con qualcosa di straordinario che non mi aspetto.`
-        : `${profileCtx}\n\nRichiesta specifica: ${prompt}\n\nCrea una versione fitporn di questa ricetta, adattata ai miei macro residui.`;
+        ? `${profileCtx}${prefsCtx}\n\nCrea LA ricetta fitporn perfetta per questo momento. Sorprendimi con qualcosa di straordinario che non mi aspetto, rispettando SEMPRE le preferenze/allergie indicate.`
+        : `${profileCtx}${prefsCtx}\n\nRichiesta specifica: ${prompt}\n\nCrea una versione fitporn di questa ricetta, adattata ai miei macro residui e alle mie preferenze/allergie.`;
 
       const data = await requestSystemAI({
         model: getModelFor('recipe') || undefined,
@@ -5820,6 +5855,10 @@ Rispondi SOLO JSON valido:
               <p className="text-sm font-black text-white" style={{ fontFamily: 'Russo One, sans-serif' }}>Recipe Forge</p>
             </div>
             <div className="flex gap-1.5">
+              <button onClick={() => setShowFoodPrefs((v) => !v)}
+                className={`text-[9px] px-2.5 py-1.5 rounded-lg border transition-colors ${showFoodPrefs ? 'border-violet-300 bg-violet-500/25 text-white' : 'border-violet-400/30 text-violet-300 hover:bg-violet-500/15'}`}>
+                🎛️ Preferenze
+              </button>
               <button onClick={() => generateRecipeFromPrompt(true)} disabled={isGeneratingRecipe}
                 className={`text-[9px] px-2.5 py-1.5 rounded-lg border transition-colors ${isGeneratingRecipe ? 'border-gray-700 text-gray-500' : 'border-violet-400/40 text-violet-300 hover:bg-violet-500/20'}`}>
                 ✨ Sorprendimi
@@ -5830,6 +5869,80 @@ Rispondi SOLO JSON valido:
               </button>
             </div>
           </div>
+          {showFoodPrefs && (
+            <div className="mb-3 p-3 rounded-xl space-y-2.5" style={{ background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(167,139,250,0.25)' }}>
+              <p className="text-[9px] uppercase tracking-wider font-bold text-violet-300">🎛️ Le tue preferenze — usate in OGNI ricetta</p>
+              <div>
+                <label className="text-[9px] text-gray-400 mb-1 block">Regime alimentare</label>
+                <div className="flex gap-1.5 flex-wrap">
+                  {['', 'vegetariano', 'vegano', 'pescetariano', 'no maiale', 'senza glutine', 'senza lattosio'].map((d) => (
+                    <button key={d || 'nessuno'} onClick={() => setFoodPrefs((p) => ({ ...p, diet: d }))}
+                      className="text-[8px] px-2 py-1 rounded-full border transition-colors"
+                      style={foodPrefs.diet === d
+                        ? { background: '#a78bfa', color: '#0b0e14', borderColor: '#a78bfa' }
+                        : { borderColor: 'rgba(167,139,250,0.3)', color: '#c4b5fd' }}>
+                      {d || 'Nessuno'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="text-[9px] text-red-300 mb-1 block">⚠️ Allergie (vincolo assoluto — mai violato)</label>
+                <input value={foodPrefs.allergies} onChange={(e) => setFoodPrefs((p) => ({ ...p, allergies: e.target.value }))}
+                  placeholder="es: arachidi, crostacei, lattosio..."
+                  className="w-full bg-black/50 border rounded-lg text-white text-[10px] p-2 focus:outline-none placeholder-gray-600"
+                  style={{ borderColor: 'rgba(248,113,113,0.35)' }} />
+              </div>
+              <div>
+                <label className="text-[9px] text-gray-400 mb-1 block">Non gradisce</label>
+                <input value={foodPrefs.dislikes} onChange={(e) => setFoodPrefs((p) => ({ ...p, dislikes: e.target.value }))}
+                  placeholder="es: funghi, coriandolo, frattaglie..."
+                  className="w-full bg-black/50 border border-white/10 rounded-lg text-white text-[10px] p-2 focus:outline-none focus:border-violet-400/50 placeholder-gray-600" />
+              </div>
+              <div>
+                <label className="text-[9px] text-gray-400 mb-1 block">Adora / preferiti</label>
+                <input value={foodPrefs.likes} onChange={(e) => setFoodPrefs((p) => ({ ...p, likes: e.target.value }))}
+                  placeholder="es: salmone, avocado, cioccolato fondente..."
+                  className="w-full bg-black/50 border border-white/10 rounded-lg text-white text-[10px] p-2 focus:outline-none focus:border-violet-400/50 placeholder-gray-600" />
+              </div>
+              <div>
+                <label className="text-[9px] text-gray-400 mb-1 block">Stile di cucina preferito</label>
+                <input value={foodPrefs.cuisine} onChange={(e) => setFoodPrefs((p) => ({ ...p, cuisine: e.target.value }))}
+                  placeholder="es: italiana, giapponese, mediterranea..."
+                  className="w-full bg-black/50 border border-white/10 rounded-lg text-white text-[10px] p-2 focus:outline-none focus:border-violet-400/50 placeholder-gray-600" />
+              </div>
+              <div className="flex gap-3">
+                <div className="flex-1">
+                  <label className="text-[9px] text-gray-400 mb-1 block">Piccantezza</label>
+                  <div className="flex gap-1">
+                    {['delicato', 'normale', 'piccante'].map((s) => (
+                      <button key={s} onClick={() => setFoodPrefs((p) => ({ ...p, spice: s }))}
+                        className="flex-1 text-[8px] px-1.5 py-1 rounded-lg border transition-colors"
+                        style={foodPrefs.spice === s
+                          ? { background: '#a78bfa', color: '#0b0e14', borderColor: '#a78bfa' }
+                          : { borderColor: 'rgba(167,139,250,0.3)', color: '#c4b5fd' }}>
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex-1">
+                  <label className="text-[9px] text-gray-400 mb-1 block">Tempo max (min)</label>
+                  <div className="flex gap-1">
+                    {[0, 15, 30, 45].map((m) => (
+                      <button key={m} onClick={() => setFoodPrefs((p) => ({ ...p, maxPrepMin: m }))}
+                        className="flex-1 text-[8px] px-1.5 py-1 rounded-lg border transition-colors"
+                        style={foodPrefs.maxPrepMin === m
+                          ? { background: '#a78bfa', color: '#0b0e14', borderColor: '#a78bfa' }
+                          : { borderColor: 'rgba(167,139,250,0.3)', color: '#c4b5fd' }}>
+                        {m === 0 ? '∞' : m}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
           <textarea value={recipePrompt} onChange={(e) => setRecipePrompt(e.target.value)}
             placeholder="Es: pollo e riso express, dessert proteico al cioccolato, bowl estiva leggera..."
             className="w-full bg-black/55 border border-white/10 rounded-xl text-white text-[11px] p-3 h-14 focus:outline-none focus:border-violet-400/50 resize-none placeholder-gray-600" />
