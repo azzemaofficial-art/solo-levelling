@@ -395,6 +395,7 @@ const SystemHub = ({ systemLogs, setSystemLogs, dailyGoal, setDailyGoal, hydrati
     } catch { return { diet: '', allergies: '', dislikes: '', likes: '', cuisine: '', spice: 'normale', maxPrepMin: 0 }; }
   });
   const [showFoodPrefs, setShowFoodPrefs] = useState(false);
+  const [recipeFeedbackGiven, setRecipeFeedbackGiven] = useState(null); // null|'up'|'down' — per la ricetta corrente
   // Selettore modelli AI (globale + override per funzione)
   const [aiModelGlobal, setAiModelGlobal] = useState(() => getGlobalModel());
   const [aiModelMeal, setAiModelMeal] = useState(() => getTaskOverride('meal'));
@@ -594,6 +595,15 @@ const SystemHub = ({ systemLogs, setSystemLogs, dailyGoal, setDailyGoal, hydrati
   }, [generatedRecipe]);
   useEffect(() => {
     localStorage.setItem('shadow_monarch_food_prefs', JSON.stringify(foodPrefs));
+    // Sync (debounced) verso KV cloud → letto dal ponte Obsidian (web_prefs:<chatId>).
+    // localStorage resta la fonte di verità per l'app; KV è solo la copia durevole/esportabile.
+    const t = setTimeout(() => {
+      fetch('/api/nvidia/visual', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ webPrefs: { foodPrefs } }),
+      }).catch(() => {});
+    }, 1500);
+    return () => clearTimeout(t);
   }, [foodPrefs]);
   useEffect(() => {
     localStorage.setItem('shadow_monarch_supplement_plan_settings', JSON.stringify(supplementPlanSettings || {}));
@@ -2907,6 +2917,8 @@ ${deltaKg ? `- Obiettivo peso: ${pesoTarget}kg (${Number(deltaKg) > 0 ? '-' : '+
       if (foodPrefs.cuisine?.trim()) prefLines.push(`- Stile di cucina preferito: ${foodPrefs.cuisine.trim()}`);
       if (foodPrefs.spice && foodPrefs.spice !== 'normale') prefLines.push(`- Livello piccantezza: ${foodPrefs.spice}`);
       if (foodPrefs.maxPrepMin > 0) prefLines.push(`- Tempo totale (prep+cottura) MASSIMO: ${foodPrefs.maxPrepMin} minuti — non superarlo`);
+      const affinity = computeFoodAffinity();
+      if (affinity) prefLines.push(`- TENDENZE OSSERVATE (soft, mai un vincolo — usale solo se coerenti con la richiesta): ${affinity}`);
       const prefsCtx = prefLines.length ? `\n\nPREFERENZE ALIMENTARI:\n${prefLines.join('\n')}` : '';
 
       const systemPrompt = `Sei uno chef nutrizionale d'élite specializzato in FITPORN — cibo che è allo stesso tempo ESTETICAMENTE PERFETTO e ultra-ottimizzato per le performance atletiche. Le tue ricette devono far venire l'acquolina in bocca solo a leggerle.
@@ -2963,6 +2975,7 @@ Rispondi SOLO JSON valido:
         auto: autoMode,
       };
       setGeneratedRecipe(nextRecipe);
+      setRecipeFeedbackGiven(null); // nuova ricetta → nessun feedback ancora dato
       // Salva in storico ricette (max 10)
       const histKey = 'shadow_monarch_recipe_history';
       try {
@@ -2980,6 +2993,57 @@ Rispondi SOLO JSON valido:
       setIsGeneratingRecipe(false);
     }
   };
+
+  // 👍/👎 sulla ricetta corrente — alimenta l'apprendimento delle affinità (stile "più ti piace,
+  // più te ne mostro simili"): ingredienti + mood della ricetta gradita finiscono nel feedback
+  // KV (per l'export Obsidian) E in un mirror locale (per l'affinità usata subito nel prompt).
+  const sendRecipeFeedback = (liked) => {
+    if (!generatedRecipe) return;
+    setRecipeFeedbackGiven(liked ? 'up' : 'down');
+    const tags = [
+      ...(generatedRecipe.ingredients || []).slice(0, 4).map((i) => i?.item).filter(Boolean),
+      generatedRecipe.mood,
+    ].filter(Boolean);
+    const row = { ts: new Date().toISOString(), title: generatedRecipe.title, tags, liked: liked ? 'up' : 'down' };
+    try {
+      const key = 'shadow_monarch_recipe_feedback';
+      const hist = JSON.parse(localStorage.getItem(key) || '[]');
+      hist.push(row);
+      localStorage.setItem(key, JSON.stringify(hist.slice(-200)));
+    } catch (_) {}
+    fetch('/api/nvidia/visual', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ webPrefs: { recipeFeedback: row } }),
+    }).catch(() => {});
+  };
+
+  // Affinità apprese dal feedback (stile TikTok: più tag/ingredienti piacciono più pesano).
+  // Frequenza ponderata per recency — le ultime 30 voci contano il doppio delle precedenti.
+  // Ritorna una riga di testo da iniettare come TENDENZA SOFT (mai un vincolo) nel prompt ricetta.
+  const computeFoodAffinity = () => {
+    try {
+      const hist = JSON.parse(localStorage.getItem('shadow_monarch_recipe_feedback') || '[]');
+      if (!hist.length) return '';
+      const score = {};
+      hist.forEach((row, i) => {
+        const recentBoost = i >= hist.length - 30 ? 2 : 1;
+        const delta = (row.liked === 'up' ? 1 : row.liked === 'down' ? -1 : 0) * recentBoost;
+        (row.tags || []).forEach((t) => {
+          const k = String(t || '').trim().toLowerCase();
+          if (!k) return;
+          score[k] = (score[k] || 0) + delta;
+        });
+      });
+      const liked = Object.entries(score).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([k]) => k);
+      const avoided = Object.entries(score).filter(([, v]) => v <= -2).sort((a, b) => a[1] - b[1]).slice(0, 4).map(([k]) => k);
+      if (!liked.length && !avoided.length) return '';
+      const parts = [];
+      if (liked.length) parts.push(`apprezza spesso: ${liked.join(', ')}`);
+      if (avoided.length) parts.push(`ha reagito male a: ${avoided.join(', ')}`);
+      return parts.join(' · ');
+    } catch { return ''; }
+  };
+
   const saveBodyCompositionGoal = () => {
     const targetWeightKg = Number(bodyGoalInput.targetWeightKg || 0);
     const targetFatPct = Number(bodyGoalInput.targetFatPct || 0);
@@ -6028,10 +6092,28 @@ Rispondi SOLO JSON valido:
               )}
               {/* Note hack */}
               {generatedRecipe.notes && (
-                <div className="p-3">
+                <div className="p-3 pb-0">
                   <p className="text-[9px] text-violet-300 leading-relaxed">💡 {generatedRecipe.notes}</p>
                 </div>
               )}
+              {/* Feedback — alimenta le affinità per le prossime ricette */}
+              <div className="p-3 flex items-center gap-2">
+                {recipeFeedbackGiven ? (
+                  <span className="text-[9px] font-bold" style={{ color: recipeFeedbackGiven === 'up' ? '#34d399' : '#f87171' }}>
+                    {recipeFeedbackGiven === 'up' ? '✓ Ti piace — ne proporrò di simili' : '✓ Annotato, eviterò cose simili'}
+                  </span>
+                ) : (
+                  <>
+                    <span className="text-[9px] text-gray-500">Ti piace questa ricetta?</span>
+                    <button onClick={() => sendRecipeFeedback(true)}
+                      className="w-6 h-6 rounded-lg flex items-center justify-center text-[11px]"
+                      style={{ background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.4)' }}>👍</button>
+                    <button onClick={() => sendRecipeFeedback(false)}
+                      className="w-6 h-6 rounded-lg flex items-center justify-center text-[11px]"
+                      style={{ background: 'rgba(248,113,113,0.14)', border: '1px solid rgba(248,113,113,0.38)' }}>👎</button>
+                  </>
+                )}
+              </div>
             </div>
           )}
         </div>
