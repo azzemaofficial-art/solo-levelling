@@ -148,6 +148,10 @@ ${profileLine(P) || '- *(nessuna misurazione — scrivi al bot es. "peso 78kg")*
     console.log('🧠 Memoria "su-di-me" aggiornata dall\'AI.');
   }
 
+  // preferenze.md — dichiarate + apprese (ricette e allenamento), stile "più ti piace più mostro"
+  writePreferences(data.webPrefs || {});
+  console.log('🎛️ Preferenze aggiornate (dichiarate + apprese).');
+
   // tocca l'indice
   touchUpdated('🐝 Shadow Coach Hive.md');
   console.log('✅ Alveare aggiornato.');
@@ -256,6 +260,82 @@ ${rows}
 `);
 }
 function mdCell(v) { return String(v ?? '').replace(/\|/g, '/').replace(/\n/g, ' ').slice(0, 90) || '—'; }
+
+// Aggrega frequenza pesata per recency (stile "più ti piace/riesce, più pesa") da una lista di
+// {tag/focus, score} — usato sia per le affinità ricette (like/dislike) sia per il focus allenamento
+// (voto perfect/good/redo). Ritorna { liked:[...top], avoided:[...worst] }.
+function weightedAffinity(rows, keyFn, scoreFn) {
+  const score = {};
+  rows.forEach((r, i) => {
+    const boost = i >= rows.length - 30 ? 2 : 1;
+    const k = keyFn(r);
+    if (!k) return;
+    score[k] = (score[k] || 0) + scoreFn(r) * boost;
+  });
+  const entries = Object.entries(score);
+  const liked = entries.filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([k]) => k);
+  const avoided = entries.filter(([, v]) => v < 0).sort((a, b) => a[1] - b[1]).slice(0, 5).map(([k]) => k);
+  return { liked, avoided };
+}
+
+// preferenze.md — dichiarate (dal pannello web) + apprese (feedback ricette + voti allenamento).
+// Il "più ti piace/riesce, più te ne propongo" è visibile qui: le voci in cima sono quelle che il
+// sistema userà di più nelle prossime ricette/combo (vedi computeFoodAffinity in SystemHub.jsx e
+// il peso focusWeights in pickCombo, Coach.jsx — questo file è lo specchio leggibile di quei pesi).
+function writePreferences(webPrefs) {
+  const fp2 = webPrefs.foodPrefs || {};
+  const declaredLines = [];
+  if (fp2.diet) declaredLines.push(`- **Regime:** ${fp2.diet}`);
+  if (fp2.allergies) declaredLines.push(`- **⚠️ Allergie (vincolo assoluto):** ${fp2.allergies}`);
+  if (fp2.dislikes) declaredLines.push(`- **Non gradisce:** ${fp2.dislikes}`);
+  if (fp2.likes) declaredLines.push(`- **Adora:** ${fp2.likes}`);
+  if (fp2.cuisine) declaredLines.push(`- **Cucina preferita:** ${fp2.cuisine}`);
+  if (fp2.spice && fp2.spice !== 'normale') declaredLines.push(`- **Piccantezza:** ${fp2.spice}`);
+  if (fp2.maxPrepMin > 0) declaredLines.push(`- **Tempo prep max:** ${fp2.maxPrepMin} min`);
+
+  const recipeFb = Array.isArray(webPrefs.recipeFeedback) ? webPrefs.recipeFeedback : [];
+  const recipeAff = weightedAffinity(
+    recipeFb.flatMap((r) => (r.tags || []).map((t) => ({ tag: String(t).toLowerCase(), liked: r.liked }))),
+    (r) => r.tag,
+    (r) => (r.liked === 'up' ? 1 : r.liked === 'down' ? -1 : 0),
+  );
+
+  const comboHist = Array.isArray(webPrefs.comboFocusHistory) ? webPrefs.comboFocusHistory : [];
+  const byDiscipline = {};
+  comboHist.forEach((h) => { (byDiscipline[h.mode] = byDiscipline[h.mode] || []).push(h); });
+  const disciplineRows = Object.entries(byDiscipline).map(([mode, rows]) => {
+    const aff = weightedAffinity(rows, (r) => r.focus, (r) => (r.grade === 'perfect' ? 2 : r.grade === 'good' ? 1 : -1));
+    return `| ${mode} | ${rows.length} | ${aff.liked.slice(0, 3).join(', ') || '—'} | ${aff.avoided.slice(0, 2).join(', ') || '—'} |`;
+  });
+
+  write('preferenze.md',
+`---
+tipo: preferenze
+aggiornato: ${stamp}
+---
+
+# 🎛️ Preferenze — Dichiarate e Apprese
+
+> Il sistema impara dai tuoi 👍/👎 e dai tuoi voti in allenamento: più ti piace/riesce una cosa,
+> più te la propone (stile "For You"). Qui vedi cosa ha imparato finora. Aggiornato il ${stamp}
+
+## 📋 Dichiarate (dal pannello Recipe Forge)
+${declaredLines.length ? declaredLines.join('\n') : '- *(nessuna preferenza dichiarata ancora — apri Recipe Forge → 🎛️ Preferenze)*'}
+
+## 🍽️ Ricette — cosa hai imparato ad apprezzare
+${recipeFb.length ? `- Feedback raccolti: **${recipeFb.length}**
+- 👍 Apprezza spesso: ${recipeAff.liked.join(', ') || '—'}
+- 👎 Da evitare: ${recipeAff.avoided.join(', ') || '—'}` : '- *(nessun feedback ancora — usa 👍/👎 sotto le ricette generate)*'}
+
+## 🥋 Allenamento — focus che ti riescono meglio (per disciplina)
+${disciplineRows.length ? `| Disciplina | Combo giudicate | 💪 Focus migliori | ⚠️ Da consolidare |
+|---|---|---|---|
+${disciplineRows.join('\n')}` : '- *(nessun dato ancora — usa la Combo Mode nel Coach Live)*'}
+
+---
+*Fonte: pannello web + Combo Mode → KV \`web_prefs\` → ponte \`tools/obsidian-hive.mjs\`*
+`);
+}
 function profileLine(P) {
   if (!P || typeof P !== 'object') return '';
   const bits = [];
