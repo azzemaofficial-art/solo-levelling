@@ -2658,12 +2658,23 @@ function VisualCoach() {
   // Storico anti-ripetizione per disciplina (si azzera al remount, non serve persistenza cross-sessione)
   const recentComboRef = useRef({});
 
+  // Trova il tag `focus` di una combo (dal suo testo) cercandola nella libreria della disciplina.
+  // Usato per loggare focus→voto e per ripesare le prossime scelte — ritorna null se non trovata
+  // (es. combo suggerita dall'AI come "nextCombo", non presente nella libreria).
+  const comboFocusFor = (m, comboStr) => {
+    const baseMode = String(m || '').replace(/^sparring_/, '');
+    const list = COMBO_LIBRARY[m] || COMBO_LIBRARY[baseMode] || COMBO_LIBRARY.default;
+    const entry = list.find((e) => (typeof e === 'string' ? e : e.c) === comboStr);
+    return entry && typeof entry !== 'string' ? entry.focus || null : null;
+  };
+
   const pickCombo = useCallback((exclude = '') => {
     // sparring_X / partner_drills usano il combo set della disciplina base (es. sparring_muaythai → muaythai)
     const baseMode = String(mode || '').replace(/^sparring_/, '');
     const list = COMBO_LIBRARY[mode] || COMBO_LIBRARY[baseMode] || COMBO_LIBRARY.default;
     const comboStr = (entry) => (typeof entry === 'string' ? entry : entry.c);
     const comboLvl = (entry) => (typeof entry === 'string' ? 'intermedio' : (entry.lvl || 'intermedio'));
+    const comboFocus = (entry) => (typeof entry === 'string' ? null : entry.focus || null);
 
     // Livello dell'utente per questa disciplina, derivato dalla media punteggio delle sessioni passate
     const modeHistory = pastSessions.filter((s) => s.mode === mode || s.mode === baseMode);
@@ -2676,6 +2687,26 @@ function VisualCoach() {
       else lvlWeights = { base: 0.5, intermedio: 1.5, avanzato: 2 };
     }
 
+    // Affinità per FOCUS (potenza/velocità/difesa/counter/clinch): dal log locale voto→focus
+    // delle combo giudicate in questa disciplina — stile "ti riesce bene/ti piace → te ne propongo
+    // di più", mai un'esclusione totale degli altri focus (peso minimo 0.4, non zero).
+    let focusWeights = {};
+    try {
+      const hist = JSON.parse(localStorage.getItem('shadow_monarch_combo_focus_history') || '[]');
+      const relevant = hist.filter((h) => h.mode === mode || h.mode === baseMode);
+      if (relevant.length >= 4) {
+        const score = {};
+        relevant.forEach((h, i) => {
+          const recentBoost = i >= relevant.length - 20 ? 2 : 1;
+          const delta = (h.grade === 'perfect' ? 2 : h.grade === 'good' ? 1 : -1) * recentBoost;
+          score[h.focus] = (score[h.focus] || 0) + delta;
+        });
+        const vals = Object.values(score);
+        const max = Math.max(1, ...vals.map(Math.abs));
+        Object.entries(score).forEach(([f, v]) => { focusWeights[f] = Math.max(0.4, 1 + (v / max)); });
+      }
+    } catch (_) {}
+
     // Anti-ripetizione: evita le ultime N combo mostrate per QUESTA disciplina (N=5 o lista se più corta)
     const historyKey = mode || 'default';
     const recentList = recentComboRef.current[historyKey] || [];
@@ -2686,11 +2717,12 @@ function VisualCoach() {
     if (!pool.length) pool = list.filter((entry) => comboStr(entry) !== exclude);
     if (!pool.length) pool = list;
 
-    // Scelta pesata per livello dentro il pool anti-ripetizione
+    // Scelta pesata per livello + affinità di focus dentro il pool anti-ripetizione
     const weighted = [];
     pool.forEach((entry) => {
-      const w = Math.max(0.05, lvlWeights[comboLvl(entry)] ?? 1);
-      const reps = Math.max(1, Math.round(w * 3));
+      const lvlW = Math.max(0.05, lvlWeights[comboLvl(entry)] ?? 1);
+      const focusW = focusWeights[comboFocus(entry)] ?? 1;
+      const reps = Math.max(1, Math.round(lvlW * focusW * 3));
       for (let i = 0; i < reps; i++) weighted.push(entry);
     });
     const chosen = weighted[Math.floor(Math.random() * weighted.length)] || pool[0] || list[0];
@@ -2810,6 +2842,22 @@ function VisualCoach() {
         const grade = result?.grade || 'good';
         setComboResult({ grade, feedback: result?.feedback || '', nextCombo: result?.nextCombo || '' });
         setComboScore((prev) => ({ ...prev, [grade]: (prev[grade] || 0) + 1 }));
+        // Log locale focus→voto: alimenta pickCombo per proporre più spesso ciò che ti riesce bene
+        // (stile "più ti piace/riesce, più te ne mostro simili"), mai un vincolo, solo un peso.
+        try {
+          const focus = comboFocusFor(mode, combo);
+          if (focus) {
+            const key = 'shadow_monarch_combo_focus_history';
+            const hist = JSON.parse(localStorage.getItem(key) || '[]');
+            hist.push({ mode, focus, grade, ts: Date.now() });
+            localStorage.setItem(key, JSON.stringify(hist.slice(-300)));
+            // Copia durevole su KV → letta dal ponte Obsidian (preferenze apprese)
+            fetch('/api/nvidia/visual', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ webPrefs: { comboFocus: { mode, focus, grade } } }),
+            }).catch(() => {});
+          }
+        } catch (_) {}
         setComboPhase('result');
         comboPhaseRef.current = 'result';
         const ttsMsg = grade === 'perfect' ? `Perfetto! ${result?.feedback || ''}` : grade === 'good' ? `Buono. ${result?.feedback || ''}` : `Riprova. ${result?.feedback || ''}`;
