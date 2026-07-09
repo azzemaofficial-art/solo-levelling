@@ -2063,17 +2063,18 @@ export default async function handler(req, res) {
       arr.push(row);
       next.recipeFeedback = arr.slice(-200); // ultime 200 voci di feedback
     }
-    if (wp.comboFocus && typeof wp.comboFocus === 'object') {
-      const cf = wp.comboFocus;
-      const row = {
+    if (wp.comboFocus) {
+      // Accetta sia una voce singola sia un batch (array) — il client accoda in locale e manda
+      // tutto insieme ogni N combo/a fine sessione, invece di una richiesta per ogni combo giudicata.
+      const items = Array.isArray(wp.comboFocus) ? wp.comboFocus : [wp.comboFocus];
+      const rows = items.filter((cf) => cf && typeof cf === 'object').slice(0, 50).map((cf) => ({
         ts: new Date().toISOString(),
         mode: String(cf.mode || '').slice(0, 40),
         focus: String(cf.focus || '').slice(0, 30),
         grade: ['perfect', 'good', 'redo'].includes(cf.grade) ? cf.grade : 'good',
-      };
+      }));
       const arr = Array.isArray(cur.comboFocusHistory) ? cur.comboFocusHistory : [];
-      arr.push(row);
-      next.comboFocusHistory = arr.slice(-400); // ultime 400 voci focus→voto
+      next.comboFocusHistory = [...arr, ...rows].slice(-400); // ultime 400 voci focus→voto
     }
     await kvSetRaw(KEY, next);
     return res.status(200).json({ ok: true, stored: true });

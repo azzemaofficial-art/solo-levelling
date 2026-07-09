@@ -2099,6 +2099,19 @@ function VisualCoach() {
   const [comboPaused, setComboPaused] = useState(false);
   const comboPausedRef = useRef(false);
   useEffect(() => { comboPausedRef.current = comboPaused; }, [comboPaused]);
+  // Coda locale di focus→voto in attesa di sync: si accumula e parte in UN'unica chiamata ogni
+  // 5 voci (o a fine sessione) invece di una richiesta per ogni combo giudicata — riduce le
+  // invocazioni serverless (Fluid Compute costa a consumo di CPU/memoria attiva).
+  const pendingComboFocusRef = useRef([]);
+  const flushComboFocus = useCallback(() => {
+    if (!pendingComboFocusRef.current.length) return;
+    const batch = pendingComboFocusRef.current;
+    pendingComboFocusRef.current = [];
+    fetch('/api/nvidia/visual', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ webPrefs: { comboFocus: batch } }),
+    }).catch(() => {});
+  }, []);
 
   // Ogni combo è ora { c: stringa combo, lvl: 'base'|'intermedio'|'avanzato', focus: 'potenza'|'velocità'|'difesa'|'counter'|'clinch' }
   // pickCombo (sotto) continua a restituire SEMPRE una stringa semplice — nessun consumer va toccato.
@@ -2740,7 +2753,8 @@ function VisualCoach() {
     setCurrentCombo('');
     setComboResult(null);
     setComboPaused(false); comboPausedRef.current = false;
-  }, []);
+    flushComboFocus(); // manda le eventuali voci accodate rimaste sotto soglia
+  }, [flushComboFocus]);
 
   const runComboJudge = useCallback(async (combo) => {
     if (!videoRef.current || !canvasRef.current) return;
@@ -2851,11 +2865,9 @@ function VisualCoach() {
             const hist = JSON.parse(localStorage.getItem(key) || '[]');
             hist.push({ mode, focus, grade, ts: Date.now() });
             localStorage.setItem(key, JSON.stringify(hist.slice(-300)));
-            // Copia durevole su KV → letta dal ponte Obsidian (preferenze apprese)
-            fetch('/api/nvidia/visual', {
-              method: 'POST', headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ webPrefs: { comboFocus: { mode, focus, grade } } }),
-            }).catch(() => {});
+            // Copia durevole su KV (per Obsidian) — accodata, sync in batch ogni 5 voci
+            pendingComboFocusRef.current.push({ mode, focus, grade });
+            if (pendingComboFocusRef.current.length >= 5) flushComboFocus();
           }
         } catch (_) {}
         setComboPhase('result');
@@ -3265,6 +3277,13 @@ function VisualCoach() {
           new Blob([JSON.stringify({ sample: row, mode })], { type: 'application/json' }));
       } catch (_) {}
       pendingSampleRef.current = null;
+    }
+    if (pendingComboFocusRef.current.length && navigator.sendBeacon) {
+      try {
+        navigator.sendBeacon('/api/nvidia/visual',
+          new Blob([JSON.stringify({ webPrefs: { comboFocus: pendingComboFocusRef.current } })], { type: 'application/json' }));
+      } catch (_) {}
+      pendingComboFocusRef.current = [];
     }
   }, [mode]);
 
