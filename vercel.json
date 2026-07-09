@@ -6,5 +6,19 @@
       "source": "/((?!api/|assets/|favicon\\.ico|robots\\.txt).*)",
       "destination": "/index.html"
     }
-  ]
+  ],
+  "functions": {
+    "api/nvidia/visual.js": { "memory": 512, "maxDuration": 30 },
+    "api/telegram/webhook.js": { "memory": 512, "maxDuration": 30 },
+    "api/ai/chat.js": { "memory": 256, "maxDuration": 30 },
+    "api/nvidia/coach.js": { "memory": 256, "maxDuration": 30 },
+    "api/nvidia/trainer.js": { "memory": 256, "maxDuration": 30 },
+    "api/nvidia/visual-analysis.js": { "memory": 256, "maxDuration": 30 },
+    "api/openrouter/chat.js": { "memory": 256, "maxDuration": 30 },
+    "api/telegram/claim-import.js": { "memory": 256, "maxDuration": 15 },
+    "api/telegram/learn-export.js": { "memory": 256, "maxDuration": 15 },
+    "api/telegram/lesson-tick.js": { "memory": 256, "maxDuration": 15 },
+    "api/telegram/remind.js": { "memory": 256, "maxDuration": 15 },
+    "api/telegram/supplements.js": { "memory": 256, "maxDuration": 30 }
+  }
 }
