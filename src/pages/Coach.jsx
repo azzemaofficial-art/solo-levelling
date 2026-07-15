@@ -1532,7 +1532,7 @@ const _repT = (ms) => { const P = 1700, t = ms % P; if (t < 620) return _easeOut
 // ── SCENA UNIVERSALE: attaccante + (sacco | avversario | nessuno) ─────────────
 // Ogni disciplina ha la scena giusta. Colpo→bersaglio con impatto; fitness→ripetizioni;
 // yoga/respiro→posa. Torso pieno, arti spessi, trail di movimento, griglia prospettica.
-function StickFigure({ poseKey, color = '#00f2ff', size = 130, highlight = false, animate = true, scene = 'bag' }) {
+const StickFigure = React.memo(function StickFigure({ poseKey, color = '#00f2ff', size = 130, highlight = false, animate = true, scene = 'bag' }) {
   let key = BAG_POSES[poseKey] ? poseKey : (scene === 'solo' ? 'ready' : 'guard');
   if (scene === 'solo' && (key === 'guard' || key === 'stance')) key = 'ready';
   const strike = BAG_STRIKE[key] || GRAPPLE_STRIKE[key] || null;
@@ -1549,15 +1549,28 @@ function StickFigure({ poseKey, color = '#00f2ff', size = 130, highlight = false
   const [t, setT] = useState(throwing ? 0 : 1);
   const rafRef = useRef(0);
   const lastRef = useRef(-1);
+  const svgRef = useRef(null);
+  const onScreenRef = useRef(true);
+  // Ferma il motore quando la figura esce dallo schermo: zero lavoro sprecato.
+  useEffect(() => {
+    const el = svgRef.current;
+    if (!el || typeof IntersectionObserver === 'undefined') return;
+    const io = new IntersectionObserver(([e]) => { onScreenRef.current = e.isIntersecting; });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
   useEffect(() => {
     if (!throwing) { setT(1); return; }
     const tl = BAG_STRIKE[key] || GRAPPLE_STRIKE[key] ? _throwT : _repT;
     let start = 0;
+    let lastCommit = 0;
     const loop = (now) => {
-      if (!start) start = now;
-      const v = tl(now - start);
-      if (Math.abs(v - lastRef.current) > 0.012) { lastRef.current = v; setT(v); }
       rafRef.current = requestAnimationFrame(loop);
+      if (!onScreenRef.current) { start = 0; return; }             // fuori schermo: congela
+      if (!start) start = now;
+      if (now - lastCommit < 33) return;                            // ~30fps: metà dei re-render, fluidità identica
+      const v = tl(now - start);
+      if (Math.abs(v - lastRef.current) > 0.012) { lastRef.current = v; lastCommit = now; setT(v); }
     };
     rafRef.current = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(rafRef.current);
@@ -1592,7 +1605,7 @@ function StickFigure({ poseKey, color = '#00f2ff', size = 130, highlight = false
     : [];
 
   return (
-    <svg width={size} height={size * 1.5} viewBox="0 0 112 168" style={{ overflow: 'visible' }}>
+    <svg ref={svgRef} width={size} height={size * 1.5} viewBox="0 0 112 168" style={{ overflow: 'visible' }}>
       <defs>
         <filter id={`glow-${uid}`} x="-60%" y="-60%" width="220%" height="220%">
           <feGaussianBlur stdDeviation="2.6" result="b" />
@@ -1604,6 +1617,15 @@ function StickFigure({ poseKey, color = '#00f2ff', size = 130, highlight = false
         <linearGradient id={`bag-${uid}`} x1="0" y1="0" x2="1" y2="0">
           <stop offset="0%" stopColor="#b45309" /><stop offset="45%" stopColor="#92400e" /><stop offset="100%" stopColor="#5b2c08" />
         </linearGradient>
+        <radialGradient id={`flash-${uid}`} cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stopColor="#fff" stopOpacity="0.95" />
+          <stop offset="45%" stopColor="#fde68a" stopOpacity="0.5" />
+          <stop offset="100%" stopColor="#ff7a1a" stopOpacity="0" />
+        </radialGradient>
+        <radialGradient id={`head-${uid}`} cx="35%" cy="30%" r="75%">
+          <stop offset="0%" stopColor="#fff" stopOpacity="0.55" />
+          <stop offset="100%" stopColor={color} stopOpacity="0.28" />
+        </radialGradient>
       </defs>
 
       {/* Griglia prospettica del pavimento */}
@@ -1615,6 +1637,12 @@ function StickFigure({ poseKey, color = '#00f2ff', size = 130, highlight = false
       {/* Ombra + terra */}
       <ellipse cx={44} cy={gy} rx={30} ry={4} fill={`url(#sh-${uid})`} />
       <line x1={8} y1={gy} x2={108} y2={gy} stroke={color} strokeWidth={1} strokeDasharray="2 5" opacity={0.28} />
+      {/* Aura di energia a terra: divampa all'impatto */}
+      {big && (
+        <ellipse cx={44} cy={gy} rx={24 + pulse * 12} ry={3.2 + pulse * 1.6} fill="none"
+          stroke={pulse > 0.2 ? STRIKE : color} strokeWidth={1.3} opacity={0.18 + pulse * 0.5}
+          filter={pulse > 0.2 ? `url(#glow-${uid})` : undefined} />
+      )}
 
       {/* SACCO da boxe */}
       {showBag && (
@@ -1687,7 +1715,7 @@ function StickFigure({ poseKey, color = '#00f2ff', size = 130, highlight = false
 
         {/* Collo + Testa */}
         <line x1={p[0][0]} y1={p[0][1] + 6} x2={p[1][0]} y2={p[1][1]} stroke={color} strokeWidth={legW - 1} strokeLinecap="round" opacity={0.85} />
-        <circle cx={p[0][0]} cy={p[0][1]} r={9} fill={color} opacity={0.28} stroke={color} strokeWidth={1.6} />
+        <circle cx={p[0][0]} cy={p[0][1]} r={9} fill={`url(#head-${uid})`} stroke={color} strokeWidth={1.6} />
         <circle cx={p[0][0] + 4} cy={p[0][1] - 1} r={1.7} fill="#0b0e14" opacity={0.75} />
       </g>
 
@@ -1700,13 +1728,22 @@ function StickFigure({ poseKey, color = '#00f2ff', size = 130, highlight = false
       {/* IMPATTO (colpo) vs CONTROLLO (presa/proiezione) — grammatica visiva diversa */}
       {E && pulse > 0.18 && !isGrip && (
         <g style={{ pointerEvents: 'none' }}>
-          {[0, 45, 90, 135, 180, 225, 270, 315].map((deg) => {
+          {/* Flash radiale dietro il punto d'impatto */}
+          <circle cx={E[0]} cy={E[1]} r={5 + pulse * 15} fill={`url(#flash-${uid})`} opacity={Math.max(0, 1.15 - pulse)} />
+          {/* Scintille irregolari (angoli/lunghezze fissi ma asimmetrici → sembra caotico, costa zero) */}
+          {[[17, 11], [63, 7], [122, 13], [158, 8], [199, 12], [241, 6], [286, 10], [331, 14]].map(([deg, len]) => {
             const r = deg * Math.PI / 180;
-            return <line key={deg} x1={E[0]} y1={E[1]}
-              x2={E[0] + Math.cos(r) * 9 * pulse} y2={E[1] + Math.sin(r) * 9 * pulse}
+            return <line key={deg} x1={E[0] + Math.cos(r) * 3 * pulse} y1={E[1] + Math.sin(r) * 3 * pulse}
+              x2={E[0] + Math.cos(r) * len * pulse} y2={E[1] + Math.sin(r) * len * pulse}
               stroke="#fde68a" strokeWidth={1.6} strokeLinecap="round" opacity={pulse} />;
           })}
-          <circle cx={E[0]} cy={E[1]} r={4 + pulse * 7} fill="none" stroke={STRIKE} strokeWidth={2} opacity={1 - pulse} />
+          {/* Detriti che volano via (puntini oltre le scintille) */}
+          {[[40, 17], [140, 19], [255, 16], [310, 20]].map(([deg, dist]) => {
+            const r = deg * Math.PI / 180;
+            return <circle key={deg} cx={E[0] + Math.cos(r) * dist * pulse} cy={E[1] + Math.sin(r) * dist * pulse - pulse * pulse * 4}
+              r={1.3} fill="#fff" opacity={Math.max(0, 1 - pulse * 0.9)} />;
+          })}
+          <circle cx={E[0]} cy={E[1]} r={4 + pulse * 9} fill="none" stroke={STRIKE} strokeWidth={2.2} opacity={1 - pulse} />
           <circle cx={E[0]} cy={E[1]} r={3 * pulse} fill="#fff" opacity={pulse * 0.9} />
         </g>
       )}
@@ -1720,7 +1757,7 @@ function StickFigure({ poseKey, color = '#00f2ff', size = 130, highlight = false
       )}
     </svg>
   );
-}
+});
 
 // Durata per tecnica: abbastanza perché la figura sferri e ritragga il colpo, poi avanza.
 const COMBO_MOVE_MS = 1550;
@@ -1760,9 +1797,21 @@ function ComboAnimator({ combo, color = '#00f2ff', mode, size = 108 }) {
           </div>
         </div>
       )}
-      {/* Scena animata (fighter + bersaglio secondo la disciplina) */}
-      <div style={{ opacity: vis ? 1 : 0, transform: `scale(${vis ? 1 : 0.94})`, transition: 'opacity 0.18s ease, transform 0.18s ease', filter: `drop-shadow(0 0 14px ${color}66)` }}>
-        <StickFigure poseKey={poseKey} color={color} size={size} highlight scene={scene} />
+      {/* Scena animata (fighter + bersaglio secondo la disciplina) dentro l'ARENA:
+          riflettore dall'alto, riflesso a pavimento e particelle di energia (solo transform/opacity → GPU) */}
+      <div className="relative flex items-center justify-center" style={{ contain: 'layout paint' }}>
+        <div aria-hidden className="absolute inset-0 pointer-events-none rounded-2xl" style={{
+          background: `radial-gradient(ellipse 75% 52% at 50% 12%, ${color}1f, transparent 62%), radial-gradient(ellipse 62% 30% at 50% 92%, ${color}30, transparent 72%)`,
+        }} />
+        {!_prefersReducedMotion() && [14, 38, 62, 84].map((x, i) => (
+          <motion.span key={i} aria-hidden className="absolute bottom-2 w-1 h-1 rounded-full pointer-events-none"
+            style={{ left: `${x}%`, background: color, boxShadow: `0 0 6px ${color}` }}
+            animate={{ y: [-2, -56 - i * 8], opacity: [0, 0.7, 0], scale: [1, 0.5] }}
+            transition={{ duration: 2.6 + i * 0.5, repeat: Infinity, delay: i * 0.65, ease: 'easeOut' }} />
+        ))}
+        <div style={{ opacity: vis ? 1 : 0, transform: `scale(${vis ? 1 : 0.94})`, transition: 'opacity 0.18s ease, transform 0.18s ease', filter: `drop-shadow(0 0 14px ${color}66)` }}>
+          <StickFigure poseKey={poseKey} color={color} size={size} highlight scene={scene} />
+        </div>
       </div>
       {/* Nome tecnica */}
       <p className="text-lg font-black tracking-wide text-center leading-tight"
@@ -3592,6 +3641,31 @@ function VisualCoach() {
   if (step === 'setup') {
     return (
       <div className="space-y-4">
+        {/* 🎁 Biglietto una-tantum: Arena Edition */}
+        {!localStorage.getItem('sm_arena_gift_seen') && (
+          <motion.div initial={{ opacity: 0, y: -10, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ type: 'spring', stiffness: 260, damping: 20 }}
+            className="relative rounded-2xl px-4 py-3.5 overflow-hidden"
+            style={{ background: 'linear-gradient(135deg, rgba(251,191,36,0.14), rgba(139,92,246,0.12))', border: '1px solid rgba(251,191,36,0.45)', boxShadow: '0 0 24px rgba(251,191,36,0.15)' }}>
+            {!_prefersReducedMotion() && [12, 34, 58, 79, 91].map((x, i) => (
+              <motion.span key={i} aria-hidden className="absolute bottom-1 w-1 h-1 rounded-full pointer-events-none"
+                style={{ left: `${x}%`, background: i % 2 ? '#fbbf24' : '#a78bfa', boxShadow: '0 0 5px currentColor' }}
+                animate={{ y: [0, -46], opacity: [0, 0.85, 0] }}
+                transition={{ duration: 2.4 + i * 0.4, repeat: Infinity, delay: i * 0.5, ease: 'easeOut' }} />
+            ))}
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <p className="text-xs font-black tracking-widest" style={{ color: '#fbbf24', fontFamily: 'Orbitron, sans-serif' }}>🎁 ARENA EDITION</p>
+                <p className="text-[11px] mt-1 leading-snug text-gray-300">
+                  Buon compleanno, Monarca. 👑 Il Coach è stato forgiato di nuovo: arena con riflettori, impatti con scintille e detriti,
+                  esplosione sui <b style={{ color: '#34d399' }}>PERFECT</b> — e un motore d'animazione che consuma la metà.
+                </p>
+              </div>
+              <button onClick={(e) => { localStorage.setItem('sm_arena_gift_seen', '1'); e.currentTarget.closest('div.relative').style.display = 'none'; }}
+                className="text-gray-500 hover:text-gray-300 flex-shrink-0 p-1" aria-label="Chiudi"><X size={14} /></button>
+            </div>
+          </motion.div>
+        )}
         <div className="relative rounded-2xl overflow-hidden"
           style={{ background: 'linear-gradient(135deg, rgba(5,150,105,0.12), rgba(13,148,136,0.06))', border: `1px solid ${C.emerald.border}` }}>
           <div className="h-px w-full" style={{ background: 'linear-gradient(90deg, transparent, #10b981 40%, #0d9488 70%, transparent)', animation: 'frame-glow-shift 4s linear infinite', backgroundSize: '200% 100%' }} />
@@ -3886,7 +3960,7 @@ function VisualCoach() {
                   </div>
                 </div>
                 <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.08)' }}>
-                  <div style={{ height: '100%', width: `${guidedPlan[guidedIdx].durationSec ? (guidedTimeLeft / guidedPlan[guidedIdx].durationSec) * 100 : 0}%`, background: C.emerald.hex, transition: 'width 1s linear' }} />
+                  <div style={{ height: '100%', width: '100%', transformOrigin: 'left', transform: `scaleX(${guidedPlan[guidedIdx].durationSec ? guidedTimeLeft / guidedPlan[guidedIdx].durationSec : 0})`, background: C.emerald.hex, transition: 'transform 1s linear' }} />
                 </div>
                 {guidedPlan[guidedIdx].watchFor && <p className="text-[11px] text-amber-200/80 flex items-center justify-center gap-1.5"><Eye size={12} /> {guidedPlan[guidedIdx].watchFor}</p>}
                 <button onClick={() => finishDrillRef.current()} className="text-[11px] text-gray-500 underline">termina ora</button>
@@ -4002,11 +4076,30 @@ function VisualCoach() {
                 )}
                 {/* RESULT */}
                 {comboPhase === 'result' && comboResult && (
-                  <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-2 py-1">
+                  <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-2 py-1 relative">
+                    {/* 🎆 Esplosione celebrativa sul PERFETTO */}
+                    {comboResult.grade === 'perfect' && !_prefersReducedMotion() && (
+                      <div aria-hidden className="absolute inset-0 pointer-events-none overflow-visible">
+                        <motion.span className="absolute left-1/2 top-1/2 w-10 h-10 -ml-5 -mt-5 rounded-full"
+                          style={{ border: '2px solid #34d399' }}
+                          initial={{ scale: 0.2, opacity: 0.9 }} animate={{ scale: 3.2, opacity: 0 }}
+                          transition={{ duration: 0.7, ease: 'easeOut' }} />
+                        {[...Array(12)].map((_, i) => {
+                          const a = (i / 12) * Math.PI * 2;
+                          return <motion.span key={i} className="absolute left-1/2 top-1/2 w-1.5 h-1.5 rounded-full"
+                            style={{ background: i % 3 === 0 ? '#fde68a' : '#34d399', boxShadow: '0 0 6px #34d399' }}
+                            initial={{ x: 0, y: 0, opacity: 1 }}
+                            animate={{ x: Math.cos(a) * (52 + (i % 4) * 14), y: Math.sin(a) * (36 + (i % 3) * 12), opacity: 0, scale: 0.4 }}
+                            transition={{ duration: 0.75 + (i % 3) * 0.12, ease: 'easeOut' }} />;
+                        })}
+                      </div>
+                    )}
                     <div className="flex items-center gap-2">
-                      <span className="text-2xl">
+                      <motion.span className="text-2xl"
+                        animate={comboResult.grade === 'perfect' ? { scale: [1, 1.5, 1], rotate: [0, -12, 8, 0] } : {}}
+                        transition={{ duration: 0.55 }}>
                         {comboResult.grade === 'perfect' ? '🌟' : comboResult.grade === 'good' ? '✅' : '🔄'}
-                      </span>
+                      </motion.span>
                       <span className="text-sm font-black" style={{
                         color: comboResult.grade === 'perfect' ? '#34d399' : comboResult.grade === 'good' ? '#fbbf24' : '#f87171'
                       }}>
