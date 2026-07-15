@@ -8,7 +8,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-const BASE = process.env.HIVE_BASE || 'https://solo-levelling-gold.vercel.app';
+const BASE = process.env.HIVE_BASE || 'https://solo-levelling-steel.vercel.app';
 const SECRET = process.env.HIVE_SECRET || (process.argv.find((a) => a.startsWith('--secret=')) || '').split('=')[1] || '';
 const VAULT = process.env.HIVE_VAULT || '/Users/emanueleazzini/Library/Mobile Documents/iCloud~md~obsidian/Documents/brain/progetti/shadow-coach';
 
