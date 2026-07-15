@@ -1850,6 +1850,42 @@ async function callBrainOrchestrator({ isSparring, disciplineLabel, techObs, bio
   return null;
 }
 
+// ─── MEMORIA DELL'ATLETA ──────────────────────────────────────────────────────
+// La differenza fra un estraneo che commenta e un maestro che ti conosce: il
+// maestro ricorda i tuoi errori di SEMPRE, li caccia, e ti dice quando li hai
+// finalmente risolti. Costruisce il blocco di contesto da mettere nel prompt.
+const learnerRubric = (learner) => {
+  if (!learner || typeof learner !== 'object') return '';
+  const lines = [];
+  const s = (v, n = 120) => String(v || '').slice(0, n);
+
+  if (learner.sessions) {
+    lines.push(`- Sessioni in questa disciplina: ${learner.sessions}${learner.avgScore ? ` · voto medio ${learner.avgScore}/100` : ''}`);
+  }
+  if (learner.level) lines.push(`- Livello: ${s(learner.level, 40)}`);
+  if (Array.isArray(learner.recurring) && learner.recurring.length) {
+    lines.push(`- ⚠️ ERRORI RICORRENTI STORICI (li ripete da più sessioni): ${learner.recurring.map((x) => s(x)).join(' | ')}`);
+  }
+  if (Array.isArray(learner.focus) && learner.focus.length) {
+    lines.push(`- Focus assegnato la volta scorsa: ${learner.focus.map((x) => s(x)).join(' | ')}`);
+  }
+  if (Array.isArray(learner.mastered) && learner.mastered.length) {
+    lines.push(`- ✅ Difetti VECCHI che sembrano superati (non comparivano più nelle ultime sessioni): ${learner.mastered.map((x) => s(x)).join(' | ')}`);
+  }
+  if (Array.isArray(learner.insisted) && learner.insisted.length) {
+    lines.push(`- 🔁 GIÀ CORRETTO IN QUESTA SESSIONE (se lo rivedi, RINCARA e alza il tono): ${learner.insisted.map((x) => s(x, 80)).join(' | ')}`);
+  }
+  if (!lines.length) return '';
+
+  return `\n══ CHI HAI DAVANTI (memoria del maestro — usala, è ciò che ti distingue da un estraneo) ══\n${lines.join('\n')}
+ISTRUZIONI SULLA MEMORIA (priorità massima):
+1. CACCIA gli errori ricorrenti storici: cercali ATTIVAMENTE nelle osservazioni. Se ne vedi uno → è LUI la priorità, e dillo che è un problema vecchio ("Sempre la stessa cosa: ...").
+2. Se un errore ricorrente storico NON è più presente nelle osservazioni → DILLO NEL CAMPO "BENE" in modo esplicito e riconoscente ("Finalmente il gomito resta chiuso: era il tuo difetto storico"). Vedere un progresso riconosciuto è ciò che fa restare un allievo.
+3. I difetti vecchi superati: NON andarli a cercare (sprecheresti l'unico comando che hai). MA se uno RICOMPARE davvero nelle osservazioni, è una REGRESSIONE e va detta subito ("Stai tornando indietro: il gomito si riapre"). Le osservazioni restano l'unica verità: non inventare mai un difetto che non è visibile, né taci uno che c'è.
+4. Se hai già corretto una cosa in questa sessione e la rivedi → NON cambiare argomento: rincara ("Te l'ho già detto, è la seconda volta: ...").
+5. Calibra il vocabolario al livello: a un principiante spiega il gesto in parole semplici; a un avanzato parla per nomi tecnici e dettagli fini.`;
+};
+
 // ─── CERVELLO VERDETTO — fusione su PIÙ momenti consecutivi ───────────────────
 // A differenza dell'orchestratore (un frame → un comando), qui il maestro ha
 // OSSERVATO l'atleta in N momenti e cerca il PATTERN ricorrente. Niente immagine:
@@ -1863,6 +1899,8 @@ REGOLE FERREE:
 - Sii CHIRURGICO: cita la parte del corpo precisa + un riferimento misurabile quando possibile (angolo ~45°/~90°, altezza al mento/costole). NON usare "destra/sinistra" (la ripresa è speculare/selfie): usa "anteriore/posteriore", "gamba d'appoggio/che calcia", "braccio del colpo/di guardia", "lato interno/esterno".
 - UN solo difetto-chiave per verdetto: il più importante adesso. Non elencare.
 - MEMORIA: se un errore presente nei FEEDBACK RECENTI è ANCORA visibile nelle osservazioni → NON cambiare argomento, RINCARA con più forza ("Te l'ho già detto: ..."). Se invece è stato corretto o non c'è più → scegli un dettaglio NUOVO, mai ripetere lo stesso consiglio.
+- Se ti viene fornito il blocco "CHI HAI DAVANTI", quelle istruzioni hanno PRIORITÀ: conosci questo atleta, comportati come tale.
+- INSEGNA, non solo correggere: nel campo PROVA dai un esercizio che ISOLA il difetto appena indicato (se il problema è l'anca che non ruota, fai fare un drill sull'anca — non una combo generica). È così che si impara davvero.
 - Se le osservazioni indicano un RISCHIO DI INFORTUNIO, è la priorità assoluta.
 - Se la forma è davvero corretta, dillo con un comando di mantenimento — non inventare un difetto.
 
@@ -1873,13 +1911,14 @@ PROVA: <il prossimo COLPO o COMBO concreto da eseguire ORA, specifico per la dis
 PERCHÉ: <principio tecnico/biomeccanico in una frase — ometti se ovvio>
 Tono secco, professionale, esigente ma incoraggiante, in italiano. Dai SEMPRE sia il difetto sia ciò che va bene.`;
 
-async function callBrainVerdict({ disciplineLabel, observations, antiRepeatContext, disciplineMode = '' }) {
+async function callBrainVerdict({ disciplineLabel, observations, antiRepeatContext, disciplineMode = '', learner = null }) {
   if (!observations || observations.length === 0) return null;
   const user = [
     `DISCIPLINA: ${disciplineLabel}`,
     `\nHAI OSSERVATO L'ATLETA IN ${observations.length} MOMENTI CONSECUTIVI:`,
     ...observations.map((o, i) => `Momento ${i + 1}: ${o}`),
     antiRepeatContext ? `\n${antiRepeatContext}` : '',
+    learnerRubric(learner),
     errorsRubric(disciplineMode, disciplineLabel),
     strikeMasteryRubric(observations.join(' '), true),
     `\nTrova il pattern ricorrente e restituisci il comando finale nel formato richiesto.`,
@@ -1994,7 +2033,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { imageBase64, mimeType = 'image/jpeg', prompt, mode = 'muaythai', observeOnly, observations, generatePlan, drillReview, drill, sample } = req.body || {};
+  const { imageBase64, mimeType = 'image/jpeg', prompt, mode = 'muaythai', observeOnly, observations, generatePlan, drillReview, drill, sample, learner } = req.body || {};
   const disciplineLabel = DISCIPLINE_LABELS[mode] || mode;
   const sparring = /sparring|partner|drill/.test(mode);
 
@@ -2246,7 +2285,7 @@ PROSSIMO: <il prossimo combo da chiamare, specifico per la disciplina, DIVERSO d
     const antiRepeat = (prompt && /FEEDBACK RECENTI/i.test(prompt))
       ? 'FEEDBACK RECENTI (applica la REGOLA MEMORIA: se l\'errore persiste rincara, altrimenti cambia dettaglio):\n' + prompt.split(/FEEDBACK RECENTI[^\n]*\n/i)[1]
       : '';
-    const verdict = await callBrainVerdict({ disciplineLabel, observations, antiRepeatContext: antiRepeat, disciplineMode: mode });
+    const verdict = await callBrainVerdict({ disciplineLabel, observations, antiRepeatContext: antiRepeat, disciplineMode: mode, learner });
     if (verdict) {
       res.setHeader('X-Visual-Provider', verdict.brain);
       res.setHeader('X-Visual-Mode', mode);

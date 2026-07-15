@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Eye, Lightbulb, Trophy, ScanSearch, Play, Pause, Target, FlipHorizontal2, Volume2, VolumeX, Bone, X, Move, ThumbsUp, ThumbsDown } from 'lucide-react';
@@ -1327,6 +1327,58 @@ const resolveGoal = (text) => {
 };
 // Debolezza ricorrente più recente per la disciplina corrente → stesso set di tag "obiettivo",
 // così il circuito locale può indirizzarla anche senza input esplicito nella sessione attuale.
+// ── MEMORIA DELL'ATLETA ──────────────────────────────────────────────────────
+// Un maestro vero non ti vede per la prima volta a ogni colpo: ricorda i tuoi
+// difetti di sempre, li caccia, e si accorge quando li hai risolti. Qui
+// distilliamo lo storico locale in un profilo che il cervello AI userà live.
+// Parti del corpo/concetti su cui si ancora un difetto ricorrente.
+const BODY_ANCHORS = ['mento', 'guardia', 'mano', 'gomito', 'spalla', 'anca', 'ginocchio', 'piede', 'gamba', 'braccio', 'testa', 'sguardo', 'schiena', 'baricentro', 'equilibrio', 'respiro', 'rotazione', 'appoggio', 'distanza', 'ritmo'];
+const anchorsOf = (text) => {
+  const t = String(text || '').toLowerCase();
+  return BODY_ANCHORS.filter((a) => t.includes(a));
+};
+
+function buildLearnerProfile(pastSessions, mode, insisted = []) {
+  const baseMode = String(mode || '').replace(/^sparring_/, '');
+  const mine = (pastSessions || []).filter((s) => s.mode === mode || s.mode === baseMode);
+  if (!mine.length && !insisted.length) return null;
+
+  const scored = mine.filter((s) => typeof s.score === 'number');
+  const avgScore = scored.length ? Math.round(scored.reduce((a, s) => a + s.score, 0) / scored.length) : null;
+
+  // Un difetto è RICORRENTE se la stessa ancora compare nelle debolezze di ≥2 sessioni.
+  const seen = {};              // ancora → indici di sessione (0 = più recente)
+  mine.forEach((s, i) => {
+    const anchors = new Set((s.weaknesses || []).flatMap(anchorsOf));
+    anchors.forEach((a) => { (seen[a] ||= []).push(i); });
+  });
+
+  const recurring = [];
+  const mastered = [];
+  Object.entries(seen).forEach(([anchor, idxs]) => {
+    if (idxs.length < 2) return;
+    // Presente ancora di recente (ultime 2 sessioni) → lo caccia. Sparito → risolto.
+    const stillRecent = idxs.some((i) => i <= 1);
+    // Testo reale della debolezza più recente su quest'ancora: molto più utile della sola parola.
+    const src = mine[idxs[0]]?.weaknesses?.find((w) => anchorsOf(w).includes(anchor));
+    (stillRecent ? recurring : mastered).push(src ? `${anchor}: ${src}` : anchor);
+  });
+
+  const last = mine[0] || {};
+  const level = avgScore == null ? null : avgScore >= 80 ? 'avanzato' : avgScore >= 60 ? 'intermedio' : 'principiante';
+
+  const profile = {
+    sessions: mine.length,
+    ...(avgScore != null && { avgScore }),
+    ...(level && { level }),
+    ...(recurring.length && { recurring: recurring.slice(0, 4) }),
+    ...(mastered.length && { mastered: mastered.slice(0, 3) }),
+    ...((last.focusNext || []).length && { focus: last.focusNext.slice(0, 3) }),
+    ...(insisted.length && { insisted: insisted.slice(-4) }),
+  };
+  return Object.keys(profile).length ? profile : null;
+}
+
 const resolveGoalFromHistory = (pastSessions, mode) => {
   const recent = (pastSessions || []).find((s) => s.mode === mode && ((s.weaknesses || []).length || (s.focusNext || []).length));
   if (!recent) return null;
@@ -2090,6 +2142,14 @@ function VisualCoach() {
   const poseRef = useRef(null);
   const feedbackHistoryRef = useRef([]);
   const sessionFeedbacksRef = useRef([]);
+  const insistedRef = useRef([]);       // su cosa il maestro ha già insistito in QUESTA sessione (per rincarare)
+  const pastSessionsRef = useRef([]);   // storico in ref: il loop di analisi lo legge senza doversi ricreare
+  useEffect(() => { pastSessionsRef.current = pastSessions; }, [pastSessions]);
+  // Il difetto storico #1 di questa disciplina: mostrato a schermo così sai cosa ti sta guardando.
+  const learnerHunt = useMemo(() => {
+    const p = buildLearnerProfile(pastSessions, mode);
+    return p?.recurring?.[0]?.split(':')[0] || null;
+  }, [pastSessions, mode]);
   const speakQueueRef = useRef([]);   // coda comandi da mostrare/leggere uno alla volta
   const presentingRef = useRef(false); // true mentre un comando è a schermo + in lettura
   const lastLandmarksRef = useRef(null); // ultimi landmark MediaPipe → angoli reali per l'AI
@@ -3094,6 +3154,7 @@ function VisualCoach() {
     setScore({ a: 0, b: 0 }); setLastPoint(null);
     setStep('setup');
     sessionFeedbacksRef.current = [];
+    insistedRef.current = [];      // nuova sessione: il maestro riparte, ma lo storico resta
     speakQueueRef.current = [];
     presentingRef.current = false;
     window.speechSynthesis?.cancel();
@@ -3461,13 +3522,26 @@ function VisualCoach() {
       if (reachedVerdict) {
         const verRes = await fetch('/api/nvidia/visual', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ mode, observations: observationsRef.current, prompt: buildPrompt(currentDisc?.prompt), poseHint }),
+          body: JSON.stringify({
+            mode, observations: observationsRef.current, prompt: buildPrompt(currentDisc?.prompt), poseHint,
+            // Il maestro sa CHI ha davanti: difetti storici da cacciare, cose già risolte, cosa gli ha già detto stasera.
+            learner: buildLearnerProfile(pastSessionsRef.current, mode, insistedRef.current),
+          }),
         });
         const data = await verRes.json();
         if (verRes.ok && data.content) {
           setAnalysis({ content: data.content, provider: data.provider, time: new Date().toLocaleTimeString('it-IT') });
           enqueueSpeak(data.content);
           stageSample(data.content, pose.angles, pose.alerts); // cattura per l'alveare (angoli reali)
+          // Registra su cosa ha già insistito stasera → se ricapita, rincara invece di ricominciare da zero.
+          const cmd = (data.content.match(/COMANDO:\s*(.+)/i) || [])[1];
+          if (cmd) {
+            anchorsOf(cmd).forEach((a) => {
+              const prev = insistedRef.current.find((x) => x.startsWith(`${a} ×`));
+              const n = prev ? parseInt(prev.split('×')[1], 10) + 1 : 1;
+              insistedRef.current = [...insistedRef.current.filter((x) => x !== prev), `${a} ×${n}: ${cmd.slice(0, 60)}`].slice(-4);
+            });
+          }
           feedbackHistoryRef.current = [data.content.split('\n')[0], ...feedbackHistoryRef.current].slice(0, 3);
           sessionFeedbacksRef.current = [...sessionFeedbacksRef.current, data.content].slice(0, 30);
           if (isSparring(mode) && data.content) {
@@ -4133,6 +4207,14 @@ function VisualCoach() {
                       <motion.span key={i} className="w-1 h-1 rounded-full inline-block" style={{ background: C.violet.hex }}
                         animate={{ opacity: [0.3,1,0.3] }} transition={{ duration: 0.7, repeat: Infinity, delay: i*0.16 }} />
                     ))}
+                  </span>
+                )}
+                {/* 🎯 Il maestro ti conosce: mostra il difetto storico che sta cacciando adesso */}
+                {learnerHunt && (
+                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded flex-shrink-0 truncate max-w-[46%]"
+                    style={{ color: '#fca5a5', background: 'rgba(239,68,68,0.14)', border: '1px solid rgba(239,68,68,0.3)' }}
+                    title={`Difetto ricorrente dalle sessioni passate — il coach lo sta cercando: ${learnerHunt}`}>
+                    🎯 caccia: {learnerHunt}
                   </span>
                 )}
                 <div className="h-px flex-1" style={{ background: `linear-gradient(90deg, ${C.violet.hex}66, transparent)` }} />
