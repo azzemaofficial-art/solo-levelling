@@ -58,7 +58,7 @@ export default async function handler(req, res) {
 
   const message = `${slotEmoji} <b>Integratori ${slotLabel}</b>\n\n${supList}\n\n` +
     `💡 <i>Basato su profilo recomp. Scrivi <b>/integratori</b> al bot per lista completa.</i>\n\n` +
-    `<a href="https://solo-levelling-gold.vercel.app">📱 Shadow Monarch System</a>`;
+    `<a href="https://solo-levelling-steel.vercel.app">📱 Shadow Monarch System</a>`;
 
   try {
     const r = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {

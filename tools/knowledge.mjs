@@ -15,7 +15,7 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(__dirname, '..');
-const BASE = process.env.HIVE_BASE || 'https://solo-levelling-gold.vercel.app';
+const BASE = process.env.HIVE_BASE || 'https://solo-levelling-steel.vercel.app';
 const VAULT = process.env.HIVE_VAULT || '/Users/emanueleazzini/Library/Mobile Documents/iCloud~md~obsidian/Documents/brain/progetti/shadow-coach';
 const PAPERS = path.join(VAULT, 'papers');
 const MANIFEST = path.join(PAPERS, '.processed.json');
@@ -23,6 +23,11 @@ const LIB_OUT = path.join(REPO, 'lib', 'knowledgeBase.js');
 const MEM_OUT = path.join(VAULT, 'memorie', 'scienza-nutrizione.md');
 const MAX_PRINCIPLES = 700;
 const MAX_CHARS = 18000; // quanto testo del paper passare all'AI
+// Modello per la distillazione: serve uno grosso che produca JSON valido in modo
+// affidabile. Senza questo, la catena di fallback ripiegava su llama-3.1-8b, che
+// restituiva JSON rotto o risposte a vuoto e faceva perdere il paper. NVIDIA ha
+// inoltre limiti di richieste separati da Groq → meno 429 durante i batch lunghi.
+const DISTILL_MODEL = process.env.DISTILL_MODEL || 'nvidia:mistralai/mistral-large-3-675b-instruct-2512';
 
 // Ripulisce i refusi più comuni del modello free e normalizza gli spazi.
 function fixTypos(s) {
@@ -60,24 +65,51 @@ function readPaper(file) {
   return null;
 }
 
-async function distill(title, text) {
+const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
+
+// L'AI gratuita ha un limite di token al minuto: distillare molti paper di fila
+// lo satura e le richieste tornano 429. Riprova con attesa crescente invece di
+// perdere il paper in silenzio (prima falliva senza nemmeno dire perché).
+async function distill(title, text, attempt = 0) {
   const r = await fetch(`${BASE}/api/ai/chat`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ messages: [
+    body: JSON.stringify({ model: DISTILL_MODEL, messages: [
       { role: 'system', content: 'Sei uno scienziato della nutrizione e dello sport. Distilli un paper in PRINCIPI azionabili, concreti e specifici (con numeri/soglie quando ci sono). Niente fronzoli, niente "potrebbe": solo ciò che il paper supporta. Scrivi in ITALIANO CORRETTO e scorrevole: frasi complete, nessun refuso, nessuna parola troncata o abbreviata, nessun anglicismo inventato. Rispondi SOLO con JSON valido: {"topic":"area breve","principles":["frase azionabile 1","frase 2", ...]} — da 5 a 10 principi, in italiano, ognuno autosufficiente.' },
       { role: 'user', content: `TITOLO: ${title}\n\nTESTO (estratto):\n${text.slice(0, MAX_CHARS)}` },
     ] }),
   });
-  if (!r.ok) return null;
+  if (!r.ok) {
+    if ((r.status === 429 || r.status >= 500) && attempt < 4) {
+      const wait = 8000 * (attempt + 1);
+      process.stdout.write(` (limite AI, riprovo tra ${wait / 1000}s…)`);
+      await sleep(wait);
+      return distill(title, text, attempt + 1);
+    }
+    process.stdout.write(` [HTTP ${r.status}]`);
+    return null;
+  }
   const j = await r.json();
-  const raw = String(j?.choices?.[0]?.message?.content || '').replace(/<think>[\s\S]*?<\/think>/gi, '');
+  const model = j?._shadowMeta?.model || '?';
+  const raw = String(j?.choices?.[0]?.message?.content || '')
+    .replace(/<think>[\s\S]*?<\/think>/gi, '')
+    .replace(/```(?:json)?/gi, '');            // alcuni modelli incorniciano il JSON in un blocco markdown
   const m = raw.match(/\{[\s\S]*\}/);
-  if (!m) return null;
+  if (!m) {
+    // Risposta vuota o senza JSON: spesso è il modello di fallback che ha risposto a modo suo.
+    process.stdout.write(raw.trim() ? ` [${model}: risposta non-JSON]` : ` [${model}: risposta vuota]`);
+    if (attempt < 2) { await sleep(6000); return distill(title, text, attempt + 1); }
+    return null;
+  }
   try {
     const o = JSON.parse(m[0]);
     const principles = Array.isArray(o.principles) ? o.principles.map((s) => String(s).trim()).filter((s) => s.length > 8).slice(0, 10) : [];
-    return principles.length ? { topic: String(o.topic || 'nutrizione').slice(0, 40), principles } : null;
-  } catch { return null; }
+    if (!principles.length) { process.stdout.write(` [${model}: 0 principi]`); return null; }
+    return { topic: String(o.topic || 'nutrizione').slice(0, 40), principles };
+  } catch (e) {
+    process.stdout.write(` [${model}: JSON rotto — ${String(e.message).slice(0, 40)}]`);
+    if (attempt < 2) { await sleep(6000); return distill(title, text, attempt + 1); }
+    return null;
+  }
 }
 
 function loadManifest() {
@@ -186,6 +218,7 @@ async function main() {
     man.principles.push(...out.principles);
     added += out.principles.length;
     console.log(`+${out.principles.length} principi.`);
+    await sleep(4000); // respira: non saturare il limite di token/minuto dell'AI gratuita
   }
 
   man.principles = dedup(man.principles.map(fixTypos)).slice(-MAX_PRINCIPLES);

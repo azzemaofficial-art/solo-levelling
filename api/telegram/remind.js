@@ -49,7 +49,7 @@ export default async function handler(req, res) {
   const dayOfYear = Math.floor((now - new Date(now.getUTCFullYear(), 0, 0)) / 86400000);
   const text = slot.pool[dayOfYear % slot.pool.length];
 
-  const message = `${slot.label}\n\n${text}\n\n<a href="https://solo-levelling-gold.vercel.app">📱 Apri Shadow Monarch System</a>`;
+  const message = `${slot.label}\n\n${text}\n\n<a href="https://solo-levelling-steel.vercel.app">📱 Apri Shadow Monarch System</a>`;
 
   try {
     const r = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {

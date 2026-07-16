@@ -6,7 +6,7 @@ import { NUTRITION_PRINCIPLES, knowledgePromptFor } from '../../lib/knowledgeBas
 
 const NVIDIA_BASE = 'https://integrate.api.nvidia.com/v1';
 const GROQ_BASE   = 'https://api.groq.com/openai/v1';
-const SITE_URL = 'https://solo-levelling-gold.vercel.app';
+const SITE_URL = 'https://solo-levelling-steel.vercel.app';
 
 // Upstash Redis REST — salva il payload lato server (TTL default 24h)
 async function kvSet(key, value, ttl = 86400) {

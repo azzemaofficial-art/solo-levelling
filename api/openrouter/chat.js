@@ -62,7 +62,7 @@ async function callProvider(prov, body, isOpenRouter) {
   try {
     const headers = { Authorization: `Bearer ${prov.key}`, 'Content-Type': 'application/json' };
     if (isOpenRouter) {
-      headers['HTTP-Referer'] = process.env.OPENROUTER_APP_URL || 'https://solo-levelling-gold.vercel.app';
+      headers['HTTP-Referer'] = process.env.OPENROUTER_APP_URL || 'https://solo-levelling-steel.vercel.app';
       headers['X-Title'] = process.env.OPENROUTER_APP_TITLE || 'solo-leveling-fit';
     }
     const upstream = await fetch(`${prov.base}/chat/completions`, {
