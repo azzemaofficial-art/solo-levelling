@@ -2156,6 +2156,29 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, stored: true });
   }
 
+  // ── CORNER COACH — discorso all'angolo tra un round e l'altro ───────────────
+  // Il client manda i verdetti del round appena finito: il maestro fa il discorso
+  // da angolo (30-45s di riposo): UNA priorità tattica + un cue di respirazione.
+  if (req.body?.cornerTalk) {
+    const roundN = Math.max(1, Math.min(20, parseInt(req.body.roundNumber) || 1));
+    const rv = Array.isArray(req.body.verdicts) ? req.body.verdicts.filter(Boolean).map((v) => String(v).slice(0, 200)).slice(-8) : [];
+    const totalRounds = Math.max(1, Math.min(20, parseInt(req.body.totalRounds) || 3));
+    const corner = await callBrainJSON({
+      system: `Sei l'allenatore all'angolo di ${disciplineLabel}. Il round ${roundN} è appena finito, hai ~40 secondi di riposo. Parli come un vero cornerman: diretto, calmo, UNA sola priorità. Rispondi SOLO con JSON valido.`,
+      user: `ROUND ${roundN}/${totalRounds} APPENA CONCLUSO.\nCorrezioni date durante il round:\n${rv.map((v, i) => `${i + 1}. ${v}`).join('\n') || '(nessuna correzione registrata: round pulito)'}\n\nFai il discorso da angolo. Rispondi SOLO con:\n{"talk":"2 frasi max: cosa ha funzionato + LA priorità per il round ${roundN + 1} (specifica, dalla lista correzioni se presente)","breath":"un cue di respirazione per recuperare in 40 secondi (es. naso 4 dentro, bocca 6 fuori)"}`,
+      maxTokens: 220,
+      temperature: 0.5,
+    });
+    const talk = String(corner?.talk || '').slice(0, 280);
+    const breath = String(corner?.breath || 'Naso 4 secondi dentro, bocca 6 fuori. Spalle giù.').slice(0, 120);
+    if (talk) return res.status(200).json({ talk, breath });
+    // fallback locale: mai lasciare l'angolo in silenzio
+    return res.status(200).json({
+      talk: rv.length ? `Ho visto: ${rv[rv.length - 1]}. Nel prossimo round è LA tua priorità.` : `Round ${roundN} in archivio. Riparti composto: guardia alta e respira.`,
+      breath,
+    });
+  }
+
   // ── PAGELLA DI FINE SESSIONE (nessuna immagine) → salva stato per la progressione
   // Il client manda a fine sessione: sessionReport=true, mode, durationMin, sampleCount,
   // verdicts[] (le righe COMANDO chiave raccolte), context, level. Il Maestro produce una
@@ -2184,7 +2207,7 @@ export default async function handler(req, res) {
 
     const report = await callBrainJSON({
       system: `Sei IL MAESTRO di ${disciplineLabel}, con conoscenza enciclopedica e tradizionale (anche le tecniche antiche e segrete). Valuti UNA sessione di allenamento appena conclusa basandoti SOLO sui dati reali forniti (i comandi che hai dato, la durata, i campioni). Vietato il generico. Dai una pagella onesta ed esigente ma motivante che aiuti l'atleta a migliorare nel tempo. Rispondi SOLO con JSON valido.`,
-      user: `DISCIPLINA: ${disciplineLabel}\nDurata: ${durationMin} min · Campioni analizzati: ${sampleCount} · Livello dichiarato: ${level || 'n/d'}\nContesto sessione: ${context || '-'}\n\nCOMANDI/CORREZIONI DATI DURANTE LA SESSIONE (${verdicts.length}):\n${verdicts.map((v, i) => `${i + 1}. ${v}`).join('\n') || '(nessuna correzione registrata)'}\n\nSTORICO ULTIME SESSIONI (per valutare i progressi e NON ripetere sempre lo stesso focus):\n${histLine}${exam ? `\n\n⚠️ QUESTA ERA UNA SESSIONE D'ESAME (livello ${exam.label}). L'atleta tentava di superare la milestone: "${exam.milestone}".\nGiudica come un esaminatore di commissione: lo SCORE riflette SOLO quanto l'esecuzione osservata dimostra la milestone (≥75 = PROMOSSO, <75 = RIPROVA). Sii onesto: promuovere chi non è pronto lo mette in pericolo; bocciare chi è pronto lo demotiva. In coachNote di' esplicitamente PROMOSSO o RIPROVA e il motivo principale.` : ''}\n\nValuta questa sessione e pianifica il prossimo passo (progressione: se un errore ricorre dallo storico, insisti; se è stato risolto, alza l'asticella con qualcosa di più avanzato).\nRispondi SOLO con:\n{"score":0-100,"title":"titolo breve e incisivo della sessione","strengths":["punto di forza concreto con parte del corpo/tecnica, max 3"],"weaknesses":["debolezza concreta da correggere, max 3"],"focusNext":["1-3 focus SPECIFICI per la prossima sessione, progressivi"],"nextDrill":"UN esercizio/combo concreto e più avanzato da provare la prossima volta","techniqueSecret":"UNA tecnica o segreto della tradizione di ${disciplineLabel} da studiare, con il suo nome","coachNote":"1 frase da maestro, diretta e motivante","xp":numero 10-100 in base a impegno e qualità}`,
+      user: `DISCIPLINA: ${disciplineLabel}\nDurata: ${durationMin} min · Campioni analizzati: ${sampleCount} · Livello dichiarato: ${level || 'n/d'}\nContesto sessione: ${context || '-'}\n\nCOMANDI/CORREZIONI DATI DURANTE LA SESSIONE (${verdicts.length}):\n${verdicts.map((v, i) => `${i + 1}. ${v}`).join('\n') || '(nessuna correzione registrata)'}\n\nSTORICO ULTIME SESSIONI (per valutare i progressi e NON ripetere sempre lo stesso focus):\n${histLine}${exam ? `\n\n⚠️ QUESTA ERA UNA SESSIONE D'ESAME (livello ${exam.label}). L'atleta tentava di superare la milestone: "${exam.milestone}".\nGiudica come un esaminatore di commissione: lo SCORE riflette SOLO quanto l'esecuzione osservata dimostra la milestone (≥75 = PROMOSSO, <75 = RIPROVA). Sii onesto: promuovere chi non è pronto lo mette in pericolo; bocciare chi è pronto lo demotiva. In coachNote di' esplicitamente PROMOSSO o RIPROVA e il motivo principale.` : ''}\n\nValuta questa sessione e pianifica il prossimo passo (progressione: se un errore ricorre dallo storico, insisti; se è stato risolto, alza l'asticella con qualcosa di più avanzato).\nRispondi SOLO con:\n{"score":0-100,"title":"titolo breve e incisivo della sessione","strengths":["punto di forza concreto con parte del corpo/tecnica, max 3"],"weaknesses":["debolezza concreta da correggere, max 3"],"focusNext":["1-3 focus SPECIFICI per la prossima sessione, progressivi"],"nextDrill":"UN esercizio/combo concreto e più avanzato da provare la prossima volta","techniqueSecret":"UNA tecnica o segreto della tradizione di ${disciplineLabel} da studiare, con il suo nome","coachNote":"1 frase da maestro, diretta e motivante","xp":numero 10-100 in base a impegno e qualità,"skills":{"guardia":0-100,"attacco":0-100,"difesa":0-100,"footwork":0-100,"respiro":0-100}}\nPer "skills": valuta le 5 competenze SOLO da ciò che emerge dai comandi dati (es. molte correzioni sulla guardia = guardia bassa). "respiro" = ritmo/respirazione/gestione energia. Se una competenza non è mai emersa, stimala prudente (55-65).`,
       maxTokens: 900,
       temperature: 0.5,
     });
@@ -2201,6 +2224,13 @@ export default async function handler(req, res) {
       coachNote: String(report?.coachNote || '').slice(0, 200),
       xp: Math.max(5, Math.min(120, parseInt(report?.xp) || 30)),
     };
+    // Radar delle 5 competenze (0-100), presente solo se il modello le ha valutate
+    const skIn = report?.skills;
+    if (skIn && typeof skIn === 'object') {
+      const c100 = (v) => Math.max(0, Math.min(100, parseInt(v) || 0));
+      const skills = { guardia: c100(skIn.guardia), attacco: c100(skIn.attacco), difesa: c100(skIn.difesa), footwork: c100(skIn.footwork), respiro: c100(skIn.respiro) };
+      if (Object.values(skills).some((v) => v > 0)) out.skills = skills;
+    }
 
     // persisti lo stato per la progressione (letto dal ponte Obsidian)
     if (SKEY) {
@@ -2213,6 +2243,7 @@ export default async function handler(req, res) {
         strengths: out.strengths, weaknesses: out.weaknesses,
         focusNext: out.focusNext, nextDrill: out.nextDrill,
         techniqueSecret: out.techniqueSecret, coachNote: out.coachNote, xp: out.xp,
+        ...(out.skills ? { skills: out.skills } : {}),
         ...(exam ? { exam: { label: exam.label, milestone: exam.milestone, passed: out.score >= 75 } } : {}),
       };
       pastArr.push(record);

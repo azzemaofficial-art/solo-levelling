@@ -888,6 +888,162 @@ const reviewTopics = (disc) => {
   return out.sort((a, b) => b.days - a.days).slice(0, 2);
 };
 
+// ── Titolo tradizionale del maestro per disciplina (persona realistica) ───────
+const MASTER_TITLES = {
+  muaythai: 'Kru', muayboran: 'Kru', boxing: 'Coach', kickboxing: 'Coach', sanda: 'Coach',
+  mma: 'Coach', wrestling: 'Coach', lutalivre: 'Coach', pankration: 'Coach', sambo: 'Trener',
+  karate: 'Sensei', judo: 'Sensei', kendo: 'Sensei', taekwondo: 'Sabum', hapkido: 'Sabum',
+  bjj: 'Professor', capoeira: 'Mestre', silat: 'Guru', wingchun: 'Sifu', kungfu: 'Sifu',
+  kravmaga: 'Istruttore', selfdefense: 'Istruttore', systema: 'Instruktor',
+};
+const masterTitle = (mode) => MASTER_TITLES[mode] || 'Maestro';
+
+// ── Reaction Trainer: comandi chiamati a voce, per famiglia di disciplina ─────
+const REACTION_CALLS = {
+  muaythai:    ['Jab!', 'Cross!', 'Teep!', 'Low kick!', 'Check!', 'Gomitata!', 'Ginocchiata!', 'Esci a quarantacinque!'],
+  muayboran:   ['Jab!', 'Teep!', 'Gomitata!', 'Ginocchiata!', 'Check!', 'Sok Tad!'],
+  boxing:      ['Jab!', 'Cross!', 'Gancio!', 'Slip!', 'Roll!', 'Doppio jab!', 'Esci dall\'angolo!', 'Corpo!'],
+  kickboxing:  ['Jab!', 'Cross!', 'Roundhouse!', 'Teep!', 'Check!', 'Back kick!', 'Slip!'],
+  taekwondo:   ['Ap chagi!', 'Dollyo!', 'Back kick!', 'Guardia!', 'Switch!', 'Doppio calcio!'],
+  karate:      ['Kizami!', 'Gyaku-zuki!', 'Mae geri!', 'Mawashi!', 'Indietro!', 'Kiai!'],
+  selfdefense: ['Palm strike!', 'Difesa 360!', 'Ginocchiata!', 'Scan!', 'Fuggi!', 'Voce: STOP!', 'Gomitata!'],
+  kravmaga:    ['Palm strike!', 'Difesa 360!', 'Burst!', 'Ginocchiata!', 'Scan!', 'Disimpegno!'],
+  bjj:         ['Sprawl!', 'Shrimp!', 'Bridge!', 'Technical stand-up!', 'Granby!'],
+  wrestling:   ['Sprawl!', 'Level change!', 'Shot!', 'Circle!', 'Snap down!'],
+  judo:        ['Kuzushi!', 'Entra!', 'Uchi-komi!', 'Tai-sabaki!', 'Difendi la presa!'],
+  mma:         ['Jab!', 'Low kick!', 'Sprawl!', 'Level change!', 'Clinch!', 'Slip!', 'Esci!'],
+  default:     ['Colpo!', 'Schiva!', 'Guardia!', 'Esci a sinistra!', 'Esci a destra!', 'Affonda!'],
+};
+const reactionCallsFor = (mode) => REACTION_CALLS[mode] || REACTION_CALLS.default;
+const REACT_DIFFS = { facile: [4000, 6000], medio: [2800, 4200], duro: [1800, 3000] };
+
+// ── Riscaldamento e defaticamento guidati (locali, zero AI) ───────────────────
+const WARMUP_STEPS = [
+  { name: 'Corsa sul posto', sec: 40, cue: 'Ginocchia alte, spalle sciolte, respira dal naso' },
+  { name: 'Rotazioni: collo, spalle, anche', sec: 35, cue: 'Cerchi ampi e lenti, entrambe le direzioni' },
+  { name: 'Jumping jack', sec: 35, cue: 'Ritmo costante, atterra morbido sull\'avampiede' },
+  { name: 'Affondi dinamici + torsione', sec: 35, cue: 'Passo lungo, ginocchio sopra la caviglia' },
+  { name: 'Shadow leggero della disciplina', sec: 45, cue: 'Tecniche al 50%, cerca fluidità non potenza' },
+];
+const COOLDOWN_STEPS = [
+  { name: 'Respirazione 4-6', sec: 45, cue: 'Naso 4 secondi dentro, bocca 6 fuori: abbassa il battito' },
+  { name: 'Flessori dell\'anca', sec: 35, cue: 'Affondo basso statico, bacino avanti, cambia lato a metà' },
+  { name: 'Quadricipiti e ischio-crurali', sec: 35, cue: 'Tallone al gluteo, poi gamba tesa avanti' },
+  { name: 'Spalle, tricipiti e collo', sec: 35, cue: 'Trazioni dolci, mai molleggiare' },
+];
+
+// ── Streak e minuti della settimana (dallo storico sessioni locale) ───────────
+const sessionStats = () => {
+  const ss = loadSessions();
+  const days = new Set(ss.map((s) => s.date));
+  let streak = 0;
+  for (let i = 0; i < 60; i++) {
+    const key = new Date(Date.now() - i * 86400000).toLocaleDateString('it-IT');
+    if (days.has(key)) streak++;
+    else if (i === 0) continue; // oggi non ancora allenato: lo streak parte da ieri
+    else break;
+  }
+  const weekMin = ss.reduce((acc, s) => {
+    const [dd, mm, yy] = String(s.date || '').split('/');
+    const t = new Date(`${yy}-${mm}-${dd}`).getTime();
+    return acc + (Number.isFinite(t) && Date.now() - t < 7 * 86400000 ? (s.duration || 0) : 0);
+  }, 0);
+  return { streak, weekMin };
+};
+
+// ── Overlay routine guidata (riscaldamento/defaticamento): timer + voce ───────
+function RoutineOverlay({ title, emoji, color = 'orange', steps, voiceOn, onExit }) {
+  const col = C[color] || C.orange;
+  const [idx, setIdx] = useState(0);
+  const [left, setLeft] = useState(steps[0]?.sec || 30);
+  const speak = useCallback((text) => {
+    if (!voiceOn || !window.speechSynthesis) return;
+    try {
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = 'it-IT'; u.rate = 1.02;
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.speak(u);
+    } catch {}
+  }, [voiceOn]);
+
+  useEffect(() => { const s = steps[idx]; if (s) speak(`${s.name}. ${s.cue}`); }, [idx, steps, speak]);
+  useEffect(() => {
+    const t = setInterval(() => {
+      setLeft((l) => {
+        if (l > 1) return l - 1;
+        setIdx((i) => {
+          if (i + 1 >= steps.length) { playGong(659); speak('Fatto. Sei pronto.'); setTimeout(onExit, 1200); return i; }
+          playGong(523);
+          setLeft(steps[i + 1].sec);
+          return i + 1;
+        });
+        return 0;
+      });
+    }, 1000);
+    return () => clearInterval(t);
+  }, [steps, onExit, speak]);
+
+  const step = steps[idx];
+  const next = steps[idx + 1];
+  return createPortal(
+    <div className="fixed inset-0 z-[130] flex flex-col items-center justify-center px-6"
+      style={{ background: 'rgba(3,7,18,0.96)', backdropFilter: 'blur(12px)' }}>
+      <p className="text-xs font-black tracking-widest mb-6" style={{ color: col.hex, fontFamily: 'Orbitron, sans-serif' }}>{emoji} {title} · {idx + 1}/{steps.length}</p>
+      <motion.p key={idx} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+        className="text-2xl font-black text-white text-center leading-tight">{step?.name}</motion.p>
+      <p className="text-sm text-center mt-2" style={{ color: '#9ca3af' }}>{step?.cue}</p>
+      <p className="text-6xl font-black font-mono mt-8" style={{ color: col.hex, textShadow: `0 0 24px ${col.glow}` }}>{left}</p>
+      {next && <p className="text-xs mt-8" style={{ color: '#4b5563' }}>Dopo: {next.name}</p>}
+      <div className="flex gap-1.5 mt-4">
+        {steps.map((_, i) => (
+          <div key={i} className="w-2 h-2 rounded-full" style={{ background: i < idx ? col.hex : i === idx ? '#fff' : 'rgba(75,85,99,0.5)' }} />
+        ))}
+      </div>
+      <button onClick={onExit} className="mt-10 px-6 py-2.5 rounded-xl text-xs font-bold text-gray-400"
+        style={{ background: 'rgba(55,65,81,0.5)', border: '1px solid rgba(255,255,255,0.08)' }}>Salta</button>
+    </div>,
+    document.body
+  );
+}
+
+// ── Radar SVG delle 5 competenze (pagella) ────────────────────────────────────
+function SkillRadar({ skills, size = 170 }) {
+  const AXES = [
+    { key: 'guardia', label: 'Guardia' }, { key: 'attacco', label: 'Attacco' },
+    { key: 'difesa', label: 'Difesa' }, { key: 'footwork', label: 'Footwork' },
+    { key: 'respiro', label: 'Respiro' },
+  ];
+  const cx = size / 2, cy = size / 2, R = size / 2 - 26;
+  const pt = (i, r) => {
+    const a = (Math.PI * 2 * i) / AXES.length - Math.PI / 2;
+    return [cx + r * Math.cos(a), cy + r * Math.sin(a)];
+  };
+  const poly = (r) => AXES.map((_, i) => pt(i, r).join(',')).join(' ');
+  const valPoly = AXES.map((ax, i) => pt(i, R * Math.max(0.06, (skills[ax.key] || 0) / 100)).join(',')).join(' ');
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ overflow: 'visible' }}>
+      {[0.33, 0.66, 1].map((f) => (
+        <polygon key={f} points={poly(R * f)} fill="none" stroke="rgba(75,85,99,0.35)" strokeWidth="1" />
+      ))}
+      {AXES.map((_, i) => {
+        const [x, y] = pt(i, R);
+        return <line key={i} x1={cx} y1={cy} x2={x} y2={y} stroke="rgba(75,85,99,0.25)" strokeWidth="1" />;
+      })}
+      <motion.polygon points={valPoly} fill="rgba(139,92,246,0.25)" stroke="#8b5cf6" strokeWidth="2"
+        initial={{ opacity: 0, scale: 0.6 }} animate={{ opacity: 1, scale: 1 }} style={{ transformOrigin: `${cx}px ${cy}px` }} />
+      {AXES.map((ax, i) => {
+        const [x, y] = pt(i, R + 15);
+        return (
+          <text key={ax.key} x={x} y={y} textAnchor="middle" dominantBaseline="middle"
+            style={{ fill: '#9ca3af', fontSize: 9, fontWeight: 700 }}>
+            {ax.label} {skills[ax.key] || 0}
+          </text>
+        );
+      })}
+    </svg>
+  );
+}
+
 // ─── Tab: Curriculum ──────────────────────────────────────────────────────────
 function CurriculumCoach({ onGoLive }) {
   const [disc, setDisc] = useState('muaythai');
@@ -2379,12 +2535,37 @@ function VisualCoach() {
       setExamBanner({ label: p.exam.label, milestone: p.exam.milestone });
     } else if (p.context) {
       setExamBanner({ objective: p.context });
+      // Se la sessione punta a un argomento del percorso, a fine sessione con voto ≥80
+      // l'argomento viene segnato appreso automaticamente (cerchio chiuso).
+      const m = p.context.match(/imparare "([^"]+)"/);
+      if (m) pendingObjectiveRef.current = { topic: m[1], mode: p.mode };
     }
   }, []);
   // Cambio disciplina manuale → l'esame/obiettivo pre-caricato decade
   useEffect(() => {
     if (examRef.current && examRef.current.mode !== mode) { examRef.current = null; setExamBanner(null); }
   }, [mode]);
+  // ── Nuove funzioni live: round solo, angolo, reflex, intensità, routine ──────
+  const [roundsOn, setRoundsOn] = useState(false);        // round timer anche in solo
+  const [cornerMsg, setCornerMsg] = useState(null);       // {talk, breath} | {loading} durante il rest
+  const roundStartIdxRef = useRef(0);                     // indice verdetti a inizio round
+  const prevPhaseRef = useRef('idle');
+  const [reactOn, setReactOn] = useState(false);          // reaction trainer
+  const [reactDiff, setReactDiff] = useState('medio');
+  const [reactCall, setReactCall] = useState('');
+  const [reactCount, setReactCount] = useState(0);
+  const reactTimerRef = useRef(null);
+  const reactOnRef = useRef(false);
+  const timerPhaseRef = useRef('idle');
+  const [intensity, setIntensity] = useState(0);          // intensità movimento 0-100 (EMA)
+  const intensityRef = useRef(0);
+  const prevLmRef = useRef(null);
+  const lastIntSetRef = useRef(0);
+  const pendingObjectiveRef = useRef(null);               // argomento percorso da auto-segnare se voto ≥80
+  const [warmupKind, setWarmupKind] = useState(null);     // 'warmup' | 'cooldown' | null
+  // pastSessions cambia dopo ogni pagella → ricalcola obiettivo (post auto-apprendimento) e stats
+  const liveObjective = useMemo(() => nextObjective(mode), [mode, pastSessions]);
+  const liveStats = useMemo(() => sessionStats(), [pastSessions]);
   const [rounds, setRounds] = useState(3);
   const [roundDuration, setRoundDuration] = useState(180);
   const [score, setScore] = useState({ a: 0, b: 0 });
@@ -3409,7 +3590,30 @@ function VisualCoach() {
             saveExams(ex);
           }
         }
-        setSessionReport({ report: data.report, discipline, exam: examOutcome });
+        // Cerchio chiuso col percorso: sessione mirata a un argomento + voto ≥80
+        // → l'argomento viene segnato appreso nel curriculum automaticamente.
+        let learned = null;
+        const po = pendingObjectiveRef.current;
+        if (po && po.mode === discipline && (data.report.score ?? 0) >= 80) {
+          const curr = CURRICULUM[discipline];
+          for (let li = 0; li < (curr?.levels.length || 0); li++) {
+            const ti = curr.levels[li].topics.indexOf(po.topic);
+            if (ti === -1) continue;
+            const prog = loadCurrProgress();
+            const dp = prog[discipline] || {};
+            const set = new Set(dp[`l${li}`] || []);
+            if (!set.has(ti)) {
+              set.add(ti);
+              prog[discipline] = { ...dp, [`l${li}`]: [...set] };
+              saveCurrProgress(prog);
+              markTopicDate(discipline, li, ti);
+              learned = po.topic;
+            }
+            break;
+          }
+          pendingObjectiveRef.current = null;
+        }
+        setSessionReport({ report: data.report, discipline, exam: examOutcome, learned });
         // arricchisci lo storico locale con voto + focus (usato anche per la progressione dei drill)
         try {
           const rep = data.report;
@@ -3447,6 +3651,8 @@ function VisualCoach() {
     sessionVerdictsRef.current = [];
     setStreaming(false); setAnalysis(null); setAutoMode(false);
     setScore({ a: 0, b: 0 }); setLastPoint(null);
+    setReactOn(false); setCornerMsg(null);
+    intensityRef.current = 0; prevLmRef.current = null; setIntensity(0);
     setStep('setup');
     sessionFeedbacksRef.current = [];
     insistedRef.current = [];      // nuova sessione: il maestro riparte, ma lo storico resta
@@ -3529,6 +3735,25 @@ function VisualCoach() {
             du.drawLandmarks(result.landmarks[0].filter((_, i) => i >= 11),
               { color: '#FF6B35', lineWidth: 1, radius: 4 });
             lastLandmarksRef.current = result.landmarks[0];   // per la precisione AI (angoli reali)
+            // ── INTENSITÀ: spostamento medio dei landmark del corpo → EMA 0-100 ──
+            {
+              const curL = result.landmarks[0];
+              const prevL = prevLmRef.current;
+              if (prevL) {
+                let d = 0, n = 0;
+                for (let i = 11; i <= 28; i++) {
+                  const a = curL[i], b = prevL[i];
+                  if (a && b) { d += Math.hypot(a.x - b.x, a.y - b.y); n++; }
+                }
+                if (n) {
+                  const inst = Math.min(100, (d / n) * 4200);
+                  intensityRef.current = intensityRef.current * 0.9 + inst * 0.1;
+                  const nowI = performance.now();
+                  if (nowI - lastIntSetRef.current > 800) { lastIntSetRef.current = nowI; setIntensity(Math.round(intensityRef.current)); }
+                }
+              }
+              prevLmRef.current = curL;
+            }
             // ── SPECCHIO: colora i giunti verde/rosso confrontando con la tecnica target ──
             if (mirrorOnRef.current) {
               const Lm = result.landmarks[0];
@@ -3578,6 +3803,7 @@ function VisualCoach() {
             if (nose) setCentered(nose.x > 0.2 && nose.x < 0.8 && nose.y < 0.85 ? 'ok' : 'off');
           } else {
             lastLandmarksRef.current = null;
+            prevLmRef.current = null;
             setCentered('none');
           }
           rafRef.current = requestAnimationFrame(loop);
@@ -3634,6 +3860,66 @@ function VisualCoach() {
       p += `\n\nFEEDBACK RECENTI (NON ripetere queste frasi, varia sempre il focus):\n` + hist.map((f, i) => `${i + 1}. ${f}`).join('\n');
     return p;
   }, [mode, sessionContext, pastSessions]);
+
+  // ── CORNER COACH: al suono del gong il maestro ti aspetta all'angolo ─────────
+  // Round → accumula verdetti; Rest → discorso da cornerman (AI) + cue respiro.
+  useEffect(() => {
+    const prev = prevPhaseRef.current;
+    prevPhaseRef.current = timer.phase;
+    timerPhaseRef.current = timer.phase;
+    if (timer.phase === prev) return;
+    if (timer.phase === 'round') { roundStartIdxRef.current = sessionVerdictsRef.current.length; setCornerMsg(null); }
+    if (timer.phase === 'rest') {
+      const roundVerdicts = sessionVerdictsRef.current.slice(roundStartIdxRef.current);
+      setCornerMsg({ loading: true });
+      fetch('/api/nvidia/visual', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cornerTalk: true, mode, roundNumber: timer.currentRound, totalRounds: timer.totalRounds, verdicts: roundVerdicts }),
+      })
+        .then((r) => r.json())
+        .then((d) => {
+          if (!d?.talk) { setCornerMsg(null); return; }
+          setCornerMsg({ talk: d.talk, breath: d.breath });
+          enqueueSpeak(`All'angolo. ${d.talk} ${d.breath || ''}`);
+        })
+        .catch(() => setCornerMsg(null));
+    }
+    if (timer.phase === 'finished') setCornerMsg(null);
+  }, [timer.phase, timer.currentRound, timer.totalRounds, mode, enqueueSpeak]);
+
+  // ── REACTION TRAINER: comandi random a voce → reattività da vero allenatore ──
+  useEffect(() => {
+    reactOnRef.current = reactOn;
+    clearTimeout(reactTimerRef.current);
+    if (!reactOn) { setReactCall(''); return; }
+    setReactCount(0);
+    let last = '';
+    const tick = () => {
+      if (!reactOnRef.current) return;
+      const [min, max] = REACT_DIFFS[reactDiff] || REACT_DIFFS.medio;
+      // in pausa durante il riposo del round: il reflex riparte al gong
+      if (timerPhaseRef.current === 'rest') {
+        reactTimerRef.current = setTimeout(tick, 1500);
+        return;
+      }
+      const calls = reactionCallsFor(mode);
+      let call = calls[Math.floor(Math.random() * calls.length)];
+      if (call === last && calls.length > 1) call = calls[(calls.indexOf(call) + 1) % calls.length];
+      last = call;
+      setReactCall(call);
+      setReactCount((c) => c + 1);
+      try {
+        const u = new SpeechSynthesisUtterance(call.replace(/!/g, ''));
+        u.lang = 'it-IT'; u.rate = 1.18; u.pitch = 1.05;
+        window.speechSynthesis?.cancel();
+        window.speechSynthesis?.speak(u);
+      } catch {}
+      if (navigator.vibrate) navigator.vibrate(45);
+      reactTimerRef.current = setTimeout(tick, min + Math.random() * (max - min));
+    };
+    reactTimerRef.current = setTimeout(tick, 1200);
+    return () => clearTimeout(reactTimerRef.current);
+  }, [reactOn, reactDiff, mode]);
 
   // ── ALVEARE: invia un campione coach al cloud (KV → ponte Obsidian) ─────────
   const postSample = useCallback(async (row) => {
@@ -3763,6 +4049,7 @@ function VisualCoach() {
     const p = (lbl, v) => { if (v != null) parts.push(`${lbl} ${v}°`); };
     p('gomito sx', sm.eL); p('gomito dx', sm.eR); p('ginocchio sx', sm.kL); p('ginocchio dx', sm.kR); p('anca sx', sm.hL); p('anca dx', sm.hR);
     if (lean != null) parts.push(`busto ${lean}° dalla verticale`);
+    if (intensityRef.current > 1) parts.push(`intensità movimento ${Math.round(intensityRef.current)}/100`);
     // 3) segnali geometrici misurati (fatti certi per l'AI)
     const alerts = [];
     if (sm.eL != null && sm.eL > 168) alerts.push('gomito sx iperesteso');
@@ -4032,6 +4319,39 @@ function VisualCoach() {
             )}
           </motion.div>
         )}
+
+        {/* 🎯 Il percorso della disciplina scelta: sempre visibile, il coach sa dove sei */}
+        {!examBanner && liveObjective && CURRICULUM[mode] && (
+          <div className="rounded-2xl px-4 py-3 flex items-center gap-3"
+            style={{ background: 'linear-gradient(135deg, rgba(16,185,129,0.07), rgba(17,24,39,0.85))', border: `1px solid ${C.emerald.border}` }}>
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] font-black tracking-widest" style={{ color: C.emerald.hex, fontFamily: 'Orbitron, sans-serif' }}>
+                🎯 PERCORSO — {liveObjective.level.label}
+              </p>
+              <p className="text-xs mt-0.5 text-gray-300 truncate">
+                {liveObjective.levelComplete ? `Pronto per l'esame: ${liveObjective.milestone}` : liveObjective.topic}
+              </p>
+            </div>
+            {(() => { const r = disciplineRank(mode); return r && (
+              <span className="px-2 py-1 rounded-lg text-[10px] font-black font-mono flex-shrink-0"
+                style={{ background: r.rank === 'S' ? 'rgba(244,63,94,0.15)' : 'rgba(139,92,246,0.12)', color: r.rank === 'S' ? C.rose.hex : C.violet.hex, border: `1px solid ${r.rank === 'S' ? C.rose.border : C.violet.border}` }}>
+                RANGO {r.rank}
+              </span>
+            ); })()}
+          </div>
+        )}
+
+        {/* 🔥 Streak e volume settimanale */}
+        {(liveStats.streak > 0 || liveStats.weekMin > 0) && (
+          <div className="flex gap-2">
+            <span className="px-3 py-1.5 rounded-xl text-[11px] font-bold" style={{ background: 'rgba(249,115,22,0.1)', color: C.orange.hex, border: `1px solid ${C.orange.border}` }}>
+              🔥 Streak {liveStats.streak} {liveStats.streak === 1 ? 'giorno' : 'giorni'}
+            </span>
+            <span className="px-3 py-1.5 rounded-xl text-[11px] font-bold" style={{ background: 'rgba(59,130,246,0.08)', color: C.blue.hex, border: `1px solid ${C.blue.border}` }}>
+              ⏱️ {liveStats.weekMin} min negli ultimi 7 giorni
+            </span>
+          </div>
+        )}
         {/* 🎁 Biglietto una-tantum: Arena Edition */}
         {!localStorage.getItem('sm_arena_gift_seen') && (
           <motion.div initial={{ opacity: 0, y: -10, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -4101,6 +4421,20 @@ function VisualCoach() {
           <RoundConfig rounds={rounds} onRounds={setRounds} roundDuration={roundDuration} onRoundDuration={setRoundDuration} />
         )}
 
+        {/* 🔔 Round anche in solo: shadowboxing/drill a round veri, con angolo e respiro */}
+        {!isPartnerMode && mode !== 'breathing' && (
+          <div className="space-y-2">
+            <motion.button whileTap={{ scale: 0.97 }} onClick={() => setRoundsOn((v) => !v)}
+              className="w-full py-2.5 rounded-xl text-xs font-black transition-all"
+              style={roundsOn
+                ? { background: `linear-gradient(135deg, ${C.red.hex}33, ${C.red.hex}11)`, color: C.red.hex, border: `1px solid ${C.red.border}`, boxShadow: `0 0 12px ${C.red.glow}` }
+                : { background: 'rgba(55,65,81,0.4)', color: '#9ca3af', border: '1px solid rgba(255,255,255,0.06)' }}>
+              🔔 Modalità ROUND {roundsOn ? 'ATTIVA — gong, angolo e respiro tra i round' : '— allena a round veri come in palestra'}
+            </motion.button>
+            {roundsOn && <RoundConfig rounds={rounds} onRounds={setRounds} roundDuration={roundDuration} onRoundDuration={setRoundDuration} />}
+          </div>
+        )}
+
         {mode === 'breathing' && (
           <div className="p-3 rounded-xl" style={{ background: C.emerald.bg, border: `1px solid ${C.emerald.border}` }}>
             <p className="text-[10px] font-black text-gray-500 mb-2 tracking-widest" style={{ fontFamily: 'Orbitron, sans-serif' }}>🌬️ PROTOCOLLO DI RESPIRAZIONE</p>
@@ -4158,6 +4492,20 @@ function VisualCoach() {
           </div>
         )}
 
+        {/* 🔥/🧘 Routine guidate: mai iniziare freddo, mai finire senza defaticare */}
+        <div className="flex gap-2">
+          <motion.button whileTap={{ scale: 0.95 }} onClick={() => { unlockSpeech(); setWarmupKind('warmup'); }}
+            className="flex-1 py-2.5 rounded-xl text-xs font-bold"
+            style={{ background: 'rgba(249,115,22,0.1)', color: C.orange.hex, border: `1px solid ${C.orange.border}` }}>
+            🔥 Riscaldamento 3'
+          </motion.button>
+          <motion.button whileTap={{ scale: 0.95 }} onClick={() => { unlockSpeech(); setWarmupKind('cooldown'); }}
+            className="flex-1 py-2.5 rounded-xl text-xs font-bold"
+            style={{ background: 'rgba(59,130,246,0.08)', color: C.blue.hex, border: `1px solid ${C.blue.border}` }}>
+            🧘 Defaticamento 2.5'
+          </motion.button>
+        </div>
+
         <motion.button whileTap={{ scale: 0.97 }} whileHover={{ scale: 1.01 }} onClick={startSession}
           className="w-full py-4 rounded-2xl text-white font-black text-sm transition-all relative overflow-hidden"
           style={isPartnerMode
@@ -4177,6 +4525,15 @@ function VisualCoach() {
             onExit={() => setShowBreathingGuide(false)}
           />,
           document.body
+        )}
+
+        {warmupKind === 'warmup' && (
+          <RoutineOverlay title="RISCALDAMENTO" emoji="🔥" color="orange" steps={WARMUP_STEPS}
+            voiceOn={voiceOn} onExit={() => setWarmupKind(null)} />
+        )}
+        {warmupKind === 'cooldown' && (
+          <RoutineOverlay title="DEFATICAMENTO" emoji="🧘" color="blue" steps={COOLDOWN_STEPS}
+            voiceOn={voiceOn} onExit={() => setWarmupKind(null)} />
         )}
       </div>
     );
@@ -4204,7 +4561,10 @@ function VisualCoach() {
           {currentDisc?.emoji}
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-xs font-black text-white leading-tight" style={{ fontFamily: 'Orbitron, sans-serif' }}>{currentDisc?.label?.toUpperCase()}</p>
+          <p className="text-xs font-black text-white leading-tight" style={{ fontFamily: 'Orbitron, sans-serif' }}>
+            {currentDisc?.label?.toUpperCase()}
+            <span className="font-bold" style={{ color: '#6b7280' }}> · {masterTitle(mode).toUpperCase()}</span>
+          </p>
           {analysis?.provider
             ? <p className="text-[10px] truncate mt-0.5 font-mono" style={{ color: C.violet.hex, opacity: 0.9 }}>🤖 {analysis.provider}</p>
             : sessionContext && <p className="text-[10px] truncate mt-0.5" style={{ color: '#9ca3af' }}>{sessionContext}</p>
@@ -4219,6 +4579,12 @@ function VisualCoach() {
               }}>
               <span className="w-1.5 h-1.5 rounded-full" style={{ background: 'currentColor' }} />
               {trackQuality === 'full' ? 'corpo pieno' : trackQuality === 'upper' ? 'busto' : trackQuality === 'partial' ? 'parziale' : 'no corpo'}
+            </span>
+          )}
+          {streaming && skeletonOn && intensity > 0 && (
+            <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold" title="Intensità del movimento"
+              style={{ background: 'rgba(0,0,0,0.4)', color: intensity > 66 ? '#ef4444' : intensity > 33 ? '#f59e0b' : '#38bdf8', border: '1px solid rgba(255,255,255,0.1)' }}>
+              ⚡{intensity}
             </span>
           )}
           {streaming && <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold" style={{ background: 'rgba(16,185,129,0.25)', color: C.emerald.hex, border: `1px solid ${C.emerald.border}`, animation: 'pulse-glow 2s ease-in-out infinite' }}>● LIVE</span>}
@@ -4243,8 +4609,8 @@ function VisualCoach() {
         </div>
       </div>
 
-      {/* SPARRING: timer + score — sotto la top bar */}
-      {isPartnerMode && (
+      {/* ROUND (sparring o solo): timer + angolo con respiro — sotto la top bar */}
+      {(isPartnerMode || roundsOn) && (
         <div className="absolute inset-x-0 z-20 px-3 space-y-2" style={{ top: 'calc(max(12px, env(safe-area-inset-top)) + 52px)' }}>
           {timer.phase === 'idle'
             ? <motion.button whileTap={{ scale: 0.97 }} onClick={timer.start}
@@ -4254,7 +4620,59 @@ function VisualCoach() {
               </motion.button>
             : <RoundTimerDisplay timer={timer} roundDuration={roundDuration} restDuration={60} />
           }
-          <ScoreTracker score={score} onScore={handleScore} lastPoint={lastPoint} />
+          {/* 🪑 ANGOLO: nel riposo il maestro parla e il cerchio guida il respiro (4-4) */}
+          {timer.phase === 'rest' && (
+            <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}
+              className="p-3 rounded-2xl flex items-center gap-3"
+              style={{ background: 'rgba(120,53,15,0.55)', border: `1px solid ${C.amber.border}`, backdropFilter: 'blur(8px)' }}>
+              <motion.div className="w-14 h-14 rounded-full flex-shrink-0 flex items-center justify-center text-[9px] font-black"
+                style={{ background: 'radial-gradient(circle, rgba(245,158,11,0.45), rgba(245,158,11,0.08))', border: `1.5px solid ${C.amber.hex}`, color: '#fde68a' }}
+                animate={{ scale: [1, 1.4, 1] }} transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut' }}>
+                4-4
+              </motion.div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[10px] font-black tracking-widest" style={{ color: C.amber.hex, fontFamily: 'Orbitron, sans-serif' }}>
+                  🪑 ANGOLO — respira col cerchio: cresce inspira, cala espira
+                </p>
+                <p className="text-xs text-white mt-1 leading-snug">
+                  {cornerMsg?.talk || (cornerMsg?.loading ? 'Il maestro sta arrivando all\'angolo…' : 'Recupera: spalle giù, respiro dal naso.')}
+                </p>
+                {cornerMsg?.breath && <p className="text-[10px] mt-0.5" style={{ color: '#d1d5db' }}>🫁 {cornerMsg.breath}</p>}
+              </div>
+            </motion.div>
+          )}
+          {isPartnerMode && <ScoreTracker score={score} onScore={handleScore} lastPoint={lastPoint} />}
+        </div>
+      )}
+
+      {/* ⚡ REFLEX: il coach chiama, tu esegui — comando gigante al centro */}
+      {reactOn && (
+        <div className="absolute inset-x-0 z-20 flex flex-col items-center pointer-events-none" style={{ top: '32%' }}>
+          <AnimatePresence mode="wait">
+            {reactCall && timerPhaseRef.current !== 'rest' && (
+              <motion.p key={`${reactCall}-${reactCount}`}
+                initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ opacity: 0, scale: 1.15 }}
+                transition={{ type: 'spring', stiffness: 400, damping: 18 }}
+                className="text-4xl font-black text-white text-center px-4"
+                style={{ fontFamily: 'Orbitron, sans-serif', textShadow: '0 0 28px rgba(220,38,38,0.9), 0 2px 8px rgba(0,0,0,0.8)' }}>
+                {reactCall}
+              </motion.p>
+            )}
+          </AnimatePresence>
+          <p className="text-[10px] font-mono mt-3 px-2 py-0.5 rounded-md" style={{ color: '#e5e7eb', background: 'rgba(0,0,0,0.45)' }}>
+            ⚡ REFLEX · {reactCount} comandi
+          </p>
+          <div className="flex gap-1.5 mt-2 pointer-events-auto">
+            {Object.keys(REACT_DIFFS).map((d) => (
+              <button key={d} onClick={() => setReactDiff(d)}
+                className="px-2.5 py-1 rounded-lg text-[10px] font-bold"
+                style={reactDiff === d
+                  ? { background: 'rgba(220,38,38,0.5)', color: '#fff', border: '1px solid rgba(239,68,68,0.6)' }
+                  : { background: 'rgba(0,0,0,0.45)', color: '#9ca3af', border: '1px solid rgba(255,255,255,0.1)' }}>
+                {d}
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
@@ -4731,6 +5149,14 @@ function VisualCoach() {
               style={{ background: 'rgba(55,65,81,0.6)', border: '1px solid rgba(255,255,255,0.08)' }}>
               {voiceSlow ? '🐢' : '🐇'}
             </motion.button>
+            <motion.button whileTap={{ scale: 0.9 }} onClick={() => { if (!reactOn) unlockSpeech(); setReactOn((v) => !v); }}
+              title="Reaction trainer: il coach chiama i comandi, tu esegui all'istante" aria-label="Reaction trainer"
+              className="px-3 py-2.5 rounded-xl text-sm font-black transition-all flex items-center justify-center"
+              style={reactOn
+                ? { background: 'linear-gradient(135deg, #dc2626, #9f1239)', boxShadow: '0 4px 16px rgba(220,38,38,0.5)', color: '#fff' }
+                : { background: 'rgba(55,65,81,0.6)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff' }}>
+              ⚡
+            </motion.button>
             <motion.button whileTap={{ scale: 0.9 }} onClick={() => setSkeletonOn((v) => !v)}
               className="flex-1 py-2.5 rounded-xl text-white font-bold text-xs transition-all flex items-center justify-center gap-1.5"
               style={skeletonOn
@@ -4813,6 +5239,14 @@ function VisualCoach() {
                       </p>
                       <button onClick={() => setSessionReport(null)} className="text-gray-500 font-black text-lg leading-none">✕</button>
                     </div>
+                    {sessionReport.learned && (
+                      <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}
+                        className="rounded-xl px-3 py-2 mb-2"
+                        style={{ background: 'rgba(139,92,246,0.12)', border: `1px solid ${C.violet.border}` }}>
+                        <p className="text-xs font-black" style={{ color: C.violet.hex }}>📚 ARGOMENTO APPRESO: {sessionReport.learned}</p>
+                        <p className="text-[10px] mt-0.5" style={{ color: '#6b7280' }}>Segnato automaticamente nel curriculum: la sessione ha superato 80/100.</p>
+                      </motion.div>
+                    )}
                     {sessionReport.exam && (
                       <div className="rounded-xl px-3 py-2 mb-2 text-center"
                         style={sessionReport.exam.passed
@@ -4849,6 +5283,13 @@ function VisualCoach() {
                         {R.coachNote && <p className="text-[11px] text-violet-200/80 italic mt-1 leading-snug">"{R.coachNote}"</p>}
                       </div>
                     </div>
+                    {/* Radar delle 5 competenze del guerriero */}
+                    {R.skills && (
+                      <div className="flex flex-col items-center mb-3">
+                        <SkillRadar skills={R.skills} />
+                        <p className="text-[9px] mt-1" style={{ color: '#4b5563' }}>Competenze valutate dal Maestro in questa sessione</p>
+                      </div>
+                    )}
                     {/* Punti di forza */}
                     {R.strengths?.length > 0 && (
                       <div className="mb-3">
