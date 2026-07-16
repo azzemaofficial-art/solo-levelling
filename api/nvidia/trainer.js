@@ -116,7 +116,7 @@ export default async function handler(req, res) {
 
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { messages, profile } = req.body || {};
+  const { messages, profile, athleteContext } = req.body || {};
   if (!Array.isArray(messages) || messages.length === 0) {
     return res.status(400).json({ error: 'messages obbligatorio' });
   }
@@ -129,6 +129,9 @@ export default async function handler(req, res) {
       .map(([k, v]) => `${k}: ${v}`)
       .join(', ');
     systemContent += `\n\nPROFILO UTENTE ATTUALE: ${profileStr}`;
+  }
+  if (athleteContext && typeof athleteContext === 'string') {
+    systemContent += `\n\n══ PERCORSO MARZIALE DELL'ATLETA (progresso reale — calibra schede, conditioning e consigli su questo) ══\n${athleteContext.slice(0, 2000)}`;
   }
 
   // Web search Tavily se la query lo richiede

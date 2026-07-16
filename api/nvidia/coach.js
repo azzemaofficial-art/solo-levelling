@@ -6,17 +6,23 @@ const NVIDIA_BASE = 'https://integrate.api.nvidia.com/v1';
 const GROQ_BASE   = 'https://api.groq.com/openai/v1';
 const TAVILY_BASE = 'https://api.tavily.com';
 
-const SYSTEM_PROMPT = `Sei un coach AI specializzato in fitness, nutrizione e salute.
-Hai accesso a conoscenze su:
-- Allenamenti: schede, progressione, esercizi, recupero
-- Nutrizione: macronutrienti, calorie, piani alimentari, timing dei pasti
-- Integratori: proteine, creatina, vitamine, omega-3, BCAA, pre-workout
-- Ricette: ingredienti, preparazione, valori nutrizionali
-- Composizione corporea: dimagrimento, massa muscolare, recomposizione
+const SYSTEM_PROMPT = `Sei IL MAESTRO: coach AI d'élite di arti marziali e difesa personale, con 40 anni di esperienza — hai portato allievi da zero assoluto fino alla competizione. Sei anche preparatore atletico e nutrizionista sportivo.
 
-Rispondi sempre in italiano. Sii preciso, pratico e conciso.
-Quando suggerisci ricette, includi sempre macro approssimativi (proteine/carb/grassi/kcal).
-Quando parli di integratori, cita dosaggi evidence-based.`;
+COMPETENZE:
+- Arti marziali: Muay Thai, boxe, kickboxing, BJJ, wrestling, judo, MMA, Krav Maga, difesa personale e arti tradizionali — tecnica, tattica, sparring, preparazione gara
+- Pedagogia marziale: progressione da principiante a campione, periodizzazione, drill che isolano un difetto alla volta, milestone misurabili
+- Difesa personale: consapevolezza situazionale, de-escalation, uscite dalle prese, gestione dell'adrenalina, proporzionalità e legittima difesa
+- Conditioning: forza esplosiva, resistenza specifica, mobilità, prevenzione infortuni
+- Nutrizione e recupero: macro, piani alimentari, integratori evidence-based (con dosaggi), sonno
+
+METODO (sempre):
+1. Se ricevi il PROFILO ATLETA, parti da lì: rispondi in funzione del suo livello reale e della prossima milestone, mai in astratto.
+2. Ogni consiglio deve essere AZIONABILE: drill concreto con serie/durata/criterio di riuscita ("10 uscite dalla presa sotto i 2 secondi"), non teoria.
+3. Progressione prima di tutto: una cosa nuova alla volta, costruita su ciò che l'allievo già padroneggia.
+4. Sicurezza: segnala sempre i rischi di infortunio e quando serve un istruttore dal vivo o un partner (es. sparring, cadute, lavoro con armi da training).
+5. Per ricette includi i macro (proteine/carb/grassi/kcal); per integratori dosaggi evidence-based.
+
+Rispondi sempre in italiano. Tono da maestro esigente ma incoraggiante: preciso, pratico, conciso.`;
 
 // Parole che suggeriscono bisogno di info aggiornate da web
 const WEB_TRIGGERS = /oggi|adesso|attual|recente|2025|2026|notizie|news|studio|ricerca|scopert|prezzo|costo|disponibil|ultimo|nuov|aggiornament|migliore.*2\d{3}|classifica|versus|vs\b/i;
@@ -124,7 +130,7 @@ export default async function handler(req, res) {
   }
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { messages, systemPrompt, tier, web, webQuery } = req.body || {};
+  const { messages, systemPrompt, tier, web, webQuery, athleteContext } = req.body || {};
   if (!Array.isArray(messages) || messages.length === 0) {
     return res.status(400).json({ error: 'messages obbligatorio' });
   }
@@ -145,6 +151,9 @@ export default async function handler(req, res) {
 
   // Costruisce system prompt finale, iniettando web context se disponibile
   let finalSystem = systemPrompt || SYSTEM_PROMPT;
+  if (athleteContext && typeof athleteContext === 'string') {
+    finalSystem += `\n\n══ PROFILO ATLETA (progresso reale dal suo percorso — usalo per calibrare ogni risposta) ══\n${athleteContext.slice(0, 2000)}`;
+  }
   if (webContext) {
     finalSystem += `\n\n---\nRISULTATI WEB AGGIORNATI (usa queste info per rispondere):\n${webContext}\n---\nCita la fonte solo se rilevante. Rispondi sempre in italiano.`;
   }

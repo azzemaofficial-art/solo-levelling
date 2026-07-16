@@ -5,11 +5,11 @@ import { Eye, Lightbulb, Trophy, ScanSearch, Play, Pause, Target, FlipHorizontal
 
 // ─── Quick prompts ─────────────────────────────────────────────────────────────
 const COACH_QUICK = [
-  { label: '🥩 Ricetta proteica', text: 'Dammi una ricetta ad alto contenuto proteico (almeno 40g di proteine) veloce da preparare, con macro completi.' },
-  { label: '💊 Integratori base', text: 'Quali integratori base consiglia la scienza per un atleta naturale? Dosaggi e timing.' },
-  { label: '📊 Macro per bulk', text: 'Come calcolo i macronutrienti per una fase di bulk pulita? Peso 75kg, altezza 178cm, alleno 4x settimana.' },
-  { label: '🏋️ Scheda push/pull', text: 'Crea una scheda push/pull/legs 6 giorni per ipertrofia, livello intermedio, palestra.' },
-  { label: '🥊 Conditioning MMA', text: 'Crea un piano di conditioning per un praticante di arti marziali miste, 3 sessioni/settimana.' },
+  { label: '🗺️ Piano della settimana', text: 'Guarda il mio percorso e dimmi cosa allenare questa settimana per avvicinarmi alla prossima milestone: giorni, drill e obiettivi misurabili.' },
+  { label: '🛡️ Difesa personale da 0', text: 'Voglio diventare fortissimo nella difesa personale partendo da zero. Costruiscimi il percorso: cosa imparare per primo, quante sessioni a settimana e come misurare i progressi.' },
+  { label: '🥊 Sblocca la milestone', text: 'Analizza a che punto sono nel curriculum e dammi un drill specifico per superare la milestone del mio livello attuale.' },
+  { label: '📊 Macro per atleta', text: 'Come calcolo i macronutrienti ideali per un atleta di arti marziali? Peso 75kg, altezza 178cm, alleno 4x settimana.' },
+  { label: '🥋 Conditioning marziale', text: 'Crea un piano di conditioning per un praticante di arti marziali, 3 sessioni/settimana: esplosività, grip, collo, core.' },
   { label: '😴 Recupero e sonno', text: 'Come ottimizzare il recupero muscolare e il sonno per massimizzare i guadagni?' },
 ];
 
@@ -35,6 +35,7 @@ const DISCIPLINE_GROUPS = [
     { id: 'judo',       emoji: '🥋', label: 'Judo',        prompt: 'Guida la mia sessione di judo. Analizza kumi-kata e proiezioni.' },
     { id: 'mma',        emoji: '🏆', label: 'MMA',         prompt: 'Guida la mia sessione MMA. Analizza striking, grappling e transizioni.' },
     { id: 'kravmaga',   emoji: '⚔️', label: 'Krav Maga',  prompt: 'Guida la mia sessione di Krav Maga. Analizza efficacia e reattività.' },
+    { id: 'selfdefense', emoji: '🛡️', label: 'Difesa Personale', prompt: 'Guida la mia sessione di difesa personale. Analizza postura, colpi di base, uscite dalle prese e reattività.' },
     { id: 'capoeira',   emoji: '🌀', label: 'Capoeira',   prompt: 'Guida la mia sessione di Capoeira. Analizza ginga, movimenti e fluidità.' },
     { id: 'sambo',      emoji: '🤼', label: 'Sambo',      prompt: 'Guida la mia sessione di Sambo. Analizza takedown, controllo e submission.' },
     { id: 'hapkido',    emoji: '🔄', label: 'Hapkido',    prompt: 'Guida la mia sessione di Hapkido. Analizza leve articolari, proiezioni e calci.' },
@@ -130,6 +131,13 @@ const CURRICULUM = {
     { label: 'Tecnica',    weeks: '5-12',  color: 'blue',    topics: ['Difesa da pugni diretti', 'Difesa da calci', 'Bear hug releases (4 varianti)', 'Headlock escape', 'Ground defense'], milestone: 'Scenario drill con stress' },
     { label: 'Avanzato',   weeks: '13-24', color: 'orange',  topics: ['Difesa da coltello', 'Difesa da arma da fuoco', 'Aggressori multipli', 'Difesa in auto', 'Stress inoculation'], milestone: 'Scenario multiplo 3 minuti no-stop' },
     { label: 'Pro',        weeks: '25+',   color: 'rose',    topics: ['Weapon retention', 'Force continuum', 'Mission-specific training', 'Istruttore P1 prep', 'Scenario avanzati notturni'], milestone: 'Certificazione istruttore P1/P2' },
+  ]},
+
+  selfdefense: { name: 'Difesa Personale', emoji: '🛡️', levels: [
+    { label: 'Fondamenta', weeks: '1-6',   color: 'emerald', topics: ['Consapevolezza situazionale (scan 360°, uscite, mani dell\'aggressore)', 'Postura non-vittima e voce ferma ("STOP" + distanza)', 'Guardia naturale (mani aperte davanti, palmi avanti)', 'Palm heel strike e gomitata (bersagli: naso, mento, gola)', 'Ginocchiata all\'inguine + disimpegno immediato'], milestone: 'Sequenza voce→palm heel→ginocchiata→fuga eseguita fluida × 10' },
+    { label: 'Tecnica',    weeks: '7-16',  color: 'blue',    topics: ['Difesa 360° da colpi circolari', 'Uscita da presa al polso, ai capelli e al collo (frontale/laterale)', 'Uscita da bear hug (davanti/dietro, braccia libere/bloccate)', 'Caduta sicura e rialzo tattico (technical stand-up)', 'Difesa a terra: calci dal suolo + rialzo e fuga'], milestone: 'Uscita da 5 prese diverse in meno di 2 secondi ciascuna' },
+    { label: 'Avanzato',   weeks: '17-32', color: 'orange',  topics: ['Stress inoculation: drill con fatica e sorpresa', 'Difesa da spinta+pugno (scenario più comune in strada)', 'Gestione di più aggressori: linea, angoli, non farsi circondare', 'Difesa da minaccia con oggetto contundente (distanza e barriere)', 'De-escalation verbale e lettura dei segnali pre-aggressione'], milestone: 'Scenario a sorpresa 2 minuti: de-escalation o neutralizzazione + fuga' },
+    { label: 'Pro',        weeks: '33+',   color: 'rose',    topics: ['Scenari complessi: spazi chiusi, auto, ascensore', 'Protezione di terzi (familiare accanto)', 'Sparring protetto con scenario (aggressore attivo)', 'Aspetti legali della difesa legittima e proporzionalità', 'Integrazione striking+grappling sotto adrenalina'], milestone: 'Scenario completo con aggressore protetto: valutazione istruttore' },
   ]},
 
   capoeira: { name: 'Capoeira', emoji: '🌀', levels: [
@@ -651,7 +659,8 @@ function CoachChat() {
   const [input, setInput] = useState('');
   const endRef = useRef(null);
   const { messages, loading, error, send, clear } = useChat('/api/nvidia/coach');
-  const handleSend = () => { if (!input.trim()) return; send(input); setInput(''); };
+  const sendWithContext = useCallback((text) => send(text, { athleteContext: athleteSummary() }), [send]);
+  const handleSend = () => { if (!input.trim()) return; sendWithContext(input); setInput(''); };
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, loading]);
 
   return (
@@ -664,10 +673,10 @@ function CoachChat() {
             <div className="relative px-4 py-3.5 overflow-hidden">
               <div className="absolute -right-4 -top-4 w-20 h-20 rounded-full pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(59,130,246,0.12) 0%, transparent 70%)' }} />
               <p className="text-xs font-black tracking-widest" style={{ color: C.blue.hex, fontFamily: 'Orbitron, sans-serif' }}>💬 AI COACH CHAT</p>
-              <p className="text-xs mt-0.5" style={{ color: '#6b7280' }}>Nutrizione · Allenamento · Recovery · Supplementi</p>
+              <p className="text-xs mt-0.5" style={{ color: '#6b7280' }}>Arti Marziali · Percorso · Nutrizione · Recovery</p>
             </div>
           </div>
-          <QuickGrid prompts={COACH_QUICK} onSend={send} accentColor="blue" />
+          <QuickGrid prompts={COACH_QUICK} onSend={sendWithContext} accentColor="blue" />
         </>
       )}
       <div className="space-y-3 min-h-[120px]">
@@ -701,7 +710,8 @@ function PersonalTrainer() {
   const [input, setInput] = useState('');
   const endRef = useRef(null);
   const { messages, loading, error, send, clear } = useChat('/api/nvidia/trainer');
-  const handleSend = () => { if (!input.trim()) return; send(input); setInput(''); };
+  const sendWithContext = useCallback((text) => send(text, { athleteContext: athleteSummary() }), [send]);
+  const handleSend = () => { if (!input.trim()) return; sendWithContext(input); setInput(''); };
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, loading]);
 
   return (
@@ -718,7 +728,7 @@ function PersonalTrainer() {
               <p className="text-xs mt-0.5" style={{ color: '#6b7280' }}>Calorie · Macro · Schede · Arti Marziali</p>
             </div>
           </div>
-          <QuickGrid prompts={TRAINER_QUICK} onSend={send} accentColor="amber" />
+          <QuickGrid prompts={TRAINER_QUICK} onSend={sendWithContext} accentColor="amber" />
         </>
       )}
       <div className="space-y-3 min-h-[120px]">
@@ -756,25 +766,153 @@ const CURRICULUM_KEY = 'shadow_monarch_curriculum';
 const loadCurrProgress = () => { try { return JSON.parse(localStorage.getItem(CURRICULUM_KEY) || '{}'); } catch { return {}; } };
 const saveCurrProgress = (p) => { try { localStorage.setItem(CURRICULUM_KEY, JSON.stringify(p)); } catch {} };
 
+// Blocco di contesto per i prompt AI: a che punto del percorso è l'allievo in
+// questa disciplina. Così il coach allena verso la prossima milestone invece
+// di dare feedback scollegati dal percorso.
+const curriculumContext = (mode) => {
+  const curr = CURRICULUM[mode];
+  if (!curr) return '';
+  const prog = loadCurrProgress()[mode] || {};
+  const li = curr.levels.findIndex((l, i) => (prog[`l${i}`] || []).length < l.topics.length);
+  if (li === -1) return `\n\nPERCORSO ALLIEVO — ${curr.name}: curriculum COMPLETATO. Coaching di perfezionamento livello Pro: dettagli fini, timing, tattica.`;
+  const level = curr.levels[li];
+  const done = new Set(prog[`l${li}`] || []);
+  const doneList = level.topics.filter((_, ti) => done.has(ti));
+  const todo = level.topics.filter((_, ti) => !done.has(ti)).slice(0, 3);
+  return `\n\nPERCORSO ALLIEVO — ${curr.name}, livello ${level.label} (sett. ${level.weeks}):` +
+    (doneList.length ? `\n- Già acquisiti: ${doneList.join(' · ')}` : '\n- Partito da zero: nessun argomento ancora completato, parla semplice e cura le basi') +
+    `\n- DA IMPARARE ORA (priorità del coaching): ${todo.join(' · ')}` +
+    `\n- Milestone da sbloccare: ${level.milestone}` +
+    `\nOrienta comandi e drill verso questi argomenti, calibrando il vocabolario al livello ${level.label}.`;
+};
+
+// Riassunto atleta cross-disciplina per la chat coach: progresso curriculum
+// reale + ultime sessioni live. Così la chat risponde conoscendo il percorso.
+const athleteSummary = () => {
+  const prog = loadCurrProgress();
+  const lines = [];
+  for (const [id, dp] of Object.entries(prog)) {
+    const curr = CURRICULUM[id];
+    if (!curr) continue;
+    const done = Object.values(dp).reduce((s, arr) => s + arr.length, 0);
+    if (!done) continue;
+    const tot = curr.levels.reduce((s, l) => s + l.topics.length, 0);
+    const li = curr.levels.findIndex((l, i) => (dp[`l${i}`] || []).length < l.topics.length);
+    const lvl = li === -1 ? 'completato' : curr.levels[li].label;
+    lines.push(`- ${curr.name}: ${done}/${tot} argomenti, livello ${lvl}${li !== -1 ? ` — prossima milestone: ${curr.levels[li].milestone}` : ''}`);
+  }
+  const sessions = loadSessions().slice(0, 3);
+  if (sessions.length) {
+    lines.push('Ultime sessioni live:');
+    sessions.forEach((s) => lines.push(`- ${s.date} (${s.mode}): ${s.keyFeedback || s.context || ''}`.slice(0, 180)));
+  }
+  if (!lines.length) return 'Allievo appena partito da zero: nessun progresso registrato ancora. Costruisci le fondamenta.';
+  return lines.join('\n');
+};
+
+// ── Esami milestone superati: { [disc]: { [levelIdx]: { score, date } } } ─────
+const EXAMS_KEY = 'shadow_monarch_exams';
+const loadExams = () => { try { return JSON.parse(localStorage.getItem(EXAMS_KEY) || '{}'); } catch { return {}; } };
+const saveExams = (e) => { try { localStorage.setItem(EXAMS_KEY, JSON.stringify(e)); } catch {} };
+
+// ── Date di completamento argomenti (per il ripasso): { 'disc:l0:2': ISOdate } ─
+const CURR_DATES_KEY = 'shadow_monarch_curr_dates';
+const loadCurrDates = () => { try { return JSON.parse(localStorage.getItem(CURR_DATES_KEY) || '{}'); } catch { return {}; } };
+const markTopicDate = (disc, li, ti) => {
+  try {
+    const d = loadCurrDates();
+    d[`${disc}:l${li}:${ti}`] = new Date().toISOString().slice(0, 10);
+    localStorage.setItem(CURR_DATES_KEY, JSON.stringify(d));
+  } catch {}
+};
+
+// ── Sessione live pre-configurata dal curriculum (deep-link tra tab) ──────────
+const PENDING_LIVE_KEY = 'shadow_monarch_pending_live';
+const setPendingLive = (p) => { try { localStorage.setItem(PENDING_LIVE_KEY, JSON.stringify(p)); } catch {} };
+const takePendingLive = () => {
+  try {
+    const raw = localStorage.getItem(PENDING_LIVE_KEY);
+    if (!raw) return null;
+    localStorage.removeItem(PENDING_LIVE_KEY);
+    return JSON.parse(raw);
+  } catch { return null; }
+};
+
+// ── Rango disciplina stile Solo Leveling: livelli completati + esami ──────────
+// E (novizio) → D/C/B (un rango per livello completato) → A (curriculum finito)
+// → S (tutti e 4 gli esami milestone superati davanti al Maestro).
+const RANK_LABELS = ['E', 'D', 'C', 'B', 'A', 'S'];
+const disciplineRank = (disc) => {
+  const curr = CURRICULUM[disc];
+  if (!curr) return null;
+  const dp = loadCurrProgress()[disc] || {};
+  const levelsDone = curr.levels.filter((l, i) => (dp[`l${i}`] || []).length >= l.topics.length).length;
+  const examsDone = Object.keys(loadExams()[disc] || {}).length;
+  const idx = levelsDone >= curr.levels.length && examsDone >= curr.levels.length ? 5 : Math.min(levelsDone, 4);
+  return { rank: RANK_LABELS[idx], levelsDone, examsDone };
+};
+
+// ── Prossimo obiettivo nel percorso: primo argomento non completato ───────────
+const nextObjective = (disc) => {
+  const curr = CURRICULUM[disc];
+  if (!curr) return null;
+  const dp = loadCurrProgress()[disc] || {};
+  for (let li = 0; li < curr.levels.length; li++) {
+    const level = curr.levels[li];
+    const done = new Set(dp[`l${li}`] || []);
+    const ti = level.topics.findIndex((_, i) => !done.has(i));
+    if (ti !== -1) return { li, level, ti, topic: level.topics[ti], milestone: level.milestone, levelComplete: false };
+    if (!loadExams()[disc]?.[li]) return { li, level, ti: -1, topic: null, milestone: level.milestone, levelComplete: true };
+  }
+  return null; // percorso completo, esami inclusi
+};
+
+// ── Ripasso spaced-repetition: argomenti completati da più di 21 giorni ───────
+const REVIEW_AFTER_DAYS = 21;
+const reviewTopics = (disc) => {
+  const curr = CURRICULUM[disc];
+  if (!curr) return [];
+  const dp = loadCurrProgress()[disc] || {};
+  const dates = loadCurrDates();
+  const now = Date.now();
+  const out = [];
+  curr.levels.forEach((level, li) => {
+    (dp[`l${li}`] || []).forEach((ti) => {
+      const d = dates[`${disc}:l${li}:${ti}`];
+      // argomenti senza data (completati prima di questa feature) non vanno in ripasso
+      if (!d) return;
+      const age = (now - new Date(d).getTime()) / 86400000;
+      if (age > REVIEW_AFTER_DAYS && level.topics[ti]) out.push({ topic: level.topics[ti], level: level.label, days: Math.round(age) });
+    });
+  });
+  return out.sort((a, b) => b.days - a.days).slice(0, 2);
+};
+
 // ─── Tab: Curriculum ──────────────────────────────────────────────────────────
-function CurriculumCoach() {
+function CurriculumCoach({ onGoLive }) {
   const [disc, setDisc] = useState('muaythai');
   const [expandedLevel, setExpandedLevel] = useState(0);
   const [progress, setProgress] = useState(() => loadCurrProgress());
   const [loadingTopic, setLoadingTopic] = useState(null);
   const [topicLesson, setTopicLesson] = useState(null);
+  const [exams, setExams] = useState(() => loadExams());
+  const [weekPlan, setWeekPlan] = useState(null);      // {content} | {loading:true}
+  useEffect(() => { setExams(loadExams()); }, [disc]); // gli esami li scrive la sessione live
 
   const curriculum = CURRICULUM[disc];
   const discProgress = progress[disc] || {};
   const getCompleted = (li) => new Set(discProgress[`l${li}`] || []);
   const totalDone = curriculum.levels.reduce((s, _, li) => s + getCompleted(li).size, 0);
   const totalTopics = curriculum.levels.reduce((s, l) => s + l.topics.length, 0);
+  const objective = useMemo(() => nextObjective(disc), [disc, progress, exams]);
+  const reviews = useMemo(() => reviewTopics(disc), [disc, progress]);
+  const rank = useMemo(() => disciplineRank(disc), [disc, progress, exams]);
 
   const toggleTopic = (li, ti) => {
     setProgress((prev) => {
       const dp = prev[disc] || {};
       const set = new Set(dp[`l${li}`] || []);
-      if (set.has(ti)) set.delete(ti); else set.add(ti);
+      if (set.has(ti)) set.delete(ti); else { set.add(ti); markTopicDate(disc, li, ti); }
       const next = { ...prev, [disc]: { ...dp, [`l${li}`]: [...set] } };
       saveCurrProgress(next);
       return next;
@@ -785,15 +923,46 @@ function CurriculumCoach() {
     setLoadingTopic(topic);
     setTopicLesson(null);
     try {
-      const prompt = `Insegnami: "${topic}" — ${curriculum.name}, livello ${levelLabel}.\n1) Cos'è e perché è fondamentale\n2) Come si esegue step-by-step\n3) Errori più comuni\n4) Drill pratico per impararlo\nRispondi in italiano, max 12 righe, tono da coach pratico.`;
+      const prompt = `Insegnami: "${topic}" — ${curriculum.name}, livello ${levelLabel}.
+1) Cos'è e perché è fondamentale (collegalo a ciò che so già, se il profilo lo dice)
+2) Esecuzione step-by-step con riferimenti misurabili (angoli, altezze, distanze)
+3) I 3 errori più comuni e come accorgersene da soli
+4) Drill per impararlo OGGI: serie × ripetizioni + criterio di riuscita misurabile
+5) Come si collega alla milestone del mio livello
+Rispondi in italiano, max 15 righe, tono da maestro pratico.`;
       const res = await fetch('/api/nvidia/trainer', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: [{ role: 'user', content: prompt }] }),
+        body: JSON.stringify({ messages: [{ role: 'user', content: prompt }], athleteContext: athleteSummary() }),
       });
       const data = await res.json();
       if (res.ok) setTopicLesson({ topic, content: data.content, provider: data.provider });
     } catch {}
     finally { setLoadingTopic(null); }
+  };
+
+  // Piano settimanale generato dal Maestro sul percorso reale di questa disciplina
+  const generateWeekPlan = async () => {
+    setWeekPlan({ loading: true });
+    try {
+      const obj = nextObjective(disc);
+      const prompt = `Costruisci il mio piano di allenamento per i prossimi 7 giorni in ${curriculum.name}.` +
+        (obj && !obj.levelComplete ? ` Sono al livello ${obj.level.label}: il prossimo argomento da imparare è "${obj.topic}" e la milestone da sbloccare è "${obj.milestone}".` :
+         obj?.levelComplete ? ` Ho completato gli argomenti del livello ${obj.level.label}: devo preparare l'ESAME della milestone "${obj.milestone}".` :
+         ' Ho completato il curriculum: piano di perfezionamento livello Pro.') +
+        `\nFormato: per ogni giorno (Lun-Dom) → focus, drill con serie/durata, criterio di riuscita. Includi 1-2 giorni di recupero attivo. Max 20 righe.`;
+      const res = await fetch('/api/nvidia/coach', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: [{ role: 'user', content: prompt }], athleteContext: athleteSummary() }),
+      });
+      const data = await res.json();
+      setWeekPlan(res.ok ? { content: data.content } : null);
+    } catch { setWeekPlan(null); }
+  };
+
+  // Manda alla sessione live pre-configurata (argomento o esame milestone)
+  const trainLive = (context, exam = null) => {
+    setPendingLive({ mode: disc, context, exam });
+    onGoLive?.();
   };
 
   const SOLO_DISCS = [...DISCIPLINE_GROUPS[0].items, ...DISCIPLINE_GROUPS[1].items].filter((d) => CURRICULUM[d.id]);
@@ -810,8 +979,16 @@ function CurriculumCoach() {
           <div className="flex items-center justify-between mb-3">
             <div>
               <p className="text-xs font-black tracking-widest" style={{ color: C.violet.hex, fontFamily: 'Orbitron, sans-serif' }}>📚 CURRICULUM</p>
-              <p className="text-lg font-black text-white mt-0.5">{curriculum.name}</p>
-              <p className="text-xs mt-0.5" style={{ color: '#6b7280' }}>{totalDone}/{totalTopics} argomenti completati</p>
+              <div className="flex items-center gap-2 mt-0.5">
+                <p className="text-lg font-black text-white">{curriculum.name}</p>
+                {rank && (
+                  <span className="px-2 py-0.5 rounded-md text-[10px] font-black font-mono"
+                    style={{ background: rank.rank === 'S' ? 'rgba(244,63,94,0.15)' : 'rgba(139,92,246,0.12)', color: rank.rank === 'S' ? C.rose.hex : C.violet.hex, border: `1px solid ${rank.rank === 'S' ? C.rose.border : C.violet.border}` }}>
+                    RANGO {rank.rank}
+                  </span>
+                )}
+              </div>
+              <p className="text-xs mt-0.5" style={{ color: '#6b7280' }}>{totalDone}/{totalTopics} argomenti · {rank?.examsDone || 0}/4 esami 🎓</p>
             </div>
             <Ring done={totalDone} total={totalTopics} color="violet" size={58} strokeW={4.5}
               label={overallPct === 1 ? '✓' : `${Math.round(overallPct * 100)}%`} />
@@ -845,6 +1022,70 @@ function CurriculumCoach() {
         })}
       </div>
 
+      {/* 🎯 Obiettivo di oggi: il percorso decide, tu esegui */}
+      {objective ? (
+        <div className="rounded-2xl p-4 space-y-3" style={{ background: 'linear-gradient(135deg, rgba(16,185,129,0.08), rgba(17,24,39,0.9))', border: `1px solid ${C.emerald.border}` }}>
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-black tracking-widest" style={{ color: C.emerald.hex, fontFamily: 'Orbitron, sans-serif' }}>
+              {objective.levelComplete ? '🎓 PRONTO PER L\'ESAME' : '🎯 OBIETTIVO DI OGGI'}
+            </p>
+            <span className="text-[10px] px-2 py-0.5 rounded-full font-bold" style={{ background: 'rgba(55,65,81,0.4)', color: '#9ca3af' }}>{objective.level.label}</span>
+          </div>
+          {objective.levelComplete ? (
+            <p className="text-sm text-white font-bold">Hai completato gli argomenti del livello. Supera l'esame davanti al Maestro: <span style={{ color: C.emerald.hex }}>{objective.milestone}</span></p>
+          ) : (
+            <>
+              <p className="text-sm text-white font-bold">{objective.topic}</p>
+              <p className="text-xs" style={{ color: '#6b7280' }}>Milestone del livello: {objective.milestone}</p>
+            </>
+          )}
+          {reviews.length > 0 && (
+            <p className="text-xs" style={{ color: C.amber.hex }}>🔁 Da ripassare: {reviews.map((r) => `${r.topic} (${r.days}gg fa)`).join(' · ')}</p>
+          )}
+          <div className="flex gap-2 flex-wrap">
+            {!objective.levelComplete && (
+              <motion.button whileTap={{ scale: 0.95 }} onClick={() => learnTopic(objective.topic, objective.level.label)}
+                className="px-3 py-2 rounded-xl text-xs font-bold" disabled={loadingTopic === objective.topic}
+                style={{ background: 'rgba(139,92,246,0.12)', color: C.violet.hex, border: `1px solid ${C.violet.border}` }}>
+                {loadingTopic === objective.topic ? '…' : '📖 Impara'}
+              </motion.button>
+            )}
+            {!objective.levelComplete && (
+              <motion.button whileTap={{ scale: 0.95 }}
+                onClick={() => trainLive(`Obiettivo del percorso: imparare "${objective.topic}" (livello ${objective.level.label}). Guida drill e correzioni su QUESTO argomento.`)}
+                className="px-3 py-2 rounded-xl text-xs font-bold"
+                style={{ background: 'rgba(16,185,129,0.12)', color: C.emerald.hex, border: `1px solid ${C.emerald.border}` }}>
+                📷 Allena live
+              </motion.button>
+            )}
+            {objective.levelComplete && (
+              <motion.button whileTap={{ scale: 0.95 }}
+                onClick={() => trainLive(`ESAME MILESTONE (${objective.level.label}): ${objective.milestone}. Valuta severamente l'esecuzione della milestone.`,
+                  { li: objective.li, label: objective.level.label, milestone: objective.milestone })}
+                className="px-3 py-2 rounded-xl text-xs font-black"
+                style={{ background: 'rgba(244,63,94,0.14)', color: C.rose.hex, border: `1px solid ${C.rose.border}`, boxShadow: `0 0 12px ${C.rose.glow}` }}>
+                🎓 Esame live — {'>'}75/100 per la promozione
+              </motion.button>
+            )}
+            <motion.button whileTap={{ scale: 0.95 }} onClick={generateWeekPlan} disabled={weekPlan?.loading}
+              className="px-3 py-2 rounded-xl text-xs font-bold"
+              style={{ background: 'rgba(245,158,11,0.1)', color: C.amber.hex, border: `1px solid ${C.amber.border}` }}>
+              {weekPlan?.loading ? '⏳ Il Maestro pianifica…' : '🗓️ Piano settimana'}
+            </motion.button>
+          </div>
+          {weekPlan?.content && (
+            <div className="rounded-xl p-3 text-xs leading-relaxed whitespace-pre-wrap" style={{ background: 'rgba(3,7,18,0.6)', color: '#d1d5db', border: '1px solid rgba(255,255,255,0.06)' }}>
+              {weekPlan.content}
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="rounded-2xl p-4" style={{ background: 'linear-gradient(135deg, rgba(244,63,94,0.1), rgba(17,24,39,0.9))', border: `1px solid ${C.rose.border}` }}>
+          <p className="text-sm font-black" style={{ color: C.rose.hex }}>👑 PERCORSO COMPLETATO — RANGO S</p>
+          <p className="text-xs mt-1" style={{ color: '#9ca3af' }}>Curriculum e tutti gli esami superati in {curriculum.name}. Mantieni il livello con sessioni live di perfezionamento.</p>
+        </div>
+      )}
+
       {/* Levels */}
       <div className="space-y-2">
         {curriculum.levels.map((level, li) => {
@@ -876,6 +1117,11 @@ function CurriculumCoach() {
                     <span className="text-[10px] px-2 py-0.5 rounded-full font-bold font-mono" style={{ background: col.bg, color: col.hex, border: `1px solid ${col.border}` }}>
                       SETT. {level.weeks}
                     </span>
+                    {exams[disc]?.[li] && (
+                      <span className="text-[10px] px-2 py-0.5 rounded-full font-black font-mono" style={{ background: 'rgba(244,63,94,0.12)', color: C.rose.hex, border: `1px solid ${C.rose.border}` }}>
+                        🎓 {exams[disc][li].score}/100
+                      </span>
+                    )}
                   </div>
                   <p className="text-xs mt-0.5" style={{ color: '#4b5563' }}>{completed.size}/{level.topics.length} completati</p>
                 </div>
@@ -1299,7 +1545,7 @@ const GRAPPLE_STRIKE = { throw: { e: 5, l: [3,4,5,6,7,8] }, shoot: { e: 8, l: [3
 const OPPONENT_POSE = [[86,20],[85,36],[84,86],[84,40],[82,54],[80,44],[88,40],[90,54],[92,44],[82,88],[82,120],[82,152],[88,88],[89,120],[92,152]];
 // Scena per disciplina: 'bag' (colpi) | 'opponent' (partner/grappling) | 'solo' (movimento)
 const DISCIPLINE_SCENE = {
-  muaythai:'bag', boxing:'bag', kickboxing:'bag', muayboran:'bag', kravmaga:'bag', sanda:'bag',
+  muaythai:'bag', boxing:'bag', kickboxing:'bag', muayboran:'bag', kravmaga:'bag', selfdefense:'bag', sanda:'bag',
   karate:'opponent', taekwondo:'opponent', mma:'opponent', judo:'opponent', wrestling:'opponent',
   bjj:'opponent', sambo:'opponent', lutalivre:'opponent', capoeira:'opponent', hapkido:'opponent',
   wingchun:'opponent', kungfu:'opponent', silat:'opponent', kendo:'opponent', pankration:'opponent',
@@ -2120,6 +2366,25 @@ function VisualCoach() {
   const [autoMode, setAutoMode] = useState(false);
   const [mode, setMode] = useState('muaythai');
   const [pastSessions, setPastSessions] = useState(() => loadSessions());
+  const examRef = useRef(null);          // esame milestone in corso: {li, label, milestone, mode}
+  const [examBanner, setExamBanner] = useState(null); // mostrato in setup quando arrivi dal curriculum
+  // Deep-link dal Curriculum: sessione pre-configurata (argomento del percorso o esame milestone)
+  useEffect(() => {
+    const p = takePendingLive();
+    if (!p || !p.mode) return;
+    setMode(p.mode);
+    setSessionContext(p.context || '');
+    if (p.exam) {
+      examRef.current = { ...p.exam, mode: p.mode };
+      setExamBanner({ label: p.exam.label, milestone: p.exam.milestone });
+    } else if (p.context) {
+      setExamBanner({ objective: p.context });
+    }
+  }, []);
+  // Cambio disciplina manuale → l'esame/obiettivo pre-caricato decade
+  useEffect(() => {
+    if (examRef.current && examRef.current.mode !== mode) { examRef.current = null; setExamBanner(null); }
+  }, [mode]);
   const [rounds, setRounds] = useState(3);
   const [roundDuration, setRoundDuration] = useState(180);
   const [score, setScore] = useState({ a: 0, b: 0 });
@@ -2375,6 +2640,22 @@ function VisualCoach() {
       { c: '360 Defense-Eye Gouge-Groin', lvl: 'avanzato', focus: 'counter' },
       { c: 'Forearm Block-Counter-Knee-Escape', lvl: 'avanzato', focus: 'difesa' },
       { c: 'Burst-Palm Strike-Knee-Push-Disengage', lvl: 'avanzato', focus: 'potenza' },
+    ],
+    selfdefense: [
+      { c: 'Voce-Palm Strike-Disimpegno', lvl: 'base', focus: 'velocità' },
+      { c: 'Palm Strike-Ginocchiata-Fuga', lvl: 'base', focus: 'potenza' },
+      { c: 'Difesa 360-Counter-Scan', lvl: 'base', focus: 'difesa' },
+      { c: 'Uscita Polso-Palm Strike', lvl: 'base', focus: 'counter' },
+      { c: 'Gomitata-Spinta-Fuga', lvl: 'base', focus: 'potenza' },
+      { c: 'Uscita Collo-Ginocchiata-Scan', lvl: 'intermedio', focus: 'counter' },
+      { c: 'Difesa 360-Palm Strike-Ginocchiata', lvl: 'intermedio', focus: 'difesa' },
+      { c: 'Caduta-Calcio da Terra-Rialzo Tattico', lvl: 'intermedio', focus: 'difesa' },
+      { c: 'Uscita Bear Hug-Gomitata-Disimpegno', lvl: 'intermedio', focus: 'counter' },
+      { c: 'Palm Strike-Gomitata-Ginocchiata-Fuga', lvl: 'intermedio', focus: 'potenza' },
+      { c: 'Angolo 45-Palm Strike-Scan', lvl: 'intermedio', focus: 'velocità' },
+      { c: 'Difesa Spinta-Counter-Disimpegno', lvl: 'avanzato', focus: 'counter' },
+      { c: 'Multi-aggressore: Linea-Colpo-Fuga', lvl: 'avanzato', focus: 'difesa' },
+      { c: 'Rialzo Tattico-Palm Strike-Ginocchiata-Fuga', lvl: 'avanzato', focus: 'potenza' },
     ],
     // ── Grappling / lotta a terra ──────────────────────────────────────────
     bjj: [
@@ -3104,17 +3385,31 @@ function VisualCoach() {
   // Fine sessione → il Maestro genera la pagella, la salva su KV (→ Obsidian) e la mostra.
   const requestSessionReport = useCallback(async ({ durationMin, verdicts, sampleCount: sc, context, discipline }) => {
     setSessionReport({ loading: true });
+    const exam = examRef.current && examRef.current.mode === discipline ? examRef.current : null;
     try {
       const r = await fetch('/api/nvidia/visual', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           sessionReport: true, mode: discipline, durationMin, sampleCount: sc,
           verdicts, context, level: guidedLevel,
+          exam: exam ? { milestone: exam.milestone, label: exam.label } : undefined,
         }),
       });
       const data = await r.json();
       if (r.ok && data.report) {
-        setSessionReport({ report: data.report, discipline });
+        // Esame milestone: >=75 = PROMOSSO → salva il diploma e sblocca il grado
+        let examOutcome = null;
+        if (exam) {
+          examRef.current = null;
+          const passed = (data.report.score ?? 0) >= 75;
+          examOutcome = { passed, label: exam.label, score: data.report.score };
+          if (passed) {
+            const ex = loadExams();
+            ex[discipline] = { ...(ex[discipline] || {}), [exam.li]: { score: data.report.score, date: new Date().toLocaleDateString('it-IT') } };
+            saveExams(ex);
+          }
+        }
+        setSessionReport({ report: data.report, discipline, exam: examOutcome });
         // arricchisci lo storico locale con voto + focus (usato anche per la progressione dei drill)
         try {
           const rep = data.report;
@@ -3330,6 +3625,7 @@ function VisualCoach() {
 
   const buildPrompt = useCallback((basePrompt) => {
     let p = basePrompt || '';
+    p += curriculumContext(mode);
     if (sessionContext.trim()) p += `\n\nSESSIONE ATTUALE: ${sessionContext.trim()}`;
     if (pastSessions.length > 0)
       p += `\n\nSESSIONI PRECEDENTI:\n` + pastSessions.slice(0, 2).map((s) => `- ${s.date} (${s.mode}): ${s.context} → ${s.keyFeedback}`).join('\n');
@@ -3337,7 +3633,7 @@ function VisualCoach() {
     if (hist.length > 0)
       p += `\n\nFEEDBACK RECENTI (NON ripetere queste frasi, varia sempre il focus):\n` + hist.map((f, i) => `${i + 1}. ${f}`).join('\n');
     return p;
-  }, [sessionContext, pastSessions]);
+  }, [mode, sessionContext, pastSessions]);
 
   // ── ALVEARE: invia un campione coach al cloud (KV → ponte Obsidian) ─────────
   const postSample = useCallback(async (row) => {
@@ -3715,6 +4011,27 @@ function VisualCoach() {
   if (step === 'setup') {
     return (
       <div className="space-y-4">
+        {/* 🎓/🎯 Sessione pre-configurata dal Curriculum */}
+        {examBanner && (
+          <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
+            className="rounded-2xl px-4 py-3"
+            style={examBanner.milestone
+              ? { background: 'linear-gradient(135deg, rgba(244,63,94,0.14), rgba(17,24,39,0.9))', border: `1px solid ${C.rose.border}`, boxShadow: `0 0 16px ${C.rose.glow}` }
+              : { background: 'linear-gradient(135deg, rgba(16,185,129,0.1), rgba(17,24,39,0.9))', border: `1px solid ${C.emerald.border}` }}>
+            {examBanner.milestone ? (
+              <>
+                <p className="text-xs font-black tracking-widest" style={{ color: C.rose.hex, fontFamily: 'Orbitron, sans-serif' }}>🎓 ESAME MILESTONE — {examBanner.label}</p>
+                <p className="text-[11px] mt-1 text-gray-300">{examBanner.milestone}</p>
+                <p className="text-[10px] mt-1" style={{ color: '#6b7280' }}>Il Maestro giudica da esaminatore: serve ≥75/100 per la promozione. Avvia la sessione quando sei pronto.</p>
+              </>
+            ) : (
+              <>
+                <p className="text-xs font-black tracking-widest" style={{ color: C.emerald.hex, fontFamily: 'Orbitron, sans-serif' }}>🎯 OBIETTIVO DAL PERCORSO</p>
+                <p className="text-[11px] mt-1 text-gray-300">{examBanner.objective}</p>
+              </>
+            )}
+          </motion.div>
+        )}
         {/* 🎁 Biglietto una-tantum: Arena Edition */}
         {!localStorage.getItem('sm_arena_gift_seen') && (
           <motion.div initial={{ opacity: 0, y: -10, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -4491,9 +4808,24 @@ function VisualCoach() {
                 return (
                   <>
                     <div className="flex items-center justify-between mb-1">
-                      <p className="text-sm font-black" style={{ color: C.violet.hex, fontFamily: 'Orbitron, sans-serif', letterSpacing: '0.06em' }}>🥋 PAGELLA SESSIONE</p>
+                      <p className="text-sm font-black" style={{ color: C.violet.hex, fontFamily: 'Orbitron, sans-serif', letterSpacing: '0.06em' }}>
+                        {sessionReport.exam ? '🎓 ESITO ESAME' : '🥋 PAGELLA SESSIONE'}
+                      </p>
                       <button onClick={() => setSessionReport(null)} className="text-gray-500 font-black text-lg leading-none">✕</button>
                     </div>
+                    {sessionReport.exam && (
+                      <div className="rounded-xl px-3 py-2 mb-2 text-center"
+                        style={sessionReport.exam.passed
+                          ? { background: 'rgba(16,185,129,0.12)', border: `1px solid ${C.emerald.border}` }
+                          : { background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)' }}>
+                        <p className="text-base font-black" style={{ color: sessionReport.exam.passed ? C.emerald.hex : '#ef4444' }}>
+                          {sessionReport.exam.passed ? `👑 PROMOSSO — livello ${sessionReport.exam.label} certificato` : `❌ RIPROVA — livello ${sessionReport.exam.label}`}
+                        </p>
+                        <p className="text-[10px] mt-0.5" style={{ color: '#6b7280' }}>
+                          {sessionReport.exam.passed ? 'Diploma salvato nel curriculum. Avanti col prossimo livello.' : 'Serve ≥75/100. Allena i punti deboli qui sotto e ripresentati.'}
+                        </p>
+                      </div>
+                    )}
                     {/* Voto + titolo */}
                     <div className="flex items-center gap-4 mb-4 mt-2">
                       <div className="relative flex-shrink-0" style={{ width: 78, height: 78 }}>
@@ -4623,7 +4955,7 @@ export default function Coach() {
           <motion.div key={tab} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.2, ease: [0.25, 0.46, 0.45, 0.94] }}>
             {tab === 'trainer'    && <PersonalTrainer />}
-            {tab === 'curriculum' && <CurriculumCoach />}
+            {tab === 'curriculum' && <CurriculumCoach onGoLive={() => setTab('visual')} />}
             {tab === 'chat'       && <CoachChat />}
             {tab === 'visual'     && <VisualCoach />}
           </motion.div>

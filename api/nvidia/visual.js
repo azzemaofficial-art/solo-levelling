@@ -275,6 +275,30 @@ ROTAZIONE FOCUS:
 27) Respirazione d'emergenza: quando l'adrenalina colpisce — 4 respiri da combattimento (4-4-4-4) prima di agire — abbassa il cortisolo e riattiva il pensiero
 28) Atteggiamento non da vittima: postura aperta ma vigile — i predatori scelgono chi sembra facile — camminata decisa e sguardo diretto`,
 
+  selfdefense: `Sei un istruttore AI di difesa personale in sessione live (percorso da zero: consapevolezza, colpi essenziali, uscite dalle prese, fuga).
+${BASE_SOLO}
+ROTAZIONE FOCUS:
+1) Postura non-vittima: schiena diritta, mento parallelo al suolo, sguardo avanti — mai spalle chiuse
+2) Guardia naturale: mani aperte davanti al petto, palmi verso l'esterno — sembra dialogo, è una guardia
+3) Palm heel strike: polso indietro, colpisci col tallone del palmo — spinta dall'anca, non dal braccio
+4) Gomitata orizzontale: gomito a ~90°, ruota il busto — l'arma più efficace a corta distanza
+5) Ginocchiata: aggancia e tira giù mentre il ginocchio sale — poi disimpegno immediato
+6) Distanza di sicurezza: due braccia tese — se l'aggressore la chiude, mani su subito
+7) Voce come arma: "STOP, STAI INDIETRO" con palmo avanti — forte, grave, deciso
+8) Uscita da presa al polso: ruota verso il pollice dell'aggressore, strappa verso l'alto
+9) Uscita da presa al collo frontale: mento giù, mani a cuneo tra le braccia, colpisci e ruota
+10) Difesa 360°: avambraccio incontra l'arco d'attacco a ~90°, contrattacco simultaneo
+11) Caduta sicura: mento al petto, batti col braccio — mai mani rigide dietro
+12) Rialzo tattico: technical stand-up — mano e piede opposti a terra, gamba libera arretra, occhi sulla minaccia
+13) Difesa a terra: calci col tallone al ginocchio/tibia dell'aggressore, poi rialzo e fuga
+14) Dopo ogni sequenza: scan 360° — controlla altri aggressori PRIMA di rilassarti
+15) Movimento continuo: dopo il primo colpo non fermarti — colpisci finché non puoi fuggire
+16) Fuga come vittoria: ogni drill finisce con disimpegno e 3 passi verso l'uscita
+17) Bersagli essenziali: naso, mento, gola, inguine, ginocchio — precisione prima della forza
+18) Respirazione sotto stress: espira a ogni colpo, 4-4-4-4 tra le sequenze — l'adrenalina si governa col respiro
+19) Base mobile: piedi larghi come le spalle, mai incrociare le gambe arretrando
+20) Angoli, non linea retta: esci a ~45° dopo ogni difesa — mai indietreggiare dritto`,
+
   taekwondo: `Sei un maestro di Taekwondo AI in sessione live (ITF e WTF/WT).
 ${BASE_SOLO}
 ROTAZIONE FOCUS:
@@ -1086,7 +1110,7 @@ async function callVisionCosmos(apiKey, model, imageBase64, mimeType, userPrompt
 const DISCIPLINE_LABELS = {
   muaythai: 'Muay Thai', boxing: 'Boxe', kickboxing: 'Kickboxing', karate: 'Karate',
   taekwondo: 'Taekwondo', bjj: 'Brazilian Jiu-Jitsu', wrestling: 'Wrestling', judo: 'Judo',
-  mma: 'MMA', kravmaga: 'Krav Maga', capoeira: 'Capoeira', sambo: 'Sambo', hapkido: 'Hapkido',
+  mma: 'MMA', kravmaga: 'Krav Maga', selfdefense: 'Difesa Personale', capoeira: 'Capoeira', sambo: 'Sambo', hapkido: 'Hapkido',
   wingchun: 'Wing Chun', kungfu: 'Kung Fu / Wushu', silat: 'Pencak Silat', kendo: 'Kendo',
   sanda: 'Sanda / Sanshou', pankration: 'Pankration', systema: 'Systema', lutalivre: 'Luta Livre',
   muayboran: 'Muay Boran', kalaripayattu: 'Kalaripayattu', calisthenics: 'Calistenia', crossfit: 'CrossFit',
@@ -1180,6 +1204,16 @@ const COMMON_ERRORS = {
     'Difesa da coltello che blocca la lama → devia il polso armato e muoviti fuori dalla linea d\'attacco, controlla poi colpisci',
     'Base statica sotto stress → resta mobile con piedi larghi come le spalle, crea angoli invece di indietreggiare in linea retta',
     'Ginocchiata senza controllo della testa → aggancia la nuca con entrambe le mani e tira giù mentre sali col ginocchio verso il plesso',
+  ],
+  selfdefense: [
+    'Palm strike col braccio solo → la spinta parte dall\'anca e dalla gamba posteriore, polso rigido, colpisci col tallone del palmo',
+    'Guardia che sembra da combattimento → mani aperte davanti al petto, palmi avanti: de-escalation visiva ma pronta a colpire',
+    'Fermarsi dopo la difesa → ogni deviazione va seguita da contrattacco immediato e disimpegno, mai bloccare e basta',
+    'Nessuno scan dopo la sequenza → gira la testa e controlla 360° prima di abbassare le mani, potrebbero esserci altri aggressori',
+    'Indietreggiare in linea retta → esci a ~45° creando un angolo, arretrando dritto resti nella traiettoria dell\'aggressore',
+    'Mento alto durante la presa al collo → abbassa subito il mento a proteggere la trachea, poi ruota verso il pollice per uscire',
+    'Rialzo da terra di schiena alla minaccia → technical stand-up con occhi sull\'aggressore, gamba libera arretra per prima',
+    'Trattenere il respiro sotto stress → espira secco a ogni colpo e respira 4-4-4-4 tra le sequenze, o l\'adrenalina ti blocca',
   ],
   taekwondo: [
     'Calcio senza camera del ginocchio → alza prima il ginocchio verso il bersaglio, poi frusta la gamba e ritira sulla stessa linea',
@@ -1900,6 +1934,8 @@ REGOLE FERREE:
 - UN solo difetto-chiave per verdetto: il più importante adesso. Non elencare.
 - MEMORIA: se un errore presente nei FEEDBACK RECENTI è ANCORA visibile nelle osservazioni → NON cambiare argomento, RINCARA con più forza ("Te l'ho già detto: ..."). Se invece è stato corretto o non c'è più → scegli un dettaglio NUOVO, mai ripetere lo stesso consiglio.
 - Se ti viene fornito il blocco "CHI HAI DAVANTI", quelle istruzioni hanno PRIORITÀ: conosci questo atleta, comportati come tale.
+- Se ti viene fornito il blocco "PERCORSO ALLIEVO" (curriculum), il campo PROVA deve allenare uno degli argomenti DA IMPARARE ORA o la milestone del livello — è così che l'allievo avanza da zero a campione, non con drill a caso.
+- Se la SESSIONE ATTUALE è un ESAME MILESTONE, giudica da esaminatore: comandi centrati SOLO sull'esecuzione della milestone.
 - INSEGNA, non solo correggere: nel campo PROVA dai un esercizio che ISOLA il difetto appena indicato (se il problema è l'anca che non ruota, fai fare un drill sull'anca — non una combo generica). È così che si impara davvero.
 - Se le osservazioni indicano un RISCHIO DI INFORTUNIO, è la priorità assoluta.
 - Se la forma è davvero corretta, dillo con un comando di mantenimento — non inventare un difetto.
@@ -1911,13 +1947,14 @@ PROVA: <il prossimo COLPO o COMBO concreto da eseguire ORA, specifico per la dis
 PERCHÉ: <principio tecnico/biomeccanico in una frase — ometti se ovvio>
 Tono secco, professionale, esigente ma incoraggiante, in italiano. Dai SEMPRE sia il difetto sia ciò che va bene.`;
 
-async function callBrainVerdict({ disciplineLabel, observations, antiRepeatContext, disciplineMode = '', learner = null }) {
+async function callBrainVerdict({ disciplineLabel, observations, antiRepeatContext, disciplineMode = '', learner = null, pathContext = '' }) {
   if (!observations || observations.length === 0) return null;
   const user = [
     `DISCIPLINA: ${disciplineLabel}`,
     `\nHAI OSSERVATO L'ATLETA IN ${observations.length} MOMENTI CONSECUTIVI:`,
     ...observations.map((o, i) => `Momento ${i + 1}: ${o}`),
     antiRepeatContext ? `\n${antiRepeatContext}` : '',
+    pathContext ? `\n${pathContext}` : '',
     learnerRubric(learner),
     errorsRubric(disciplineMode, disciplineLabel),
     strikeMasteryRubric(observations.join(' '), true),
@@ -2131,6 +2168,10 @@ export default async function handler(req, res) {
     const verdicts = Array.isArray(req.body.verdicts) ? req.body.verdicts.filter(Boolean).map((v) => String(v).slice(0, 220)).slice(-24) : [];
     const context = String(req.body.context || '').slice(0, 300);
     const level = String(req.body.level || '').slice(0, 40);
+    // Esame milestone: la pagella diventa un giudizio da commissione (score = SOLO la milestone)
+    const exam = req.body.exam && typeof req.body.exam === 'object'
+      ? { milestone: String(req.body.exam.milestone || '').slice(0, 200), label: String(req.body.exam.label || '').slice(0, 40) }
+      : null;
 
     // storia recente per trend e anti-ripetizione focus
     const SKEY = chatId ? `coach_sessions:${chatId}` : null;
@@ -2143,7 +2184,7 @@ export default async function handler(req, res) {
 
     const report = await callBrainJSON({
       system: `Sei IL MAESTRO di ${disciplineLabel}, con conoscenza enciclopedica e tradizionale (anche le tecniche antiche e segrete). Valuti UNA sessione di allenamento appena conclusa basandoti SOLO sui dati reali forniti (i comandi che hai dato, la durata, i campioni). Vietato il generico. Dai una pagella onesta ed esigente ma motivante che aiuti l'atleta a migliorare nel tempo. Rispondi SOLO con JSON valido.`,
-      user: `DISCIPLINA: ${disciplineLabel}\nDurata: ${durationMin} min · Campioni analizzati: ${sampleCount} · Livello dichiarato: ${level || 'n/d'}\nContesto sessione: ${context || '-'}\n\nCOMANDI/CORREZIONI DATI DURANTE LA SESSIONE (${verdicts.length}):\n${verdicts.map((v, i) => `${i + 1}. ${v}`).join('\n') || '(nessuna correzione registrata)'}\n\nSTORICO ULTIME SESSIONI (per valutare i progressi e NON ripetere sempre lo stesso focus):\n${histLine}\n\nValuta questa sessione e pianifica il prossimo passo (progressione: se un errore ricorre dallo storico, insisti; se è stato risolto, alza l'asticella con qualcosa di più avanzato).\nRispondi SOLO con:\n{"score":0-100,"title":"titolo breve e incisivo della sessione","strengths":["punto di forza concreto con parte del corpo/tecnica, max 3"],"weaknesses":["debolezza concreta da correggere, max 3"],"focusNext":["1-3 focus SPECIFICI per la prossima sessione, progressivi"],"nextDrill":"UN esercizio/combo concreto e più avanzato da provare la prossima volta","techniqueSecret":"UNA tecnica o segreto della tradizione di ${disciplineLabel} da studiare, con il suo nome","coachNote":"1 frase da maestro, diretta e motivante","xp":numero 10-100 in base a impegno e qualità}`,
+      user: `DISCIPLINA: ${disciplineLabel}\nDurata: ${durationMin} min · Campioni analizzati: ${sampleCount} · Livello dichiarato: ${level || 'n/d'}\nContesto sessione: ${context || '-'}\n\nCOMANDI/CORREZIONI DATI DURANTE LA SESSIONE (${verdicts.length}):\n${verdicts.map((v, i) => `${i + 1}. ${v}`).join('\n') || '(nessuna correzione registrata)'}\n\nSTORICO ULTIME SESSIONI (per valutare i progressi e NON ripetere sempre lo stesso focus):\n${histLine}${exam ? `\n\n⚠️ QUESTA ERA UNA SESSIONE D'ESAME (livello ${exam.label}). L'atleta tentava di superare la milestone: "${exam.milestone}".\nGiudica come un esaminatore di commissione: lo SCORE riflette SOLO quanto l'esecuzione osservata dimostra la milestone (≥75 = PROMOSSO, <75 = RIPROVA). Sii onesto: promuovere chi non è pronto lo mette in pericolo; bocciare chi è pronto lo demotiva. In coachNote di' esplicitamente PROMOSSO o RIPROVA e il motivo principale.` : ''}\n\nValuta questa sessione e pianifica il prossimo passo (progressione: se un errore ricorre dallo storico, insisti; se è stato risolto, alza l'asticella con qualcosa di più avanzato).\nRispondi SOLO con:\n{"score":0-100,"title":"titolo breve e incisivo della sessione","strengths":["punto di forza concreto con parte del corpo/tecnica, max 3"],"weaknesses":["debolezza concreta da correggere, max 3"],"focusNext":["1-3 focus SPECIFICI per la prossima sessione, progressivi"],"nextDrill":"UN esercizio/combo concreto e più avanzato da provare la prossima volta","techniqueSecret":"UNA tecnica o segreto della tradizione di ${disciplineLabel} da studiare, con il suo nome","coachNote":"1 frase da maestro, diretta e motivante","xp":numero 10-100 in base a impegno e qualità}`,
       maxTokens: 900,
       temperature: 0.5,
     });
@@ -2172,6 +2213,7 @@ export default async function handler(req, res) {
         strengths: out.strengths, weaknesses: out.weaknesses,
         focusNext: out.focusNext, nextDrill: out.nextDrill,
         techniqueSecret: out.techniqueSecret, coachNote: out.coachNote, xp: out.xp,
+        ...(exam ? { exam: { label: exam.label, milestone: exam.milestone, passed: out.score >= 75 } } : {}),
       };
       pastArr.push(record);
       await kvSetRaw(SKEY, pastArr.slice(-180)); // ~6 mesi di sessioni giornaliere
@@ -2285,7 +2327,18 @@ PROSSIMO: <il prossimo combo da chiamare, specifico per la disciplina, DIVERSO d
     const antiRepeat = (prompt && /FEEDBACK RECENTI/i.test(prompt))
       ? 'FEEDBACK RECENTI (applica la REGOLA MEMORIA: se l\'errore persiste rincara, altrimenti cambia dettaglio):\n' + prompt.split(/FEEDBACK RECENTI[^\n]*\n/i)[1]
       : '';
-    const verdict = await callBrainVerdict({ disciplineLabel, observations, antiRepeatContext: antiRepeat, disciplineMode: mode, learner });
+    // Estrae dal prompt il blocco PERCORSO ALLIEVO (curriculum) e la riga SESSIONE ATTUALE
+    // (obiettivo/esame): il verdetto deve allenare verso il percorso, non a caso.
+    const extractBlock = (marker) => {
+      if (!prompt) return '';
+      const i = prompt.indexOf(marker);
+      if (i === -1) return '';
+      const rest = prompt.slice(i);
+      const end = rest.indexOf('\n\n');
+      return (end === -1 ? rest : rest.slice(0, end)).slice(0, 900);
+    };
+    const pathContext = [extractBlock('PERCORSO ALLIEVO'), extractBlock('SESSIONE ATTUALE:')].filter(Boolean).join('\n');
+    const verdict = await callBrainVerdict({ disciplineLabel, observations, antiRepeatContext: antiRepeat, disciplineMode: mode, learner, pathContext });
     if (verdict) {
       res.setHeader('X-Visual-Provider', verdict.brain);
       res.setHeader('X-Visual-Mode', mode);
