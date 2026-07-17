@@ -48,6 +48,7 @@ const DISCIPLINE_GROUPS = [
     { id: 'systema',    emoji: '🌊', label: 'Systema',    prompt: 'Guida la mia sessione di Systema. Analizza respirazione, tensione muscolare e movimenti naturali.' },
     { id: 'lutalivre',  emoji: '🤼', label: 'Luta Livre', prompt: 'Guida la mia sessione di Luta Livre. Analizza clinch, takedown e submission a terra.' },
     { id: 'muayboran',  emoji: '🏺', label: 'Muay Boran', prompt: 'Guida la mia sessione di Muay Boran. Analizza le tecniche tradizionali thailandesi pre-ring.' },
+    { id: 'kalaripayattu', emoji: '🐅', label: 'Kalaripayattu', prompt: 'Guida la mia sessione di Kalaripayattu. Analizza vadivu (posture animali), chuvadu (passi) e fluidità del corpo.' },
   ]},
   { label: '💪 Sport & Fitness', items: [
     { id: 'calisthenics', emoji: '💪', label: 'Calistenia',  prompt: 'Guida il mio allenamento a corpo libero. Analizza forma, range of motion e progressione.' },
@@ -222,6 +223,13 @@ const CURRICULUM = {
     { label: 'Tecnica',    weeks: '7-18',  color: 'blue',    topics: ['Luk mai (tecniche figlie, varianti avanzate)', 'Clinch tradizionale (chap ko)', 'Ginocchiate dal clinch (sapato kao)', 'Proiezioni e spazzate antiche', 'Calci saltati e volteggi'], milestone: 'Sequenza Mae mai completa (15 tecniche)' },
     { label: 'Avanzato',   weeks: '19-36', color: 'orange',  topics: ['Armi del corpo: testa, denti, morsi (Boran)', 'Tecniche proibite nel ring moderno', 'Kard Chuek (bendaggio a mani nude)', 'Applicazioni Boran in Muay Thai moderno', 'Studio dei Kru tradizionali (maestri storici)'], milestone: 'Dimostrazione pubblica Muay Boran × 5 tecniche luk mai' },
     { label: 'Pro',        weeks: '37+',   color: 'rose',    topics: ['Trasmissione della tradizione come Kru', 'Kard Chuek match (se disponibile)', 'Studio del Krabi Krabong (armi tradizionali thailandesi)', 'Ricerca storica e connessione culturale', 'Insegnamento certificato dalla Thailand Board of Muay Thai'], milestone: 'Certificazione Kru Muay Thai IFMA o WBMT' },
+  ]},
+
+  kalaripayattu: { name: 'Kalaripayattu', emoji: '🐅', levels: [
+    { label: 'Fondamenta', weeks: '1-8',   color: 'emerald', topics: ['Chuvadu (posizioni dei passi base)', 'Vadivu: gaja (elefante) e simha (leone)', 'Meippayattu 1 (sequenza corpo)', 'Kaal eduppu (sollevamenti di gamba, 8 direzioni)', 'Flessibilità: ponte e affondo profondo'], milestone: 'Meippayattu 1 completa da memoria con kaal eduppu fluidi' },
+    { label: 'Tecnica',    weeks: '9-20',  color: 'blue',    topics: ['Vadivu completi (8 posture animali)', 'Meippayattu 2-4', 'Salti e rotazioni (chattom, thirichil)', 'Verumkai: tecniche a mani nude base', 'Marma: introduzione ai punti vitali (teoria)'], milestone: 'Sequenza meippayattu 1-4 senza pause' },
+    { label: 'Avanzato',   weeks: '21-40', color: 'orange',  topics: ['Kolthari: kettukari (bastone lungo)', 'Cheruvadi (bastone corto)', 'Otta (bastone curvo, forme avanzate)', 'Verumkai avanzato: leve e proiezioni', 'Combattimento condizionato con partner'], milestone: 'Forma completa con kettukari davanti al Gurukkal' },
+    { label: 'Pro',        weeks: '41+',   color: 'rose',    topics: ['Ankathari: spada e scudo (val & paricha)', 'Urumi (spada flessibile, solo con maestro)', 'Marma chikitsa (studio dei punti vitali e cura)', 'Kalari come pratica completa: massaggio e medicina', 'Trasmissione della tradizione'], milestone: 'Riconoscimento del proprio Gurukkal e dimostrazione pubblica' },
   ]},
 
   calisthenics: { name: 'Calistenia', emoji: '💪', levels: [
@@ -894,7 +902,7 @@ const MASTER_TITLES = {
   mma: 'Coach', wrestling: 'Coach', lutalivre: 'Coach', pankration: 'Coach', sambo: 'Trener',
   karate: 'Sensei', judo: 'Sensei', kendo: 'Sensei', taekwondo: 'Sabum', hapkido: 'Sabum',
   bjj: 'Professor', capoeira: 'Mestre', silat: 'Guru', wingchun: 'Sifu', kungfu: 'Sifu',
-  kravmaga: 'Istruttore', selfdefense: 'Istruttore', systema: 'Instruktor',
+  kravmaga: 'Istruttore', selfdefense: 'Istruttore', systema: 'Instruktor', kalaripayattu: 'Gurukkal',
 };
 const masterTitle = (mode) => MASTER_TITLES[mode] || 'Maestro';
 
@@ -912,6 +920,18 @@ const REACTION_CALLS = {
   wrestling:   ['Sprawl!', 'Level change!', 'Shot!', 'Circle!', 'Snap down!'],
   judo:        ['Kuzushi!', 'Entra!', 'Uchi-komi!', 'Tai-sabaki!', 'Difendi la presa!'],
   mma:         ['Jab!', 'Low kick!', 'Sprawl!', 'Level change!', 'Clinch!', 'Slip!', 'Esci!'],
+  capoeira:    ['Ginga!', 'Esquiva!', 'Au!', 'Meia-lua!', 'Negativa!', 'Rasteira!'],
+  sambo:       ['Presa!', 'Sgambetto!', 'Hip throw!', 'Sprawl!', 'Leva!', 'Entra!'],
+  hapkido:     ['Leva al polso!', 'Proiezione!', 'Calcio basso!', 'Ruota!', 'Esci!'],
+  wingchun:    ['Chain punch!', 'Pak sao!', 'Tan sao!', 'Bong sao!', 'Centro!', 'Lap sao!'],
+  kungfu:      ['Ma bu!', 'Gong bu!', 'Chong quan!', 'Calcio frontale!', 'Blocca!', 'Cambio stance!'],
+  silat:       ['Langkah!', 'Kuda-kuda!', 'Sapuan!', 'Elakan!', 'Colpo di palmo!'],
+  kendo:       ['Men!', 'Kote!', 'Do!', 'Tsuki!', 'Kamae!', 'Fumikomi!'],
+  sanda:       ['Jab!', 'Cross!', 'Bian tui!', 'Teep!', 'Takedown!', 'Clinch!'],
+  pankration:  ['Colpo!', 'Takedown!', 'Sprawl!', 'Clinch!', 'A terra!', 'Rialzati!'],
+  systema:     ['Respira!', 'Rilassa!', 'Cadi!', 'Rotola!', 'Devia!', 'Muoviti!'],
+  lutalivre:   ['Sprawl!', 'Single leg!', 'Guillotine!', 'Scramble!', 'Back take!'],
+  kalaripayattu: ['Vadivu!', 'Chuvadu!', 'Salto!', 'Abbassati!', 'Calcio alto!', 'Ruota!'],
   default:     ['Colpo!', 'Schiva!', 'Guardia!', 'Esci a sinistra!', 'Esci a destra!', 'Affonda!'],
 };
 const reactionCallsFor = (mode) => REACTION_CALLS[mode] || REACTION_CALLS.default;
@@ -949,6 +969,63 @@ const sessionStats = () => {
     return acc + (Number.isFinite(t) && Date.now() - t < 7 * 86400000 ? (s.duration || 0) : 0);
   }, 0);
   return { streak, weekMin };
+};
+
+// ── TRONO DEL MONARCA: visione globale su TUTTE le discipline ────────────────
+const monarchStats = () => {
+  const prog = loadCurrProgress();
+  const exams = loadExams();
+  let topics = 0, done = 0, examsDone = 0, examsTot = 0;
+  const active = [];
+  for (const [id, curr] of Object.entries(CURRICULUM)) {
+    const tot = curr.levels.reduce((s, l) => s + l.topics.length, 0);
+    topics += tot;
+    examsTot += curr.levels.length;
+    const dp = prog[id] || {};
+    const d = Object.values(dp).reduce((s, a) => s + a.length, 0);
+    done += d;
+    examsDone += Object.keys(exams[id] || {}).length;
+    if (d > 0) active.push(id);
+  }
+  // gli esami pesano il triplo di un argomento: la maestria vera si dimostra
+  const frac = topics + examsTot ? (done + examsDone * 3) / (topics + examsTot * 3) : 0;
+  const rank = frac >= 0.999 ? 'S' : frac >= 0.75 ? 'A' : frac >= 0.5 ? 'B' : frac >= 0.25 ? 'C' : frac >= 0.08 ? 'D' : 'E';
+  return { done, topics, examsDone, examsTot, active, rank, frac };
+};
+
+// Disciplina del giorno: tra quelle iniziate, la meno allenata di recente
+const todaysDiscipline = () => {
+  const { active } = monarchStats();
+  const pool = active.length ? active : ['selfdefense'];
+  const sessions = loadSessions();
+  const lastByMode = {};
+  sessions.forEach((s) => { if (!lastByMode[s.mode]) lastByMode[s.mode] = s.date; }); // storico: più recente prima
+  const dateVal = (d) => {
+    const [dd, mm, yy] = String(d || '').split('/');
+    const t = new Date(`${yy}-${mm}-${dd}`).getTime();
+    return Number.isFinite(t) ? t : 0;
+  };
+  return [...pool].sort((a, b) => dateVal(lastByMode[a]) - dateVal(lastByMode[b]))[0];
+};
+
+// ── Storico radar competenze (trend nel tempo, per disciplina) ────────────────
+const SKILLS_HIST_KEY = 'shadow_monarch_skills_history';
+const pushSkillsHistory = (disc, skills) => {
+  try {
+    const h = JSON.parse(localStorage.getItem(SKILLS_HIST_KEY) || '[]');
+    h.push({ disc, skills, date: new Date().toISOString().slice(0, 10) });
+    localStorage.setItem(SKILLS_HIST_KEY, JSON.stringify(h.slice(-80)));
+  } catch {}
+};
+const avgSkillsRecent = (n = 6) => {
+  try {
+    const h = JSON.parse(localStorage.getItem(SKILLS_HIST_KEY) || '[]').slice(-n);
+    if (!h.length) return null;
+    const keys = ['guardia', 'attacco', 'difesa', 'footwork', 'respiro'];
+    const out = {};
+    keys.forEach((k) => { out[k] = Math.round(h.reduce((s, e) => s + (e.skills?.[k] || 0), 0) / h.length); });
+    return out;
+  } catch { return null; }
 };
 
 // ── Overlay routine guidata (riscaldamento/defaticamento): timer + voce ───────
@@ -1126,6 +1203,63 @@ Rispondi in italiano, max 15 righe, tono da maestro pratico.`;
 
   return (
     <div className="space-y-4">
+      {/* 👑 TRONO DEL MONARCA — la visione su TUTTE le discipline */}
+      {(() => {
+        const ms = monarchStats();
+        const today = todaysDiscipline();
+        const todayCurr = CURRICULUM[today];
+        const avgSk = avgSkillsRecent();
+        return (
+          <div className="relative rounded-2xl overflow-hidden"
+            style={{ background: 'linear-gradient(135deg, rgba(251,191,36,0.1), rgba(139,92,246,0.08), rgba(3,7,18,0.9))', border: '1px solid rgba(251,191,36,0.3)' }}>
+            <div className="h-px w-full" style={{ background: 'linear-gradient(90deg, transparent, #fbbf24 35%, #a855f7 70%, transparent)', animation: 'frame-glow-shift 4s linear infinite', backgroundSize: '200% 100%' }} />
+            <div className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-black tracking-widest" style={{ color: '#fbbf24', fontFamily: 'Orbitron, sans-serif' }}>👑 TRONO DEL MONARCA</p>
+                  <p className="text-[11px] mt-1" style={{ color: '#9ca3af' }}>
+                    {ms.done}/{ms.topics} tecniche · {ms.examsDone}/{ms.examsTot} esami · {ms.active.length} discipline attive
+                  </p>
+                </div>
+                <div className="text-center flex-shrink-0">
+                  <span className="text-3xl font-black" style={{ color: ms.rank === 'S' ? C.rose.hex : '#fbbf24', fontFamily: 'Orbitron, sans-serif', textShadow: '0 0 18px rgba(251,191,36,0.5)' }}>{ms.rank}</span>
+                  <p className="text-[8px] font-mono tracking-widest" style={{ color: '#6b7280' }}>RANGO GLOBALE</p>
+                </div>
+              </div>
+              <div className="h-1.5 rounded-full overflow-hidden mt-3" style={{ background: 'rgba(55,65,81,0.5)' }}>
+                <div className="h-full rounded-full" style={{ background: 'linear-gradient(90deg, #fbbf24, #a855f7)', width: `${Math.max(1, Math.round(ms.frac * 100))}%`, boxShadow: '0 0 8px rgba(251,191,36,0.4)' }} />
+              </div>
+              {todayCurr && (
+                <div className="flex items-center gap-2 mt-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[10px] font-bold" style={{ color: '#6b7280' }}>⚔️ OGGI IL TRONO CHIAMA</p>
+                    <p className="text-xs font-black text-white truncate">{todayCurr.emoji} {todayCurr.name}{(() => { const o = nextObjective(today); return o && !o.levelComplete ? ` — ${o.topic}` : o?.levelComplete ? ' — esame milestone' : ''; })()}</p>
+                  </div>
+                  <motion.button whileTap={{ scale: 0.95 }}
+                    onClick={() => {
+                      const o = nextObjective(today);
+                      setPendingLive({ mode: today, context: o && !o.levelComplete ? `Obiettivo del percorso: imparare "${o.topic}" (livello ${o.level.label}). Guida drill e correzioni su QUESTO argomento.` : `Sessione di ${todayCurr.name} decisa dal percorso.` });
+                      onGoLive?.();
+                    }}
+                    className="px-3 py-2 rounded-xl text-xs font-black flex-shrink-0"
+                    style={{ background: 'linear-gradient(135deg, rgba(251,191,36,0.25), rgba(251,191,36,0.1))', color: '#fbbf24', border: '1px solid rgba(251,191,36,0.4)' }}>
+                    📷 Rispondi
+                  </motion.button>
+                </div>
+              )}
+              {avgSk && (
+                <div className="flex items-center gap-3 mt-2">
+                  <SkillRadar skills={avgSk} size={130} />
+                  <p className="text-[10px] leading-snug flex-1" style={{ color: '#6b7280' }}>
+                    Il tuo profilo da guerriero: media delle ultime sessioni valutate dal Maestro. Le lacune si vedono — e si allenano.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Header */}
       <div className="relative rounded-2xl overflow-hidden"
         style={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.12), rgba(79,70,229,0.06))', border: `1px solid ${C.violet.border}` }}>
@@ -2838,6 +2972,17 @@ function VisualCoach() {
       { c: 'Multi-aggressore: Linea-Colpo-Fuga', lvl: 'avanzato', focus: 'difesa' },
       { c: 'Rialzo Tattico-Palm Strike-Ginocchiata-Fuga', lvl: 'avanzato', focus: 'potenza' },
     ],
+    kalaripayattu: [
+      { c: 'Chuvadu-Vadivu Leone', lvl: 'base', focus: 'difesa' },
+      { c: 'Kaal Eduppu-Affondo', lvl: 'base', focus: 'velocità' },
+      { c: 'Vadivu Elefante-Colpo di Palmo', lvl: 'base', focus: 'potenza' },
+      { c: 'Chuvadu-Salto-Abbassata', lvl: 'base', focus: 'velocità' },
+      { c: 'Meippayattu: Apertura-Chiusura', lvl: 'intermedio', focus: 'difesa' },
+      { c: 'Calcio Alto-Rotazione-Vadivu', lvl: 'intermedio', focus: 'potenza' },
+      { c: 'Abbassata-Sweep-Rialzo', lvl: 'intermedio', focus: 'counter' },
+      { c: 'Salto-Calcio-Atterraggio in Vadivu', lvl: 'avanzato', focus: 'potenza' },
+      { c: 'Sequenza Fluida: 3 Vadivu concatenati', lvl: 'avanzato', focus: 'difesa' },
+    ],
     // ── Grappling / lotta a terra ──────────────────────────────────────────
     bjj: [
       { c: 'Guardia-Kimura', lvl: 'base', focus: 'clinch' },
@@ -3578,6 +3723,7 @@ function VisualCoach() {
       });
       const data = await r.json();
       if (r.ok && data.report) {
+        if (data.report.skills) pushSkillsHistory(discipline, data.report.skills); // trend competenze
         // Esame milestone: >=75 = PROMOSSO → salva il diploma e sblocca il grado
         let examOutcome = null;
         if (exam) {
