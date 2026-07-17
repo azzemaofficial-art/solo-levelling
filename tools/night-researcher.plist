@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.sololevelling.research.night</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/local/bin/node</string>
+        <string>/Users/emanueleazzini/Library/Application Support/sololevelling/night-researcher.mjs</string>
+        <string>--limit</string>
+        <string>12</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/emanueleazzini/Library/Application Support/sololevelling</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    </dict>
+
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>1</integer>
+        <key>Minute</key>
+        <integer>0</integer>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>/tmp/sololevelling-research.log</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/sololevelling-research.log</string>
+
+    <key>RunAtLoad</key>
+    <false/>
+</dict>
+</plist>
