@@ -73,13 +73,27 @@ const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
 // lo satura e le richieste tornano 429. Riprova con attesa crescente invece di
 // perdere il paper in silenzio (prima falliva senza nemmeno dire perché).
 async function distill(title, text, attempt = 0) {
-  const r = await fetch(`${BASE}/api/ai/chat`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: DISTILL_MODEL, messages: [
-      { role: 'system', content: 'Sei uno scienziato della nutrizione e dello sport. Distilli un paper in PRINCIPI azionabili, concreti e specifici (con numeri/soglie quando ci sono). Niente fronzoli, niente "potrebbe": solo ciò che il paper supporta. Scrivi in ITALIANO CORRETTO e scorrevole: frasi complete, nessun refuso, nessuna parola troncata o abbreviata, nessun anglicismo inventato. Rispondi SOLO con JSON valido: {"topic":"area breve","principles":["frase azionabile 1","frase 2", ...]} — da 5 a 10 principi, in italiano, ognuno autosufficiente.' },
-      { role: 'user', content: `TITOLO: ${title}\n\nTESTO (estratto):\n${text.slice(0, MAX_CHARS)}` },
-    ] }),
-  });
+  let r;
+  try {
+    r = await fetch(`${BASE}/api/ai/chat`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: DISTILL_MODEL, messages: [
+        { role: 'system', content: 'Sei uno scienziato della nutrizione e dello sport. Distilli un paper in PRINCIPI azionabili, concreti e specifici (con numeri/soglie quando ci sono). Niente fronzoli, niente "potrebbe": solo ciò che il paper supporta. Scrivi in ITALIANO CORRETTO e scorrevole: frasi complete, nessun refuso, nessuna parola troncata o abbreviata, nessun anglicismo inventato. Rispondi SOLO con JSON valido: {"topic":"area breve","principles":["frase azionabile 1","frase 2", ...]} — da 5 a 10 principi, in italiano, ognuno autosufficiente.' },
+        { role: 'user', content: `TITOLO: ${title}\n\nTESTO (estratto):\n${text.slice(0, MAX_CHARS)}` },
+      ] }),
+    });
+  } catch (netErr) {
+    // Errore di rete ("fetch failed"): NON deve uccidere l'intero batch. Riprova
+    // con attesa crescente, poi salta il paper (resta non-processato → ritentabile).
+    if (attempt < 4) {
+      const wait = 8000 * (attempt + 1);
+      process.stdout.write(` (rete KO, riprovo tra ${wait / 1000}s…)`);
+      await sleep(wait);
+      return distill(title, text, attempt + 1);
+    }
+    process.stdout.write(` [rete: ${String(netErr.message).slice(0, 40)}]`);
+    return null;
+  }
   if (!r.ok) {
     if ((r.status === 429 || r.status >= 500) && attempt < 4) {
       const wait = 8000 * (attempt + 1);
@@ -206,21 +220,28 @@ async function main() {
   let added = 0;
 
   for (const f of files) {
-    const full = path.join(PAPERS, f);
-    const text = readPaper(full);
-    if (!text || text.trim().length < 200) { console.log(`⏭️  ${f} — illeggibile o troppo corto, salto.`); continue; }
-    const hash = crypto.createHash('md5').update(text).digest('hex').slice(0, 12);
-    if (known.has(f + ':' + hash)) { console.log(`✓ ${f} — già elaborato.`); continue; }
-    const title = path.basename(f, path.extname(f)).replace(/[_-]+/g, ' ');
-    process.stdout.write(`🧪 Distillo "${title}"… `);
-    const out = await distill(title, text);
-    if (!out) { console.log('fallito (AI), riprova più tardi.'); continue; }
-    man.sources = man.sources.filter((s) => s.file !== f); // rimpiazza versioni vecchie dello stesso file
-    man.sources.push({ file: f, title, topic: out.topic, hash, count: out.principles.length, processedAt: new Date().toISOString() });
-    man.principles.push(...out.principles);
-    added += out.principles.length;
-    console.log(`+${out.principles.length} principi.`);
-    await sleep(4000); // respira: non saturare il limite di token/minuto dell'AI gratuita
+    try {
+      const full = path.join(PAPERS, f);
+      const text = readPaper(full);
+      if (!text || text.trim().length < 200) { console.log(`⏭️  ${f} — illeggibile o troppo corto, salto.`); continue; }
+      const hash = crypto.createHash('md5').update(text).digest('hex').slice(0, 12);
+      if (known.has(f + ':' + hash)) { console.log(`✓ ${f} — già elaborato.`); continue; }
+      const title = path.basename(f, path.extname(f)).replace(/[_-]+/g, ' ');
+      process.stdout.write(`🧪 Distillo "${title}"… `);
+      const out = await distill(title, text);
+      if (!out) { console.log('fallito (AI), riprova più tardi.'); continue; }
+      man.sources = man.sources.filter((s) => s.file !== f); // rimpiazza versioni vecchie dello stesso file
+      man.sources.push({ file: f, title, topic: out.topic, hash, count: out.principles.length, processedAt: new Date().toISOString() });
+      man.principles.push(...out.principles);
+      added += out.principles.length;
+      console.log(`+${out.principles.length} principi.`);
+      // salva il manifest a ogni successo: se il processo muore, i paper già fatti non si riperdono
+      man.principles = dedup(man.principles.map(fixTypos)).slice(-MAX_PRINCIPLES);
+      saveManifest(man);
+      await sleep(4000); // respira: non saturare il limite di token/minuto dell'AI gratuita
+    } catch (loopErr) {
+      console.log(`⚠️  ${f} — errore imprevisto (${String(loopErr.message).slice(0, 50)}), continuo.`);
+    }
   }
 
   man.principles = dedup(man.principles.map(fixTypos)).slice(-MAX_PRINCIPLES);
