@@ -136,6 +136,45 @@ const SEED = [
   { q: 'mindfulness meditation telomeres cortisol', slug: 'mindfulness-telomeri', tag: 'salute' },
   { q: 'slow breathing HRV blood pressure resonance', slug: 'respiro-lento-hrv', tag: 'salute' },
   { q: 'women exercise dose mortality benefit sex difference', slug: 'donne-esercizio-mortalita', tag: 'salute' },
+
+  // — Nutrizione pratica & ricette (interesse utente) —
+  { q: 'protein satiety appetite meal high protein', slug: 'proteine-sazieta-appetito', tag: 'nutrizione' },
+  { q: 'cooking method nutrient retention vegetables', slug: 'cottura-ritenzione-nutrienti', tag: 'nutrizione' },
+  { q: 'resistant starch cooling potato rice glycemic', slug: 'amido-resistente-glicemia', tag: 'nutrizione' },
+  { q: 'spices cinnamon ginger metabolic glycemic', slug: 'spezie-metabolismo', tag: 'nutrizione' },
+  { q: 'meal frequency snacking weight metabolic health', slug: 'frequenza-pasti-peso', tag: 'nutrizione' },
+  { q: 'egg consumption cholesterol cardiovascular breakfast', slug: 'uova-colesterolo-colazione', tag: 'nutrizione' },
+  { q: 'whole grains cardiometabolic mortality cohort', slug: 'cereali-integrali-salute', tag: 'nutrizione' },
+  { q: 'dietary calcium absorption bioavailability', slug: 'calcio-biodisponibilita', tag: 'nutrizione' },
+  { q: 'hydration water intake health cognition kidney', slug: 'idratazione-acqua-salute', tag: 'nutrizione' },
+  { q: 'olive oil consumption mortality cardiovascular dose', slug: 'olio-oliva-mortalita', tag: 'nutrizione' },
+  { q: 'yogurt dairy fermented metabolic health', slug: 'yogurt-latticini-salute', tag: 'nutrizione' },
+  { q: 'dark chocolate cocoa blood pressure endothelial', slug: 'cioccolato-fondente-pressione', tag: 'nutrizione' },
+
+  // — Sonno (interesse utente) —
+  { q: 'warm bath shower before bed sleep onset temperature', slug: 'bagno-caldo-sonno', tag: 'salute' },
+  { q: 'bedroom temperature thermal sleep quality', slug: 'temperatura-camera-sonno', tag: 'salute' },
+  { q: 'sleep position side back health apnea', slug: 'posizione-sonno-salute', tag: 'salute' },
+  { q: 'breathing technique 4-7-8 sleep onset relaxation', slug: 'respiro-478-sonno', tag: 'salute' },
+  { q: 'weekend catch-up sleep debt metabolic recovery', slug: 'recupero-sonno-weekend', tag: 'salute' },
+  { q: 'chronotype meal timing metabolic health alignment', slug: 'cronotipo-orari-salute', tag: 'salute' },
+
+  // — Energia & vitalità (interesse utente) —
+  { q: 'glycemic dips postprandial energy hunger PREDICT', slug: 'crolli-glicemici-energia', tag: 'salute' },
+  { q: 'mild dehydration fatigue attention mood', slug: 'disidratazione-fatica', tag: 'salute' },
+  { q: 'daytime bright light alertness cognition', slug: 'luce-diurna-vigilanza', tag: 'salute' },
+  { q: 'microbreaks work fatigue vigor productivity', slug: 'micro-pause-energia', tag: 'salute' },
+  { q: 'postprandial somnolence food coma glycemic load', slug: 'sonnolenza-postprandiale', tag: 'salute' },
+  { q: 'non-anemic iron deficiency ferritin fatigue athletes', slug: 'ferritina-bassa-fatica', tag: 'salute' },
+
+  // — Abitudini & vita (interesse utente) —
+  { q: 'habit formation time automaticity behavior', slug: 'formazione-abitudini', tag: 'salute' },
+  { q: 'cyclic sighing physiological sigh stress mood', slug: 'sospiro-ciclico-stress', tag: 'salute' },
+  { q: 'screen time reduction mood wellbeing trial', slug: 'riduzione-schermi-umore', tag: 'salute' },
+  { q: 'spacing effect distributed practice memory learning', slug: 'spacing-effect-memoria', tag: 'salute' },
+  { q: 'implementation intentions habit stacking behavior change', slug: 'habit-stacking-intenzioni', tag: 'salute' },
+  { q: 'brief mindfulness dose attention stress acute', slug: 'mindfulness-dose-minima', tag: 'salute' },
+  { q: 'posture upright mood energy affect', slug: 'postura-umore-energia', tag: 'salute' },
 ];
 
 // ─── UTILITÀ ─────────────────────────────────────────────────────────────────
