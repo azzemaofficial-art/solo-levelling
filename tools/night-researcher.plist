@@ -11,6 +11,7 @@
         <string>/Users/emanueleazzini/Library/Application Support/sololevelling/night-researcher.mjs</string>
         <string>--limit</string>
         <string>12</string>
+        <string>--distill</string>
     </array>
 
     <key>WorkingDirectory</key>

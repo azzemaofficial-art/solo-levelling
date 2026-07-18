@@ -19,7 +19,9 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const REPO = path.resolve(__dirname, '..');
+// Repo reale (per trovare knowledge.mjs): quando lo script gira dalla copia locale
+// fuori iCloud, __dirname non è il repo → punta esplicitamente al repo in iCloud.
+const REPO = process.env.RESEARCH_REPO || '/Users/emanueleazzini/Library/Mobile Documents/com~apple~CloudDocs/solo levelling';
 const VAULT = process.env.HIVE_VAULT || '/Users/emanueleazzini/Library/Mobile Documents/iCloud~md~obsidian/Documents/brain/progetti/shadow-coach';
 const PAPERS = path.join(VAULT, 'papers');
 const SEEN = path.join(PAPERS, '.night-seen.json');

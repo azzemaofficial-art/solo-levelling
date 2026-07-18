@@ -21,7 +21,9 @@ const PAPERS = path.join(VAULT, 'papers');
 const MANIFEST = path.join(PAPERS, '.processed.json');
 const LIB_OUT = path.join(REPO, 'lib', 'knowledgeBase.js');
 const MEM_OUT = path.join(VAULT, 'memorie', 'scienza-nutrizione.md');
-const MAX_PRINCIPLES = 700;
+const MAX_PRINCIPLES = 1200; // alzato da 700: i ~150 paper producono più principi e il
+// retrieval (knowledgePromptFor) inietta solo i top pertinenti, quindi il cap alto non
+// gonfia i prompt — evita solo di buttare principi validi quando la base cresce.
 const MAX_CHARS = 18000; // quanto testo del paper passare all'AI
 // Modello per la distillazione: serve uno grosso che produca JSON valido in modo
 // affidabile. Senza questo, la catena di fallback ripiegava su llama-3.1-8b, che
