@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { motion } from 'framer-motion';
+import { createPortal } from 'react-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import { playSfx } from '../utils/sfx';
 import { speakEvent } from '../utils/voice';
 import AnimeStrip from '../components/AnimeStrip';
@@ -400,6 +401,12 @@ const SystemHub = ({ systemLogs, setSystemLogs, dailyGoal, setDailyGoal, hydrati
   const [aiModelGlobal, setAiModelGlobal] = useState(() => getGlobalModel());
   const [aiModelMeal, setAiModelMeal] = useState(() => getTaskOverride('meal'));
   const [aiModelRecipe, setAiModelRecipe] = useState(() => getTaskOverride('recipe'));
+  // ── Calendario del Destino: forgia N ricette in un colpo (batch a lotti, reveal mystery) ──
+  const [showForgeControls, setShowForgeControls] = useState(false);
+  const [forgeMealType, setForgeMealType] = useState('colazione');
+  const [forgeCountInput, setForgeCountInput] = useState('7');
+  const [forgeBatch, setForgeBatch] = useState(null); // {total, mealType, cards:[], done, generating, error}
+  const [forgeDetailCardId, setForgeDetailCardId] = useState(null);
   const [aiModelProfile, setAiModelProfile] = useState(() => getTaskOverride('profile'));
   // Analisi profilo profonda (Nemotron)
   const [profileAnalysis, setProfileAnalysis] = useState(() => {
@@ -2869,35 +2876,29 @@ Italiano, conciso, niente markdown pesante. Dosi concrete (anche per ${pesoKg}kg
     }
   };
 
-  const generateRecipeFromPrompt = async (autoMode = false) => {
-    if (isGeneratingRecipe) return;
-    const prompt = String(recipePrompt || '').trim();
-    if (!autoMode && !prompt) {
-      emitUiToast({ message: 'Scrivi cosa vuoi o premi "Sorprendimi"', tone: 'warning', durationMs: 2400 });
-      return;
-    }
-    setIsGeneratingRecipe(true);
-    try {
-      const kcalResidui = Math.max(0, Math.round(Number(effectiveDailyGoal || dailyGoal || 2400) - Number(todayData.consumed || 0)));
-      const protResidui = Math.max(0, Math.round(Number(adaptiveMacroTargets?.protein || macroGoals?.protein || 150) - Number(todayData.protein || 0)));
-      const carbResidui = Math.max(0, Math.round(Number(adaptiveMacroTargets?.carbs || macroGoals?.carbs || 200) - Number(todayData.carbs || 0)));
-      const fatResidui = Math.max(0, Math.round(Number(adaptiveMacroTargets?.fats || macroGoals?.fats || 60) - Number(todayData.fatMacros || 0)));
-      const isTrainingDay = playerStats?.lastWorkoutDate === new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit' }) || Number(todayData?.workoutBurn ?? todayData?.burned ?? 0) > 100;
-      const hourNow = new Date().getHours();
-      const mealMoment = hourNow < 10 ? 'colazione' : hourNow < 14 ? 'pranzo' : hourNow < 18 ? 'spuntino pomeridiano' : 'cena';
-      const last7 = systemLogs.slice(-7);
-      const avgProt7 = last7.length ? Math.round(last7.reduce((s, l) => s + Number(l.protein || 0), 0) / last7.length) : 0;
-      const avgKcal7 = last7.length ? Math.round(last7.reduce((s, l) => s + Number(l.consumed || 0), 0) / last7.length) : 0;
-      const trainDays7 = last7.filter((l) => Number(l.workoutBurn ?? l.burned ?? 0) > 100).length;
-      const pesoKg = Number(playerStats?.currentWeightKg || todayData?.weight || 0) || Number([...systemLogs].reverse().find((l) => l.weight > 0)?.weight || 70);
-      const altezzaCm = Number(playerStats?.heightCm || metabolicProfile?.heightCm || 178);
-      const bmi = altezzaCm > 0 ? (pesoKg / ((altezzaCm / 100) ** 2)).toFixed(1) : '?';
-      const eta = playerStats?.age || metabolicProfile?.age || 25;
-      const sesso = playerStats?.sex || metabolicProfile?.sex || 'male';
-      const pesoTarget = playerStats?.bodyGoal?.targetWeightKg;
-      const deltaKg = pesoTarget ? (pesoKg - pesoTarget).toFixed(1) : null;
+  // Contesto condiviso (profilo + preferenze) per ogni generazione ricetta — riusato
+  // sia dalla ricetta singola sia dal Calendario del Destino (batch multiplo).
+  const computeRecipeContext = () => {
+    const kcalResidui = Math.max(0, Math.round(Number(effectiveDailyGoal || dailyGoal || 2400) - Number(todayData.consumed || 0)));
+    const protResidui = Math.max(0, Math.round(Number(adaptiveMacroTargets?.protein || macroGoals?.protein || 150) - Number(todayData.protein || 0)));
+    const carbResidui = Math.max(0, Math.round(Number(adaptiveMacroTargets?.carbs || macroGoals?.carbs || 200) - Number(todayData.carbs || 0)));
+    const fatResidui = Math.max(0, Math.round(Number(adaptiveMacroTargets?.fats || macroGoals?.fats || 60) - Number(todayData.fatMacros || 0)));
+    const isTrainingDay = playerStats?.lastWorkoutDate === new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit' }) || Number(todayData?.workoutBurn ?? todayData?.burned ?? 0) > 100;
+    const hourNow = new Date().getHours();
+    const mealMoment = hourNow < 10 ? 'colazione' : hourNow < 14 ? 'pranzo' : hourNow < 18 ? 'spuntino pomeridiano' : 'cena';
+    const last7 = systemLogs.slice(-7);
+    const avgProt7 = last7.length ? Math.round(last7.reduce((s, l) => s + Number(l.protein || 0), 0) / last7.length) : 0;
+    const avgKcal7 = last7.length ? Math.round(last7.reduce((s, l) => s + Number(l.consumed || 0), 0) / last7.length) : 0;
+    const trainDays7 = last7.filter((l) => Number(l.workoutBurn ?? l.burned ?? 0) > 100).length;
+    const pesoKg = Number(playerStats?.currentWeightKg || todayData?.weight || 0) || Number([...systemLogs].reverse().find((l) => l.weight > 0)?.weight || 70);
+    const altezzaCm = Number(playerStats?.heightCm || metabolicProfile?.heightCm || 178);
+    const bmi = altezzaCm > 0 ? (pesoKg / ((altezzaCm / 100) ** 2)).toFixed(1) : '?';
+    const eta = playerStats?.age || metabolicProfile?.age || 25;
+    const sesso = playerStats?.sex || metabolicProfile?.sex || 'male';
+    const pesoTarget = playerStats?.bodyGoal?.targetWeightKg;
+    const deltaKg = pesoTarget ? (pesoKg - pesoTarget).toFixed(1) : null;
 
-      const profileCtx = `PROFILO SHADOW HUNTER COMPLETO:
+    const profileCtx = `PROFILO SHADOW HUNTER COMPLETO:
 - Obiettivo: ${playerStats?.objective || 'recomp'} | Livello ${playerStats?.level || 1} | Streak ${playerStats?.streak || 0}gg
 - Dati fisici: ${pesoKg}kg | ${altezzaCm}cm | BMI ${bmi} | ${eta} anni | ${sesso === 'male' ? 'uomo' : 'donna'}
 ${deltaKg ? `- Obiettivo peso: ${pesoTarget}kg (${Number(deltaKg) > 0 ? '-' : '+'}${Math.abs(deltaKg)}kg da raggiungere)` : ''}
@@ -2908,18 +2909,32 @@ ${deltaKg ? `- Obiettivo peso: ${pesoTarget}kg (${Number(deltaKg) > 0 ? '-' : '+
 - Media 7gg: ${avgKcal7} kcal/die | ${avgProt7}g prot/die (target ${Math.round(Number(adaptiveMacroTargets?.protein || macroGoals?.protein || 150))}g)
 - Kcal target giornaliero: ${Math.round(Number(effectiveDailyGoal || dailyGoal || 2400))} kcal`;
 
-      // Preferenze alimentari — le allergie sono un vincolo di SICUREZZA, mai un suggerimento.
-      const prefLines = [];
-      if (foodPrefs.allergies?.trim()) prefLines.push(`- ⚠️ ALLERGIE (VINCOLO ASSOLUTO, NON NEGOZIABILE): ${foodPrefs.allergies.trim()} — NON usare questi ingredienti in NESSUNA forma, nemmeno tracce o derivati. Se un ingrediente li contiene, escludilo e basta.`);
-      if (foodPrefs.diet?.trim()) prefLines.push(`- Regime alimentare (vincolo): ${foodPrefs.diet.trim()}`);
-      if (foodPrefs.dislikes?.trim()) prefLines.push(`- Non gradisce (evita fortemente): ${foodPrefs.dislikes.trim()}`);
-      if (foodPrefs.likes?.trim()) prefLines.push(`- Preferisce/adora (favorisci quando ha senso): ${foodPrefs.likes.trim()}`);
-      if (foodPrefs.cuisine?.trim()) prefLines.push(`- Stile di cucina preferito: ${foodPrefs.cuisine.trim()}`);
-      if (foodPrefs.spice && foodPrefs.spice !== 'normale') prefLines.push(`- Livello piccantezza: ${foodPrefs.spice}`);
-      if (foodPrefs.maxPrepMin > 0) prefLines.push(`- Tempo totale (prep+cottura) MASSIMO: ${foodPrefs.maxPrepMin} minuti — non superarlo`);
-      const affinity = computeFoodAffinity();
-      if (affinity) prefLines.push(`- TENDENZE OSSERVATE (soft, mai un vincolo — usale solo se coerenti con la richiesta): ${affinity}`);
-      const prefsCtx = prefLines.length ? `\n\nPREFERENZE ALIMENTARI:\n${prefLines.join('\n')}` : '';
+    // Preferenze alimentari — le allergie sono un vincolo di SICUREZZA, mai un suggerimento.
+    const prefLines = [];
+    if (foodPrefs.allergies?.trim()) prefLines.push(`- ⚠️ ALLERGIE (VINCOLO ASSOLUTO, NON NEGOZIABILE): ${foodPrefs.allergies.trim()} — NON usare questi ingredienti in NESSUNA forma, nemmeno tracce o derivati. Se un ingrediente li contiene, escludilo e basta.`);
+    if (foodPrefs.diet?.trim()) prefLines.push(`- Regime alimentare (vincolo): ${foodPrefs.diet.trim()}`);
+    if (foodPrefs.dislikes?.trim()) prefLines.push(`- Non gradisce (evita fortemente): ${foodPrefs.dislikes.trim()}`);
+    if (foodPrefs.likes?.trim()) prefLines.push(`- Preferisce/adora (favorisci quando ha senso): ${foodPrefs.likes.trim()}`);
+    if (foodPrefs.cuisine?.trim()) prefLines.push(`- Stile di cucina preferito: ${foodPrefs.cuisine.trim()}`);
+    if (foodPrefs.spice && foodPrefs.spice !== 'normale') prefLines.push(`- Livello piccantezza: ${foodPrefs.spice}`);
+    if (foodPrefs.maxPrepMin > 0) prefLines.push(`- Tempo totale (prep+cottura) MASSIMO: ${foodPrefs.maxPrepMin} minuti — non superarlo`);
+    const affinity = computeFoodAffinity();
+    if (affinity) prefLines.push(`- TENDENZE OSSERVATE (soft, mai un vincolo — usale solo se coerenti con la richiesta): ${affinity}`);
+    const prefsCtx = prefLines.length ? `\n\nPREFERENZE ALIMENTARI:\n${prefLines.join('\n')}` : '';
+
+    return { profileCtx, prefsCtx, mealMoment };
+  };
+
+  const generateRecipeFromPrompt = async (autoMode = false) => {
+    if (isGeneratingRecipe) return;
+    const prompt = String(recipePrompt || '').trim();
+    if (!autoMode && !prompt) {
+      emitUiToast({ message: 'Scrivi cosa vuoi o premi "Sorprendimi"', tone: 'warning', durationMs: 2400 });
+      return;
+    }
+    setIsGeneratingRecipe(true);
+    try {
+      const { profileCtx, prefsCtx } = computeRecipeContext();
 
       const systemPrompt = `Sei uno chef nutrizionale d'élite specializzato in FITPORN — cibo che è allo stesso tempo ESTETICAMENTE PERFETTO e ultra-ottimizzato per le performance atletiche. Le tue ricette devono far venire l'acquolina in bocca solo a leggerle.
 
@@ -3043,6 +3058,147 @@ Rispondi SOLO JSON valido:
       return parts.join(' · ');
     } catch { return ''; }
   };
+
+  // ── Calendario del Destino: "prepara 7 ricette di colazione" / "sorprendimi con 30 pranzi" ──
+  // Riconosce in testo libero un numero (1-365) + un pasto, per lanciare la forgiatura a lotti
+  // invece della singola ricetta. Puro: nessuna dipendenza da stato del componente.
+  const parseForgeIntent = (text) => {
+    const t = String(text || '').trim();
+    if (!t) return null;
+    const m = t.match(/(\d{1,3})\s*(?:ricett[ae]\s*(?:di\s*)?)?(colazion\w*|pranz\w*|cen\w*|spuntin\w*)/i);
+    if (!m) return null;
+    const count = Math.max(1, Math.min(365, parseInt(m[1], 10) || 0));
+    if (!count) return null;
+    const w = m[2].toLowerCase();
+    const mealType = w.startsWith('colazion') ? 'colazione' : w.startsWith('pranz') ? 'pranzo' : w.startsWith('cen') ? 'cena' : 'spuntino';
+    return { count, mealType };
+  };
+
+  // Estrae il primo array JSON valido da una risposta AI grezza (parseModelJson gestisce solo
+  // oggetti singoli {...}); qui serve un array [...] di N ricette-teaser in un colpo solo.
+  const parseModelJsonArray = (data) => {
+    const raw = String(data?.choices?.[0]?.message?.content || '').replace(/```json/gi, '').replace(/```/g, '').trim();
+    const start = raw.indexOf('[');
+    const end = raw.lastIndexOf(']');
+    if (start === -1 || end === -1 || end <= start) throw new Error('Risposta AI non valida (array mancante)');
+    const parsed = JSON.parse(raw.slice(start, end + 1));
+    if (!Array.isArray(parsed)) throw new Error('Risposta AI non valida (non è un array)');
+    return parsed;
+  };
+
+  const FORGE_MEAL_LABELS = { colazione: 'colazioni', pranzo: 'pranzi', cena: 'cene', spuntino: 'spuntini' };
+
+  // Forgia N ricette-teaser (titolo, tagline, macro, tempo) a lotti da max 15 per chiamata,
+  // aggiornando la UI dopo ogni lotto — così il "Calendario del Destino" si popola dal vivo
+  // mentre il resto è ancora "chiuso" in attesa. I dettagli completi (ingredienti/step) si
+  // generano solo quando l'utente apre una singola card (lazy), per non sprecare token su
+  // ricette che magari non aprirà mai.
+  const startRecipeForge = async (mealType, count) => {
+    const total = Math.max(1, Math.min(365, Math.round(Number(count) || 0)));
+    setShowForgeControls(false);
+    setForgeBatch({ total, mealType, cards: [], generating: true, error: null });
+    playSfx('success', soundEnabled, soundTheme);
+    const { profileCtx, prefsCtx } = computeRecipeContext();
+    const cards = [];
+    const CHUNK = 15;
+    try {
+      while (cards.length < total) {
+        const chunkSize = Math.min(CHUNK, total - cards.length);
+        const avoidTitles = cards.map((c) => c.title).slice(-40);
+        const systemPrompt = `Sei uno chef nutrizionale d'élite specializzato in FITPORN — cibo esteticamente perfetto e ottimizzato per le performance atletiche.
+Genera un ELENCO di ricette-TEASER (non la ricetta completa: solo titolo, tagline e macro stimati) per "${mealType}".
+Ogni ricetta deve essere DIVERSA dalle altre (ingrediente principale, stile o preparazione differenti) e rispettare SEMPRE le eventuali allergie indicate (vincolo assoluto di sicurezza).
+Rispondi SOLO con un array JSON valido di esattamente ${chunkSize} oggetti, in questo formato:
+[{"title":"string epico","emoji":"emoji","tagline":"string appetitosa max 12 parole","kcal":numero,"protein":numero,"carbs":numero,"fat":numero,"prepMin":numero,"difficulty":"facile|medio|avanzato"}]`;
+        const userMsg = `${profileCtx}${prefsCtx}\n\nGenera esattamente ${chunkSize} ricette DIVERSE tra loro per ${mealType}.${avoidTitles.length ? `\nNon ripetere questi titoli già usati: ${avoidTitles.join(', ')}.` : ''}`;
+        const data = await requestSystemAI({
+          model: getModelFor('recipe') || undefined,
+          temperature: 0.95,
+          max_tokens: Math.min(4000, 260 * chunkSize + 200),
+          timeoutMs: 32000,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userMsg },
+          ],
+        });
+        const rawItems = parseModelJsonArray(data);
+        rawItems.slice(0, chunkSize).forEach((item, i) => {
+          cards.push({
+            id: `${Date.now()}-${cards.length}-${i}`,
+            title: String(item?.title || 'Ricetta misteriosa').slice(0, 80),
+            emoji: String(item?.emoji || '🍽️').slice(0, 8),
+            tagline: String(item?.tagline || '').slice(0, 120),
+            kcal: Math.max(0, Math.round(Number(item?.kcal || 0))),
+            protein: Math.max(0, Math.round(Number(item?.protein || 0))),
+            carbs: Math.max(0, Math.round(Number(item?.carbs || 0))),
+            fat: Math.max(0, Math.round(Number(item?.fat || 0))),
+            prepMin: Math.max(0, Math.min(120, Math.round(Number(item?.prepMin || 15)))),
+            difficulty: ['facile', 'medio', 'avanzato'].includes(item?.difficulty) ? item.difficulty : 'facile',
+            revealed: false,
+            full: null,
+            loadingFull: false,
+          });
+        });
+        setForgeBatch({ total, mealType, cards: [...cards], generating: cards.length < total, error: null });
+        if (!rawItems.length) break; // AI non ha prodotto nulla di utile: evita loop infinito
+      }
+      playSfx('success', soundEnabled, soundTheme);
+      emitUiToast({ message: `📜 Calendario pronto: ${cards.length} ${FORGE_MEAL_LABELS[mealType] || 'ricette'} ti aspettano`, tone: 'success', durationMs: 3600 });
+    } catch (error) {
+      const detail = formatAiErrorDetail(error?.message || 'errore forge').slice(0, 90);
+      setForgeBatch((prev) => prev ? { ...prev, generating: false, error: detail } : prev);
+      playSfx('warning', soundEnabled, soundTheme);
+    }
+  };
+
+  const revealForgeCard = (cardId) => {
+    setForgeBatch((prev) => prev ? { ...prev, cards: prev.cards.map((c) => c.id === cardId ? { ...c, revealed: true } : c) } : prev);
+    playSfx('success', soundEnabled, soundTheme);
+  };
+
+  // Apre il dettaglio completo di UNA carta: se non ancora generato, chiede all'AI ingredienti
+  // e procedimento COERENTI con il teaser già mostrato (stesso titolo/macro), poi apre la modale.
+  const openForgeCardFull = async (cardId) => {
+    const card = forgeBatch?.cards?.find((c) => c.id === cardId);
+    if (!card) return;
+    if (card.full) { setForgeDetailCardId(cardId); return; }
+    setForgeBatch((prev) => prev ? { ...prev, cards: prev.cards.map((c) => c.id === cardId ? { ...c, loadingFull: true } : c) } : prev);
+    try {
+      const { profileCtx, prefsCtx } = computeRecipeContext();
+      const systemPrompt = `Sei uno chef nutrizionale d'élite specializzato in FITPORN. Devi completare una ricetta il cui titolo, tagline e macro sono GIÀ decisi: crea ingredienti e procedimento coerenti con quei valori, senza cambiarli.
+VINCOLO ASSOLUTO DI SICUREZZA: rispetta sempre le eventuali allergie indicate.
+Rispondi SOLO JSON valido:
+{"ingredients":[{"item":"string","amount":"string"}],"steps":["string con emoji"],"notes":"string hack nutrizionale","fitScore":numero_1_10}`;
+      const userMsg = `${profileCtx}${prefsCtx}\n\nCompleta questa ricetta per ${forgeBatch.mealType}: "${card.title}" — ${card.tagline}\nMacro da rispettare: ${card.kcal}kcal, ${card.protein}g proteine, ${card.carbs}g carboidrati, ${card.fat}g grassi, tempo totale ~${card.prepMin} minuti, difficoltà ${card.difficulty}.`;
+      const data = await requestSystemAI({
+        model: getModelFor('recipe') || undefined,
+        temperature: 0.7,
+        max_tokens: 700,
+        timeoutMs: 28000,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userMsg },
+        ],
+      });
+      const parsed = parseModelJson(data);
+      const full = {
+        ingredients: Array.isArray(parsed?.ingredients)
+          ? parsed.ingredients.map((x) => typeof x === 'string' ? { item: x, amount: '' } : x).filter((x) => x?.item).slice(0, 16)
+          : [],
+        steps: Array.isArray(parsed?.steps) ? parsed.steps.map((x) => String(x || '').trim()).filter(Boolean).slice(0, 10) : [],
+        notes: String(parsed?.notes || '').slice(0, 280),
+        fitScore: Math.min(10, Math.max(1, Math.round(Number(parsed?.fitScore || 7)))),
+      };
+      setForgeBatch((prev) => prev ? { ...prev, cards: prev.cards.map((c) => c.id === cardId ? { ...c, full, loadingFull: false } : c) } : prev);
+      setForgeDetailCardId(cardId);
+    } catch (error) {
+      const detail = formatAiErrorDetail(error?.message || 'errore ricetta').slice(0, 90);
+      setForgeBatch((prev) => prev ? { ...prev, cards: prev.cards.map((c) => c.id === cardId ? { ...c, loadingFull: false } : c) } : prev);
+      emitUiToast({ message: `Dettaglio fallito (${detail})`, tone: 'warning', durationMs: 4200 });
+    }
+  };
+
+  const closeForgeBatch = () => { setForgeBatch(null); setForgeDetailCardId(null); };
 
   const saveBodyCompositionGoal = () => {
     const targetWeightKg = Number(bodyGoalInput.targetWeightKg || 0);
@@ -5918,21 +6074,68 @@ Rispondi SOLO JSON valido:
               <p className="text-[9px] uppercase tracking-[0.36em] font-bold" style={{ color: 'rgba(167,139,250,0.9)' }}>◈ Fitporn AI</p>
               <p className="text-sm font-black text-white" style={{ fontFamily: 'Russo One, sans-serif' }}>Recipe Forge</p>
             </div>
-            <div className="flex gap-1.5">
+            <div className="flex gap-1.5 flex-wrap justify-end">
               <button onClick={() => setShowFoodPrefs((v) => !v)}
                 className={`text-[9px] px-2.5 py-1.5 rounded-lg border transition-colors ${showFoodPrefs ? 'border-violet-300 bg-violet-500/25 text-white' : 'border-violet-400/30 text-violet-300 hover:bg-violet-500/15'}`}>
                 🎛️ Preferenze
+              </button>
+              <button onClick={() => { setShowFoodPrefs(false); setShowForgeControls((v) => !v); }}
+                className={`text-[9px] px-2.5 py-1.5 rounded-lg border transition-colors ${showForgeControls ? 'border-amber-300 bg-amber-500/25 text-white' : 'border-amber-400/35 text-amber-300 hover:bg-amber-500/15'}`}>
+                🔮 Piano Misterioso
               </button>
               <button onClick={() => generateRecipeFromPrompt(true)} disabled={isGeneratingRecipe}
                 className={`text-[9px] px-2.5 py-1.5 rounded-lg border transition-colors ${isGeneratingRecipe ? 'border-gray-700 text-gray-500' : 'border-violet-400/40 text-violet-300 hover:bg-violet-500/20'}`}>
                 ✨ Sorprendimi
               </button>
-              <button onClick={() => generateRecipeFromPrompt(false)} disabled={isGeneratingRecipe}
+              <button onClick={() => {
+                const intent = parseForgeIntent(recipePrompt);
+                if (intent) { setRecipePrompt(''); startRecipeForge(intent.mealType, intent.count); }
+                else generateRecipeFromPrompt(false);
+              }} disabled={isGeneratingRecipe}
                 className={`text-[9px] px-2.5 py-1.5 rounded-lg border transition-colors ${isGeneratingRecipe ? 'border-gray-700 text-gray-500' : 'border-violet-300/60 text-white hover:bg-violet-500/30'}`}>
                 {isGeneratingRecipe ? '⏳' : '⚡ Genera'}
               </button>
             </div>
           </div>
+          {showForgeControls && (
+            <div className="mb-3 p-3 rounded-xl space-y-2.5" style={{ background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(245,158,11,0.3)' }}>
+              <p className="text-[9px] uppercase tracking-wider font-bold text-amber-300">🔮 Calendario del Destino — forgia più ricette in un colpo</p>
+              <p className="text-[9px] text-gray-400">Scegli il pasto e quante ricette misteriose vuoi (1-365). Oppure scrivi direttamente in chat, es. "prepara 7 ricette di colazione".</p>
+              <div className="flex gap-1.5 flex-wrap">
+                {['colazione', 'pranzo', 'cena', 'spuntino'].map((mt) => (
+                  <button key={mt} onClick={() => setForgeMealType(mt)}
+                    className="text-[9px] px-2.5 py-1 rounded-full border transition-colors capitalize"
+                    style={forgeMealType === mt
+                      ? { background: '#f59e0b', color: '#1a1206', borderColor: '#f59e0b' }
+                      : { borderColor: 'rgba(245,158,11,0.3)', color: '#fcd34d' }}>
+                    {mt}
+                  </button>
+                ))}
+              </div>
+              <div className="flex items-center gap-2">
+                <input type="number" min={1} max={365} value={forgeCountInput}
+                  onChange={(e) => setForgeCountInput(e.target.value)}
+                  className="w-20 bg-black/50 border rounded-lg text-white text-[11px] p-2 text-center focus:outline-none"
+                  style={{ borderColor: 'rgba(245,158,11,0.35)' }} />
+                <div className="flex gap-1">
+                  {[3, 7, 14, 30].map((n) => (
+                    <button key={n} onClick={() => setForgeCountInput(String(n))}
+                      className="text-[8px] px-2 py-1 rounded-lg border transition-colors" style={{ borderColor: 'rgba(245,158,11,0.3)', color: '#fcd34d' }}>
+                      {n}
+                    </button>
+                  ))}
+                </div>
+                <button onClick={() => {
+                  const n = Math.max(1, Math.min(365, Math.round(Number(forgeCountInput) || 0)));
+                  if (!n) { emitUiToast({ message: 'Scegli un numero tra 1 e 365', tone: 'warning', durationMs: 2400 }); return; }
+                  startRecipeForge(forgeMealType, n);
+                }}
+                  className="flex-1 text-[10px] font-black py-2 rounded-lg transition-colors" style={{ background: 'linear-gradient(135deg,#f59e0b,#d97706)', color: '#1a1206' }}>
+                  ✨ Evoca il Destino
+                </button>
+              </div>
+            </div>
+          )}
           {showFoodPrefs && (
             <div className="mb-3 p-3 rounded-xl space-y-2.5" style={{ background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(167,139,250,0.25)' }}>
               <p className="text-[9px] uppercase tracking-wider font-bold text-violet-300">🎛️ Le tue preferenze — usate in OGNI ricetta</p>
@@ -6118,6 +6321,179 @@ Rispondi SOLO JSON valido:
           )}
         </div>
       </motion.div>
+
+      {/* ── 📜 CALENDARIO DEL DESTINO — overlay fullscreen a portal, griglia di carte mystery ── */}
+      {forgeBatch && createPortal(
+        <div className="fixed inset-0 z-[200] overflow-y-auto" style={{ background: 'radial-gradient(ellipse at 50% 0%, rgba(45,22,74,0.97), rgba(5,3,10,0.99) 65%)' }}>
+          <div className="max-w-3xl mx-auto px-4 py-6 pb-16">
+            {/* Header pergamena */}
+            <div className="flex items-start justify-between gap-3 mb-4">
+              <div>
+                <p className="text-[10px] uppercase tracking-[0.4em] font-bold" style={{ color: '#fcd34d' }}>◈ Destino Sigillato</p>
+                <p className="text-lg font-black text-white" style={{ fontFamily: 'Russo One, sans-serif' }}>
+                  📜 Calendario delle {FORGE_MEAL_LABELS[forgeBatch.mealType] || 'ricette'}
+                </p>
+                <p className="text-[10px] text-gray-400 mt-0.5">
+                  {forgeBatch.cards.filter((c) => c.revealed).length} rivelate su {forgeBatch.cards.length} forgiate
+                  {forgeBatch.generating ? ` · ${forgeBatch.cards.length}/${forgeBatch.total} in creazione…` : ` di ${forgeBatch.total}`}
+                </p>
+              </div>
+              <button onClick={closeForgeBatch}
+                className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-white text-sm"
+                style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)' }}>✕</button>
+            </div>
+
+            {/* Barra di progresso mentre forgia */}
+            {forgeBatch.generating && (
+              <div className="mb-5 h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.08)' }}>
+                <motion.div className="h-full rounded-full" style={{ background: 'linear-gradient(90deg,#f59e0b,#a78bfa)' }}
+                  animate={{ width: `${Math.min(100, (forgeBatch.cards.length / forgeBatch.total) * 100)}%` }}
+                  transition={{ duration: 0.6 }} />
+              </div>
+            )}
+            {forgeBatch.error && (
+              <div className="mb-4 rounded-xl p-3" style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)' }}>
+                <p className="text-[10px] text-red-300">Il destino si è inceppato: {forgeBatch.error} — {forgeBatch.cards.length > 0 ? 'tieni comunque le ricette già forgiate.' : 'riprova.'}</p>
+              </div>
+            )}
+
+            {/* Griglia di carte — mystery finché non rivelate, + placeholder "in forgiatura" per gli slot non ancora pronti */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+              {Array.from({ length: forgeBatch.total }).map((_, idx) => {
+                const card = forgeBatch.cards[idx];
+                if (!card) {
+                  return (
+                    <div key={`placeholder-${idx}`} className="aspect-[3/4] rounded-2xl flex items-center justify-center"
+                      style={{ background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(255,255,255,0.1)' }}>
+                      <motion.span className="text-lg" style={{ color: 'rgba(255,255,255,0.15)' }}
+                        animate={{ opacity: [0.2, 0.5, 0.2] }} transition={{ duration: 1.6, repeat: Infinity, delay: (idx % 5) * 0.15 }}>
+                        ⏳
+                      </motion.span>
+                    </div>
+                  );
+                }
+                return (
+                  <div key={card.id} className="aspect-[3/4]" style={{ perspective: 1000 }}>
+                    <motion.div className="relative w-full h-full"
+                      style={{ transformStyle: 'preserve-3d' }}
+                      animate={{ rotateY: card.revealed ? 180 : 0 }}
+                      transition={{ duration: 0.65, ease: [0.34, 1.56, 0.64, 1] }}>
+                      {/* Retro carta: sigillo misterioso */}
+                      <motion.button onClick={() => revealForgeCard(card.id)}
+                        whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
+                        className="absolute inset-0 rounded-2xl flex flex-col items-center justify-center gap-2 overflow-hidden"
+                        style={{ backfaceVisibility: 'hidden', background: 'linear-gradient(155deg, #1a0f2e, #2d1650 55%, #1a0f2e)', border: '1px solid rgba(245,158,11,0.35)', boxShadow: '0 0 20px rgba(245,158,11,0.12), inset 0 1px 0 rgba(255,255,255,0.06)' }}>
+                        <div className="pointer-events-none absolute inset-0" style={{ background: 'repeating-linear-gradient(135deg, rgba(245,158,11,0.05) 0px, rgba(245,158,11,0.05) 2px, transparent 2px, transparent 10px)' }} />
+                        <motion.span className="text-3xl relative z-10" style={{ filter: 'drop-shadow(0 0 8px rgba(245,158,11,0.6))' }}
+                          animate={{ scale: [1, 1.12, 1], opacity: [0.75, 1, 0.75] }} transition={{ duration: 2.2, repeat: Infinity }}>
+                          ✦
+                        </motion.span>
+                        <span className="text-[9px] font-bold uppercase tracking-widest relative z-10" style={{ color: '#fcd34d' }}>#{idx + 1}</span>
+                        <span className="text-[8px] relative z-10" style={{ color: 'rgba(252,211,77,0.55)' }}>tocca per svelare</span>
+                      </motion.button>
+                      {/* Fronte carta: teaser rivelato */}
+                      <div className="absolute inset-0 rounded-2xl flex flex-col p-2.5"
+                        style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)', background: 'linear-gradient(160deg, rgba(124,58,237,0.22), rgba(15,8,28,0.96))', border: '1px solid rgba(167,139,250,0.35)', boxShadow: '0 0 18px rgba(124,58,237,0.18)' }}>
+                        <span className="text-2xl leading-none">{card.emoji}</span>
+                        <p className="text-[11px] font-black text-white leading-tight mt-1 line-clamp-2" style={{ fontFamily: 'Russo One, sans-serif' }}>{card.title}</p>
+                        <p className="text-[8px] text-violet-200 italic mt-0.5 leading-snug line-clamp-2 flex-1">"{card.tagline}"</p>
+                        <div className="grid grid-cols-4 gap-0.5 my-1.5 text-center">
+                          <div><p className="text-[9px] font-black" style={{ color: '#f97316' }}>{card.kcal}</p><p className="text-[6px] text-gray-500">KCAL</p></div>
+                          <div><p className="text-[9px] font-black" style={{ color: '#10b981' }}>{card.protein}g</p><p className="text-[6px] text-gray-500">PROT</p></div>
+                          <div><p className="text-[9px] font-black" style={{ color: '#3b82f6' }}>{card.carbs}g</p><p className="text-[6px] text-gray-500">CARB</p></div>
+                          <div><p className="text-[9px] font-black" style={{ color: '#f59e0b' }}>{card.fat}g</p><p className="text-[6px] text-gray-500">GRAS</p></div>
+                        </div>
+                        <p className="text-[7px] text-gray-500 mb-1">⏱ {card.prepMin}min · {card.difficulty}</p>
+                        <button onClick={() => openForgeCardFull(card.id)} disabled={card.loadingFull}
+                          className="text-[9px] font-bold py-1.5 rounded-lg transition-colors"
+                          style={card.loadingFull
+                            ? { background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.4)' }
+                            : { background: 'rgba(167,139,250,0.25)', color: '#e9d5ff', border: '1px solid rgba(167,139,250,0.4)' }}>
+                          {card.loadingFull ? '⏳ Preparo…' : '🔍 Ricetta completa'}
+                        </button>
+                      </div>
+                    </motion.div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* ── Modale dettaglio completo di una carta del Calendario del Destino ── */}
+      {forgeDetailCardId && (() => {
+        const card = forgeBatch?.cards?.find((c) => c.id === forgeDetailCardId);
+        if (!card?.full) return null;
+        return createPortal(
+          <div className="fixed inset-0 z-[210] flex items-center justify-center p-4" style={{ background: 'rgba(3,2,8,0.88)' }} onClick={() => setForgeDetailCardId(null)}>
+            <motion.div initial={{ opacity: 0, scale: 0.94, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }}
+              className="w-full max-w-sm max-h-[85vh] overflow-y-auto rounded-2xl"
+              style={{ background: 'rgba(12,8,20,0.98)', border: '1px solid rgba(167,139,250,0.3)', boxShadow: '0 20px 60px rgba(0,0,0,0.6)' }}
+              onClick={(e) => e.stopPropagation()}>
+              <div className="p-3 pb-2 relative" style={{ background: 'linear-gradient(135deg, rgba(124,58,237,0.22), rgba(79,70,229,0.16))' }}>
+                <button onClick={() => setForgeDetailCardId(null)} className="absolute top-2 right-2 w-6 h-6 rounded-lg flex items-center justify-center text-white text-xs" style={{ background: 'rgba(255,255,255,0.1)' }}>✕</button>
+                <div className="flex items-start gap-2 pr-6">
+                  <span className="text-3xl leading-none">{card.emoji}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-black text-white leading-tight" style={{ fontFamily: 'Russo One, sans-serif' }}>{card.title}</p>
+                    {card.tagline && <p className="text-[10px] text-violet-200 mt-0.5 italic leading-snug">"{card.tagline}"</p>}
+                  </div>
+                  <div className="px-1.5 py-0.5 rounded text-[8px] font-bold flex-shrink-0" style={{ background: 'rgba(167,139,250,0.2)', color: '#c4b5fd' }}>FIT {card.full.fitScore}/10</div>
+                </div>
+                <p className="text-[9px] text-gray-400 mt-2">⏱ {card.prepMin}min · {card.difficulty}</p>
+              </div>
+              <div className="grid grid-cols-4 divide-x divide-white/5 border-b border-white/5">
+                {[
+                  { label: 'Kcal', val: card.kcal, color: '#f97316' },
+                  { label: 'Prot', val: `${card.protein}g`, color: '#10b981' },
+                  { label: 'Carb', val: `${card.carbs}g`, color: '#3b82f6' },
+                  { label: 'Grass', val: `${card.fat}g`, color: '#f59e0b' },
+                ].map((m) => (
+                  <div key={m.label} className="py-2 text-center">
+                    <p className="text-[11px] font-black" style={{ color: m.color }}>{m.val}</p>
+                    <p className="text-[8px] text-gray-500 uppercase">{m.label}</p>
+                  </div>
+                ))}
+              </div>
+              {card.full.ingredients.length > 0 && (
+                <div className="p-3 border-b border-white/5">
+                  <p className="text-[8px] uppercase tracking-widest text-gray-500 mb-1.5">Ingredienti</p>
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-0.5">
+                    {card.full.ingredients.map((ing, i) => (
+                      <div key={i} className="flex justify-between text-[10px]">
+                        <span className="text-gray-300 truncate">{ing.item}</span>
+                        {ing.amount && <span className="text-gray-500 ml-1 flex-shrink-0">{ing.amount}</span>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {card.full.steps.length > 0 && (
+                <div className="p-3 border-b border-white/5">
+                  <p className="text-[8px] uppercase tracking-widest text-gray-500 mb-1.5">Preparazione</p>
+                  <ol className="space-y-1.5">
+                    {card.full.steps.map((step, i) => (
+                      <li key={i} className="flex gap-2 text-[10px] text-gray-300 leading-snug">
+                        <span className="flex-shrink-0 w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-bold mt-0.5" style={{ background: 'rgba(167,139,250,0.2)', color: '#a78bfa' }}>{i + 1}</span>
+                        <span>{step}</span>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              )}
+              {card.full.notes && (
+                <div className="p-3">
+                  <p className="text-[9px] text-violet-300 leading-relaxed">💡 {card.full.notes}</p>
+                </div>
+              )}
+            </motion.div>
+          </div>,
+          document.body
+        );
+      })()}
+
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} whileHover={{ y: -2, scale: 1.005 }} transition={{ delay: 0.0832 }} className="bg-black/40 border border-fuchsia-300/30 p-5 rounded-sm mb-6">
         <div className="flex items-center justify-between mb-2">
           <p className="text-fuchsia-200 text-[10px] uppercase tracking-widest">Body Composition Trends (pesate)</p>
