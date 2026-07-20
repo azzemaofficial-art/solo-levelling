@@ -15,7 +15,9 @@ const PAPERS = path.join(VAULT, 'papers');
 const MANIFEST = path.join(PAPERS, '.processed.json');
 const LIB_OUT = path.join(REPO, 'lib', 'knowledgeBase.js');
 const MEM_OUT = path.join(VAULT, 'memorie', 'scienza-nutrizione.md');
-const MAX_PRINCIPLES = 1200;
+const MAX_PRINCIPLES = 1800; // alzato da 1200 (raggiunto): la base continua a crescere ogni
+// notte col Ricercatore Notturno, il retrieval inietta solo i top pertinenti quindi il cap
+// alto non gonfia i prompt — evita solo di scartare principi validi quando la base cresce.
 
 function fixTypos(s) {
   let t = ' ' + String(s) + ' ';
