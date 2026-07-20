@@ -175,6 +175,38 @@ const SEED = [
   { q: 'implementation intentions habit stacking behavior change', slug: 'habit-stacking-intenzioni', tag: 'salute' },
   { q: 'brief mindfulness dose attention stress acute', slug: 'mindfulness-dose-minima', tag: 'salute' },
   { q: 'posture upright mood energy affect', slug: 'postura-umore-energia', tag: 'salute' },
+
+  // — Risveglio riposato (interesse utente) —
+  { q: 'sleep inertia grogginess waking reduction strategies', slug: 'inerzia-risveglio-strategie', tag: 'salute' },
+  { q: 'smart alarm sleep stage wake window efficacy', slug: 'sveglia-smart-fase-sonno', tag: 'salute' },
+  { q: 'dawn simulation light therapy waking alertness', slug: 'dawn-simulator-risveglio', tag: 'salute' },
+  { q: 'snooze button sleep quality morning alertness', slug: 'snooze-effetto-vigilanza', tag: 'salute' },
+  { q: 'morning cold shower alertness cortisol', slug: 'doccia-fredda-mattutina-vigilanza', tag: 'salute' },
+  { q: 'morning exercise light physical activity alertness wake', slug: 'movimento-mattutino-vigilanza', tag: 'salute' },
+
+  // — Integratori in generale (interesse utente) —
+  { q: 'third party supplement testing contamination athletes', slug: 'terze-parti-integratori-contaminazione', tag: 'nutrizione' },
+  { q: 'creatine loading protocol versus maintenance dose', slug: 'creatina-loading-protocollo', tag: 'nutrizione' },
+  { q: 'whey casein plant protein muscle protein synthesis comparison', slug: 'whey-caseina-vegetale-confronto', tag: 'nutrizione' },
+  { q: 'supplement drug interaction common risks', slug: 'interazioni-integratori-farmaci', tag: 'nutrizione' },
+  { q: 'fat soluble vitamin overdose toxicity risk', slug: 'vitamine-liposolubili-eccesso', tag: 'nutrizione' },
+  { q: 'pre workout supplement proprietary blend safety', slug: 'preworkout-blend-rischi', tag: 'nutrizione' },
+
+  // — Cibi che fanno bene (interesse utente) —
+  { q: 'leafy greens cognitive function brain health', slug: 'verdure-foglia-verde-cognizione', tag: 'nutrizione' },
+  { q: 'fish oil versus whole fish cardiovascular outcomes', slug: 'pesce-grasso-vs-omega3-integratore', tag: 'nutrizione' },
+  { q: 'dietary cholesterol eggs blood cholesterol myth', slug: 'uova-colesterolo-mito', tag: 'nutrizione' },
+  { q: 'avocado cardiovascular health outcomes trial', slug: 'avocado-salute-cardiovascolare', tag: 'nutrizione' },
+  { q: 'garlic allicin sulfur compounds health raw cooked', slug: 'aglio-composti-solforati', tag: 'nutrizione' },
+  { q: 'ultra processed food definition identification practical', slug: 'ultraprocessati-definizione-pratica', tag: 'nutrizione' },
+
+  // — Life hacking (interesse utente) —
+  { q: 'decision fatigue depletion choice quality', slug: 'decision-fatigue-scelte', tag: 'salute' },
+  { q: 'deep work focused attention distraction cost', slug: 'deep-work-concentrazione', tag: 'salute' },
+  { q: 'multitasking task switching cognitive cost', slug: 'multitasking-costo-cognitivo', tag: 'salute' },
+  { q: 'digital minimalism notification reduction attention wellbeing', slug: 'digital-minimalism-notifiche', tag: 'salute' },
+  { q: 'zeigarnik effect unfinished tasks memory intrusive thoughts', slug: 'effetto-zeigarnik-compiti-incompleti', tag: 'salute' },
+  { q: 'workplace environment clutter productivity cognitive load', slug: 'ambiente-disordine-produttivita', tag: 'salute' },
 ];
 
 // ─── UTILITÀ ─────────────────────────────────────────────────────────────────
