@@ -105,11 +105,133 @@ const isRetryableError = (error) => {
   return true;
 };
 
-const extractJsonCandidate = (raw) => {
-  const start = raw.indexOf('{');
-  const end = raw.lastIndexOf('}');
-  if (start >= 0 && end > start) return raw.slice(start, end + 1);
-  return raw;
+// Pulisce una risposta AI grezza: toglie i fence markdown e gli spazi.
+const stripFences = (rawContent) =>
+  String(rawContent || '').replace(/```json/gi, '').replace(/```/g, '').trim();
+
+// Ritaglia dal primo `open` fino alla chiusura BILANCIATA corrispondente (depth 0),
+// rispettando le stringhe (le parentesi dentro le stringhe non contano). Gestisce prosa
+// prima e dopo il JSON. Se la risposta è TRONCATA (non si bilancia mai) ritorna null.
+const sliceToBalance = (raw, open, close) => {
+  const start = raw.indexOf(open);
+  if (start < 0) return null;
+  let depth = 0;
+  let inStr = false;
+  let esc = false;
+  for (let i = start; i < raw.length; i++) {
+    const ch = raw[i];
+    if (inStr) {
+      if (esc) esc = false;
+      else if (ch === '\\') esc = true;
+      else if (ch === '"') inStr = false;
+      continue;
+    }
+    if (ch === '"') inStr = true;
+    else if (ch === open) depth++;
+    else if (ch === close) { depth--; if (depth === 0) return raw.slice(start, i + 1); }
+  }
+  return null; // troncato: nessuna chiusura di pari livello trovata
+};
+
+// Chiude stringhe e parentesi rimaste aperte (tipico di risposte tagliate a max_tokens),
+// rimuove code pendenti (virgole/duepunti finali) e trailing comma prima delle chiusure.
+const closeOpenStructures = (input) => {
+  let s = input;
+  const stack = [];
+  let inStr = false;
+  let esc = false;
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (inStr) {
+      if (esc) esc = false;
+      else if (ch === '\\') esc = true;
+      else if (ch === '"') inStr = false;
+      continue;
+    }
+    if (ch === '"') inStr = true;
+    else if (ch === '{' || ch === '[') stack.push(ch);
+    else if (ch === '}' || ch === ']') stack.pop();
+  }
+  if (inStr) s += '"';                 // stringa lasciata aperta
+  s = s.replace(/\\+$/, '');           // backslash di escape spurio in coda
+  s = s.replace(/[\s,:]+$/, '');       // virgola/duepunti/spazi pendenti
+  for (let i = stack.length - 1; i >= 0; i--) s += stack[i] === '{' ? '}' : ']';
+  return s.replace(/,\s*([}\]])/g, '$1');
+};
+
+// Ripara una risposta TRONCATA: prova a chiudere le strutture aperte e, se ancora non
+// parsa, retrocede all'ultimo confine di elemento (ultima virgola/chiusura) e riprova —
+// così un array o oggetto tagliato a metà salva tutto ciò che è completo invece di esplodere.
+const repairTruncatedJson = (candidate) => {
+  let s = candidate;
+  for (let guard = 0; guard < 80 && s.length > 1; guard++) {
+    const closed = closeOpenStructures(s);
+    try { return JSON.parse(closed); } catch (_) { /* prova a tagliare più corto */ }
+    const cut = Math.max(s.lastIndexOf(','), s.lastIndexOf('}'), s.lastIndexOf(']'));
+    if (cut <= 0) break;
+    s = s.slice(0, cut);
+  }
+  return undefined;
+};
+
+// Estrae uno per uno gli oggetti top-level `{...}` bilanciati da un array: ognuno viene
+// parsato in isolamento, così un ultimo oggetto troncato viene semplicemente scartato e i
+// precedenti (interi) si salvano. Ultima rete di sicurezza per gli array di ricette.
+const salvageJsonObjects = (candidate) => {
+  const objects = [];
+  let depth = 0;
+  let inStr = false;
+  let esc = false;
+  let objStart = -1;
+  for (let i = 0; i < candidate.length; i++) {
+    const ch = candidate[i];
+    if (inStr) {
+      if (esc) esc = false;
+      else if (ch === '\\') esc = true;
+      else if (ch === '"') inStr = false;
+      continue;
+    }
+    if (ch === '"') { inStr = true; continue; }
+    if (ch === '{') { if (depth === 0) objStart = i; depth++; }
+    else if (ch === '}') {
+      depth--;
+      if (depth === 0 && objStart >= 0) {
+        try { objects.push(JSON.parse(candidate.slice(objStart, i + 1))); } catch (_) { /* salta */ }
+        objStart = -1;
+      }
+    }
+  }
+  return objects;
+};
+
+// Parsing tollerante di JSON prodotto da modelli: gestisce fence markdown, prosa attorno al
+// JSON, trailing commas e — soprattutto — risposte troncate (max_tokens). `prefer` sceglie se
+// il valore atteso è un oggetto o un array; 'auto' decide in base a cosa compare per primo.
+export const looseJsonParse = (rawContent, prefer = 'auto') => {
+  const raw = stripFences(rawContent);
+  const oCurly = raw.indexOf('{');
+  const oSquare = raw.indexOf('[');
+  const useArray = prefer === 'array'
+    || (prefer !== 'object' && oSquare >= 0 && (oCurly < 0 || oSquare < oCurly));
+  const open = useArray ? '[' : '{';
+  const close = useArray ? ']' : '}';
+  if (raw.indexOf(open) < 0) throw new Error('Risposta AI non valida (nessun JSON presente)');
+  // 1) percorso veloce: ritaglio bilanciato (regge la prosa prima/dopo)
+  const balanced = sliceToBalance(raw, open, close);
+  if (balanced) {
+    try { return JSON.parse(balanced); } catch (_) { /* continua */ }
+    try { return JSON.parse(balanced.replace(/,\s*([}\]])/g, '$1')); } catch (_) { /* continua */ }
+  }
+  // 2) risposta troncata: chiudi e retrocedi all'ultimo elemento completo
+  const candidate = raw.slice(raw.indexOf(open));
+  const repaired = repairTruncatedJson(candidate);
+  if (repaired !== undefined) return repaired;
+  // 3) rete finale per gli array: salva gli oggetti interi uno per uno
+  if (useArray) {
+    const objs = salvageJsonObjects(candidate);
+    if (objs.length) return objs;
+  }
+  throw new Error('Risposta AI non valida (JSON irrecuperabile)');
 };
 
 const toSafeNumber = (value, fallback = 0, min = 0, max = 99999) => {
@@ -406,11 +528,10 @@ export const subscribeAiStatus = (handler) => {
 };
 
 export const parseModelJson = (data, config = {}) => {
-  const raw = String(data?.choices?.[0]?.message?.content || '').replace(/```json/g, '').replace(/```/g, '').trim();
-  const candidate = extractJsonCandidate(raw);
+  const content = data?.choices?.[0]?.message?.content;
   let parsed;
   try {
-    parsed = JSON.parse(candidate);
+    parsed = looseJsonParse(content, config?.expect || 'object');
   } catch (_) {
     throw new Error('Risposta AI non valida (JSON malformato)');
   }

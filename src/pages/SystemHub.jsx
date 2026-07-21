@@ -4,12 +4,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { playSfx } from '../utils/sfx';
 import { speakEvent } from '../utils/voice';
 import AnimeStrip from '../components/AnimeStrip';
-import { formatAiErrorDetail, parseModelJson, requestSystemAI } from '../utils/aiClient';
+import { formatAiErrorDetail, looseJsonParse, parseModelJson, requestSystemAI } from '../utils/aiClient';
 import { AI_MODELS, getModelFor, getGlobalModel, setGlobalModel, getTaskOverride, setTaskOverride } from '../utils/aiModels';
 import { computeReadinessOutcome, computeSleepCoach, computeWeightTrendGuard, computeWeeklyOverview, evaluateDataQuality } from '../utils/healthLogic';
 import { emitShadowFxBurst } from '../utils/fxEvents';
 import { emitUiToast } from '../utils/uiEvents';
-import { knowledgePrompt, knowledgePromptFor } from '../../lib/knowledgeBase.js';
+import { knowledgePrompt, knowledgePromptFor, NUTRITION_PRINCIPLES, NUTRITION_SOURCES } from '../../lib/knowledgeBase.js';
+import { SCIENCE_HIGHLIGHTS, SCIENCE_CATEGORIES, scienceCategoryOf } from '../../lib/scienceHighlights.js';
 const QUICK_PROTOCOLS = [
   { id: 'nutrition', title: 'Nutrition Lock', desc: 'Chiudi proteine + kcal target', color: 'text-cyan-200 border-cyan-300/30 bg-cyan-500/10' },
   { id: 'hydration', title: 'Hydration Shield', desc: 'Acqua costante durante il giorno', color: 'text-emerald-200 border-emerald-300/30 bg-emerald-500/10' },
@@ -407,6 +408,10 @@ const SystemHub = ({ systemLogs, setSystemLogs, dailyGoal, setDailyGoal, hydrati
   const [forgeCountInput, setForgeCountInput] = useState('7');
   const [forgeBatch, setForgeBatch] = useState(null); // {total, mealType, cards:[], done, generating, error}
   const [forgeDetailCardId, setForgeDetailCardId] = useState(null);
+  // ── Novità dagli Studi: feed editoriale delle perle scientifiche dai paper distillati ──
+  const [scienceFilter, setScienceFilter] = useState('all'); // 'all' | chiave categoria | 'myth'
+  const [scienceExpandedId, setScienceExpandedId] = useState(null);
+  const [scienceFeatured, setScienceFeatured] = useState(() => Math.floor(Math.random() * SCIENCE_HIGHLIGHTS.length));
   const [aiModelProfile, setAiModelProfile] = useState(() => getTaskOverride('profile'));
   // Analisi profilo profonda (Nemotron)
   const [profileAnalysis, setProfileAnalysis] = useState(() => {
@@ -3074,14 +3079,12 @@ Rispondi SOLO JSON valido:
     return { count, mealType };
   };
 
-  // Estrae il primo array JSON valido da una risposta AI grezza (parseModelJson gestisce solo
-  // oggetti singoli {...}); qui serve un array [...] di N ricette-teaser in un colpo solo.
+  // Estrae l'array [...] di N ricette-teaser da una risposta AI grezza. Usa il parser
+  // tollerante condiviso (looseJsonParse): regge prosa attorno al JSON, trailing commas e
+  // soprattutto risposte TRONCATE a max_tokens — in quel caso salva le ricette complete e
+  // scarta solo l'ultima tagliata a metà, invece di far fallire l'intero lotto.
   const parseModelJsonArray = (data) => {
-    const raw = String(data?.choices?.[0]?.message?.content || '').replace(/```json/gi, '').replace(/```/g, '').trim();
-    const start = raw.indexOf('[');
-    const end = raw.lastIndexOf(']');
-    if (start === -1 || end === -1 || end <= start) throw new Error('Risposta AI non valida (array mancante)');
-    const parsed = JSON.parse(raw.slice(start, end + 1));
+    const parsed = looseJsonParse(data?.choices?.[0]?.message?.content, 'array');
     if (!Array.isArray(parsed)) throw new Error('Risposta AI non valida (non è un array)');
     return parsed;
   };
@@ -3096,25 +3099,38 @@ Rispondi SOLO JSON valido:
   const startRecipeForge = async (mealType, count) => {
     const total = Math.max(1, Math.min(365, Math.round(Number(count) || 0)));
     setShowForgeControls(false);
-    setForgeBatch({ total, mealType, cards: [], generating: true, error: null });
+    // Se un Calendario precedente esiste ancora, lo teniamo da parte: se questo tentativo
+    // fallisce del tutto (0 carte prodotte) lo ripristiniamo invece di lasciare lo schermo
+    // vuoto — così un "riprova" andato male non cancella un risultato buono già ottenuto.
+    let previousBatch = null;
+    setForgeBatch((prev) => { previousBatch = prev; return { total, mealType, cards: [], generating: true, error: null }; });
     playSfx('success', soundEnabled, soundTheme);
     const { profileCtx, prefsCtx } = computeRecipeContext();
+    // Inietta i principi scientifici pertinenti (dalla knowledge base distillata dai paper):
+    // così le ricette diventano evidence-based — timing, densità proteica, indice glicemico,
+    // micronutrienti — non solo "belle da vedere".
+    const science = knowledgePromptFor(`${mealType} nutrizione proteine sazietà energia ${prefsCtx}`, 12);
     const cards = [];
-    const CHUNK = 15;
+    // Lotti più piccoli (12) con budget-token più ampio per oggetto: riduce drasticamente le
+    // troncature a metà array. Se un lotto arriva comunque tagliato, parseModelJsonArray salva
+    // le ricette complete e il while continua a colmare gli slot mancanti.
+    const CHUNK = 12;
     try {
+      let emptyStreak = 0;
       while (cards.length < total) {
         const chunkSize = Math.min(CHUNK, total - cards.length);
-        const avoidTitles = cards.map((c) => c.title).slice(-40);
-        const systemPrompt = `Sei uno chef nutrizionale d'élite specializzato in FITPORN — cibo esteticamente perfetto e ottimizzato per le performance atletiche.
+        const avoidTitles = cards.map((c) => c.title).slice(-30);
+        const systemPrompt = `Sei uno chef nutrizionale d'élite specializzato in FITPORN — cibo esteticamente perfetto e ottimizzato per le performance atletiche, ma sempre fondato sulla scienza della nutrizione.
 Genera un ELENCO di ricette-TEASER (non la ricetta completa: solo titolo, tagline e macro stimati) per "${mealType}".
-Ogni ricetta deve essere DIVERSA dalle altre (ingrediente principale, stile o preparazione differenti) e rispettare SEMPRE le eventuali allergie indicate (vincolo assoluto di sicurezza).
+Ogni ricetta deve essere DIVERSA dalle altre (ingrediente principale, stile o preparazione differenti), realistica nei macro, e rispettare SEMPRE le eventuali allergie indicate (vincolo assoluto di sicurezza).
+Applica i principi scientifici forniti quando pertinenti (densità proteica per la sazietà, fibre, timing dei carboidrati, grassi buoni).${science}
 Rispondi SOLO con un array JSON valido di esattamente ${chunkSize} oggetti, in questo formato:
 [{"title":"string epico","emoji":"emoji","tagline":"string appetitosa max 12 parole","kcal":numero,"protein":numero,"carbs":numero,"fat":numero,"prepMin":numero,"difficulty":"facile|medio|avanzato"}]`;
         const userMsg = `${profileCtx}${prefsCtx}\n\nGenera esattamente ${chunkSize} ricette DIVERSE tra loro per ${mealType}.${avoidTitles.length ? `\nNon ripetere questi titoli già usati: ${avoidTitles.join(', ')}.` : ''}`;
         const data = await requestSystemAI({
           model: getModelFor('recipe') || undefined,
           temperature: 0.95,
-          max_tokens: Math.min(4000, 260 * chunkSize + 200),
+          max_tokens: Math.min(4096, 320 * chunkSize + 300),
           timeoutMs: 32000,
           messages: [
             { role: 'system', content: systemPrompt },
@@ -3140,13 +3156,25 @@ Rispondi SOLO con un array JSON valido di esattamente ${chunkSize} oggetti, in q
           });
         });
         setForgeBatch({ total, mealType, cards: [...cards], generating: cards.length < total, error: null });
-        if (!rawItems.length) break; // AI non ha prodotto nulla di utile: evita loop infinito
+        // Se un lotto non produce nulla di utile due volte di fila, fermati: evita loop infiniti
+        // quando il modello è in difficoltà, ma tollera un singolo lotto sfortunato.
+        emptyStreak = rawItems.length ? 0 : emptyStreak + 1;
+        if (emptyStreak >= 2) break;
       }
+      if (!cards.length) throw new Error('nessuna ricetta forgiata');
       playSfx('success', soundEnabled, soundTheme);
       emitUiToast({ message: `📜 Calendario pronto: ${cards.length} ${FORGE_MEAL_LABELS[mealType] || 'ricette'} ti aspettano`, tone: 'success', durationMs: 3600 });
     } catch (error) {
       const detail = formatAiErrorDetail(error?.message || 'errore forge').slice(0, 90);
-      setForgeBatch((prev) => prev ? { ...prev, generating: false, error: detail } : prev);
+      if (cards.length > 0) {
+        // Abbiamo comunque forgiato qualcosa: teniamo le carte buone e segnaliamo l'intoppo.
+        setForgeBatch({ total, mealType, cards: [...cards], generating: false, error: detail, retry: { mealType, count: total } });
+      } else if (previousBatch && previousBatch.cards?.length) {
+        // Tentativo a vuoto ma c'era un Calendario buono prima: ripristinalo, non azzerare nulla.
+        setForgeBatch({ ...previousBatch, error: `Nuova forgiatura fallita (${detail}). Ho tenuto il calendario precedente.` });
+      } else {
+        setForgeBatch({ total, mealType, cards: [], generating: false, error: detail, retry: { mealType, count: total } });
+      }
       playSfx('warning', soundEnabled, soundTheme);
     }
   };
@@ -3165,8 +3193,10 @@ Rispondi SOLO con un array JSON valido di esattamente ${chunkSize} oggetti, in q
     setForgeBatch((prev) => prev ? { ...prev, cards: prev.cards.map((c) => c.id === cardId ? { ...c, loadingFull: true } : c) } : prev);
     try {
       const { profileCtx, prefsCtx } = computeRecipeContext();
+      const science = knowledgePromptFor(`${forgeBatch.mealType} ${card.title} nutrizione proteine`, 8);
       const systemPrompt = `Sei uno chef nutrizionale d'élite specializzato in FITPORN. Devi completare una ricetta il cui titolo, tagline e macro sono GIÀ decisi: crea ingredienti e procedimento coerenti con quei valori, senza cambiarli.
 VINCOLO ASSOLUTO DI SICUREZZA: rispetta sempre le eventuali allergie indicate.
+La nota finale ("notes") deve contenere UN hack nutrizionale concreto e fondato sulla scienza qui sotto (timing, assorbimento, sazietà), non un consiglio generico.${science}
 Rispondi SOLO JSON valido:
 {"ingredients":[{"item":"string","amount":"string"}],"steps":["string con emoji"],"notes":"string hack nutrizionale","fitScore":numero_1_10}`;
       const userMsg = `${profileCtx}${prefsCtx}\n\nCompleta questa ricetta per ${forgeBatch.mealType}: "${card.title}" — ${card.tagline}\nMacro da rispettare: ${card.kcal}kcal, ${card.protein}g proteine, ${card.carbs}g carboidrati, ${card.fat}g grassi, tempo totale ~${card.prepMin} minuti, difficoltà ${card.difficulty}.`;
@@ -6020,6 +6050,123 @@ Rispondi SOLO JSON valido:
         <p className="mt-2 text-[8px] text-gray-600">Override vuoto = usa il globale. Globale vuoto = catena automatica del proxy.</p>
       </motion.div>
 
+      {/* ── NOVITÀ DAGLI STUDI — feed editoriale delle perle scientifiche ── */}
+      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mb-6 rounded-2xl overflow-hidden relative"
+        style={{ background: 'linear-gradient(150deg, rgba(4,10,20,0.98), rgba(10,18,30,0.95) 55%, rgba(6,20,18,0.97))', border: '1px solid rgba(56,189,248,0.24)', boxShadow: '0 8px 34px rgba(14,165,233,0.1), inset 0 1px 0 rgba(255,255,255,0.05)' }}>
+        <div className="pointer-events-none absolute -top-10 -left-8 h-36 w-36 rounded-full blur-3xl" style={{ background: 'rgba(56,189,248,0.16)' }} />
+        <div className="pointer-events-none absolute -bottom-12 -right-6 h-36 w-36 rounded-full blur-3xl" style={{ background: 'rgba(52,211,153,0.12)' }} />
+        <div className="p-4 relative z-10">
+          {/* Header + stat live */}
+          <div className="flex items-start justify-between gap-3 mb-3">
+            <div>
+              <p className="text-[9px] uppercase tracking-[0.36em] font-bold" style={{ color: 'rgba(125,211,252,0.95)' }}>◈ Live Science</p>
+              <p className="text-sm font-black text-white" style={{ fontFamily: 'Russo One, sans-serif' }}>Novità dagli Studi</p>
+            </div>
+            <div className="flex-shrink-0 text-right rounded-xl px-3 py-1.5" style={{ background: 'rgba(56,189,248,0.12)', border: '1px solid rgba(56,189,248,0.25)' }}>
+              <p className="text-[13px] font-black leading-none" style={{ color: '#7dd3fc' }}>{NUTRITION_PRINCIPLES.length.toLocaleString('it-IT')}</p>
+              <p className="text-[7px] uppercase tracking-wider font-bold mt-0.5" style={{ color: 'rgba(125,211,252,0.75)' }}>principi · {NUTRITION_SOURCES.length} fonti</p>
+            </div>
+          </div>
+
+          {/* Perla del momento — card in evidenza, rotabile */}
+          {(() => {
+            const f = SCIENCE_HIGHLIGHTS[scienceFeatured] || SCIENCE_HIGHLIGHTS[0];
+            const cat = scienceCategoryOf(f.cat);
+            return (
+              <motion.div key={f.id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
+                className="rounded-2xl p-3.5 mb-3 relative overflow-hidden"
+                style={{ background: `linear-gradient(140deg, ${cat.color}26, rgba(6,12,22,0.92) 70%)`, border: `1px solid ${cat.color}55`, boxShadow: `0 0 24px ${cat.color}1f` }}>
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-[8px] uppercase tracking-[0.3em] font-bold" style={{ color: cat.color }}>✦ Perla del momento</span>
+                  <button onClick={() => setScienceFeatured((SCIENCE_HIGHLIGHTS.length > 1
+                    ? (prev) => { let n = prev; while (n === prev) n = Math.floor(Math.random() * SCIENCE_HIGHLIGHTS.length); return n; }
+                    : (prev) => prev))}
+                    className="text-[11px] w-7 h-7 rounded-lg flex items-center justify-center transition-transform hover:rotate-180"
+                    style={{ background: `${cat.color}22`, border: `1px solid ${cat.color}44`, color: cat.color }} title="Un'altra perla">🎲</button>
+                </div>
+                <div className="flex items-start gap-2.5">
+                  <span className="text-2xl leading-none flex-shrink-0" style={{ filter: `drop-shadow(0 0 8px ${cat.color}88)` }}>{f.emoji}</span>
+                  <div className="min-w-0">
+                    <p className="text-[13px] font-black text-white leading-tight">{f.punch}</p>
+                    <p className="text-[10px] leading-snug mt-1" style={{ color: 'rgba(226,232,240,0.82)' }}>{f.detail}</p>
+                    <div className="flex items-center gap-1.5 mt-2">
+                      <span className="text-[7px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded" style={{ background: `${cat.color}22`, color: cat.color }}>{cat.emoji} {cat.label}</span>
+                      {f.myth && <span className="text-[7px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded" style={{ background: 'rgba(248,113,113,0.18)', color: '#fca5a5' }}>⚡ Mito sfatato</span>}
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            );
+          })()}
+
+          {/* Chip filtro categorie */}
+          <div className="flex flex-wrap gap-1.5 mb-3">
+            <button onClick={() => setScienceFilter('all')}
+              className="text-[9px] font-bold px-2.5 py-1 rounded-full transition-colors"
+              style={scienceFilter === 'all'
+                ? { background: 'rgba(56,189,248,0.28)', color: '#e0f2fe', border: '1px solid rgba(56,189,248,0.5)' }
+                : { background: 'rgba(255,255,255,0.05)', color: 'rgba(125,211,252,0.85)', border: '1px solid rgba(56,189,248,0.2)' }}>
+              Tutte
+            </button>
+            <button onClick={() => setScienceFilter('myth')}
+              className="text-[9px] font-bold px-2.5 py-1 rounded-full transition-colors"
+              style={scienceFilter === 'myth'
+                ? { background: 'rgba(248,113,113,0.28)', color: '#fee2e2', border: '1px solid rgba(248,113,113,0.5)' }
+                : { background: 'rgba(255,255,255,0.05)', color: 'rgba(252,165,165,0.9)', border: '1px solid rgba(248,113,113,0.22)' }}>
+              ⚡ Miti sfatati
+            </button>
+            {SCIENCE_CATEGORIES.map((c) => (
+              <button key={c.key} onClick={() => setScienceFilter(c.key)}
+                className="text-[9px] font-bold px-2.5 py-1 rounded-full transition-colors"
+                style={scienceFilter === c.key
+                  ? { background: `${c.color}3d`, color: '#fff', border: `1px solid ${c.color}80` }
+                  : { background: 'rgba(255,255,255,0.05)', color: c.color, border: `1px solid ${c.color}33` }}>
+                {c.emoji} {c.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Griglia perle filtrate */}
+          <div className="grid sm:grid-cols-2 gap-2">
+            {SCIENCE_HIGHLIGHTS
+              .filter((h) => scienceFilter === 'all' || (scienceFilter === 'myth' ? h.myth : h.cat === scienceFilter))
+              .map((h) => {
+                const cat = scienceCategoryOf(h.cat);
+                const open = scienceExpandedId === h.id;
+                return (
+                  <motion.button key={h.id} layout onClick={() => setScienceExpandedId(open ? null : h.id)}
+                    className="text-left rounded-xl p-2.5 transition-colors"
+                    style={{ background: open ? `${cat.color}1f` : 'rgba(255,255,255,0.035)', border: `1px solid ${open ? `${cat.color}66` : 'rgba(255,255,255,0.08)'}` }}>
+                    <div className="flex items-start gap-2">
+                      <span className="text-lg leading-none flex-shrink-0 mt-0.5" style={{ filter: `drop-shadow(0 0 5px ${cat.color}66)` }}>{h.emoji}</span>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[11px] font-bold text-white leading-tight">{h.punch}</p>
+                        <div className="flex items-center gap-1 mt-1">
+                          <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: cat.color }} />
+                          <span className="text-[7.5px] uppercase tracking-wide font-bold" style={{ color: cat.color }}>{h.tag}</span>
+                          {h.myth && <span className="text-[7.5px] font-bold" style={{ color: '#fca5a5' }}>· ⚡ mito</span>}
+                          {h.fresh && <span className="text-[7.5px] font-bold" style={{ color: '#7dd3fc' }}>· nuovo</span>}
+                        </div>
+                        <AnimatePresence>
+                          {open && (
+                            <motion.p initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
+                              className="text-[10px] leading-snug mt-1.5 overflow-hidden" style={{ color: 'rgba(226,232,240,0.85)' }}>
+                              {h.detail}
+                            </motion.p>
+                          )}
+                        </AnimatePresence>
+                      </div>
+                    </div>
+                  </motion.button>
+                );
+              })}
+          </div>
+          <p className="text-[8px] mt-2.5 text-center" style={{ color: 'rgba(148,163,184,0.7)' }}>
+            Distillate da {NUTRITION_SOURCES.length} paper scientifici · il Ricercatore Notturno ne aggiunge ogni notte
+          </p>
+        </div>
+      </motion.div>
+
       {/* ── ANALISI PROFILO PROFONDA (Nemotron) ── */}
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mb-6 rounded-2xl overflow-hidden relative p-4" style={{ background: 'linear-gradient(145deg, rgba(6,18,14,0.97), rgba(8,24,18,0.93))', border: '1px solid rgba(16,185,129,0.22)' }}>
         <div className="flex items-center justify-between mb-3">
@@ -6352,8 +6499,15 @@ Rispondi SOLO JSON valido:
               </div>
             )}
             {forgeBatch.error && (
-              <div className="mb-4 rounded-xl p-3" style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)' }}>
-                <p className="text-[10px] text-red-300">Il destino si è inceppato: {forgeBatch.error} — {forgeBatch.cards.length > 0 ? 'tieni comunque le ricette già forgiate.' : 'riprova.'}</p>
+              <div className="mb-4 rounded-xl p-3 flex items-center justify-between gap-3" style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)' }}>
+                <p className="text-[10px] text-red-300">Il destino si è inceppato: {forgeBatch.error}{forgeBatch.cards.length > 0 ? ' — le ricette già forgiate restano qui sotto.' : ''}</p>
+                {!forgeBatch.generating && forgeBatch.retry && (
+                  <button onClick={() => startRecipeForge(forgeBatch.retry.mealType, forgeBatch.retry.count)}
+                    className="flex-shrink-0 text-[10px] font-bold px-3 py-1.5 rounded-lg"
+                    style={{ background: 'rgba(245,158,11,0.25)', color: '#fcd34d', border: '1px solid rgba(245,158,11,0.4)' }}>
+                    ↻ Riprova
+                  </button>
+                )}
               </div>
             )}
 
