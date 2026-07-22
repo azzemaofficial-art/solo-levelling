@@ -421,11 +421,13 @@ const SystemHub = ({ systemLogs, setSystemLogs, dailyGoal, setDailyGoal, hydrati
         cuisine: raw.cuisine || '',      // stile cucina preferito, testo libero
         spice: raw.spice || 'normale',   // 'delicato'|'normale'|'piccante'
         maxPrepMin: Number(raw.maxPrepMin) || 0, // 0 = nessun limite
+        principles: raw.principles || '', // principi nutrizionali richiesti (es. "basso IG, alta fibra") — vincolo forte
       };
-    } catch { return { diet: '', allergies: '', dislikes: '', likes: '', cuisine: '', spice: 'normale', maxPrepMin: 0 }; }
+    } catch { return { diet: '', allergies: '', dislikes: '', likes: '', cuisine: '', spice: 'normale', maxPrepMin: 0, principles: '' }; }
   });
   const [showFoodPrefs, setShowFoodPrefs] = useState(false);
   const [recipeFeedbackGiven, setRecipeFeedbackGiven] = useState(null); // null|'up'|'down' — per la ricetta corrente
+  const [recipeLogged, setRecipeLogged] = useState(false); // la ricetta corrente è già stata loggata nei pasti di oggi
   // Selettore modelli AI (globale + override per funzione)
   const [aiModelGlobal, setAiModelGlobal] = useState(() => getGlobalModel());
   const [aiModelMeal, setAiModelMeal] = useState(() => getTaskOverride('meal'));
@@ -2942,6 +2944,7 @@ ${deltaKg ? `- Obiettivo peso: ${pesoTarget}kg (${Number(deltaKg) > 0 ? '-' : '+
     const prefLines = [];
     if (foodPrefs.allergies?.trim()) prefLines.push(`- ⚠️ ALLERGIE (VINCOLO ASSOLUTO, NON NEGOZIABILE): ${foodPrefs.allergies.trim()} — NON usare questi ingredienti in NESSUNA forma, nemmeno tracce o derivati. Se un ingrediente li contiene, escludilo e basta.`);
     if (foodPrefs.diet?.trim()) prefLines.push(`- Regime alimentare (vincolo): ${foodPrefs.diet.trim()}`);
+    if (foodPrefs.principles?.trim()) prefLines.push(`- PRINCIPI NUTRIZIONALI RICHIESTI (vincolo forte — la ricetta deve rispettarli e la nota "science" deve dire come): ${foodPrefs.principles.trim()}`);
     if (foodPrefs.dislikes?.trim()) prefLines.push(`- Non gradisce (evita fortemente): ${foodPrefs.dislikes.trim()}`);
     if (foodPrefs.likes?.trim()) prefLines.push(`- Preferisce/adora (favorisci quando ha senso): ${foodPrefs.likes.trim()}`);
     if (foodPrefs.cuisine?.trim()) prefLines.push(`- Stile di cucina preferito: ${foodPrefs.cuisine.trim()}`);
@@ -2963,7 +2966,10 @@ ${deltaKg ? `- Obiettivo peso: ${pesoTarget}kg (${Number(deltaKg) > 0 ? '-' : '+
     }
     setIsGeneratingRecipe(true);
     try {
-      const { profileCtx, prefsCtx } = computeRecipeContext();
+      const { profileCtx, prefsCtx, mealMoment } = computeRecipeContext();
+      // Principi scientifici pertinenti alla richiesta: la ricetta singola ne era priva
+      // (li aveva solo il batch) → le ricette ignoravano la knowledge base dei paper.
+      const science = knowledgePromptFor(`${prompt || mealMoment} nutrizione proteine sazietà energia`, 1800);
 
       const systemPrompt = `Sei uno chef nutrizionale d'élite specializzato in FITPORN — cibo che è allo stesso tempo ESTETICAMENTE PERFETTO e ultra-ottimizzato per le performance atletiche. Le tue ricette devono far venire l'acquolina in bocca solo a leggerle.
 
@@ -2977,16 +2983,17 @@ STILE OBBLIGATORIO:
 
 VINCOLO FERRO: la ricetta DEVE rispettare i macro residui del profilo. Se le proteine residue sono basse, fai una ricetta low-protein. Se è giorno di allenamento, priorità a carbs + proteine.
 VINCOLO ASSOLUTO DI SICUREZZA: se sono indicate allergie, la ricetta NON deve MAI contenere quegli ingredienti o loro derivati — questo vincolo ha priorità su tutto il resto, incluso lo stile e la richiesta dell'utente.
+FONDAMENTO SCIENTIFICO: applica i principi qui sotto quando pertinenti (densità proteica, fibre, timing dei carboidrati, grassi buoni) e in "science" cita IL principio concreto che ha guidato la ricetta, in una frase.${science}
 
 Rispondi SOLO JSON valido:
-{"title":"string","emoji":"emoji","tagline":"string appetitosa max 15 parole","prepMin":numero,"cookMin":numero,"difficulty":"facile|medio|avanzato","mood":"performance|recovery|comfort|light","ingredients":[{"item":"string","amount":"string"}],"steps":["string con emoji"],"kcal":numero,"protein":numero,"carbs":numero,"fat":numero,"fiber":numero,"fitScore":numero_1_10,"notes":"string hack nutrizionale"}`;
+{"title":"string","emoji":"emoji","tagline":"string appetitosa max 15 parole","prepMin":numero,"cookMin":numero,"difficulty":"facile|medio|avanzato","mood":"performance|recovery|comfort|light","ingredients":[{"item":"string","amount":"string"}],"steps":["string con emoji"],"kcal":numero,"protein":numero,"carbs":numero,"fat":numero,"fiber":numero,"fitScore":numero_1_10,"notes":"string hack nutrizionale","science":"string principio scientifico applicato"}`;
 
       const userMsg = autoMode
         ? `${profileCtx}${prefsCtx}\n\nCrea LA ricetta fitporn perfetta per questo momento. Sorprendimi con qualcosa di straordinario che non mi aspetto, rispettando SEMPRE le preferenze/allergie indicate.`
         : `${profileCtx}${prefsCtx}\n\nRichiesta specifica: ${prompt}\n\nCrea una versione fitporn di questa ricetta, adattata ai miei macro residui e alle mie preferenze/allergie.`;
 
-      const data = await requestSystemAI({
-        model: getModelFor('recipe') || undefined,
+      const recipeRequest = (modelOverride) => requestSystemAI({
+        model: modelOverride,
         temperature: 0.82,
         max_tokens: 700,
         timeoutMs: 28000,
@@ -2995,6 +3002,15 @@ Rispondi SOLO JSON valido:
           { role: 'user', content: userMsg },
         ]
       });
+      let data;
+      try {
+        data = await recipeRequest(getModelFor('recipe') || undefined);
+      } catch (firstErr) {
+        // Il modello scelto può sparire dal provider (es. Scout 404) o essere in 429:
+        // un secondo giro con la catena automatica del proxy salva la generazione.
+        if (getModelFor('recipe')) data = await recipeRequest(undefined);
+        else throw firstErr;
+      }
       const parsed = parseModelJson(data);
       const nextRecipe = {
         title: String(parsed?.title || 'Ricetta AI').slice(0, 80),
@@ -3015,11 +3031,14 @@ Rispondi SOLO JSON valido:
         fiber: Math.max(0, Math.round(Number(parsed?.fiber || 0))),
         fitScore: Math.min(10, Math.max(1, Math.round(Number(parsed?.fitScore || 7)))),
         notes: String(parsed?.notes || '').slice(0, 280),
+        science: String(parsed?.science || '').slice(0, 280),
+        provider: String(data?._shadowMeta?.model || '').replace(/^\w+:/, '').split('/').pop().slice(0, 40),
         createdAt: new Date().toISOString(),
         auto: autoMode,
       };
       setGeneratedRecipe(nextRecipe);
       setRecipeFeedbackGiven(null); // nuova ricetta → nessun feedback ancora dato
+      setRecipeLogged(false);
       // Salva in storico ricette (max 10)
       const histKey = 'shadow_monarch_recipe_history';
       try {
@@ -3036,6 +3055,27 @@ Rispondi SOLO JSON valido:
     } finally {
       setIsGeneratingRecipe(false);
     }
+  };
+
+  // "Mangiata!" — logga i macro della ricetta generata nei pasti di oggi, nello slot
+  // dedotto dall'ora (stesso pattern di applyMealTemplate). Un tap, zero doppi inserimenti.
+  const logGeneratedRecipe = () => {
+    if (!generatedRecipe || recipeLogged) return;
+    const hourNow = new Date().getHours();
+    const slot = hourNow < 10 ? 'breakfast' : hourNow < 14 ? 'lunch' : hourNow < 18 ? 'snack' : 'dinner';
+    const slotMeta = MEAL_SLOT_META[slot];
+    saveToSystem({
+      consumed: Number(todayData.consumed || 0) + Number(generatedRecipe.kcal || 0),
+      protein: Number(todayData.protein || 0) + Number(generatedRecipe.protein || 0),
+      carbs: Number(todayData.carbs || 0) + Number(generatedRecipe.carbs || 0),
+      fatMacros: Number(todayData.fatMacros || 0) + Number(generatedRecipe.fat || 0),
+      fiber: Number(todayData.fiber || 0) + Number(generatedRecipe.fiber || 0),
+      [slotMeta.key]: Number(todayData?.[slotMeta.key] || 0) + Number(generatedRecipe.kcal || 0),
+    });
+    setRecipeLogged(true);
+    playSfx('success', soundEnabled, soundTheme);
+    emitFxBurst();
+    emitUiToast({ message: `✅ ${generatedRecipe.title} loggata — ${generatedRecipe.kcal} kcal (${slotMeta.label})`, tone: 'success', durationMs: 3200 });
   };
 
   // 👍/👎 sulla ricetta corrente — alimenta l'apprendimento delle affinità (stile "più ti piace,
@@ -3133,7 +3173,9 @@ Rispondi SOLO JSON valido:
     // Inietta i principi scientifici pertinenti (dalla knowledge base distillata dai paper):
     // così le ricette diventano evidence-based — timing, densità proteica, indice glicemico,
     // micronutrienti — non solo "belle da vedere".
-    const science = knowledgePromptFor(`${mealType} nutrizione proteine sazietà energia ${prefsCtx}`, 12);
+    // NB: il 2° parametro è un BUDGET IN CARATTERI (non un conteggio di principi):
+    // con 12 la scienza usciva vuota e le ricette ignoravano la knowledge base.
+    const science = knowledgePromptFor(`${mealType} nutrizione proteine sazietà energia ${prefsCtx}`, 1800);
     const cards = [];
     // Lotti più piccoli (12) con budget-token più ampio per oggetto: riduce drasticamente le
     // troncature a metà array. Se un lotto arriva comunque tagliato, parseModelJsonArray salva
@@ -3217,12 +3259,12 @@ Rispondi SOLO con un array JSON valido di esattamente ${chunkSize} oggetti, in q
     setForgeBatch((prev) => prev ? { ...prev, cards: prev.cards.map((c) => c.id === cardId ? { ...c, loadingFull: true } : c) } : prev);
     try {
       const { profileCtx, prefsCtx } = computeRecipeContext();
-      const science = knowledgePromptFor(`${forgeBatch.mealType} ${card.title} nutrizione proteine`, 8);
+      const science = knowledgePromptFor(`${forgeBatch.mealType} ${card.title} nutrizione proteine`, 1200);
       const systemPrompt = `Sei uno chef nutrizionale d'élite specializzato in FITPORN. Devi completare una ricetta il cui titolo, tagline e macro sono GIÀ decisi: crea ingredienti e procedimento coerenti con quei valori, senza cambiarli.
 VINCOLO ASSOLUTO DI SICUREZZA: rispetta sempre le eventuali allergie indicate.
 La nota finale ("notes") deve contenere UN hack nutrizionale concreto e fondato sulla scienza qui sotto (timing, assorbimento, sazietà), non un consiglio generico.${science}
 Rispondi SOLO JSON valido:
-{"ingredients":[{"item":"string","amount":"string"}],"steps":["string con emoji"],"notes":"string hack nutrizionale","fitScore":numero_1_10}`;
+{"ingredients":[{"item":"string","amount":"string"}],"steps":["string con emoji"],"notes":"string hack nutrizionale","science":"string: il principio scientifico concreto applicato","fitScore":numero_1_10}`;
       const userMsg = `${profileCtx}${prefsCtx}\n\nCompleta questa ricetta per ${forgeBatch.mealType}: "${card.title}" — ${card.tagline}\nMacro da rispettare: ${card.kcal}kcal, ${card.protein}g proteine, ${card.carbs}g carboidrati, ${card.fat}g grassi, tempo totale ~${card.prepMin} minuti, difficoltà ${card.difficulty}.`;
       const data = await requestSystemAI({
         model: getModelFor('recipe') || undefined,
@@ -3241,6 +3283,7 @@ Rispondi SOLO JSON valido:
           : [],
         steps: Array.isArray(parsed?.steps) ? parsed.steps.map((x) => String(x || '').trim()).filter(Boolean).slice(0, 10) : [],
         notes: String(parsed?.notes || '').slice(0, 280),
+        science: String(parsed?.science || '').slice(0, 280),
         fitScore: Math.min(10, Math.max(1, Math.round(Number(parsed?.fitScore || 7)))),
       };
       setForgeBatch((prev) => prev ? { ...prev, cards: prev.cards.map((c) => c.id === cardId ? { ...c, full, loadingFull: false } : c) } : prev);
@@ -6236,6 +6279,12 @@ Rispondi SOLO JSON valido:
                   placeholder="es: italiana, giapponese, mediterranea..."
                   className="w-full bg-black/50 border border-white/10 rounded-lg text-white text-[10px] p-2 focus:outline-none focus:border-violet-400/50 placeholder-gray-600" />
               </div>
+              <div>
+                <label className="text-[9px] text-gray-400 mb-1 block">🔬 Principi nutrizionali richiesti (vincolo)</label>
+                <input value={foodPrefs.principles} onChange={(e) => setFoodPrefs((p) => ({ ...p, principles: e.target.value }))}
+                  placeholder="es: basso indice glicemico, 30g+ proteine, alta fibra..."
+                  className="w-full bg-black/50 border border-white/10 rounded-lg text-white text-[10px] p-2 focus:outline-none focus:border-violet-400/50 placeholder-gray-600" />
+              </div>
               <div className="flex gap-3">
                 <div className="flex-1">
                   <label className="text-[9px] text-gray-400 mb-1 block">Piccantezza</label>
@@ -6280,6 +6329,23 @@ Rispondi SOLO JSON valido:
               </button>
             ))}
           </div>
+          {/* Storico: le ultime ricette forgiate si riaprono con un tap (prima erano salvate ma invisibili) */}
+          {(() => {
+            try {
+              const hist = JSON.parse(localStorage.getItem('shadow_monarch_recipe_history') || '[]');
+              if (!hist.length) return null;
+              return (
+                <div className="flex gap-1.5 mt-2 overflow-x-auto pb-0.5">
+                  {hist.slice(0, 6).map((r, i) => (
+                    <button key={`${r.createdAt || i}`} onClick={() => { setGeneratedRecipe(r); setRecipeFeedbackGiven(null); setRecipeLogged(false); }}
+                      className="flex-shrink-0 text-[8px] px-2 py-0.5 rounded-full border border-white/10 text-gray-300 hover:border-violet-300/40 hover:text-violet-200 transition-colors">
+                      {r.emoji} {String(r.title || '').slice(0, 22)}
+                    </button>
+                  ))}
+                </div>
+              );
+            } catch { return null; }
+          })()}
           {isGeneratingRecipe && (
             <div className="mt-4 flex items-center gap-2">
               <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#a78bfa' }} />
@@ -6301,6 +6367,7 @@ Rispondi SOLO JSON valido:
                       FIT {generatedRecipe.fitScore}/10
                     </div>
                     <div className="text-[8px] text-gray-400">{generatedRecipe.difficulty}</div>
+                    {generatedRecipe.provider && <div className="text-[7px] font-mono text-violet-300/70">🤖 {generatedRecipe.provider}</div>}
                   </div>
                 </div>
                 <div className="flex gap-3 mt-2 text-[9px] text-gray-400">
@@ -6357,6 +6424,22 @@ Rispondi SOLO JSON valido:
                   <p className="text-[9px] text-violet-300 leading-relaxed">💡 {generatedRecipe.notes}</p>
                 </div>
               )}
+              {/* Principio scientifico che ha guidato la ricetta (knowledge base paper) */}
+              {generatedRecipe.science && (
+                <div className="p-3 pb-0">
+                  <p className="text-[9px] text-emerald-300 leading-relaxed">🔬 {generatedRecipe.science}</p>
+                </div>
+              )}
+              {/* Mangiata → logga i macro nel giorno con un tap */}
+              <div className="p-3 pb-0">
+                <button onClick={logGeneratedRecipe} disabled={recipeLogged}
+                  className="w-full py-2.5 rounded-xl text-[11px] font-black transition-colors"
+                  style={recipeLogged
+                    ? { background: 'rgba(16,185,129,0.12)', color: '#34d399', border: '1px solid rgba(16,185,129,0.3)' }
+                    : { background: 'linear-gradient(135deg, #10b981, #047857)', color: '#fff', boxShadow: '0 4px 14px rgba(16,185,129,0.35)' }}>
+                  {recipeLogged ? '✓ Loggata nei pasti di oggi' : `🍽️ Mangiata! Logga ${generatedRecipe.kcal} kcal nel giorno`}
+                </button>
+              </div>
               {/* Feedback — alimenta le affinità per le prossime ricette */}
               <div className="p-3 flex items-center gap-2">
                 {recipeFeedbackGiven ? (
@@ -6549,8 +6632,13 @@ Rispondi SOLO JSON valido:
                 </div>
               )}
               {card.full.notes && (
-                <div className="p-3">
+                <div className="p-3 pb-0">
                   <p className="text-[9px] text-violet-300 leading-relaxed">💡 {card.full.notes}</p>
+                </div>
+              )}
+              {card.full.science && (
+                <div className="p-3">
+                  <p className="text-[9px] text-emerald-300 leading-relaxed">🔬 {card.full.science}</p>
                 </div>
               )}
             </motion.div>
@@ -7813,10 +7901,10 @@ Rispondi SOLO JSON valido:
           </div>
         </div>
         <div className="mb-3 grid grid-cols-2 md:grid-cols-4 gap-2 text-center">
-          <div className="border border-orange-300/20 bg-orange-500/10 p-1.5"><p className="text-[9px] font-black text-orange-200">{Math.round(Number(quickLogData.satFat || 0))}g</p><p className="text-[8px] text-gray-500 uppercase">Sat</p></div>
-          <div className="border border-cyan-300/20 bg-cyan-500/10 p-1.5"><p className="text-[9px] font-black text-cyan-100">{Math.round(Number(quickLogData.monoFat || 0))}g</p><p className="text-[8px] text-gray-500 uppercase">Mono</p></div>
-          <div className="border border-indigo-300/20 bg-indigo-500/10 p-1.5"><p className="text-[9px] font-black text-indigo-200">{Math.round(Number(quickLogData.polyFat || 0))}g</p><p className="text-[8px] text-gray-500 uppercase">Poly</p></div>
-          <div className="border border-pink-300/20 bg-pink-500/10 p-1.5"><p className="text-[9px] font-black text-pink-200">{Math.round(Number(quickLogData.sugars || 0))}g</p><p className="text-[8px] text-gray-500 uppercase">Zucch</p></div>
+          <div className="border border-orange-300/20 bg-orange-500/10 p-1.5"><p className="text-[9px] font-black text-orange-200">{Math.round(Number(quickLogData.satFat || 0))}g</p><p className="text-[8px] text-orange-200/60 uppercase">Sat</p></div>
+          <div className="border border-cyan-300/20 bg-cyan-500/10 p-1.5"><p className="text-[9px] font-black text-cyan-100">{Math.round(Number(quickLogData.monoFat || 0))}g</p><p className="text-[8px] text-cyan-100/60 uppercase">Mono</p></div>
+          <div className="border border-indigo-300/20 bg-indigo-500/10 p-1.5"><p className="text-[9px] font-black text-indigo-200">{Math.round(Number(quickLogData.polyFat || 0))}g</p><p className="text-[8px] text-indigo-200/60 uppercase">Poly</p></div>
+          <div className="border border-pink-300/20 bg-pink-500/10 p-1.5"><p className="text-[9px] font-black text-pink-200">{Math.round(Number(quickLogData.sugars || 0))}g</p><p className="text-[8px] text-pink-200/60 uppercase">Zucch</p></div>
         </div>
 
         <div className="mb-3 grid grid-cols-3 gap-2">

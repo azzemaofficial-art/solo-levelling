@@ -6,21 +6,21 @@
 
 // Modelli via Groq + NVIDIA NIM (proxy /api/ai/chat) — VERIFICATI funzionanti.
 // Prefisso groq:/nvidia: → ogni modello NVIDIA usa la chiave mappata in chat.js.
+// Verificati live il 2026-07-22 (probe su /api/ai/chat con campo `tried`):
+// rimossi Llama 4 Scout, Kimi K2.6 NIM e Mistral Large 3 → 404/no-key su provider.
 export const AI_MODELS = [
   { id: '', label: 'Automatico (fallback)' },
+  { id: 'groq:openai/gpt-oss-120b', label: 'Groq GPT-OSS 120B — qualità alta, mai in coda' },
   { id: 'groq:llama-3.3-70b-versatile', label: 'Groq Llama 3.3 70B — veloce, JSON pulito' },
-  { id: 'groq:meta-llama/llama-4-scout-17b-16e-instruct', label: 'Groq Llama 4 Scout — creativo' },
-  { id: 'nvidia:moonshotai/kimi-k2.6', label: 'NVIDIA Kimi K2 — ragionamento lungo' },
-  { id: 'nvidia:meta/llama-3.1-70b-instruct', label: 'NVIDIA Llama 3.1 70B' },
-  { id: 'nvidia:mistralai/mistral-large-3-675b-instruct-2512', label: 'NVIDIA Mistral Large 3' },
+  { id: 'groq:openai/gpt-oss-20b', label: 'Groq GPT-OSS 20B — fulmineo' },
   { id: 'nvidia:nvidia/nemotron-3-ultra-550b-a55b', label: 'NVIDIA Nemotron Ultra 550B — il più potente' },
 ];
 
 // Default consigliati per funzione quando l'utente non ha scelto nulla.
 const TASK_DEFAULT = {
-  meal: 'groq:llama-3.3-70b-versatile',                    // veloce e JSON pulito (no reasoning)
-  recipe: 'groq:meta-llama/llama-4-scout-17b-16e-instruct', // creativo e veloce
-  profile: '',                                              // usa sempre /api/nvidia/coach direttamente
+  meal: 'groq:llama-3.3-70b-versatile',   // veloce e JSON pulito (no reasoning)
+  recipe: 'groq:openai/gpt-oss-120b',     // creativo, JSON solido, niente rate-limit 429
+  profile: '',                            // usa sempre /api/nvidia/coach direttamente
 };
 
 // Prefisso shadow_monarch_ → incluso nel backup cloud (createBackupPayload).

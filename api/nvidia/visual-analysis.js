@@ -1,3 +1,5 @@
+export const config = { maxDuration: 60 }; // analisi lunga su modelli NIM
+
 // Visual Coach Session Analyzer
 // Riceve tutti i feedback AI raccolti durante la sessione e produce un'analisi completa:
 // pattern ricorrenti, errori sistematici, piano di miglioramento

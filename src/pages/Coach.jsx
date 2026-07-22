@@ -2651,6 +2651,7 @@ function VisualCoach() {
   const [step, setStep] = useState('setup');
   const [sessionContext, setSessionContext] = useState('');
   const [streaming, setStreaming] = useState(false);
+  const wakeLockRef = useRef(null);
   const [analysis, setAnalysis] = useState(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [autoMode, setAutoMode] = useState(false);
@@ -2679,6 +2680,27 @@ function VisualCoach() {
   useEffect(() => {
     if (examRef.current && examRef.current.mode !== mode) { examRef.current = null; setExamBanner(null); }
   }, [mode]);
+  // 🔒 Wake Lock: durante la sessione live lo schermo non deve MAI spegnersi (telefono
+  // appoggiato in palestra, mani occupate). Si ri-acquisisce al ritorno in foreground
+  // perché iOS lo rilascia a ogni cambio di visibilità.
+  useEffect(() => {
+    if (!streaming || !('wakeLock' in navigator)) return undefined;
+    let released = false;
+    const acquire = async () => {
+      try {
+        if (document.visibilityState !== 'visible' || released) return;
+        wakeLockRef.current = await navigator.wakeLock.request('screen');
+      } catch (_) { /* non supportato o negato: la sessione funziona comunque */ }
+    };
+    acquire();
+    document.addEventListener('visibilitychange', acquire);
+    return () => {
+      released = true;
+      document.removeEventListener('visibilitychange', acquire);
+      try { wakeLockRef.current?.release(); } catch (_) {}
+      wakeLockRef.current = null;
+    };
+  }, [streaming]);
   // ── Nuove funzioni live: round solo, angolo, reflex, intensità, routine ──────
   const [roundsOn, setRoundsOn] = useState(false);        // round timer anche in solo
   const [cornerMsg, setCornerMsg] = useState(null);       // {talk, breath} | {loading} durante il rest
@@ -4709,7 +4731,7 @@ function VisualCoach() {
         <div className="flex-1 min-w-0">
           <p className="text-xs font-black text-white leading-tight" style={{ fontFamily: 'Orbitron, sans-serif' }}>
             {currentDisc?.label?.toUpperCase()}
-            <span className="font-bold" style={{ color: '#6b7280' }}> · {masterTitle(mode).toUpperCase()}</span>
+            <span className="font-bold" style={{ color: '#9ca3af' }}> · {masterTitle(mode).toUpperCase()}</span>
           </p>
           {analysis?.provider
             ? <p className="text-[10px] truncate mt-0.5 font-mono" style={{ color: C.violet.hex, opacity: 0.9 }}>🤖 {analysis.provider}</p>
@@ -4783,7 +4805,7 @@ function VisualCoach() {
                 <p className="text-xs text-white mt-1 leading-snug">
                   {cornerMsg?.talk || (cornerMsg?.loading ? 'Il maestro sta arrivando all\'angolo…' : 'Recupera: spalle giù, respiro dal naso.')}
                 </p>
-                {cornerMsg?.breath && <p className="text-[10px] mt-0.5" style={{ color: '#d1d5db' }}>🫁 {cornerMsg.breath}</p>}
+                {cornerMsg?.breath && <p className="text-[10px] mt-0.5" style={{ color: 'rgba(254,243,199,0.85)' }}>🫁 {cornerMsg.breath}</p>}
               </div>
             </motion.div>
           )}
@@ -4846,7 +4868,7 @@ function VisualCoach() {
             {guidedPhase === 'gen' && (
               <div className="text-center py-3">
                 <p className="text-sm font-black" style={{ color: C.emerald.hex, fontFamily: 'Orbitron, sans-serif' }}>🎯 Genero il tuo circuito…</p>
-                <p className="text-[11px] text-gray-500 mt-1">Esercizi su misura per {currentDisc?.label}</p>
+                <p className="text-[11px] mt-1" style={{ color: 'rgba(209,250,229,0.7)' }}>Esercizi su misura per {currentDisc?.label}</p>
               </div>
             )}
 
@@ -4854,7 +4876,7 @@ function VisualCoach() {
               <div className="space-y-3">
                 {/* stepper del circuito */}
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-mono tracking-widest text-gray-500">ESERCIZIO {guidedIdx + 1}/{guidedPlan.length}</span>
+                  <span className="text-[10px] font-mono tracking-widest" style={{ color: 'rgba(209,250,229,0.6)' }}>ESERCIZIO {guidedIdx + 1}/{guidedPlan.length}</span>
                   <span className="text-[10px] font-mono px-2 py-0.5 rounded" style={{ background: 'rgba(16,185,129,0.15)', color: C.emerald.hex }}>{guidedPlan[guidedIdx].durationSec}s</span>
                 </div>
                 <div className="flex gap-1">
@@ -4890,7 +4912,7 @@ function VisualCoach() {
 
             {guidedPhase === 'running' && guidedPlan[guidedIdx] && (
               <div className="text-center space-y-2">
-                <p className="text-[10px] font-mono tracking-widest text-gray-500">ESERCIZIO {guidedIdx + 1}/{guidedPlan.length}</p>
+                <p className="text-[10px] font-mono tracking-widest" style={{ color: 'rgba(209,250,229,0.6)' }}>ESERCIZIO {guidedIdx + 1}/{guidedPlan.length}</p>
                 {/* movimento animato ben visibile */}
                 <div className="flex justify-center" style={{ filter: `drop-shadow(0 0 14px ${C.emerald.hex}55)` }}>
                   <StickFigure poseKey={resolvePose((guidedPlan[guidedIdx].name || '').split(/[-–—,]/)[0].trim())} color={C.emerald.hex} size={104} highlight scene={sceneFor(mode)} />
@@ -4906,29 +4928,29 @@ function VisualCoach() {
                 <div className="flex items-center justify-center gap-5 pt-1">
                   <div>
                     <p className="text-5xl font-black text-white tabular-nums leading-none" style={{ fontFamily: 'Orbitron, sans-serif' }}>{Math.floor(guidedTimeLeft / 60)}:{String(guidedTimeLeft % 60).padStart(2, '0')}</p>
-                    <p className="text-[8px] tracking-widest uppercase text-gray-500 mt-1">tempo</p>
+                    <p className="text-[8px] tracking-widest uppercase mt-1" style={{ color: 'rgba(209,250,229,0.6)' }}>tempo</p>
                   </div>
                   <div className="w-px h-12" style={{ background: 'rgba(255,255,255,0.1)' }} />
                   <div>
                     <p className="text-5xl font-black tabular-nums leading-none" style={{ fontFamily: 'Orbitron, sans-serif', color: C.emerald.hex }}>{repCount}</p>
-                    <p className="text-[8px] tracking-widest uppercase text-gray-500 mt-1">rip</p>
+                    <p className="text-[8px] tracking-widest uppercase mt-1" style={{ color: 'rgba(209,250,229,0.6)' }}>rip</p>
                   </div>
                 </div>
                 <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.08)' }}>
                   <div style={{ height: '100%', width: '100%', transformOrigin: 'left', transform: `scaleX(${guidedPlan[guidedIdx].durationSec ? guidedTimeLeft / guidedPlan[guidedIdx].durationSec : 0})`, background: C.emerald.hex, transition: 'transform 1s linear' }} />
                 </div>
                 {guidedPlan[guidedIdx].watchFor && <p className="text-[11px] text-amber-200/80 flex items-center justify-center gap-1.5"><Eye size={12} /> {guidedPlan[guidedIdx].watchFor}</p>}
-                <button onClick={() => finishDrillRef.current()} className="text-[11px] text-gray-500 underline">termina ora</button>
+                <button onClick={() => finishDrillRef.current()} className="text-[11px] underline" style={{ color: 'rgba(255,255,255,0.55)' }}>termina ora</button>
               </div>
             )}
 
             {guidedPhase === 'review' && (
               <div className="space-y-2.5">
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-mono tracking-widest text-gray-500">PAGELLA · {guidedPlan[guidedIdx]?.name}</span>
+                  <span className="text-[10px] font-mono tracking-widest" style={{ color: 'rgba(209,250,229,0.6)' }}>PAGELLA · {guidedPlan[guidedIdx]?.name}</span>
                   {guidedReview && <span className="text-base font-black" style={{ color: guidedReview.score >= 7 ? C.emerald.hex : guidedReview.score >= 5 ? C.orange.hex : C.red.hex }}>{guidedReview.score}/10</span>}
                 </div>
-                {guidedLoading && <p className="text-xs text-gray-500">⏳ Analizzo il drill…</p>}
+                {guidedLoading && <p className="text-xs" style={{ color: 'rgba(209,250,229,0.7)' }}>⏳ Analizzo il drill…</p>}
                 {guidedReview && (
                   <>
                     {guidedReview.good?.length > 0 && <div className="space-y-1">{guidedReview.good.map((g, i) => <p key={i} className="text-xs text-gray-200">✅ {g}</p>)}</div>}
@@ -4941,7 +4963,7 @@ function VisualCoach() {
                   style={{ background: `linear-gradient(135deg, ${C.violet.hex}, #4f46e5)` }}>
                   {guidedIdx + 1 >= guidedPlan.length ? '🏁 Fine circuito' : 'Prossimo drill →'}
                 </motion.button>
-                <label className="flex items-center gap-2 text-[11px] text-gray-500">
+                <label className="flex items-center gap-2 text-[11px]" style={{ color: 'rgba(209,250,229,0.65)' }}>
                   <input type="checkbox" checked={guidedAutoAdvance} onChange={(e) => setGuidedAutoAdvance(e.target.checked)} /> auto-avanza dopo la pagella
                 </label>
               </div>
@@ -5026,7 +5048,7 @@ function VisualCoach() {
                       <motion.span key={i} className="w-2 h-2 rounded-full" style={{ background: '#f97316' }}
                         animate={{ opacity: [0.3,1,0.3] }} transition={{ duration: 0.6, repeat: Infinity, delay: i*0.2 }} />
                     ))}</div>
-                    <p className="text-[10px] text-gray-400">Il coach valuta…</p>
+                    <p className="text-[10px]" style={{ color: 'rgba(254,215,170,0.8)' }}>Il coach valuta…</p>
                   </div>
                 )}
                 {/* RESULT */}
@@ -5062,7 +5084,7 @@ function VisualCoach() {
                       </span>
                     </div>
                     {comboResult.feedback && <p className="text-[12px] text-gray-200 leading-snug">{comboResult.feedback}</p>}
-                    <p className="text-[10px] text-gray-500">Prossimo combo in arrivo…</p>
+                    <p className="text-[10px]" style={{ color: 'rgba(254,215,170,0.7)' }}>Prossimo combo in arrivo…</p>
                   </motion.div>
                 )}
               </div>
@@ -5119,9 +5141,8 @@ function VisualCoach() {
                         transition={{ type: 'spring', stiffness: 360, damping: 22 }}
                         className="rounded-xl px-3.5 py-3 relative overflow-hidden"
                         style={{ background: 'linear-gradient(135deg, rgba(16,185,129,0.16), rgba(124,58,237,0.10))', border: '1px solid rgba(16,185,129,0.35)', boxShadow: '0 0 24px rgba(16,185,129,0.18)' }}>
-                        <span className="absolute left-0 top-0 bottom-0 w-1" style={{ background: 'linear-gradient(180deg, #10b981, #7c3aed)' }} />
                         <p className="text-[10px] font-bold uppercase tracking-wider text-orange-300/90 pl-1.5 mb-0.5">⚠️ Correggi</p>
-                        <p className="text-[15px] font-black text-white leading-tight pl-1.5" style={{ letterSpacing: '-0.01em' }}>{cmd}</p>
+                        <p className="text-[17px] font-black text-white leading-tight pl-1.5" style={{ letterSpacing: '-0.01em' }}>{cmd}</p>
                         {parts.BENE && <p className="mt-2 text-[12px] font-semibold text-emerald-300 pl-1.5 flex items-start gap-1.5"><span className="shrink-0">✅</span> <span><b className="uppercase text-[9px] tracking-wider opacity-80">Bene</b> · {parts.BENE}</span></p>}
                         {parts.PROVA && (() => {
                           const firstTech = parts.PROVA.split(/[→\-,· ]/)[0].trim();
@@ -5152,7 +5173,7 @@ function VisualCoach() {
                               </motion.span>
                             ) : (
                               <>
-                                <span className="text-[10px] text-gray-400">Consiglio giusto?</span>
+                                <span className="text-[10px]" style={{ color: 'rgba(255,255,255,0.65)' }}>Consiglio giusto?</span>
                                 <motion.button whileTap={{ scale: 0.85 }} onClick={() => labelSample('up')}
                                   className="w-7 h-7 rounded-lg flex items-center justify-center"
                                   style={{ background: 'rgba(16,185,129,0.16)', border: '1px solid rgba(16,185,129,0.4)' }} aria-label="Consiglio utile">
@@ -5217,7 +5238,7 @@ function VisualCoach() {
                   <div className="flex-1 min-w-0">
                     <p className="text-[9px] uppercase tracking-widest text-emerald-300/80">Rispecchi: <b className="text-emerald-200">{LBL[mirrorTargetKey] || mirrorTargetKey}</b></p>
                     {!mirrorState ? (
-                      <p className="text-[11px] text-gray-400 mt-1">Inquadrati tutto e muoviti…</p>
+                      <p className="text-[11px] mt-1" style={{ color: 'rgba(209,250,229,0.65)' }}>Inquadrati tutto e muoviti…</p>
                     ) : sc >= 82 ? (
                       <p className="text-[13px] font-bold text-emerald-300 mt-1">✓ Perfetto, tieni così!</p>
                     ) : mirrorState.hints?.length ? (
@@ -5229,7 +5250,7 @@ function VisualCoach() {
                 </div>
                 {/* selettore tecnica (solo se non stai seguendo guidato/combo) */}
                 {following ? (
-                  <p className="text-[10px] text-center text-gray-400">Segue automaticamente l'esercizio in corso</p>
+                  <p className="text-[10px] text-center" style={{ color: 'rgba(209,250,229,0.65)' }}>Segue automaticamente l'esercizio in corso</p>
                 ) : (
                   <div className="flex items-center gap-1 overflow-x-auto pb-0.5">
                     {chips.map((k) => (
@@ -5243,15 +5264,14 @@ function VisualCoach() {
                     ))}
                   </div>
                 )}
-                <p className="text-[9px] text-center text-emerald-300/60">🟢 giunto corretto · 🔴 da aggiustare — usa la fotocamera frontale (Gira)</p>
+                <p className="text-[9px] text-center text-emerald-200/80">🟢 giunto corretto · 🔴 da aggiustare — usa la fotocamera frontale (Gira)</p>
               </div>
             );
           })()}
           <div className="flex gap-2">
             <motion.button whileTap={{ scale: 0.93 }} onClick={captureAndAnalyze} disabled={analyzing}
-              className="flex-1 py-3.5 rounded-xl text-white text-sm font-black transition-all disabled:opacity-40 relative overflow-hidden"
+              className="flex-[1.4] py-3.5 rounded-xl text-white text-sm font-black transition-all disabled:opacity-40 relative overflow-hidden"
               style={{ background: `linear-gradient(135deg, ${C.violet.hex}, #4f46e5)`, boxShadow: `0 4px 18px ${C.violet.glow}` }}>
-              <span className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent)', animation: 'chip-sheen 2s ease-in-out infinite', backgroundSize: '200% 100%' }} />
               <span className="relative inline-flex items-center justify-center gap-1.5"><ScanSearch size={16} /> Analizza</span>
             </motion.button>
             <motion.button whileTap={{ scale: 0.93 }} onClick={() => { if (!autoMode && guidedOn) stopGuided(); setAutoMode((v) => !v); }}

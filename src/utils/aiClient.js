@@ -93,7 +93,13 @@ const toUserFacingDetail = (detail = '') => {
 export const formatAiErrorDetail = (detail = '') => toUserFacingDetail(detail);
 
 const createHttpError = (status, payload) => {
-  const detail = toUserFacingDetail(payload?.error || payload?.message || `HTTP ${status}`);
+  let detail = toUserFacingDetail(payload?.error || payload?.message || `HTTP ${status}`);
+  // Il proxy riporta la catena di provider tentati: mostrarla trasforma un generico
+  // "Errore AI" in qualcosa di diagnosticabile (es. "70b:429 → 8b:429").
+  if (Array.isArray(payload?.tried) && payload.tried.length) {
+    const chain = payload.tried.slice(-3).map((t) => String(t).replace(/^\w+:/, '').split('/').pop()).join(' → ');
+    detail = `${detail} [${chain}]`.slice(0, 140);
+  }
   const error = new Error(detail);
   error.status = status;
   return error;

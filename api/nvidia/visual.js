@@ -1,3 +1,5 @@
+export const config = { maxDuration: 60 }; // pipeline 2 coach vision + cervello supera i 15s default
+
 // NVIDIA NIM visual live coach — Llama Vision 90B primary, Groq fallback
 // Discipline: muaythai, boxing, kickboxing, bjj, wrestling, karate, mma, kravmaga, general, fitness
 

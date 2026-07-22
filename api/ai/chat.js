@@ -5,6 +5,10 @@
 //  Ids non prefissati/sconosciuti → ignorati, si passa alla catena di fallback.
 // ─────────────────────────────────────────────────────────────────────────────
 
+// I modelli NIM (es. Nemotron 550B) possono superare i 15s di default: senza questo
+// Vercel uccide la funzione a metà risposta e il client vede "Ricetta fallita".
+export const config = { maxDuration: 60 };
+
 const NVIDIA_BASE = 'https://integrate.api.nvidia.com/v1';
 const GROQ_BASE = 'https://api.groq.com/openai/v1';
 
@@ -27,8 +31,18 @@ const NVIDIA_MODEL_KEY = {
 };
 const NVIDIA_KEY_DEFAULT = () => firstKey('NVIDIA_API_KEY', 'LLAMA_NVIDIA_API_KEY', 'KIMI_NVIDIA_API_KEY', 'DEEPSEEK_PRO_API_KEY');
 
-// Catena di fallback sempre disponibile (modelli che reggiamo per certo).
-const FALLBACK = ['groq:llama-3.3-70b-versatile', 'groq:llama-3.1-8b-instant'];
+// Catena di fallback sempre disponibile (modelli VERIFICATI live il 2026-07-22).
+// gpt-oss-120b prima: qualità alta, JSON pulito e — a differenza del 70B — non va
+// in rate-limit 429 sotto carico (batch Recipe Forge da 12+ chiamate consecutive).
+const FALLBACK = [
+  'groq:openai/gpt-oss-120b',
+  'groq:llama-3.3-70b-versatile',
+  'groq:openai/gpt-oss-20b',
+  'groq:llama-3.1-8b-instant',
+  // Ultima risorsa fuori-Groq: se Groq è interamente in 429, NIM risponde comunque
+  // (lento ma verificato 200) — meglio una risposta in 20s che nessuna.
+  'nvidia:nvidia/nemotron-3-ultra-550b-a55b',
+];
 
 function resolveProvider(modelId) {
   const id = String(modelId || '').trim();
@@ -73,7 +87,7 @@ export default async function handler(req, res) {
       endpoint: '/api/ai/chat',
       providers: {
         groq: Boolean(GROQ_KEY()),
-        nvidia: Boolean(NVIDIA_KEY()),
+        nvidia: Boolean(NVIDIA_KEY_DEFAULT()),
       },
       nvidiaKeySource: ['NVIDIA_550B_API_KEY', 'DEEPSEEK_PRO_API_KEY', 'KIMI_NVIDIA_API_KEY', 'LLAMA_NVIDIA_API_KEY', 'MISTRAL_NVIDIA_API_KEY', 'NVIDIA_API_KEY']
         .filter((n) => process.env[n]),
@@ -107,6 +121,11 @@ export default async function handler(req, res) {
         const msg = r.data.choices[0].message;
         if (typeof msg.content === 'string') {
           msg.content = msg.content.replace(/<think>[\s\S]*?<\/think>/gi, '').replace(/^\s*<\/?think>\s*/gi, '').trim();
+        }
+        // gpt-oss (Groq) separa il ragionamento in message.reasoning: se il content
+        // arriva vuoto (finish per max_tokens durante il reasoning) usa quello.
+        if (!msg.content && typeof msg.reasoning === 'string' && msg.reasoning.trim()) {
+          msg.content = msg.reasoning.trim();
         }
         res.setHeader('X-Shadow-Model', cand);
         return res.status(200).json({ ...r.data, _shadowMeta: { model: cand, fallbackUsed: cand !== model, tried } });

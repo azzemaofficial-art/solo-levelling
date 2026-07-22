@@ -1,3 +1,5 @@
+export const config = { maxDuration: 60 }; // i modelli NIM superano i 15s di default Vercel
+
 // NVIDIA NIM fitness/nutrition AI coach
 // tier: 'max' → tenta 550B prima; default → chain veloce
 // web: true → Tavily search iniettata nel contesto prima dell'LLM

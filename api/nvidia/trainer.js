@@ -1,3 +1,5 @@
+export const config = { maxDuration: 60 }; // i modelli NIM superano i 15s di default Vercel
+
 // Personal Trainer AI — Shadow Coach
 // Gestisce: calorie/macro, ricette, schede allenamento, integratori
 
