@@ -70,7 +70,7 @@ export const NUTRITION_PRINCIPLES = [
 ${principles.map((p) => `  \`${esc(p)}\`,`).join('\n')}
 ];
 
-export const NUTRITION_SOURCES = [
+export const KNOWLEDGE_SOURCES = [
 ${sources.map((s) => `  { title: \`${esc(s.title)}\`, topic: \`${esc(s.topic)}\`, principles: ${s.count} },`).join('\n')}
 ];
 

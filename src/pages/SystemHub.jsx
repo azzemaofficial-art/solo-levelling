@@ -9,8 +9,8 @@ import { AI_MODELS, getModelFor, getGlobalModel, setGlobalModel, getTaskOverride
 import { computeReadinessOutcome, computeSleepCoach, computeWeightTrendGuard, computeWeeklyOverview, evaluateDataQuality } from '../utils/healthLogic';
 import { emitShadowFxBurst } from '../utils/fxEvents';
 import { emitUiToast } from '../utils/uiEvents';
-import { knowledgePrompt, knowledgePromptFor, NUTRITION_PRINCIPLES, NUTRITION_SOURCES } from '../../lib/knowledgeBase.js';
-import { SCIENCE_HIGHLIGHTS, SCIENCE_CATEGORIES, scienceCategoryOf } from '../../lib/scienceHighlights.js';
+import { knowledgePrompt, knowledgePromptFor } from '../../lib/knowledgeBase.js';
+import ScienceFeed from '../components/ScienceFeed.jsx';
 const QUICK_PROTOCOLS = [
   { id: 'nutrition', title: 'Nutrition Lock', desc: 'Chiudi proteine + kcal target', color: 'text-cyan-200 border-cyan-300/30 bg-cyan-500/10' },
   { id: 'hydration', title: 'Hydration Shield', desc: 'Acqua costante durante il giorno', color: 'text-emerald-200 border-emerald-300/30 bg-emerald-500/10' },
@@ -318,6 +318,34 @@ const SystemHub = ({ systemLogs, setSystemLogs, dailyGoal, setDailyGoal, hydrati
     targetWeightKg: Number(playerStats.bodyGoal?.targetWeightKg || 0),
     targetFatPct: Number(playerStats.bodyGoal?.targetFatPct || 0)
   });
+
+  // Segnali per il feed "Novità dagli Studi": leggono lo stato reale dai check-in per far
+  // emergere i principi scientifici pertinenti a COSA sta vivendo l'utente adesso.
+  const scienceSignals = useMemo(() => {
+    const s = [];
+    const stress = Math.max(Number(morningCheckin.stress || 0), Number(eveningCheckin.stress || 0));
+    if (Number(morningCheckin.sleepQuality || 7) <= 5 || Number(morningCheckin.sleepHours || 7) < 6.5 || Number(morningCheckin.awakenings || 0) >= 3)
+      s.push({ key: 'sonno', label: 'Sonno da sistemare', emoji: '🌙', query: 'sonno risveglio riposato melatonina qualità profondo caffeina luce blu circadiano' });
+    if (stress >= 6)
+      s.push({ key: 'stress', label: 'Stress alto', emoji: '🧘', query: 'stress cortisolo mindfulness respirazione meditazione ansia HRV resilienza' });
+    if (Number(morningCheckin.energy || 6) <= 4)
+      s.push({ key: 'energia', label: 'Energia bassa', emoji: '⚡', query: 'energia fatica stanchezza caffeina ferro mitocondri glicemia pisolino' });
+    if (Number(eveningCheckin.bloating || 4) >= 6 || Number(eveningCheckin.digestion || 6) <= 4)
+      s.push({ key: 'intestino', label: 'Digestione ballerina', emoji: '🦠', query: 'intestino microbiota fibra gonfiore digestione probiotici butirrato fermentati' });
+    if (Number(eveningCheckin.craving || 5) >= 7 || Number(eveningCheckin.hunger || 5) >= 8)
+      s.push({ key: 'appetito', label: 'Fame e voglie alte', emoji: '🍽️', query: 'sazietà proteine fame grelina leptina fibra zucchero glicemia voglie' });
+    // Segnale sempre presente legato all'obiettivo, così il feed non è mai vuoto.
+    const obj = String(playerStats.objective || 'recomp');
+    const objMap = {
+      cut: { label: 'Obiettivo: definizione', query: 'deficit calorico sazietà proteine massa magra grasso perdita peso' },
+      bulk: { label: 'Obiettivo: massa', query: 'ipertrofia proteine creatina leucina sintesi muscolare volume allenamento' },
+      recomp: { label: 'Obiettivo: ricomposizione', query: 'proteine composizione corporea forza muscolo grasso recupero' },
+      longevity: { label: 'Obiettivo: longevità', query: 'longevità VO2max forza presa autofagia infiammazione sarcopenia' },
+    };
+    const o = objMap[obj] || objMap.recomp;
+    s.push({ key: 'obiettivo', label: o.label, emoji: '🎯', query: o.query });
+    return s;
+  }, [morningCheckin, eveningCheckin, playerStats.objective]);
   const [microTargets, setMicroTargets] = useState(() => {
     try {
       const raw = localStorage.getItem('shadow_monarch_micro_targets');
@@ -408,10 +436,6 @@ const SystemHub = ({ systemLogs, setSystemLogs, dailyGoal, setDailyGoal, hydrati
   const [forgeCountInput, setForgeCountInput] = useState('7');
   const [forgeBatch, setForgeBatch] = useState(null); // {total, mealType, cards:[], done, generating, error}
   const [forgeDetailCardId, setForgeDetailCardId] = useState(null);
-  // ── Novità dagli Studi: feed editoriale delle perle scientifiche dai paper distillati ──
-  const [scienceFilter, setScienceFilter] = useState('all'); // 'all' | chiave categoria | 'myth'
-  const [scienceExpandedId, setScienceExpandedId] = useState(null);
-  const [scienceFeatured, setScienceFeatured] = useState(() => Math.floor(Math.random() * SCIENCE_HIGHLIGHTS.length));
   const [aiModelProfile, setAiModelProfile] = useState(() => getTaskOverride('profile'));
   // Analisi profilo profonda (Nemotron)
   const [profileAnalysis, setProfileAnalysis] = useState(() => {
@@ -6050,122 +6074,9 @@ Rispondi SOLO JSON valido:
         <p className="mt-2 text-[8px] text-gray-600">Override vuoto = usa il globale. Globale vuoto = catena automatica del proxy.</p>
       </motion.div>
 
-      {/* ── NOVITÀ DAGLI STUDI — feed editoriale delle perle scientifiche ── */}
-      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mb-6 rounded-2xl overflow-hidden relative"
-        style={{ background: 'linear-gradient(150deg, rgba(4,10,20,0.98), rgba(10,18,30,0.95) 55%, rgba(6,20,18,0.97))', border: '1px solid rgba(56,189,248,0.24)', boxShadow: '0 8px 34px rgba(14,165,233,0.1), inset 0 1px 0 rgba(255,255,255,0.05)' }}>
-        <div className="pointer-events-none absolute -top-10 -left-8 h-36 w-36 rounded-full blur-3xl" style={{ background: 'rgba(56,189,248,0.16)' }} />
-        <div className="pointer-events-none absolute -bottom-12 -right-6 h-36 w-36 rounded-full blur-3xl" style={{ background: 'rgba(52,211,153,0.12)' }} />
-        <div className="p-4 relative z-10">
-          {/* Header + stat live */}
-          <div className="flex items-start justify-between gap-3 mb-3">
-            <div>
-              <p className="text-[9px] uppercase tracking-[0.36em] font-bold" style={{ color: 'rgba(125,211,252,0.95)' }}>◈ Live Science</p>
-              <p className="text-sm font-black text-white" style={{ fontFamily: 'Russo One, sans-serif' }}>Novità dagli Studi</p>
-            </div>
-            <div className="flex-shrink-0 text-right rounded-xl px-3 py-1.5" style={{ background: 'rgba(56,189,248,0.12)', border: '1px solid rgba(56,189,248,0.25)' }}>
-              <p className="text-[13px] font-black leading-none" style={{ color: '#7dd3fc' }}>{NUTRITION_PRINCIPLES.length.toLocaleString('it-IT')}</p>
-              <p className="text-[7px] uppercase tracking-wider font-bold mt-0.5" style={{ color: 'rgba(125,211,252,0.75)' }}>principi · {NUTRITION_SOURCES.length} fonti</p>
-            </div>
-          </div>
-
-          {/* Perla del momento — card in evidenza, rotabile */}
-          {(() => {
-            const f = SCIENCE_HIGHLIGHTS[scienceFeatured] || SCIENCE_HIGHLIGHTS[0];
-            const cat = scienceCategoryOf(f.cat);
-            return (
-              <motion.div key={f.id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
-                className="rounded-2xl p-3.5 mb-3 relative overflow-hidden"
-                style={{ background: `linear-gradient(140deg, ${cat.color}26, rgba(6,12,22,0.92) 70%)`, border: `1px solid ${cat.color}55`, boxShadow: `0 0 24px ${cat.color}1f` }}>
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-[8px] uppercase tracking-[0.3em] font-bold" style={{ color: cat.color }}>✦ Perla del momento</span>
-                  <button onClick={() => setScienceFeatured((SCIENCE_HIGHLIGHTS.length > 1
-                    ? (prev) => { let n = prev; while (n === prev) n = Math.floor(Math.random() * SCIENCE_HIGHLIGHTS.length); return n; }
-                    : (prev) => prev))}
-                    className="text-[11px] w-7 h-7 rounded-lg flex items-center justify-center transition-transform hover:rotate-180"
-                    style={{ background: `${cat.color}22`, border: `1px solid ${cat.color}44`, color: cat.color }} title="Un'altra perla">🎲</button>
-                </div>
-                <div className="flex items-start gap-2.5">
-                  <span className="text-2xl leading-none flex-shrink-0" style={{ filter: `drop-shadow(0 0 8px ${cat.color}88)` }}>{f.emoji}</span>
-                  <div className="min-w-0">
-                    <p className="text-[13px] font-black text-white leading-tight">{f.punch}</p>
-                    <p className="text-[10px] leading-snug mt-1" style={{ color: 'rgba(226,232,240,0.82)' }}>{f.detail}</p>
-                    <div className="flex items-center gap-1.5 mt-2">
-                      <span className="text-[7px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded" style={{ background: `${cat.color}22`, color: cat.color }}>{cat.emoji} {cat.label}</span>
-                      {f.myth && <span className="text-[7px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded" style={{ background: 'rgba(248,113,113,0.18)', color: '#fca5a5' }}>⚡ Mito sfatato</span>}
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
-            );
-          })()}
-
-          {/* Chip filtro categorie */}
-          <div className="flex flex-wrap gap-1.5 mb-3">
-            <button onClick={() => setScienceFilter('all')}
-              className="text-[9px] font-bold px-2.5 py-1 rounded-full transition-colors"
-              style={scienceFilter === 'all'
-                ? { background: 'rgba(56,189,248,0.28)', color: '#e0f2fe', border: '1px solid rgba(56,189,248,0.5)' }
-                : { background: 'rgba(255,255,255,0.05)', color: 'rgba(125,211,252,0.85)', border: '1px solid rgba(56,189,248,0.2)' }}>
-              Tutte
-            </button>
-            <button onClick={() => setScienceFilter('myth')}
-              className="text-[9px] font-bold px-2.5 py-1 rounded-full transition-colors"
-              style={scienceFilter === 'myth'
-                ? { background: 'rgba(248,113,113,0.28)', color: '#fee2e2', border: '1px solid rgba(248,113,113,0.5)' }
-                : { background: 'rgba(255,255,255,0.05)', color: 'rgba(252,165,165,0.9)', border: '1px solid rgba(248,113,113,0.22)' }}>
-              ⚡ Miti sfatati
-            </button>
-            {SCIENCE_CATEGORIES.map((c) => (
-              <button key={c.key} onClick={() => setScienceFilter(c.key)}
-                className="text-[9px] font-bold px-2.5 py-1 rounded-full transition-colors"
-                style={scienceFilter === c.key
-                  ? { background: `${c.color}3d`, color: '#fff', border: `1px solid ${c.color}80` }
-                  : { background: 'rgba(255,255,255,0.05)', color: c.color, border: `1px solid ${c.color}33` }}>
-                {c.emoji} {c.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Griglia perle filtrate */}
-          <div className="grid sm:grid-cols-2 gap-2">
-            {SCIENCE_HIGHLIGHTS
-              .filter((h) => scienceFilter === 'all' || (scienceFilter === 'myth' ? h.myth : h.cat === scienceFilter))
-              .map((h) => {
-                const cat = scienceCategoryOf(h.cat);
-                const open = scienceExpandedId === h.id;
-                return (
-                  <motion.button key={h.id} layout onClick={() => setScienceExpandedId(open ? null : h.id)}
-                    className="text-left rounded-xl p-2.5 transition-colors"
-                    style={{ background: open ? `${cat.color}1f` : 'rgba(255,255,255,0.035)', border: `1px solid ${open ? `${cat.color}66` : 'rgba(255,255,255,0.08)'}` }}>
-                    <div className="flex items-start gap-2">
-                      <span className="text-lg leading-none flex-shrink-0 mt-0.5" style={{ filter: `drop-shadow(0 0 5px ${cat.color}66)` }}>{h.emoji}</span>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-[11px] font-bold text-white leading-tight">{h.punch}</p>
-                        <div className="flex items-center gap-1 mt-1">
-                          <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: cat.color }} />
-                          <span className="text-[7.5px] uppercase tracking-wide font-bold" style={{ color: cat.color }}>{h.tag}</span>
-                          {h.myth && <span className="text-[7.5px] font-bold" style={{ color: '#fca5a5' }}>· ⚡ mito</span>}
-                          {h.fresh && <span className="text-[7.5px] font-bold" style={{ color: '#7dd3fc' }}>· nuovo</span>}
-                        </div>
-                        <AnimatePresence>
-                          {open && (
-                            <motion.p initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
-                              className="text-[10px] leading-snug mt-1.5 overflow-hidden" style={{ color: 'rgba(226,232,240,0.85)' }}>
-                              {h.detail}
-                            </motion.p>
-                          )}
-                        </AnimatePresence>
-                      </div>
-                    </div>
-                  </motion.button>
-                );
-              })}
-          </div>
-          <p className="text-[8px] mt-2.5 text-center" style={{ color: 'rgba(148,163,184,0.7)' }}>
-            Distillate da {NUTRITION_SOURCES.length} paper scientifici · il Ricercatore Notturno ne aggiunge ogni notte
-          </p>
-        </div>
-      </motion.div>
+      {/* ── NOVITÀ DAGLI STUDI — feed vivo: 1463 principi reali, personalizzato, azionabile ── */}
+      <ScienceFeed signals={scienceSignals} onAskCoach={sendShadowChatMessage}
+        onToast={(message) => emitUiToast({ message, tone: "success", durationMs: 2600 })} />
 
       {/* ── ANALISI PROFILO PROFONDA (Nemotron) ── */}
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mb-6 rounded-2xl overflow-hidden relative p-4" style={{ background: 'linear-gradient(145deg, rgba(6,18,14,0.97), rgba(8,24,18,0.93))', border: '1px solid rgba(16,185,129,0.22)' }}>
