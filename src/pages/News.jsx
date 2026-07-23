@@ -48,6 +48,17 @@ const News = ({ playerStats = {}, onAskCoach, onToast }) => {
     if (heightCm >= 183)
       s.push({ key: 'corporatura', label: 'Corporatura alta', emoji: '📏', query: 'altezza corporatura creatina dose peso corporeo lombalgia stacco biomeccanica trombosi tvp leve lunghe' });
 
+    // Peso corporeo elevato (>80kg): dosaggi mg/kg standard (creatina, caffeina,
+    // proteine per pasto, vitamina D) sono tarati su un 70-75kg medio e sottodosano
+    // chi pesa di più — principio diverso dalla sola altezza, va scalato sul peso reale.
+    const weightKg = Number(playerStats.currentWeightKg || 0);
+    if (weightKg >= 80)
+      s.push({ key: 'peso-corporeo', label: 'Peso corporeo elevato', emoji: '⚖️', query: 'dose creatina caffeina proteine pasto peso corporeo scalato mg/kg whey plateau' });
+
+    // Chi combina pesi e arti marziali ha un problema specifico (interferenza,
+    // timing tra sessioni) che chi fa solo palestra non ha — sempre rilevante qui.
+    s.push({ key: 'concurrent-training', label: 'Pesi + arti marziali', emoji: '🥋', query: 'concurrent training interferenza recupero ore ordine sessioni forza esplosiva glicogeno' });
+
     // Finestra 20-25 anni: picco naturale di testosterone e ultima fase di
     // costruzione della massa ossea — una finestra biologica che non si ripete.
     const age = Number(playerStats.age || 0);
