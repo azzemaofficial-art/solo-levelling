@@ -663,6 +663,10 @@ function QuickGrid({ prompts, onSend, accentColor }) {
 }
 
 // ─── Tab: Chat generale ────────────────────────────────────────────────────────
+// PENDING_COACH_QUESTION_KEY: bridge cross-pagina — la pagina News ("Applica a me"
+// su una scoperta scientifica) scrive qui e naviga a Coach; questo tab la consuma
+// una sola volta all'apertura, invece di perdere la domanda cambiando pagina.
+const PENDING_COACH_QUESTION_KEY = 'shadow_monarch_pending_coach_question';
 function CoachChat() {
   const [input, setInput] = useState('');
   const endRef = useRef(null);
@@ -670,6 +674,15 @@ function CoachChat() {
   const sendWithContext = useCallback((text) => send(text, { athleteContext: athleteSummary() }), [send]);
   const handleSend = () => { if (!input.trim()) return; sendWithContext(input); setInput(''); };
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, loading]);
+  useEffect(() => {
+    let pending;
+    try { pending = localStorage.getItem(PENDING_COACH_QUESTION_KEY); } catch { pending = null; }
+    if (pending) {
+      try { localStorage.removeItem(PENDING_COACH_QUESTION_KEY); } catch {}
+      sendWithContext(pending);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="space-y-4">
@@ -5510,7 +5523,9 @@ const TABS = [
 ];
 
 export default function Coach() {
-  const [tab, setTab] = useState('trainer');
+  const [tab, setTab] = useState(() => {
+    try { return localStorage.getItem(PENDING_COACH_QUESTION_KEY) ? 'chat' : 'trainer'; } catch { return 'trainer'; }
+  });
 
   return (
     <div className="min-h-full text-white pb-8" style={{ background: '#030712' }}>

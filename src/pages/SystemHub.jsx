@@ -9,8 +9,7 @@ import { AI_MODELS, getModelFor, getGlobalModel, setGlobalModel, getTaskOverride
 import { computeReadinessOutcome, computeSleepCoach, computeWeightTrendGuard, computeWeeklyOverview, evaluateDataQuality } from '../utils/healthLogic';
 import { emitShadowFxBurst } from '../utils/fxEvents';
 import { emitUiToast } from '../utils/uiEvents';
-import { knowledgePrompt, knowledgePromptFor } from '../../lib/knowledgeBase.js';
-import ScienceFeed from '../components/ScienceFeed.jsx';
+import { knowledgePrompt, knowledgePromptFor, NUTRITION_PRINCIPLES } from '../../lib/knowledgeBase.js';
 const QUICK_PROTOCOLS = [
   { id: 'nutrition', title: 'Nutrition Lock', desc: 'Chiudi proteine + kcal target', color: 'text-cyan-200 border-cyan-300/30 bg-cyan-500/10' },
   { id: 'hydration', title: 'Hydration Shield', desc: 'Acqua costante durante il giorno', color: 'text-emerald-200 border-emerald-300/30 bg-emerald-500/10' },
@@ -213,7 +212,7 @@ const getBattlePassStreakMultiplier = (streak = 0) => {
   return 1;
 };
 
-const SystemHub = ({ systemLogs, setSystemLogs, dailyGoal, setDailyGoal, hydrationGoal, setHydrationGoal, macroGoals, setMacroGoals, playerStats, setPlayerStats, createEmptyLog, soundEnabled, soundTheme, voiceEnabled, voicePack, crownAnthemEnabled = true, coachMode = false, systemCompactMode = false }) => {
+const SystemHub = ({ systemLogs, setSystemLogs, dailyGoal, setDailyGoal, hydrationGoal, setHydrationGoal, macroGoals, setMacroGoals, playerStats, setPlayerStats, createEmptyLog, soundEnabled, soundTheme, voiceEnabled, voicePack, crownAnthemEnabled = true, coachMode = false, systemCompactMode = false, onOpenNews }) => {
   const today = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit' });
   const todayData = systemLogs.find((log) => log.date === today) || createEmptyLog(today);
   const [tgSyncStatus, setTgSyncStatus] = useState(() => {
@@ -319,33 +318,8 @@ const SystemHub = ({ systemLogs, setSystemLogs, dailyGoal, setDailyGoal, hydrati
     targetFatPct: Number(playerStats.bodyGoal?.targetFatPct || 0)
   });
 
-  // Segnali per il feed "Novità dagli Studi": leggono lo stato reale dai check-in per far
-  // emergere i principi scientifici pertinenti a COSA sta vivendo l'utente adesso.
-  const scienceSignals = useMemo(() => {
-    const s = [];
-    const stress = Math.max(Number(morningCheckin.stress || 0), Number(eveningCheckin.stress || 0));
-    if (Number(morningCheckin.sleepQuality || 7) <= 5 || Number(morningCheckin.sleepHours || 7) < 6.5 || Number(morningCheckin.awakenings || 0) >= 3)
-      s.push({ key: 'sonno', label: 'Sonno da sistemare', emoji: '🌙', query: 'sonno risveglio riposato melatonina qualità profondo caffeina luce blu circadiano' });
-    if (stress >= 6)
-      s.push({ key: 'stress', label: 'Stress alto', emoji: '🧘', query: 'stress cortisolo mindfulness respirazione meditazione ansia HRV resilienza' });
-    if (Number(morningCheckin.energy || 6) <= 4)
-      s.push({ key: 'energia', label: 'Energia bassa', emoji: '⚡', query: 'energia fatica stanchezza caffeina ferro mitocondri glicemia pisolino' });
-    if (Number(eveningCheckin.bloating || 4) >= 6 || Number(eveningCheckin.digestion || 6) <= 4)
-      s.push({ key: 'intestino', label: 'Digestione ballerina', emoji: '🦠', query: 'intestino microbiota fibra gonfiore digestione probiotici butirrato fermentati' });
-    if (Number(eveningCheckin.craving || 5) >= 7 || Number(eveningCheckin.hunger || 5) >= 8)
-      s.push({ key: 'appetito', label: 'Fame e voglie alte', emoji: '🍽️', query: 'sazietà proteine fame grelina leptina fibra zucchero glicemia voglie' });
-    // Segnale sempre presente legato all'obiettivo, così il feed non è mai vuoto.
-    const obj = String(playerStats.objective || 'recomp');
-    const objMap = {
-      cut: { label: 'Obiettivo: definizione', query: 'deficit calorico sazietà proteine massa magra grasso perdita peso' },
-      bulk: { label: 'Obiettivo: massa', query: 'ipertrofia proteine creatina leucina sintesi muscolare volume allenamento' },
-      recomp: { label: 'Obiettivo: ricomposizione', query: 'proteine composizione corporea forza muscolo grasso recupero' },
-      longevity: { label: 'Obiettivo: longevità', query: 'longevità VO2max forza presa autofagia infiammazione sarcopenia' },
-    };
-    const o = objMap[obj] || objMap.recomp;
-    s.push({ key: 'obiettivo', label: o.label, emoji: '🎯', query: o.query });
-    return s;
-  }, [morningCheckin, eveningCheckin, playerStats.objective]);
+  // I segnali per "Novità dagli Studi" sono stati spostati in src/pages/News.jsx
+  // (la sezione ora è una destinazione di primo livello, non più embedded qui).
   const [microTargets, setMicroTargets] = useState(() => {
     try {
       const raw = localStorage.getItem('shadow_monarch_micro_targets');
@@ -6117,9 +6091,24 @@ Rispondi SOLO JSON valido:
         <p className="mt-2 text-[8px] text-gray-600">Override vuoto = usa il globale. Globale vuoto = catena automatica del proxy.</p>
       </motion.div>
 
-      {/* ── NOVITÀ DAGLI STUDI — feed vivo: 1463 principi reali, personalizzato, azionabile ── */}
-      <ScienceFeed signals={scienceSignals} onAskCoach={sendShadowChatMessage}
-        onToast={(message) => emitUiToast({ message, tone: "success", durationMs: 2600 })} />
+      {/* ── NOVITÀ DAGLI STUDI — ora una destinazione di primo livello (menu ▸ News),
+          non più sepolta a metà scroll: qui resta solo una teaser che rimanda là. ── */}
+      <motion.button
+        type="button"
+        onClick={() => (onOpenNews ? onOpenNews() : void 0)}
+        initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} whileTap={{ scale: 0.98 }}
+        className="mb-6 w-full text-left rounded-2xl overflow-hidden relative p-4"
+        style={{ background: 'linear-gradient(150deg, rgba(4,10,20,0.98), rgba(10,18,30,0.95) 55%, rgba(6,20,18,0.97))', border: '1px solid rgba(56,189,248,0.24)', boxShadow: '0 8px 34px rgba(14,165,233,0.1)' }}>
+        <div className="pointer-events-none absolute -top-10 -left-8 h-32 w-32 rounded-full blur-3xl" style={{ background: 'rgba(56,189,248,0.16)' }} />
+        <div className="relative z-10 flex items-center justify-between gap-3">
+          <div>
+            <p className="text-[9px] uppercase tracking-[0.36em] font-bold" style={{ color: 'rgba(125,211,252,0.95)' }}>◈ Live Science</p>
+            <p className="text-sm font-black text-white mt-0.5" style={{ fontFamily: 'Russo One, sans-serif' }}>Novità dagli Studi</p>
+            <p className="text-[10px] mt-1" style={{ color: 'rgba(191,219,254,0.75)' }}>{NUTRITION_PRINCIPLES.length.toLocaleString('it-IT')} principi personalizzati per te, ora →</p>
+          </div>
+          <span className="flex-shrink-0 text-2xl" style={{ filter: 'drop-shadow(0 0 8px rgba(56,189,248,0.5))' }}>🔬</span>
+        </div>
+      </motion.button>
 
       {/* ── ANALISI PROFILO PROFONDA (Nemotron) ── */}
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mb-6 rounded-2xl overflow-hidden relative p-4" style={{ background: 'linear-gradient(145deg, rgba(6,18,14,0.97), rgba(8,24,18,0.93))', border: '1px solid rgba(16,185,129,0.22)' }}>
