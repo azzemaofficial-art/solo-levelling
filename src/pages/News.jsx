@@ -17,12 +17,19 @@ const OBJECTIVE_SIGNAL = {
   longevity: { label: 'Obiettivo: longevità', query: 'longevità VO2max forza presa autofagia infiammazione sarcopenia' },
 };
 
+// Mesi (0-indicizzati) in cui in Italia la sintesi cutanea di vitamina D è
+// praticamente azzerata sopra il 34°-35° parallelo (Webb/Kline/Holick 1988):
+// ottobre-aprile. Il resto dell'anno è la finestra per "caricare" le riserve al sole.
+const WINTER_MONTHS = new Set([9, 10, 11, 0, 1, 2, 3]);
+
 const News = ({ playerStats = {}, onAskCoach, onToast }) => {
   const signals = useMemo(() => {
     const s = [];
     const morning = playerStats.lastMorningCheckin || {};
     const evening = playerStats.lastEveningCheckin || {};
     const stress = Math.max(Number(morning.stress || 0), Number(evening.stress || 0));
+    // Segnali di stato — leggono i check-in di oggi, quindi hanno priorità (cosa
+    // vivi ADESSO) sui segnali di profilo più sotto (chi sei in generale).
     if (Number(morning.sleepQuality || 7) <= 5 || Number(morning.sleepHours || 7) < 6.5 || Number(morning.awakenings || 0) >= 3)
       s.push({ key: 'sonno', label: 'Sonno da sistemare', emoji: '🌙', query: 'sonno risveglio riposato melatonina qualità profondo caffeina luce blu circadiano' });
     if (stress >= 6)
@@ -33,6 +40,29 @@ const News = ({ playerStats = {}, onAskCoach, onToast }) => {
       s.push({ key: 'intestino', label: 'Digestione ballerina', emoji: '🦠', query: 'intestino microbiota fibra gonfiore digestione probiotici butirrato fermentati' });
     if (Number(evening.craving || 5) >= 7 || Number(evening.hunger || 5) >= 8)
       s.push({ key: 'appetito', label: 'Fame e voglie alte', emoji: '🍽️', query: 'sazietà proteine fame grelina leptina fibra zucchero glicemia voglie' });
+
+    // Segnali di PROFILO — chi sei (altezza, età, dove vivi), non cosa senti oggi.
+    // Corporatura alta: leve lunghe cambiano dosaggi (creatina) e rischi reali
+    // (lombalgia, TVP) che un profilo medio non ha — principi specifici, non generici.
+    const heightCm = Number(playerStats.heightCm || 0);
+    if (heightCm >= 183)
+      s.push({ key: 'corporatura', label: 'Corporatura alta', emoji: '📏', query: 'altezza corporatura creatina dose peso corporeo lombalgia stacco biomeccanica trombosi tvp leve lunghe' });
+
+    // Finestra 20-25 anni: picco naturale di testosterone e ultima fase di
+    // costruzione della massa ossea — una finestra biologica che non si ripete.
+    const age = Number(playerStats.age || 0);
+    if (age >= 18 && age <= 26)
+      s.push({ key: 'finestra-giovane', label: 'Finestra 20-25 anni', emoji: '🌱', query: 'testosterone giovani sonno picco massa ossea volume allenamento ipertrofia natural' });
+
+    // Vitamina D: la finestra utile dipende dal mese, non è un consiglio statico.
+    const month = new Date().getMonth();
+    s.push(WINTER_MONTHS.has(month)
+      ? { key: 'vitd-inverno', label: 'Vitamina D — inverno IT', emoji: '☀️', query: 'vitamina D latitudine inverno Italia dose integrazione peso corporeo' }
+      : { key: 'vitd-estate', label: 'Vitamina D — estate IT', emoji: '☀️', query: 'vitamina D sole estate esposizione sintesi cutanea latitudine' });
+
+    // Sempre rilevante per chi vive in Italia: orari pasto "all'italiana" e sonno.
+    s.push({ key: 'italia-cena', label: "Cena all'italiana", emoji: '🍝', query: 'cena tardiva timing pasti sonno qualità italiana' });
+
     const o = OBJECTIVE_SIGNAL[String(playerStats.objective || 'recomp')] || OBJECTIVE_SIGNAL.recomp;
     s.push({ key: 'obiettivo', label: o.label, emoji: '🎯', query: o.query });
     return s;

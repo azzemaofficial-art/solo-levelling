@@ -93,7 +93,7 @@ const ScienceFeed = ({ signals = [], onAskCoach, onToast }) => {
   }, [onAskCoach, onToast]);
 
   // "Per te ora": per ogni segnale attivo, i migliori principi reali pertinenti.
-  const personalized = useMemo(() => signals.slice(0, 4).map((sig) => ({
+  const personalized = useMemo(() => signals.slice(0, 6).map((sig) => ({
     ...sig,
     hits: searchPrinciples(sig.query, 3),
   })).filter((s) => s.hits.length), [signals]);
