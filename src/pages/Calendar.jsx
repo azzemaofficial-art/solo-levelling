@@ -1112,23 +1112,16 @@ const Calendar = ({
             return (
               <button
                 key={`${cell.day}-${idx}`}
-                onClick={() => setSelectedMonthDay({ ...cell, iso: cell.iso, inYear: true, score: getDayScore(cell.log, dailyGoal, hydrationGoal, 'all'), maxScore: 5 })}
+                onClick={() => {
+                  setSelectedHeatmapDay(null);
+                  setSelectedMonthDay({ ...cell, iso: cell.iso, inYear: true, score: getDayScore(cell.log, dailyGoal, hydrationGoal, 'all'), maxScore: 5 });
+                }}
                 className={`h-16 border p-1 text-left transition ${selected ? 'ring-1 ring-cyan-300/80' : ''} ${cell.workout ? 'border-fuchsia-300/60 bg-fuchsia-500/10' : 'border-white/10 bg-white/5'}`}
               >
                 <div className="flex items-center justify-between">
                   <p className="text-[9px] text-white">{cell.day}</p>
                   <div className="flex items-center gap-1">
-                    <button
-                      onClick={(ev) => {
-                        ev.preventDefault();
-                        ev.stopPropagation();
-                        setSelectedHeatmapDay(null);
-                        setSelectedMonthDay({ ...cell, iso: cell.iso, inYear: true, score: getDayScore(cell.log, dailyGoal, hydrationGoal, 'all'), maxScore: 5 });
-                      }}
-                      className="text-[8px] px-1 border border-cyan-300/40 text-cyan-200 hover:bg-cyan-300 hover:text-black"
-                    >
-                      +
-                    </button>
+                    <span className="text-[8px] px-1 border border-cyan-300/40 text-cyan-200">+</span>
                     {cell.workout ? <span className="text-[8px] text-fuchsia-200">W</span> : null}
                   </div>
                 </div>
