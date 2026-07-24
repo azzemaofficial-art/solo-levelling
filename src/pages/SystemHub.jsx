@@ -2979,16 +2979,19 @@ Rispondi SOLO JSON valido:
           { role: 'user', content: userMsg },
         ]
       });
-      let data;
+      // Retry robusto: copre SIA l'errore HTTP (modello sparito/429) SIA il caso in
+      // cui la chiamata riesce (200) ma il JSON esce malformato o troncato — prima
+      // quest'ultimo caso non veniva ritentato affatto (parseModelJson era fuori dal
+      // try/catch del retry) e un singolo JSON rotto faceva fallire l'intera ricetta,
+      // anche se un secondo tentativo aveva ottime probabilità di riuscire.
+      let data, parsed;
       try {
         data = await recipeRequest(getModelFor('recipe') || undefined);
+        parsed = parseModelJson(data);
       } catch (firstErr) {
-        // Il modello scelto può sparire dal provider (es. Scout 404) o essere in 429:
-        // un secondo giro con la catena automatica del proxy salva la generazione.
-        if (getModelFor('recipe')) data = await recipeRequest(undefined);
-        else throw firstErr;
+        data = await recipeRequest(undefined); // catena di fallback del proxy, modello diverso
+        parsed = parseModelJson(data);
       }
-      const parsed = parseModelJson(data);
       const nextRecipe = {
         title: String(parsed?.title || 'Ricetta AI').slice(0, 80),
         emoji: String(parsed?.emoji || '🍽️').slice(0, 8),
@@ -3170,8 +3173,8 @@ Applica i principi scientifici forniti quando pertinenti (densità proteica per 
 Rispondi SOLO con un array JSON valido di esattamente ${chunkSize} oggetti, in questo formato:
 [{"title":"string epico","emoji":"emoji","tagline":"string appetitosa max 12 parole","kcal":numero,"protein":numero,"carbs":numero,"fat":numero,"prepMin":numero,"difficulty":"facile|medio|avanzato"}]`;
         const userMsg = `${profileCtx}${prefsCtx}\n\nGenera esattamente ${chunkSize} ricette DIVERSE tra loro per ${mealType}.${avoidTitles.length ? `\nNon ripetere questi titoli già usati: ${avoidTitles.join(', ')}.` : ''}`;
-        const data = await requestSystemAI({
-          model: getModelFor('recipe') || undefined,
+        const chunkRequest = (modelOverride) => requestSystemAI({
+          model: modelOverride,
           temperature: 0.95,
           max_tokens: Math.min(4096, 320 * chunkSize + 300),
           timeoutMs: 32000,
@@ -3180,7 +3183,17 @@ Rispondi SOLO con un array JSON valido di esattamente ${chunkSize} oggetti, in q
             { role: 'user', content: userMsg },
           ],
         });
-        const rawItems = parseModelJsonArray(data);
+        // Un chunk malformato non deve terminare l'INTERO batch: un retry con la
+        // catena di fallback del proxy salva questo lotto invece di abbandonare
+        // tutte le ricette ancora da generare.
+        let rawItems;
+        try {
+          const data = await chunkRequest(getModelFor('recipe') || undefined);
+          rawItems = parseModelJsonArray(data);
+        } catch (chunkErr) {
+          const data = await chunkRequest(undefined);
+          rawItems = parseModelJsonArray(data);
+        }
         rawItems.slice(0, chunkSize).forEach((item, i) => {
           cards.push({
             id: `${Date.now()}-${cards.length}-${i}`,
@@ -3243,8 +3256,8 @@ La nota finale ("notes") deve contenere UN hack nutrizionale concreto e fondato 
 Rispondi SOLO JSON valido:
 {"ingredients":[{"item":"string","amount":"string"}],"steps":["string con emoji"],"notes":"string hack nutrizionale","science":"string: il principio scientifico concreto applicato","fitScore":numero_1_10}`;
       const userMsg = `${profileCtx}${prefsCtx}\n\nCompleta questa ricetta per ${forgeBatch.mealType}: "${card.title}" — ${card.tagline}\nMacro da rispettare: ${card.kcal}kcal, ${card.protein}g proteine, ${card.carbs}g carboidrati, ${card.fat}g grassi, tempo totale ~${card.prepMin} minuti, difficoltà ${card.difficulty}.`;
-      const data = await requestSystemAI({
-        model: getModelFor('recipe') || undefined,
+      const cardDetailRequest = (modelOverride) => requestSystemAI({
+        model: modelOverride,
         temperature: 0.7,
         // 700 troncava lo schema completo (titolo+12 ingredienti+7 step+notes+science)
         // con gpt-oss-120b: finish_reason 'length' verificato in test end-to-end, la
@@ -3256,7 +3269,17 @@ Rispondi SOLO JSON valido:
           { role: 'user', content: userMsg },
         ],
       });
-      const parsed = parseModelJson(data);
+      // Stesso retry robusto della ricetta singola: un JSON malformato/troncato è
+      // probabilistico, un secondo tentativo (con la catena di fallback del proxy
+      // se il modello scelto dall'utente fallisce) ha ottime probabilità di riuscire.
+      let data, parsed;
+      try {
+        data = await cardDetailRequest(getModelFor('recipe') || undefined);
+        parsed = parseModelJson(data);
+      } catch (firstErr) {
+        data = await cardDetailRequest(undefined);
+        parsed = parseModelJson(data);
+      }
       const full = {
         ingredients: Array.isArray(parsed?.ingredients)
           ? parsed.ingredients.map((x) => typeof x === 'string' ? { item: x, amount: '' } : x).filter((x) => x?.item).slice(0, 16)
