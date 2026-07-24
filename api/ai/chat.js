@@ -62,14 +62,25 @@ function resolveProvider(modelId) {
 
 const unique = (arr) => { const s = new Set(); const o = []; for (const x of arr) { if (x && !s.has(x)) { s.add(x); o.push(x); } } return o; };
 
+// I modelli gpt-oss (Groq) sono "reasoning": senza reasoning_effort esplicito
+// possono riempire TUTTO il max_tokens col ragionamento interno prima di arrivare
+// alla risposta finale — il client vede `content` pieno di "We need to output..."
+// invece del JSON atteso (bug reale trovato testando Recipe Forge). low = risposte
+// dirette, adatto a JSON strutturato; il chiamante può comunque sovrascriverlo.
+const isReasoningModel = (modelName) => /^openai\/gpt-oss/i.test(String(modelName || ''));
+
 async function callProvider(prov, body) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 30000);
   try {
+    const payload = { ...body, model: prov.model };
+    if (isReasoningModel(prov.model) && payload.reasoning_effort === undefined) {
+      payload.reasoning_effort = 'low';
+    }
     const upstream = await fetch(`${prov.base}/chat/completions`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${prov.key}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...body, model: prov.model }),
+      body: JSON.stringify(payload),
       signal: controller.signal,
     });
     const text = await upstream.text();
