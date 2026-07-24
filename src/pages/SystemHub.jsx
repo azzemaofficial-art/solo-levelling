@@ -2966,30 +2966,32 @@ Rispondi SOLO JSON valido:
         ? `${profileCtx}${prefsCtx}\n\nCrea LA ricetta fitporn perfetta per questo momento. Sorprendimi con qualcosa di straordinario che non mi aspetto, rispettando SEMPRE le preferenze/allergie indicate.`
         : `${profileCtx}${prefsCtx}\n\nRichiesta specifica: ${prompt}\n\nCrea una versione fitporn di questa ricetta, adattata ai miei macro residui e alle mie preferenze/allergie.`;
 
-      const recipeRequest = (modelOverride) => requestSystemAI({
+      const recipeRequest = (modelOverride, opts = {}) => requestSystemAI({
         model: modelOverride,
         temperature: 0.82,
-        // 700 troncava lo schema completo (titolo+12 ingredienti+7 step+notes+science)
-        // con gpt-oss-120b: finish_reason 'length' verificato in test end-to-end, la
-        // ricetta perdeva "science" e a volte anche "notes" a metà stringa.
-        max_tokens: 1200,
-        timeoutMs: 28000,
+        // 2500: Nemotron 550B ragiona più a lungo sui macro (qualità nettamente
+        // migliore, verificato in test comparativo) ma consuma più token prima
+        // di rispondere — 1200 lo troncava. gpt-oss-120b resta comodo con margine.
+        max_tokens: opts.maxTokens || 2500,
+        timeoutMs: opts.timeoutMs || 28000,
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userMsg },
         ]
       });
-      // Retry robusto: copre SIA l'errore HTTP (modello sparito/429) SIA il caso in
-      // cui la chiamata riesce (200) ma il JSON esce malformato o troncato — prima
-      // quest'ultimo caso non veniva ritentato affatto (parseModelJson era fuori dal
-      // try/catch del retry) e un singolo JSON rotto faceva fallire l'intera ricetta,
-      // anche se un secondo tentativo aveva ottime probabilità di riuscire.
+      // Qualità prima di tutto: Nemotron 550B stima macro e procedimento in modo
+      // nettamente più preciso (verificato: ragiona su % kcal da proteine, EPA/DHA,
+      // biodisponibilità dei nutrienti) — ma è più lento e ogni tanto va in timeout
+      // (504 osservato). Primo tentativo con Nemotron (45s di margine), poi la
+      // catena veloce e affidabile (gpt-oss-120b) come rete di sicurezza — sia per
+      // errore HTTP sia per JSON malformato/troncato (entrambi ritentati qui).
+      const userOverride = getTaskOverride('recipe');
       let data, parsed;
       try {
-        data = await recipeRequest(getModelFor('recipe') || undefined);
+        data = await recipeRequest(userOverride || 'nvidia:nvidia/nemotron-3-ultra-550b-a55b', { timeoutMs: 45000 });
         parsed = parseModelJson(data);
       } catch (firstErr) {
-        data = await recipeRequest(undefined); // catena di fallback del proxy, modello diverso
+        data = await recipeRequest(userOverride || undefined);
         parsed = parseModelJson(data);
       }
       const nextRecipe = {
@@ -3114,7 +3116,10 @@ Rispondi SOLO JSON valido:
   const parseForgeIntent = (text) => {
     const t = String(text || '').trim();
     if (!t) return null;
-    const m = t.match(/(\d{1,3})\s*(?:ricett[ae]\s*(?:di\s*)?)?(colazion\w*|pranz\w*|cen\w*|spuntin\w*)/i);
+    // \D{0,25} invece del template rigido "ricette (di )?": regge "7 ricette PER
+    // colazione", "7 ricette per il pranzo", "prepara 7 per la cena" ecc. — prima
+    // capiva solo "N ricette di X" o "N X", non le altre forme comuni.
+    const m = t.match(/(\d{1,3})\D{0,25}(colazion\w*|pranz\w*|cen\w*|spuntin\w*)/i);
     if (!m) return null;
     const count = Math.max(1, Math.min(365, parseInt(m[1], 10) || 0));
     if (!count) return null;
@@ -3256,28 +3261,28 @@ La nota finale ("notes") deve contenere UN hack nutrizionale concreto e fondato 
 Rispondi SOLO JSON valido:
 {"ingredients":[{"item":"string","amount":"string"}],"steps":["string con emoji"],"notes":"string hack nutrizionale","science":"string: il principio scientifico concreto applicato","fitScore":numero_1_10}`;
       const userMsg = `${profileCtx}${prefsCtx}\n\nCompleta questa ricetta per ${forgeBatch.mealType}: "${card.title}" — ${card.tagline}\nMacro da rispettare: ${card.kcal}kcal, ${card.protein}g proteine, ${card.carbs}g carboidrati, ${card.fat}g grassi, tempo totale ~${card.prepMin} minuti, difficoltà ${card.difficulty}.`;
-      const cardDetailRequest = (modelOverride) => requestSystemAI({
+      const cardDetailRequest = (modelOverride, opts = {}) => requestSystemAI({
         model: modelOverride,
         temperature: 0.7,
-        // 700 troncava lo schema completo (titolo+12 ingredienti+7 step+notes+science)
-        // con gpt-oss-120b: finish_reason 'length' verificato in test end-to-end, la
-        // ricetta perdeva "science" e a volte anche "notes" a metà stringa.
-        max_tokens: 1200,
-        timeoutMs: 28000,
+        // 2500: stesso motivo della ricetta singola — Nemotron 550B ragiona più a
+        // lungo su ingredienti/procedimento coerenti coi macro già fissati.
+        max_tokens: opts.maxTokens || 2500,
+        timeoutMs: opts.timeoutMs || 28000,
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userMsg },
         ],
       });
-      // Stesso retry robusto della ricetta singola: un JSON malformato/troncato è
-      // probabilistico, un secondo tentativo (con la catena di fallback del proxy
-      // se il modello scelto dall'utente fallisce) ha ottime probabilità di riuscire.
+      // Qualità prima: Nemotron 550B per ingredienti/procedimento/hack nutrizionale
+      // coerenti coi macro già decisi dal teaser; fallback veloce (gpt-oss-120b via
+      // catena del proxy) se lento o fallisce — copre sia errore HTTP sia JSON rotto.
+      const userOverride = getTaskOverride('recipe');
       let data, parsed;
       try {
-        data = await cardDetailRequest(getModelFor('recipe') || undefined);
+        data = await cardDetailRequest(userOverride || 'nvidia:nvidia/nemotron-3-ultra-550b-a55b', { timeoutMs: 45000 });
         parsed = parseModelJson(data);
       } catch (firstErr) {
-        data = await cardDetailRequest(undefined);
+        data = await cardDetailRequest(userOverride || undefined);
         parsed = parseModelJson(data);
       }
       const full = {
