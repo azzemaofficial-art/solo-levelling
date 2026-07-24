@@ -2969,7 +2969,10 @@ Rispondi SOLO JSON valido:
       const recipeRequest = (modelOverride) => requestSystemAI({
         model: modelOverride,
         temperature: 0.82,
-        max_tokens: 700,
+        // 700 troncava lo schema completo (titolo+12 ingredienti+7 step+notes+science)
+        // con gpt-oss-120b: finish_reason 'length' verificato in test end-to-end, la
+        // ricetta perdeva "science" e a volte anche "notes" a metà stringa.
+        max_tokens: 1200,
         timeoutMs: 28000,
         messages: [
           { role: 'system', content: systemPrompt },
@@ -3243,7 +3246,10 @@ Rispondi SOLO JSON valido:
       const data = await requestSystemAI({
         model: getModelFor('recipe') || undefined,
         temperature: 0.7,
-        max_tokens: 700,
+        // 700 troncava lo schema completo (titolo+12 ingredienti+7 step+notes+science)
+        // con gpt-oss-120b: finish_reason 'length' verificato in test end-to-end, la
+        // ricetta perdeva "science" e a volte anche "notes" a metà stringa.
+        max_tokens: 1200,
         timeoutMs: 28000,
         messages: [
           { role: 'system', content: systemPrompt },
