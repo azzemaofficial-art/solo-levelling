@@ -2979,20 +2979,23 @@ Rispondi SOLO JSON valido:
           { role: 'user', content: userMsg },
         ]
       });
-      // Qualità prima di tutto: Nemotron 550B stima macro e procedimento in modo
-      // nettamente più preciso (verificato: ragiona su % kcal da proteine, EPA/DHA,
-      // biodisponibilità dei nutrienti) — ma è più lento e ogni tanto va in timeout
-      // (504 osservato). Primo tentativo con Nemotron (45s di margine), poi la
-      // catena veloce e affidabile (gpt-oss-120b) come rete di sicurezza — sia per
-      // errore HTTP sia per JSON malformato/troncato (entrambi ritentati qui).
+      // Qualità prima di tutto, in 3 gradini: Mistral NeMo (macro precisi, 13-17s,
+      // verificato 3/3) → Nemotron 550B (qualità pari o superiore ma più lento, ogni
+      // tanto in timeout/504) → catena veloce e affidabile (gpt-oss-120b) come rete
+      // di sicurezza finale — copre sia errore HTTP sia JSON malformato/troncato.
       const userOverride = getTaskOverride('recipe');
       let data, parsed;
       try {
-        data = await recipeRequest(userOverride || 'nvidia:nvidia/nemotron-3-ultra-550b-a55b', { timeoutMs: 45000 });
+        data = await recipeRequest(userOverride || 'nvidia:mistralai/mistral-nemotron', { timeoutMs: 30000 });
         parsed = parseModelJson(data);
       } catch (firstErr) {
-        data = await recipeRequest(userOverride || undefined);
-        parsed = parseModelJson(data);
+        try {
+          data = await recipeRequest(userOverride || 'nvidia:nvidia/nemotron-3-ultra-550b-a55b', { timeoutMs: 45000 });
+          parsed = parseModelJson(data);
+        } catch (secondErr) {
+          data = await recipeRequest(userOverride || undefined);
+          parsed = parseModelJson(data);
+        }
       }
       const nextRecipe = {
         title: String(parsed?.title || 'Ricetta AI').slice(0, 80),
@@ -3273,17 +3276,21 @@ Rispondi SOLO JSON valido:
           { role: 'user', content: userMsg },
         ],
       });
-      // Qualità prima: Nemotron 550B per ingredienti/procedimento/hack nutrizionale
-      // coerenti coi macro già decisi dal teaser; fallback veloce (gpt-oss-120b via
-      // catena del proxy) se lento o fallisce — copre sia errore HTTP sia JSON rotto.
+      // Qualità in 3 gradini (stessa strategia della ricetta singola): Mistral NeMo
+      // → Nemotron 550B → catena veloce (gpt-oss-120b) come rete di sicurezza finale.
       const userOverride = getTaskOverride('recipe');
       let data, parsed;
       try {
-        data = await cardDetailRequest(userOverride || 'nvidia:nvidia/nemotron-3-ultra-550b-a55b', { timeoutMs: 45000 });
+        data = await cardDetailRequest(userOverride || 'nvidia:mistralai/mistral-nemotron', { timeoutMs: 30000 });
         parsed = parseModelJson(data);
       } catch (firstErr) {
-        data = await cardDetailRequest(userOverride || undefined);
-        parsed = parseModelJson(data);
+        try {
+          data = await cardDetailRequest(userOverride || 'nvidia:nvidia/nemotron-3-ultra-550b-a55b', { timeoutMs: 45000 });
+          parsed = parseModelJson(data);
+        } catch (secondErr) {
+          data = await cardDetailRequest(userOverride || undefined);
+          parsed = parseModelJson(data);
+        }
       }
       const full = {
         ingredients: Array.isArray(parsed?.ingredients)

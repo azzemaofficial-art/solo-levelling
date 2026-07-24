@@ -14,6 +14,7 @@ export const AI_MODELS = [
   { id: 'groq:llama-3.3-70b-versatile', label: 'Groq Llama 3.3 70B — veloce, JSON pulito' },
   { id: 'groq:openai/gpt-oss-20b', label: 'Groq GPT-OSS 20B — fulmineo' },
   { id: 'nvidia:nvidia/nemotron-3-ultra-550b-a55b', label: 'NVIDIA Nemotron Ultra 550B — il più potente' },
+  { id: 'nvidia:mistralai/mistral-nemotron', label: 'NVIDIA Mistral NeMo — macro precisi, veloce (13-17s)' },
 ];
 
 // Default consigliati per funzione quando l'utente non ha scelto nulla.

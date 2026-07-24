@@ -28,6 +28,9 @@ const NVIDIA_MODEL_KEY = {
   'microsoft/phi-4-mini-instruct':     () => firstKey('PHI_NVIDIA_API_KEY'),
   'mistralai/mistral-large-3-675b-instruct-2512': () => firstKey('MISTRAL_NVIDIA_API_KEY'),
   'mistralai/mistral-medium-3.5-128b': () => firstKey('MISTRAL_MEDIUM3_NVIDIA_API_KEY'),
+  // Verificato live 2026-07-24: risponde 200, JSON pulito (fence markdown, gestito
+  // da looseJsonParse), 13-17s — più veloce e affidabile di Nemotron 550B per le ricette.
+  'mistralai/mistral-nemotron': () => firstKey('MISTRAL_NEMO_NVIDIA_API_KEY'),
 };
 const NVIDIA_KEY_DEFAULT = () => firstKey('NVIDIA_API_KEY', 'LLAMA_NVIDIA_API_KEY', 'KIMI_NVIDIA_API_KEY', 'DEEPSEEK_PRO_API_KEY');
 
