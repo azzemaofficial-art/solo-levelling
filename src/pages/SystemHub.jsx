@@ -2981,8 +2981,11 @@ ${deltaKg ? `- Obiettivo peso: ${pesoTarget}kg (${Number(deltaKg) > 0 ? '-' : '+
       return;
     }
     // Numero richiesto dal testo (1-12). Senza numero → 1. "Sorprendimi" → 1.
-    const countMatch = prompt.match(/\b(\d{1,2})\b/);
-    const total = autoMode ? 1 : Math.max(1, Math.min(12, countMatch ? parseInt(countMatch[1], 10) : 1));
+    // Numero richiesto: prima cerco un numero seguito da "ricette/piatti/colazioni…" (così
+    // "180g pollo per 3 persone" NON conta come 3 ricette), poi un numero a inizio frase.
+    const nearNoun = prompt.match(/(\d{1,2})\s*\S{0,12}?\s*(ricett|piatt|colazion|pranz|cen[ea]|spuntin|past|dessert|dolc|insalat)/i);
+    const leading = prompt.match(/^\s*(\d{1,2})\b/);
+    const total = autoMode ? 1 : Math.max(1, Math.min(12, nearNoun ? parseInt(nearNoun[1], 10) : leading ? parseInt(leading[1], 10) : 1));
     setIsGeneratingRecipe(true);
     setGeneratedRecipes([]);   // nuova generazione: pulisci la lista precedente
     setRecipeActions({});
@@ -2991,7 +2994,8 @@ ${deltaKg ? `- Obiettivo peso: ${pesoTarget}kg (${Number(deltaKg) > 0 ? '-' : '+
       const { profileCtx, prefsCtx, mealMoment } = computeRecipeContext();
       const science = knowledgePromptFor(`${prompt || mealMoment} nutrizione proteine sazietà energia`, 1800);
       const userOverride = getTaskOverride('recipe');
-      const CHUNK = 3; // ricette complete = lunghe; lotti piccoli evitano il troncamento del JSON
+      const CHUNK = 1; // UNA ricetta per chiamata: zero troncamento e ognuna rispetta il tema
+      //                  (il vecchio lotto da 3 in un array si fermava a 3 e ignorava la richiesta)
       const MAX_CALLS = Math.ceil(total / CHUNK) * 2 + 3;
       let emptyStreak = 0;
       let calls = 0;
@@ -2999,13 +3003,12 @@ ${deltaKg ? `- Obiettivo peso: ${pesoTarget}kg (${Number(deltaKg) > 0 ? '-' : '+
         calls += 1;
         const chunkSize = Math.min(CHUNK, total - collected.length);
         const avoid = collected.map((r) => r.title).slice(-20);
-        const many = total > 1;
         const systemPrompt = `Sei uno chef nutrizionale d'élite specializzato in FITPORN — cibo ESTETICAMENTE PERFETTO e ultra-ottimizzato per le performance atletiche. Deve far venire l'acquolina solo a leggerlo.
 
 STILE OBBLIGATORIO per OGNI ricetta:
 - Titolo epico e evocativo (es: "Salmon Inferno Bowl", "Thunder Chicken Wrap")
 - Tagline che fa DESIDERARE il piatto (max 15 parole, molto visiva)
-- Ingredienti con grammature precise e trucchi da chef (es: "180g petto pollo — battuto sottile")
+- REGOLA INGREDIENTI: "item" = SOLO il nome pulito dell'ingrediente (es. "petto di pollo", "riso basmati"), MAI quantità o note dentro il nome. La grammatura va SOLO in "amount" (es. "180 g", "2", "q.b."). I trucchi da chef vanno negli steps, non nel nome.
 - Steps concreti con tecniche vere (Maillard, marinatura rapida, croccantezza) ed emoji pertinenti
 - Note: 1 hack nutrizionale concreto
 
@@ -3013,11 +3016,11 @@ VINCOLO FERRO: rispetta i macro residui del profilo.
 VINCOLO ASSOLUTO DI SICUREZZA: se sono indicate allergie, NON usare MAI quegli ingredienti o derivati — priorità su tutto.
 FONDAMENTO SCIENTIFICO: applica i principi qui sotto quando pertinenti e cita in "science" IL principio concreto che ha guidato la ricetta.${science}
 
-Rispondi SOLO con un array JSON valido di ESATTAMENTE ${chunkSize} ricette${many ? ' DIVERSE tra loro (ingrediente principale, stile o tecnica differenti)' : ''}, nel formato:
-[{"title":"string","emoji":"emoji","tagline":"string max 15 parole","prepMin":numero,"cookMin":numero,"difficulty":"facile|medio|avanzato","mood":"performance|recovery|comfort|light","ingredients":[{"item":"string","amount":"string"}],"steps":["string con emoji"],"kcal":numero,"protein":numero,"carbs":numero,"fat":numero,"fiber":numero,"fitScore":numero_1_10,"notes":"string hack","science":"string principio"}]`;
+Rispondi SOLO con un array JSON valido di ESATTAMENTE ${chunkSize} ricett${chunkSize === 1 ? 'a' : 'e diverse tra loro'}, nel formato:
+[{"title":"string","emoji":"emoji","tagline":"string max 15 parole","prepMin":numero,"cookMin":numero,"difficulty":"facile|medio|avanzato","mood":"performance|recovery|comfort|light","ingredients":[{"item":"nome pulito senza quantità","amount":"solo la quantità es 180 g"}],"steps":["string con emoji"],"kcal":numero,"protein":numero,"carbs":numero,"fat":numero,"fiber":numero,"fitScore":numero_1_10,"notes":"string hack","science":"string principio"}]`;
         const userMsg = autoMode
-          ? `${profileCtx}${prefsCtx}\n\nCrea ${chunkSize} ricetta/e fitporn straordinaria/e per questo momento. Sorprendimi, rispettando SEMPRE preferenze/allergie.`
-          : `${profileCtx}${prefsCtx}\n\nRichiesta: ${prompt}\n\nCrea ${chunkSize} ricetta/e fitporn adattata/e ai miei macro residui e preferenze/allergie.${avoid.length ? `\nNon ripetere questi titoli già usati: ${avoid.join(', ')}.` : ''}`;
+          ? `${profileCtx}${prefsCtx}\n\nCrea 1 ricetta fitporn straordinaria per questo momento. Sorprendimi, rispettando SEMPRE preferenze/allergie.`
+          : `${profileCtx}${prefsCtx}\n\nRICHIESTA DELL'UTENTE (rispettala alla lettera, è la cosa più importante): ${prompt}\n\nCrea ${chunkSize === 1 ? 'UNA ricetta' : `${chunkSize} ricette`} fitporn su questo tema, adattata ai macro residui e alle preferenze/allergie.${avoid.length ? `\nDiversifica: non ripetere questi titoli già usati: ${avoid.join(', ')}.` : ''}`;
         const req = (modelOverride, opts = {}) => requestSystemAI({
           model: modelOverride,
           temperature: 0.85,
@@ -3374,24 +3377,47 @@ Rispondi SOLO JSON valido:
   // non numeriche ("q.b.", "1 cucchiaio") vengono elencate affiancate con " + ".
   // Aggregatore puro: da una lista di "fonti" {id, ingredients:[{item,amount}]} costruisce le
   // voci del carrello, sommando le quantità con stessa unità e affiancando quelle diverse.
+  // Normalizza un'unità di misura per aggregare sinonimi (gr/grammi→g, ecc.).
+  const normUnit = (u) => {
+    const s = String(u || '').toLowerCase().trim().replace(/\.$/, '');
+    if (/^(gr|grammi|grammo)$/.test(s)) return 'g';
+    if (/^(millilitri|ml)$/.test(s)) return 'ml';
+    if (/^litri?$/.test(s)) return 'l';
+    if (/^cucchiai?o?$/.test(s)) return 'cucchiai';
+    if (/^cucchiaini?o?$/.test(s)) return 'cucchiaini';
+    return s;
+  };
+  // Ripulisce UN ingrediente grezzo → { item: nome pulito, amount: quantità }. I modelli spesso
+  // infilano grammatura e note da chef dentro il nome ("180g petto pollo — battuto sottile"):
+  // qui taglio le note dopo trattino/parentesi ed estraggo la quantità se è nel nome.
+  const cleanIngredient = (ing) => {
+    let rawItem = typeof ing === 'string' ? ing : String(ing?.item || '');
+    let amount = typeof ing === 'string' ? '' : String(ing?.amount || '').trim();
+    rawItem = rawItem.split(/\s[—–-]\s|—|–|\(/)[0].replace(/\s+/g, ' ').trim(); // via le note
+    // Se manca la quantità ma il nome inizia con "numero + (unità) + nome", estraila.
+    if (!amount) {
+      const m = rawItem.match(/^(\d+(?:[.,/]\d+)?)\s*(g|gr|grammi|kg|ml|l|mg|cucchiai?o?|cucchiaini?o?|tazz[ae]|pizzichi?o?|fett[ae]|spicchi?o?|foglie?|q\.?b\.?)?\s+(.+)$/i);
+      if (m && m[3]) { amount = `${m[1]}${m[2] ? ' ' + m[2] : ''}`.trim(); rawItem = m[3].trim(); }
+    }
+    return { item: rawItem, amount };
+  };
   const buildCart = (sources) => {
     const map = new Map();
     for (const src of sources || []) {
       const ings = src?.ingredients;
       if (!Array.isArray(ings)) continue;
-      for (const ing of ings) {
-        const item = String(ing?.item || (typeof ing === 'string' ? ing : '')).trim();
+      for (const raw of ings) {
+        const { item, amount: amt } = cleanIngredient(raw);
         if (!item) continue;
         const key = item.toLowerCase();
         if (!map.has(key)) map.set(key, { item, units: new Map(), freeforms: [], recipes: new Set() });
         const entry = map.get(key);
         entry.recipes.add(src.id);
-        const amt = String(ing?.amount || '').trim();
         if (!amt) continue;
         const m = amt.match(/^(\d+(?:[.,]\d+)?)\s*(.*)$/);
         const qty = m ? parseFloat(m[1].replace(',', '.')) : NaN;
         if (m && Number.isFinite(qty)) {
-          const unit = m[2].trim().toLowerCase();
+          const unit = normUnit(m[2]);
           entry.units.set(unit, (entry.units.get(unit) || 0) + qty);
         } else if (!entry.freeforms.includes(amt)) {
           entry.freeforms.push(amt);
