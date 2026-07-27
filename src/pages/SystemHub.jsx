@@ -400,8 +400,9 @@ const SystemHub = ({ systemLogs, setSystemLogs, dailyGoal, setDailyGoal, hydrati
     } catch { return { diet: '', allergies: '', dislikes: '', likes: '', cuisine: '', spice: 'normale', maxPrepMin: 0, principles: '' }; }
   });
   const [showFoodPrefs, setShowFoodPrefs] = useState(false);
-  const [recipeFeedbackGiven, setRecipeFeedbackGiven] = useState(null); // null|'up'|'down' — per la ricetta corrente
-  const [recipeLogged, setRecipeLogged] = useState(false); // la ricetta corrente è già stata loggata nei pasti di oggi
+  // Azioni per singola ricetta della lista, indicizzate per id: { [id]: { logged, feedback } }.
+  // Prima erano due booleani globali (una sola ricetta alla volta); ora la lista ne mostra N.
+  const [recipeActions, setRecipeActions] = useState({});
   // Selettore modelli AI (globale + override per funzione)
   const [aiModelGlobal, setAiModelGlobal] = useState(() => getGlobalModel());
   const [aiModelMeal, setAiModelMeal] = useState(() => getTaskOverride('meal'));
@@ -435,12 +436,17 @@ const SystemHub = ({ systemLogs, setSystemLogs, dailyGoal, setDailyGoal, hydrati
   const [displayedSuppContent, setDisplayedSuppContent] = useState('');
   const suppTypeTimer = useRef(null);
   const [isRecommendingSupp, setIsRecommendingSupp] = useState(false);
-  const [generatedRecipe, setGeneratedRecipe] = useState(() => {
+  // Lista scrollabile di ricette generate (prima era una singola). Migra il vecchio formato.
+  const [generatedRecipes, setGeneratedRecipes] = useState(() => {
     try {
-      const raw = localStorage.getItem('shadow_monarch_generated_recipe');
-      return raw ? JSON.parse(raw) : null;
+      const raw = localStorage.getItem('shadow_monarch_generated_recipes');
+      const parsed = raw ? JSON.parse(raw) : null;
+      if (Array.isArray(parsed)) return parsed;
+      const old = localStorage.getItem('shadow_monarch_generated_recipe');
+      const oldParsed = old ? JSON.parse(old) : null;
+      return oldParsed ? [oldParsed] : [];
     } catch (_) {
-      return null;
+      return [];
     }
   });
   const [supplementPlanSettings, setSupplementPlanSettings] = useState(() => {
@@ -609,8 +615,8 @@ const SystemHub = ({ systemLogs, setSystemLogs, dailyGoal, setDailyGoal, hydrati
     localStorage.setItem('shadow_monarch_recipe_prompt', String(recipePrompt || ''));
   }, [recipePrompt]);
   useEffect(() => {
-    localStorage.setItem('shadow_monarch_generated_recipe', JSON.stringify(generatedRecipe || null));
-  }, [generatedRecipe]);
+    localStorage.setItem('shadow_monarch_generated_recipes', JSON.stringify(generatedRecipes || []));
+  }, [generatedRecipes]);
   useEffect(() => {
     localStorage.setItem('shadow_monarch_food_prefs', JSON.stringify(foodPrefs));
     // Sync (debounced) verso KV cloud → letto dal ponte Obsidian (web_prefs:<chatId>).
@@ -2937,6 +2943,36 @@ ${deltaKg ? `- Obiettivo peso: ${pesoTarget}kg (${Number(deltaKg) > 0 ? '-' : '+
     return { profileCtx, prefsCtx, mealMoment };
   };
 
+  // Normalizza UNA ricetta completa grezza del modello in oggetto pulito (macro riconciliati,
+  // liste tagliate, id univoco). Condiviso da tutti i lotti della generazione multipla.
+  const normalizeFullRecipe = (parsed, data, autoMode) => ({
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    title: String(parsed?.title || 'Ricetta AI').slice(0, 80),
+    emoji: String(parsed?.emoji || '🍽️').slice(0, 8),
+    tagline: String(parsed?.tagline || '').slice(0, 120),
+    prepMin: Math.max(0, Math.min(120, Math.round(Number(parsed?.prepMin || 10)))),
+    cookMin: Math.max(0, Math.min(120, Math.round(Number(parsed?.cookMin || 10)))),
+    difficulty: ['facile', 'medio', 'avanzato'].includes(parsed?.difficulty) ? parsed.difficulty : 'facile',
+    mood: parsed?.mood || 'performance',
+    ingredients: Array.isArray(parsed?.ingredients)
+      ? parsed.ingredients.map((x) => typeof x === 'string' ? { item: x, amount: '' } : x).filter((x) => x?.item).slice(0, 16)
+      : [],
+    steps: Array.isArray(parsed?.steps) ? parsed.steps.map((x) => String(x || '').trim()).filter(Boolean).slice(0, 10) : [],
+    // Macro riconciliati: kcal coerenti coi grammi, fibre ≤ carboidrati.
+    ...reconcileRecipeMacros({
+      kcal: parsed?.kcal, protein: parsed?.protein,
+      carbs: parsed?.carbs, fat: parsed?.fat, fiber: parsed?.fiber,
+    }),
+    fitScore: Math.min(10, Math.max(1, Math.round(Number(parsed?.fitScore || 7)))),
+    notes: String(parsed?.notes || '').slice(0, 280),
+    science: String(parsed?.science || '').slice(0, 280),
+    provider: String(data?._shadowMeta?.model || '').replace(/^\w+:/, '').split('/').pop().slice(0, 40),
+    createdAt: new Date().toISOString(),
+    auto: !!autoMode,
+  });
+
+  // Genera N ricette COMPLETE (default 1; il numero si legge dal prompt, es. "genera 5 ricette").
+  // Le mostra in una lista scrollabile che si popola dal vivo, a lotti da 3 per non troncare il JSON.
   const generateRecipeFromPrompt = async (autoMode = false) => {
     if (isGeneratingRecipe) return;
     const prompt = String(recipePrompt || '').trim();
@@ -2944,105 +2980,91 @@ ${deltaKg ? `- Obiettivo peso: ${pesoTarget}kg (${Number(deltaKg) > 0 ? '-' : '+
       emitUiToast({ message: 'Scrivi cosa vuoi o premi "Sorprendimi"', tone: 'warning', durationMs: 2400 });
       return;
     }
+    // Numero richiesto dal testo (1-12). Senza numero → 1. "Sorprendimi" → 1.
+    const countMatch = prompt.match(/\b(\d{1,2})\b/);
+    const total = autoMode ? 1 : Math.max(1, Math.min(12, countMatch ? parseInt(countMatch[1], 10) : 1));
     setIsGeneratingRecipe(true);
+    setGeneratedRecipes([]);   // nuova generazione: pulisci la lista precedente
+    setRecipeActions({});
+    const collected = [];
     try {
       const { profileCtx, prefsCtx, mealMoment } = computeRecipeContext();
-      // Principi scientifici pertinenti alla richiesta: la ricetta singola ne era priva
-      // (li aveva solo il batch) → le ricette ignoravano la knowledge base dei paper.
       const science = knowledgePromptFor(`${prompt || mealMoment} nutrizione proteine sazietà energia`, 1800);
-
-      const systemPrompt = `Sei uno chef nutrizionale d'élite specializzato in FITPORN — cibo che è allo stesso tempo ESTETICAMENTE PERFETTO e ultra-ottimizzato per le performance atletiche. Le tue ricette devono far venire l'acquolina in bocca solo a leggerle.
-
-STILE OBBLIGATORIO:
-- Titolo epico e evocativo (es: "Salmon Inferno Bowl", "Thunder Chicken Wrap", "Zero Guilt Dark Choc Mousse")
-- Tagline che fa DESIDERARE il piatto (max 15 parole, molto visiva e appetitosa)
-- Ingredienti con grammature precise e piccoli trucchi da chef (es: "180g petto pollo — battuto sottile per cottura uniforme")
-- Steps concreti con tecniche vere (Maillard reaction, marinatura rapida, textura croccante)
-- Emoji pertinenti negli steps per renderli scansionabili
-- Note: 1 hack nutrizionale o variante fitporn
-
-VINCOLO FERRO: la ricetta DEVE rispettare i macro residui del profilo. Se le proteine residue sono basse, fai una ricetta low-protein. Se è giorno di allenamento, priorità a carbs + proteine.
-VINCOLO ASSOLUTO DI SICUREZZA: se sono indicate allergie, la ricetta NON deve MAI contenere quegli ingredienti o loro derivati — questo vincolo ha priorità su tutto il resto, incluso lo stile e la richiesta dell'utente.
-FONDAMENTO SCIENTIFICO: applica i principi qui sotto quando pertinenti (densità proteica, fibre, timing dei carboidrati, grassi buoni) e in "science" cita IL principio concreto che ha guidato la ricetta, in una frase.${science}
-
-Rispondi SOLO JSON valido:
-{"title":"string","emoji":"emoji","tagline":"string appetitosa max 15 parole","prepMin":numero,"cookMin":numero,"difficulty":"facile|medio|avanzato","mood":"performance|recovery|comfort|light","ingredients":[{"item":"string","amount":"string"}],"steps":["string con emoji"],"kcal":numero,"protein":numero,"carbs":numero,"fat":numero,"fiber":numero,"fitScore":numero_1_10,"notes":"string hack nutrizionale","science":"string principio scientifico applicato"}`;
-
-      const userMsg = autoMode
-        ? `${profileCtx}${prefsCtx}\n\nCrea LA ricetta fitporn perfetta per questo momento. Sorprendimi con qualcosa di straordinario che non mi aspetto, rispettando SEMPRE le preferenze/allergie indicate.`
-        : `${profileCtx}${prefsCtx}\n\nRichiesta specifica: ${prompt}\n\nCrea una versione fitporn di questa ricetta, adattata ai miei macro residui e alle mie preferenze/allergie.`;
-
-      const recipeRequest = (modelOverride, opts = {}) => requestSystemAI({
-        model: modelOverride,
-        temperature: 0.82,
-        // 2500: Nemotron 550B ragiona più a lungo sui macro (qualità nettamente
-        // migliore, verificato in test comparativo) ma consuma più token prima
-        // di rispondere — 1200 lo troncava. gpt-oss-120b resta comodo con margine.
-        max_tokens: opts.maxTokens || 2500,
-        timeoutMs: opts.timeoutMs || 28000,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userMsg },
-        ]
-      });
-      // Qualità prima di tutto, in 3 gradini: Mistral NeMo (macro precisi, 13-17s,
-      // verificato 3/3) → Nemotron 550B (qualità pari o superiore ma più lento, ogni
-      // tanto in timeout/504) → catena veloce e affidabile (gpt-oss-120b) come rete
-      // di sicurezza finale — copre sia errore HTTP sia JSON malformato/troncato.
       const userOverride = getTaskOverride('recipe');
-      let data, parsed;
-      try {
-        data = await recipeRequest(userOverride || 'nvidia:mistralai/mistral-nemotron', { timeoutMs: 30000 });
-        parsed = parseModelJson(data);
-      } catch (firstErr) {
+      const CHUNK = 3; // ricette complete = lunghe; lotti piccoli evitano il troncamento del JSON
+      const MAX_CALLS = Math.ceil(total / CHUNK) * 2 + 3;
+      let emptyStreak = 0;
+      let calls = 0;
+      while (collected.length < total && calls < MAX_CALLS) {
+        calls += 1;
+        const chunkSize = Math.min(CHUNK, total - collected.length);
+        const avoid = collected.map((r) => r.title).slice(-20);
+        const many = total > 1;
+        const systemPrompt = `Sei uno chef nutrizionale d'élite specializzato in FITPORN — cibo ESTETICAMENTE PERFETTO e ultra-ottimizzato per le performance atletiche. Deve far venire l'acquolina solo a leggerlo.
+
+STILE OBBLIGATORIO per OGNI ricetta:
+- Titolo epico e evocativo (es: "Salmon Inferno Bowl", "Thunder Chicken Wrap")
+- Tagline che fa DESIDERARE il piatto (max 15 parole, molto visiva)
+- Ingredienti con grammature precise e trucchi da chef (es: "180g petto pollo — battuto sottile")
+- Steps concreti con tecniche vere (Maillard, marinatura rapida, croccantezza) ed emoji pertinenti
+- Note: 1 hack nutrizionale concreto
+
+VINCOLO FERRO: rispetta i macro residui del profilo.
+VINCOLO ASSOLUTO DI SICUREZZA: se sono indicate allergie, NON usare MAI quegli ingredienti o derivati — priorità su tutto.
+FONDAMENTO SCIENTIFICO: applica i principi qui sotto quando pertinenti e cita in "science" IL principio concreto che ha guidato la ricetta.${science}
+
+Rispondi SOLO con un array JSON valido di ESATTAMENTE ${chunkSize} ricette${many ? ' DIVERSE tra loro (ingrediente principale, stile o tecnica differenti)' : ''}, nel formato:
+[{"title":"string","emoji":"emoji","tagline":"string max 15 parole","prepMin":numero,"cookMin":numero,"difficulty":"facile|medio|avanzato","mood":"performance|recovery|comfort|light","ingredients":[{"item":"string","amount":"string"}],"steps":["string con emoji"],"kcal":numero,"protein":numero,"carbs":numero,"fat":numero,"fiber":numero,"fitScore":numero_1_10,"notes":"string hack","science":"string principio"}]`;
+        const userMsg = autoMode
+          ? `${profileCtx}${prefsCtx}\n\nCrea ${chunkSize} ricetta/e fitporn straordinaria/e per questo momento. Sorprendimi, rispettando SEMPRE preferenze/allergie.`
+          : `${profileCtx}${prefsCtx}\n\nRichiesta: ${prompt}\n\nCrea ${chunkSize} ricetta/e fitporn adattata/e ai miei macro residui e preferenze/allergie.${avoid.length ? `\nNon ripetere questi titoli già usati: ${avoid.join(', ')}.` : ''}`;
+        const req = (modelOverride, opts = {}) => requestSystemAI({
+          model: modelOverride,
+          temperature: 0.85,
+          // ~780 token/ricetta completa + margine, sotto i 4096: nessun taglio a metà.
+          max_tokens: Math.min(4096, 780 * chunkSize + 400),
+          timeoutMs: opts.timeoutMs || 34000,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userMsg },
+          ],
+        });
+        // Estrae le ricette: array atteso; se il modello rende un oggetto singolo lo avvolge.
+        const extract = (data) => {
+          let arr;
+          try { arr = parseModelJsonArray(data); }
+          catch (_) { const o = parseModelJson(data); arr = o ? [o] : []; }
+          return arr.map((p) => normalizeFullRecipe(p, data, autoMode));
+        };
+        // Qualità: Mistral NeMo (macro precisi) → catena di fallback del proxy. Un lotto
+        // fallito non abortisce tutto: conta come vuoto e il while riprova/continua.
+        let items = [];
         try {
-          data = await recipeRequest(userOverride || 'nvidia:nvidia/nemotron-3-ultra-550b-a55b', { timeoutMs: 45000 });
-          parsed = parseModelJson(data);
-        } catch (secondErr) {
-          data = await recipeRequest(userOverride || undefined);
-          parsed = parseModelJson(data);
+          items = extract(await req(userOverride || 'nvidia:mistralai/mistral-nemotron', { timeoutMs: 32000 }));
+        } catch (e1) {
+          try { items = extract(await req(userOverride || undefined)); }
+          catch (e2) { items = []; }
         }
+        for (const it of items.slice(0, chunkSize)) collected.push(it);
+        setGeneratedRecipes([...collected]);
+        emptyStreak = items.length ? 0 : emptyStreak + 1;
+        if (emptyStreak >= 2) break;
       }
-      const nextRecipe = {
-        title: String(parsed?.title || 'Ricetta AI').slice(0, 80),
-        emoji: String(parsed?.emoji || '🍽️').slice(0, 8),
-        tagline: String(parsed?.tagline || '').slice(0, 120),
-        prepMin: Math.max(0, Math.min(120, Math.round(Number(parsed?.prepMin || 10)))),
-        cookMin: Math.max(0, Math.min(120, Math.round(Number(parsed?.cookMin || 10)))),
-        difficulty: ['facile','medio','avanzato'].includes(parsed?.difficulty) ? parsed.difficulty : 'facile',
-        mood: parsed?.mood || 'performance',
-        ingredients: Array.isArray(parsed?.ingredients)
-          ? parsed.ingredients.map((x) => typeof x === 'string' ? { item: x, amount: '' } : x).filter((x) => x?.item).slice(0, 16)
-          : [],
-        steps: Array.isArray(parsed?.steps) ? parsed.steps.map((x) => String(x || '').trim()).filter(Boolean).slice(0, 10) : [],
-        // Macro riconciliati: kcal coerenti coi grammi, fibre ≤ carboidrati (i modelli
-        // sbagliano spesso la coerenza kcal↔macro). Vedi reconcileRecipeMacros.
-        ...reconcileRecipeMacros({
-          kcal: parsed?.kcal, protein: parsed?.protein,
-          carbs: parsed?.carbs, fat: parsed?.fat, fiber: parsed?.fiber,
-        }),
-        fitScore: Math.min(10, Math.max(1, Math.round(Number(parsed?.fitScore || 7)))),
-        notes: String(parsed?.notes || '').slice(0, 280),
-        science: String(parsed?.science || '').slice(0, 280),
-        provider: String(data?._shadowMeta?.model || '').replace(/^\w+:/, '').split('/').pop().slice(0, 40),
-        createdAt: new Date().toISOString(),
-        auto: autoMode,
-      };
-      setGeneratedRecipe(nextRecipe);
-      setRecipeFeedbackGiven(null); // nuova ricetta → nessun feedback ancora dato
-      setRecipeLogged(false);
-      // Salva in storico ricette (max 10)
-      const histKey = 'shadow_monarch_recipe_history';
+      if (!collected.length) throw new Error('nessuna ricetta generata');
+      // Storico (max 10 ricette più recenti)
       try {
+        const histKey = 'shadow_monarch_recipe_history';
         const hist = JSON.parse(localStorage.getItem(histKey) || '[]');
-        hist.unshift(nextRecipe);
-        localStorage.setItem(histKey, JSON.stringify(hist.slice(0, 10)));
+        localStorage.setItem(histKey, JSON.stringify([...collected, ...hist].slice(0, 10)));
       } catch (_) {}
       playSfx('success', soundEnabled, soundTheme);
-      emitUiToast({ message: `🍽️ ${nextRecipe.title} — pronta!`, tone: 'success', durationMs: 3000 });
+      emitUiToast({
+        message: collected.length === 1 ? `🍽️ ${collected[0].title} — pronta!` : `🍽️ ${collected.length} ricette pronte!`,
+        tone: 'success', durationMs: 3000,
+      });
     } catch (error) {
       const detail = formatAiErrorDetail(error?.message || 'errore recipe').slice(0, 90);
-      emitUiToast({ message: `Ricetta fallita (${detail})`, tone: 'warning', durationMs: 4200 });
+      emitUiToast({ message: `Ricette fallite (${detail})`, tone: 'warning', durationMs: 4200 });
       playSfx('warning', soundEnabled, soundTheme);
     } finally {
       setIsGeneratingRecipe(false);
@@ -3051,36 +3073,36 @@ Rispondi SOLO JSON valido:
 
   // "Mangiata!" — logga i macro della ricetta generata nei pasti di oggi, nello slot
   // dedotto dall'ora (stesso pattern di applyMealTemplate). Un tap, zero doppi inserimenti.
-  const logGeneratedRecipe = () => {
-    if (!generatedRecipe || recipeLogged) return;
+  const logGeneratedRecipe = (recipe) => {
+    if (!recipe || recipeActions[recipe.id]?.logged) return;
     const hourNow = new Date().getHours();
     const slot = hourNow < 10 ? 'breakfast' : hourNow < 14 ? 'lunch' : hourNow < 18 ? 'snack' : 'dinner';
     const slotMeta = MEAL_SLOT_META[slot];
     saveToSystem({
-      consumed: Number(todayData.consumed || 0) + Number(generatedRecipe.kcal || 0),
-      protein: Number(todayData.protein || 0) + Number(generatedRecipe.protein || 0),
-      carbs: Number(todayData.carbs || 0) + Number(generatedRecipe.carbs || 0),
-      fatMacros: Number(todayData.fatMacros || 0) + Number(generatedRecipe.fat || 0),
-      fiber: Number(todayData.fiber || 0) + Number(generatedRecipe.fiber || 0),
-      [slotMeta.key]: Number(todayData?.[slotMeta.key] || 0) + Number(generatedRecipe.kcal || 0),
+      consumed: Number(todayData.consumed || 0) + Number(recipe.kcal || 0),
+      protein: Number(todayData.protein || 0) + Number(recipe.protein || 0),
+      carbs: Number(todayData.carbs || 0) + Number(recipe.carbs || 0),
+      fatMacros: Number(todayData.fatMacros || 0) + Number(recipe.fat || 0),
+      fiber: Number(todayData.fiber || 0) + Number(recipe.fiber || 0),
+      [slotMeta.key]: Number(todayData?.[slotMeta.key] || 0) + Number(recipe.kcal || 0),
     });
-    setRecipeLogged(true);
+    setRecipeActions((prev) => ({ ...prev, [recipe.id]: { ...prev[recipe.id], logged: true } }));
     playSfx('success', soundEnabled, soundTheme);
     emitFxBurst();
-    emitUiToast({ message: `✅ ${generatedRecipe.title} loggata — ${generatedRecipe.kcal} kcal (${slotMeta.label})`, tone: 'success', durationMs: 3200 });
+    emitUiToast({ message: `✅ ${recipe.title} loggata — ${recipe.kcal} kcal (${slotMeta.label})`, tone: 'success', durationMs: 3200 });
   };
 
   // 👍/👎 sulla ricetta corrente — alimenta l'apprendimento delle affinità (stile "più ti piace,
   // più te ne mostro simili"): ingredienti + mood della ricetta gradita finiscono nel feedback
   // KV (per l'export Obsidian) E in un mirror locale (per l'affinità usata subito nel prompt).
-  const sendRecipeFeedback = (liked) => {
-    if (!generatedRecipe) return;
-    setRecipeFeedbackGiven(liked ? 'up' : 'down');
+  const sendRecipeFeedback = (recipe, liked) => {
+    if (!recipe) return;
+    setRecipeActions((prev) => ({ ...prev, [recipe.id]: { ...prev[recipe.id], feedback: liked ? 'up' : 'down' } }));
     const tags = [
-      ...(generatedRecipe.ingredients || []).slice(0, 4).map((i) => i?.item).filter(Boolean),
-      generatedRecipe.mood,
+      ...(recipe.ingredients || []).slice(0, 4).map((i) => i?.item).filter(Boolean),
+      recipe.mood,
     ].filter(Boolean);
-    const row = { ts: new Date().toISOString(), title: generatedRecipe.title, tags, liked: liked ? 'up' : 'down' };
+    const row = { ts: new Date().toISOString(), title: recipe.title, tags, liked: liked ? 'up' : 'down' };
     try {
       const key = 'shadow_monarch_recipe_feedback';
       const hist = JSON.parse(localStorage.getItem(key) || '[]');
@@ -3350,19 +3372,20 @@ Rispondi SOLO JSON valido:
   // Somma le quantità degli ingredienti uguali quando hanno la stessa unità (es. due
   // ricette con "200 g" e "150 g" di pollo → "350 g"); le quantità in unità diverse o
   // non numeriche ("q.b.", "1 cucchiaio") vengono elencate affiancate con " + ".
-  const forgeCart = useMemo(() => {
-    const cards = forgeBatch?.cards || [];
+  // Aggregatore puro: da una lista di "fonti" {id, ingredients:[{item,amount}]} costruisce le
+  // voci del carrello, sommando le quantità con stessa unità e affiancando quelle diverse.
+  const buildCart = (sources) => {
     const map = new Map();
-    for (const c of cards) {
-      const ings = c?.full?.ingredients;
+    for (const src of sources || []) {
+      const ings = src?.ingredients;
       if (!Array.isArray(ings)) continue;
       for (const ing of ings) {
-        const item = String(ing?.item || '').trim();
+        const item = String(ing?.item || (typeof ing === 'string' ? ing : '')).trim();
         if (!item) continue;
         const key = item.toLowerCase();
         if (!map.has(key)) map.set(key, { item, units: new Map(), freeforms: [], recipes: new Set() });
         const entry = map.get(key);
-        entry.recipes.add(c.id);
+        entry.recipes.add(src.id);
         const amt = String(ing?.amount || '').trim();
         if (!amt) continue;
         const m = amt.match(/^(\d+(?:[.,]\d+)?)\s*(.*)$/);
@@ -3370,8 +3393,8 @@ Rispondi SOLO JSON valido:
         if (m && Number.isFinite(qty)) {
           const unit = m[2].trim().toLowerCase();
           entry.units.set(unit, (entry.units.get(unit) || 0) + qty);
-        } else {
-          if (!entry.freeforms.includes(amt)) entry.freeforms.push(amt);
+        } else if (!entry.freeforms.includes(amt)) {
+          entry.freeforms.push(amt);
         }
       }
     }
@@ -3384,7 +3407,14 @@ Rispondi SOLO JSON valido:
       for (const f of e.freeforms) parts.push(f);
       return { key: e.item.toLowerCase(), item: e.item, amount: parts.join(' + '), recipeCount: e.recipes.size };
     }).sort((a, b) => a.item.localeCompare(b.item, 'it'));
-  }, [forgeBatch]);
+  };
+
+  // Carrello della lista principale (ricette complete generate) e del Calendario del Destino.
+  const recipeCart = useMemo(() => buildCart(generatedRecipes), [generatedRecipes]);
+  const forgeCart = useMemo(
+    () => buildCart((forgeBatch?.cards || []).map((c) => ({ id: c.id, ingredients: c?.full?.ingredients }))),
+    [forgeBatch],
+  );
 
   useEffect(() => {
     try { localStorage.setItem('shadow_monarch_forge_cart_checked', JSON.stringify(cartChecked || {})); } catch (_) {}
@@ -3392,9 +3422,9 @@ Rispondi SOLO JSON valido:
 
   const toggleCartItem = (key) => setCartChecked((prev) => ({ ...prev, [key]: !prev[key] }));
   const clearCartChecks = () => setCartChecked({});
-  const copyCartList = () => {
-    const lines = forgeCart.map((c) => `- ${c.item}${c.amount ? ` — ${c.amount}` : ''}`);
-    const text = `🛒 Lista della spesa (${forgeCart.length} ingredienti)\n${lines.join('\n')}`;
+  const copyCartList = (cart) => {
+    const lines = cart.map((c) => `- ${c.item}${c.amount ? ` — ${c.amount}` : ''}`);
+    const text = `🛒 Lista della spesa (${cart.length} ingredienti)\n${lines.join('\n')}`;
     try {
       navigator.clipboard?.writeText(text);
       emitUiToast({ message: '🛒 Lista copiata negli appunti', tone: 'success', durationMs: 2400 });
@@ -6309,11 +6339,7 @@ Rispondi SOLO JSON valido:
                 className={`text-[9px] px-2.5 py-1.5 rounded-lg border transition-colors ${isGeneratingRecipe ? 'border-gray-700 text-gray-500' : 'border-violet-400/40 text-violet-300 hover:bg-violet-500/20'}`}>
                 ✨ Sorprendimi
               </button>
-              <button onClick={() => {
-                const intent = parseForgeIntent(recipePrompt);
-                if (intent) { setRecipePrompt(''); startRecipeForge(intent.mealType, intent.count); }
-                else generateRecipeFromPrompt(false);
-              }} disabled={isGeneratingRecipe}
+              <button onClick={() => generateRecipeFromPrompt(false)} disabled={isGeneratingRecipe}
                 className={`text-[9px] px-2.5 py-1.5 rounded-lg border transition-colors ${isGeneratingRecipe ? 'border-gray-700 text-gray-500' : 'border-violet-300/60 text-white hover:bg-violet-500/30'}`}>
                 {isGeneratingRecipe ? '⏳' : '⚡ Genera'}
               </button>
@@ -6458,7 +6484,7 @@ Rispondi SOLO JSON valido:
               return (
                 <div className="flex gap-1.5 mt-2 overflow-x-auto pb-0.5">
                   {hist.slice(0, 6).map((r, i) => (
-                    <button key={`${r.createdAt || i}`} onClick={() => { setGeneratedRecipe(r); setRecipeFeedbackGiven(null); setRecipeLogged(false); }}
+                    <button key={`${r.createdAt || i}`} onClick={() => { setGeneratedRecipes([{ ...r, id: r.id || `${Date.now()}-${i}` }]); setRecipeActions({}); }}
                       className="flex-shrink-0 text-[8px] px-2 py-0.5 rounded-full border border-white/10 text-gray-300 hover:border-violet-300/40 hover:text-violet-200 transition-colors">
                       {r.emoji} {String(r.title || '').slice(0, 22)}
                     </button>
@@ -6473,112 +6499,209 @@ Rispondi SOLO JSON valido:
               <span className="text-[10px] text-violet-300">Chef AI al lavoro...</span>
             </div>
           )}
-          {generatedRecipe && !isGeneratingRecipe && (
-            <div className="mt-4 rounded-xl overflow-hidden" style={{ border: '1px solid rgba(167,139,250,0.2)', background: 'rgba(0,0,0,0.4)' }}>
-              {/* Header fitporn */}
-              <div className="p-3 pb-2" style={{ background: 'linear-gradient(135deg, rgba(124,58,237,0.2), rgba(79,70,229,0.15))' }}>
-                <div className="flex items-start gap-2">
-                  <span className="text-3xl leading-none">{generatedRecipe.emoji}</span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-black text-white leading-tight" style={{ fontFamily: 'Russo One, sans-serif' }}>{generatedRecipe.title}</p>
-                    {generatedRecipe.tagline && <p className="text-[10px] text-violet-200 mt-0.5 italic leading-snug">"{generatedRecipe.tagline}"</p>}
-                  </div>
-                  <div className="flex-shrink-0 flex flex-col items-end gap-1">
-                    <div className="px-1.5 py-0.5 rounded text-[8px] font-bold" style={{ background: 'rgba(167,139,250,0.2)', color: '#c4b5fd' }}>
-                      FIT {generatedRecipe.fitScore}/10
+          {/* 🛒 Carrello della spesa — aggrega gli ingredienti di TUTTE le ricette in lista */}
+          <AnimatePresence>
+            {recipeCart.length > 0 && (() => {
+              const checkedCount = recipeCart.filter((c) => cartChecked[c.key]).length;
+              return (
+                <motion.div
+                  initial={{ opacity: 0, y: -8, height: 0 }}
+                  animate={{ opacity: 1, y: 0, height: 'auto' }}
+                  exit={{ opacity: 0, y: -8, height: 0 }}
+                  transition={{ duration: 0.35, ease: [0.34, 1.4, 0.64, 1] }}
+                  className="mt-4 rounded-2xl overflow-hidden"
+                  style={{ background: 'linear-gradient(160deg, rgba(245,158,11,0.14), rgba(15,8,28,0.9))', border: '1px solid rgba(245,158,11,0.3)', boxShadow: '0 0 22px rgba(245,158,11,0.1)' }}>
+                  <button onClick={() => setCartOpen((v) => !v)} className="w-full flex items-center gap-2.5 p-3">
+                    <motion.span className="text-xl" animate={{ rotate: cartOpen ? [0, -12, 8, 0] : 0 }} transition={{ duration: 0.5 }}>🛒</motion.span>
+                    <div className="flex-1 text-left">
+                      <p className="text-[11px] font-black text-white leading-tight" style={{ fontFamily: 'Russo One, sans-serif' }}>Carrello della spesa</p>
+                      <p className="text-[8px] text-amber-200/80">{checkedCount}/{recipeCart.length} presi · da {generatedRecipes.length} ricett{generatedRecipes.length === 1 ? 'a' : 'e'}</p>
                     </div>
-                    <div className="text-[8px] text-gray-400">{generatedRecipe.difficulty}</div>
-                    {generatedRecipe.provider && <div className="text-[7px] font-mono text-violet-300/70">🤖 {generatedRecipe.provider}</div>}
-                  </div>
-                </div>
-                <div className="flex gap-3 mt-2 text-[9px] text-gray-400">
-                  {generatedRecipe.prepMin > 0 && <span>⏱ prep {generatedRecipe.prepMin}min</span>}
-                  {generatedRecipe.cookMin > 0 && <span>🔥 cook {generatedRecipe.cookMin}min</span>}
-                  <span className="capitalize">{generatedRecipe.mood}</span>
-                </div>
-              </div>
-              {/* Macro bar */}
-              <div className="grid grid-cols-4 divide-x divide-white/5 border-b border-white/5">
-                {[
-                  { label: 'Kcal', val: generatedRecipe.kcal, color: '#f97316' },
-                  { label: 'Prot', val: `${generatedRecipe.protein}g`, color: '#10b981' },
-                  { label: 'Carb', val: `${generatedRecipe.carbs}g`, color: '#3b82f6' },
-                  { label: 'Grass', val: `${generatedRecipe.fat}g`, color: '#f59e0b' },
-                ].map((m) => (
-                  <div key={m.label} className="py-2 text-center">
-                    <p className="text-[11px] font-black" style={{ color: m.color }}>{m.val}</p>
-                    <p className="text-[8px] text-gray-500 uppercase">{m.label}</p>
-                  </div>
-                ))}
-              </div>
-              {/* Ingredienti */}
-              {generatedRecipe.ingredients?.length > 0 && (
-                <div className="p-3 border-b border-white/5">
-                  <p className="text-[8px] uppercase tracking-widest text-gray-500 mb-1.5">Ingredienti</p>
-                  <div className="grid grid-cols-2 gap-x-3 gap-y-0.5">
-                    {generatedRecipe.ingredients.map((ing, i) => (
-                      <div key={i} className="flex justify-between text-[10px]">
-                        <span className="text-gray-300 truncate">{ing.item || ing}</span>
-                        {ing.amount && <span className="text-gray-500 ml-1 flex-shrink-0">{ing.amount}</span>}
+                    <AnimatePresence mode="popLayout">
+                      <motion.span key={recipeCart.length}
+                        initial={{ scale: 1.6, backgroundColor: 'rgba(245,158,11,0.9)' }}
+                        animate={{ scale: 1, backgroundColor: 'rgba(245,158,11,0.25)' }}
+                        transition={{ type: 'spring', stiffness: 400, damping: 15 }}
+                        className="min-w-[24px] px-1.5 py-0.5 rounded-full text-center text-[10px] font-black"
+                        style={{ color: '#fcd34d', border: '1px solid rgba(245,158,11,0.45)' }}>
+                        {recipeCart.length}
+                      </motion.span>
+                    </AnimatePresence>
+                    <motion.span className="text-amber-300 text-xs" animate={{ rotate: cartOpen ? 180 : 0 }}>▾</motion.span>
+                  </button>
+                  <AnimatePresence initial={false}>
+                    {cartOpen && (
+                      <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.3 }}>
+                        <div className="px-3 pb-3">
+                          <div className="max-h-64 overflow-y-auto pr-1 space-y-1">
+                            <AnimatePresence initial={false}>
+                              {recipeCart.map((c) => {
+                                const checked = !!cartChecked[c.key];
+                                return (
+                                  <motion.button key={c.key} layout onClick={() => toggleCartItem(c.key)}
+                                    initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 12 }}
+                                    transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                                    className="w-full flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left"
+                                    style={{ background: checked ? 'rgba(255,255,255,0.03)' : 'rgba(245,158,11,0.06)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                                    <span className="flex-shrink-0 w-4 h-4 rounded-md flex items-center justify-center text-[9px] font-black"
+                                      style={checked
+                                        ? { background: '#f59e0b', color: '#1a1206', borderColor: '#f59e0b' }
+                                        : { border: '1.5px solid rgba(245,158,11,0.5)', color: 'transparent' }}>✓</span>
+                                    <span className={`flex-1 text-[11px] leading-tight ${checked ? 'line-through text-gray-500' : 'text-gray-200'}`}>
+                                      {c.item}
+                                      {c.recipeCount > 1 && <span className="ml-1 text-[8px] text-amber-300/70">×{c.recipeCount}</span>}
+                                    </span>
+                                    {c.amount && <span className={`text-[10px] flex-shrink-0 ${checked ? 'text-gray-600' : 'text-amber-200/70'}`}>{c.amount}</span>}
+                                  </motion.button>
+                                );
+                              })}
+                            </AnimatePresence>
+                          </div>
+                          <div className="flex gap-2 mt-2.5">
+                            <button onClick={() => copyCartList(recipeCart)}
+                              className="flex-1 text-[10px] font-black py-2 rounded-lg"
+                              style={{ background: 'linear-gradient(135deg,#f59e0b,#d97706)', color: '#1a1206' }}>
+                              📋 Copia lista
+                            </button>
+                            {checkedCount > 0 && (
+                              <button onClick={clearCartChecks}
+                                className="text-[10px] font-bold py-2 px-3 rounded-lg"
+                                style={{ background: 'rgba(255,255,255,0.06)', color: '#fcd34d', border: '1px solid rgba(245,158,11,0.3)' }}>
+                                Azzera spunte
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </motion.div>
+              );
+            })()}
+          </AnimatePresence>
+
+          {/* Lista scrollabile di ricette complete — si popola dal vivo mentre l'AI genera */}
+          {generatedRecipes.length > 0 && (
+            <div className="mt-4 space-y-4">
+              {generatedRecipes.length > 1 && (
+                <p className="text-[9px] uppercase tracking-widest text-violet-300/80">{generatedRecipes.length} ricette · scorri per vederle tutte</p>
+              )}
+              {generatedRecipes.map((recipe, idx) => {
+                const act = recipeActions[recipe.id] || {};
+                const logged = !!act.logged;
+                const fb = act.feedback || null;
+                return (
+                  <motion.div key={recipe.id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}
+                    className="rounded-xl overflow-hidden" style={{ border: '1px solid rgba(167,139,250,0.2)', background: 'rgba(0,0,0,0.4)' }}>
+                    {/* Header fitporn */}
+                    <div className="p-3 pb-2" style={{ background: 'linear-gradient(135deg, rgba(124,58,237,0.2), rgba(79,70,229,0.15))' }}>
+                      <div className="flex items-start gap-2">
+                        <span className="text-3xl leading-none">{recipe.emoji}</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-black text-white leading-tight" style={{ fontFamily: 'Russo One, sans-serif' }}>
+                            {generatedRecipes.length > 1 && <span className="text-violet-400/80">#{idx + 1} </span>}{recipe.title}
+                          </p>
+                          {recipe.tagline && <p className="text-[10px] text-violet-200 mt-0.5 italic leading-snug">"{recipe.tagline}"</p>}
+                        </div>
+                        <div className="flex-shrink-0 flex flex-col items-end gap-1">
+                          <div className="px-1.5 py-0.5 rounded text-[8px] font-bold" style={{ background: 'rgba(167,139,250,0.2)', color: '#c4b5fd' }}>
+                            FIT {recipe.fitScore}/10
+                          </div>
+                          <div className="text-[8px] text-gray-400">{recipe.difficulty}</div>
+                          {recipe.provider && <div className="text-[7px] font-mono text-violet-300/70">🤖 {recipe.provider}</div>}
+                        </div>
                       </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {/* Steps */}
-              {generatedRecipe.steps?.length > 0 && (
-                <div className="p-3 border-b border-white/5">
-                  <p className="text-[8px] uppercase tracking-widest text-gray-500 mb-1.5">Preparazione</p>
-                  <ol className="space-y-1.5">
-                    {generatedRecipe.steps.map((step, i) => (
-                      <li key={i} className="flex gap-2 text-[10px] text-gray-300 leading-snug">
-                        <span className="flex-shrink-0 w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-bold mt-0.5" style={{ background: 'rgba(167,139,250,0.2)', color: '#a78bfa' }}>{i + 1}</span>
-                        <span>{step}</span>
-                      </li>
-                    ))}
-                  </ol>
-                </div>
-              )}
-              {/* Note hack */}
-              {generatedRecipe.notes && (
-                <div className="p-3 pb-0">
-                  <p className="text-[9px] text-violet-300 leading-relaxed">💡 {generatedRecipe.notes}</p>
-                </div>
-              )}
-              {/* Principio scientifico che ha guidato la ricetta (knowledge base paper) */}
-              {generatedRecipe.science && (
-                <div className="p-3 pb-0">
-                  <p className="text-[9px] text-emerald-300 leading-relaxed">🔬 {generatedRecipe.science}</p>
-                </div>
-              )}
-              {/* Mangiata → logga i macro nel giorno con un tap */}
-              <div className="p-3 pb-0">
-                <button onClick={logGeneratedRecipe} disabled={recipeLogged}
-                  className="w-full py-2.5 rounded-xl text-[11px] font-black transition-colors"
-                  style={recipeLogged
-                    ? { background: 'rgba(16,185,129,0.12)', color: '#34d399', border: '1px solid rgba(16,185,129,0.3)' }
-                    : { background: 'linear-gradient(135deg, #10b981, #047857)', color: '#fff', boxShadow: '0 4px 14px rgba(16,185,129,0.35)' }}>
-                  {recipeLogged ? '✓ Loggata nei pasti di oggi' : `🍽️ Mangiata! Logga ${generatedRecipe.kcal} kcal nel giorno`}
-                </button>
-              </div>
-              {/* Feedback — alimenta le affinità per le prossime ricette */}
-              <div className="p-3 flex items-center gap-2">
-                {recipeFeedbackGiven ? (
-                  <span className="text-[9px] font-bold" style={{ color: recipeFeedbackGiven === 'up' ? '#34d399' : '#f87171' }}>
-                    {recipeFeedbackGiven === 'up' ? '✓ Ti piace — ne proporrò di simili' : '✓ Annotato, eviterò cose simili'}
-                  </span>
-                ) : (
-                  <>
-                    <span className="text-[9px] text-gray-500">Ti piace questa ricetta?</span>
-                    <button onClick={() => sendRecipeFeedback(true)}
-                      className="w-6 h-6 rounded-lg flex items-center justify-center text-[11px]"
-                      style={{ background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.4)' }}>👍</button>
-                    <button onClick={() => sendRecipeFeedback(false)}
-                      className="w-6 h-6 rounded-lg flex items-center justify-center text-[11px]"
-                      style={{ background: 'rgba(248,113,113,0.14)', border: '1px solid rgba(248,113,113,0.38)' }}>👎</button>
-                  </>
-                )}
-              </div>
+                      <div className="flex gap-3 mt-2 text-[9px] text-gray-400">
+                        {recipe.prepMin > 0 && <span>⏱ prep {recipe.prepMin}min</span>}
+                        {recipe.cookMin > 0 && <span>🔥 cook {recipe.cookMin}min</span>}
+                        <span className="capitalize">{recipe.mood}</span>
+                      </div>
+                    </div>
+                    {/* Macro bar */}
+                    <div className="grid grid-cols-4 divide-x divide-white/5 border-b border-white/5">
+                      {[
+                        { label: 'Kcal', val: recipe.kcal, color: '#f97316' },
+                        { label: 'Prot', val: `${recipe.protein}g`, color: '#10b981' },
+                        { label: 'Carb', val: `${recipe.carbs}g`, color: '#3b82f6' },
+                        { label: 'Grass', val: `${recipe.fat}g`, color: '#f59e0b' },
+                      ].map((m) => (
+                        <div key={m.label} className="py-2 text-center">
+                          <p className="text-[11px] font-black" style={{ color: m.color }}>{m.val}</p>
+                          <p className="text-[8px] text-gray-500 uppercase">{m.label}</p>
+                        </div>
+                      ))}
+                    </div>
+                    {/* Ingredienti */}
+                    {recipe.ingredients?.length > 0 && (
+                      <div className="p-3 border-b border-white/5">
+                        <p className="text-[8px] uppercase tracking-widest text-gray-500 mb-1.5">Ingredienti</p>
+                        <div className="grid grid-cols-2 gap-x-3 gap-y-0.5">
+                          {recipe.ingredients.map((ing, i) => (
+                            <div key={i} className="flex justify-between text-[10px]">
+                              <span className="text-gray-300 truncate">{ing.item || ing}</span>
+                              {ing.amount && <span className="text-gray-500 ml-1 flex-shrink-0">{ing.amount}</span>}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {/* Steps */}
+                    {recipe.steps?.length > 0 && (
+                      <div className="p-3 border-b border-white/5">
+                        <p className="text-[8px] uppercase tracking-widest text-gray-500 mb-1.5">Preparazione</p>
+                        <ol className="space-y-1.5">
+                          {recipe.steps.map((step, i) => (
+                            <li key={i} className="flex gap-2 text-[10px] text-gray-300 leading-snug">
+                              <span className="flex-shrink-0 w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-bold mt-0.5" style={{ background: 'rgba(167,139,250,0.2)', color: '#a78bfa' }}>{i + 1}</span>
+                              <span>{step}</span>
+                            </li>
+                          ))}
+                        </ol>
+                      </div>
+                    )}
+                    {/* Note hack */}
+                    {recipe.notes && (
+                      <div className="p-3 pb-0">
+                        <p className="text-[9px] text-violet-300 leading-relaxed">💡 {recipe.notes}</p>
+                      </div>
+                    )}
+                    {/* Principio scientifico */}
+                    {recipe.science && (
+                      <div className="p-3 pb-0">
+                        <p className="text-[9px] text-emerald-300 leading-relaxed">🔬 {recipe.science}</p>
+                      </div>
+                    )}
+                    {/* Mangiata → logga i macro nel giorno */}
+                    <div className="p-3 pb-0">
+                      <button onClick={() => logGeneratedRecipe(recipe)} disabled={logged}
+                        className="w-full py-2.5 rounded-xl text-[11px] font-black transition-colors"
+                        style={logged
+                          ? { background: 'rgba(16,185,129,0.12)', color: '#34d399', border: '1px solid rgba(16,185,129,0.3)' }
+                          : { background: 'linear-gradient(135deg, #10b981, #047857)', color: '#fff', boxShadow: '0 4px 14px rgba(16,185,129,0.35)' }}>
+                        {logged ? '✓ Loggata nei pasti di oggi' : `🍽️ Mangiata! Logga ${recipe.kcal} kcal nel giorno`}
+                      </button>
+                    </div>
+                    {/* Feedback */}
+                    <div className="p-3 flex items-center gap-2">
+                      {fb ? (
+                        <span className="text-[9px] font-bold" style={{ color: fb === 'up' ? '#34d399' : '#f87171' }}>
+                          {fb === 'up' ? '✓ Ti piace — ne proporrò di simili' : '✓ Annotato, eviterò cose simili'}
+                        </span>
+                      ) : (
+                        <>
+                          <span className="text-[9px] text-gray-500">Ti piace questa ricetta?</span>
+                          <button onClick={() => sendRecipeFeedback(recipe, true)}
+                            className="w-6 h-6 rounded-lg flex items-center justify-center text-[11px]"
+                            style={{ background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.4)' }}>👍</button>
+                          <button onClick={() => sendRecipeFeedback(recipe, false)}
+                            className="w-6 h-6 rounded-lg flex items-center justify-center text-[11px]"
+                            style={{ background: 'rgba(248,113,113,0.14)', border: '1px solid rgba(248,113,113,0.38)' }}>👎</button>
+                        </>
+                      )}
+                    </div>
+                  </motion.div>
+                );
+              })}
             </div>
           )}
         </div>
@@ -6667,7 +6790,7 @@ Rispondi SOLO JSON valido:
                               </AnimatePresence>
                             </div>
                             <div className="flex gap-2 mt-2.5">
-                              <button onClick={copyCartList}
+                              <button onClick={() => copyCartList(forgeCart)}
                                 className="flex-1 text-[10px] font-black py-2 rounded-lg"
                                 style={{ background: 'linear-gradient(135deg,#f59e0b,#d97706)', color: '#1a1206' }}>
                                 📋 Copia lista
