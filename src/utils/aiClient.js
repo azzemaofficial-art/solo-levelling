@@ -275,6 +275,38 @@ const sanitizeReps = (value) => {
   return text;
 };
 
+// Fa quadrare le kcal con i macro di UNA ricetta (i modelli sbagliano spesso: kcal
+// scollegate dai grammi, o fibre > carboidrati). Stessa filosofia di normalizeMealAnalysis
+// ma isolata e riusabile sia dalla ricetta singola sia dalle card del Recipe Forge, che
+// finora NON avevano nessun controllo di coerenza. Ritorna interi già sanificati.
+export const reconcileRecipeMacros = (raw = {}) => {
+  const protein = toSafeInteger(raw.protein, 0, 0, 900);
+  const carbs = toSafeInteger(raw.carbs, 0, 0, 1200);
+  const fat = toSafeInteger(raw.fat, 0, 0, 700);
+  let fiber = toSafeInteger(raw.fiber ?? raw.fibre, 0, 0, 250);
+  let kcal = toSafeInteger(raw.kcal, 0, 0, 12000);
+
+  // Le fibre sono un sottoinsieme dei carboidrati: non possono superarli.
+  fiber = Math.min(fiber, carbs);
+
+  const kcalFromMacros = Math.round((carbs * 4) + (protein * 4) + (fat * 9));
+  if (kcalFromMacros > 0) {
+    // Se il modello non ha dato le kcal, usiamo quelle calcolate dai macro.
+    if (kcal <= 0) {
+      kcal = kcalFromMacros;
+    } else {
+      // Se le kcal dichiarate divergono troppo dai macro (fuori -26% / +30%),
+      // le riportiamo verso il valore fisiologico, tenendo un filo dell'originale.
+      const lowerBound = Math.round(kcalFromMacros * 0.74);
+      const upperBound = Math.round(kcalFromMacros * 1.3);
+      if (kcal < lowerBound || kcal > upperBound) {
+        kcal = Math.round((kcalFromMacros * 0.85) + (kcal * 0.15));
+      }
+    }
+  }
+  return { kcal, protein, carbs, fat, fiber };
+};
+
 const normalizeMealAnalysis = (parsed) => {
   const base = {
     kcal: toSafeInteger(parsed?.kcal, 0, 0, 12000),

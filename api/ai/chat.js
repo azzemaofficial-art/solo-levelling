@@ -11,6 +11,10 @@ export const config = { maxDuration: 60 };
 
 const NVIDIA_BASE = 'https://integrate.api.nvidia.com/v1';
 const GROQ_BASE = 'https://api.groq.com/openai/v1';
+// Endpoint OpenAI-compatibile di Anthropic: stessa forma chat/completions, auth Bearer,
+// così si incastra nel proxy senza casi speciali. Attivo SOLO se esiste ANTHROPIC_API_KEY
+// (a pagamento) — senza key resolveProvider ritorna null e Claude viene saltato.
+const ANTHROPIC_BASE = 'https://api.anthropic.com/v1';
 
 const firstKey = (...names) => {
   for (const n of names) { const v = process.env[n]; if (v && String(v).trim()) return String(v).trim(); }
@@ -18,6 +22,7 @@ const firstKey = (...names) => {
 };
 
 const GROQ_KEY = () => firstKey('GROQ_API_KEY');
+const ANTHROPIC_KEY = () => firstKey('ANTHROPIC_API_KEY');
 
 // Mapping modello NVIDIA → chiave specifica (ogni modello ha la sua key su NIM)
 const NVIDIA_MODEL_KEY = {
@@ -45,6 +50,9 @@ const FALLBACK = [
   // Ultima risorsa fuori-Groq: se Groq è interamente in 429, NIM risponde comunque
   // (lento ma verificato 200) — meglio una risposta in 20s che nessuna.
   'nvidia:nvidia/nemotron-3-ultra-550b-a55b',
+  // Rete di sicurezza FINALE a pagamento: entra in gioco solo se TUTTO il resto ha
+  // fallito E esiste ANTHROPIC_API_KEY. Senza la key viene saltato (nessun costo).
+  'anthropic:claude-haiku-4-5-20251001',
 ];
 
 function resolveProvider(modelId) {
@@ -59,6 +67,10 @@ function resolveProvider(modelId) {
     const keyFn = NVIDIA_MODEL_KEY[modelName] || NVIDIA_KEY_DEFAULT;
     const key = keyFn();
     return key ? { base: NVIDIA_BASE, key, model: modelName, tag: id } : null;
+  }
+  if (id.startsWith('anthropic:')) {
+    const key = ANTHROPIC_KEY();
+    return key ? { base: ANTHROPIC_BASE, key, model: id.slice(10), tag: id } : null;
   }
   return null; // id non prefissato (es. vecchi id OpenRouter) → salta al fallback
 }
@@ -102,6 +114,7 @@ export default async function handler(req, res) {
       providers: {
         groq: Boolean(GROQ_KEY()),
         nvidia: Boolean(NVIDIA_KEY_DEFAULT()),
+        anthropic: Boolean(ANTHROPIC_KEY()),
       },
       nvidiaKeySource: ['NVIDIA_550B_API_KEY', 'DEEPSEEK_PRO_API_KEY', 'KIMI_NVIDIA_API_KEY', 'LLAMA_NVIDIA_API_KEY', 'MISTRAL_NVIDIA_API_KEY', 'NVIDIA_API_KEY']
         .filter((n) => process.env[n]),

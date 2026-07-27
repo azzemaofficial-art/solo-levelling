@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { playSfx } from '../utils/sfx';
 import { speakEvent } from '../utils/voice';
 import AnimeStrip from '../components/AnimeStrip';
-import { formatAiErrorDetail, looseJsonParse, parseModelJson, requestSystemAI } from '../utils/aiClient';
+import { formatAiErrorDetail, looseJsonParse, parseModelJson, reconcileRecipeMacros, requestSystemAI } from '../utils/aiClient';
 import { AI_MODELS, getModelFor, getGlobalModel, setGlobalModel, getTaskOverride, setTaskOverride } from '../utils/aiModels';
 import { computeReadinessOutcome, computeSleepCoach, computeWeightTrendGuard, computeWeeklyOverview, evaluateDataQuality } from '../utils/healthLogic';
 import { emitShadowFxBurst } from '../utils/fxEvents';
@@ -412,6 +412,12 @@ const SystemHub = ({ systemLogs, setSystemLogs, dailyGoal, setDailyGoal, hydrati
   const [forgeCountInput, setForgeCountInput] = useState('7');
   const [forgeBatch, setForgeBatch] = useState(null); // {total, mealType, cards:[], done, generating, error}
   const [forgeDetailCardId, setForgeDetailCardId] = useState(null);
+  // ── Carrello della spesa: aggrega gli ingredienti di TUTTE le card forge di cui hai aperto
+  // il dettaglio (gli ingredienti esistono solo dopo l'apertura → card.full.ingredients). ──
+  const [cartOpen, setCartOpen] = useState(false);
+  const [cartChecked, setCartChecked] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('shadow_monarch_forge_cart_checked') || '{}') || {}; } catch { return {}; }
+  });
   const [aiModelProfile, setAiModelProfile] = useState(() => getTaskOverride('profile'));
   // Analisi profilo profonda (Nemotron)
   const [profileAnalysis, setProfileAnalysis] = useState(() => {
@@ -3009,11 +3015,12 @@ Rispondi SOLO JSON valido:
           ? parsed.ingredients.map((x) => typeof x === 'string' ? { item: x, amount: '' } : x).filter((x) => x?.item).slice(0, 16)
           : [],
         steps: Array.isArray(parsed?.steps) ? parsed.steps.map((x) => String(x || '').trim()).filter(Boolean).slice(0, 10) : [],
-        kcal: Math.max(0, Math.round(Number(parsed?.kcal || 0))),
-        protein: Math.max(0, Math.round(Number(parsed?.protein || 0))),
-        carbs: Math.max(0, Math.round(Number(parsed?.carbs || 0))),
-        fat: Math.max(0, Math.round(Number(parsed?.fat || 0))),
-        fiber: Math.max(0, Math.round(Number(parsed?.fiber || 0))),
+        // Macro riconciliati: kcal coerenti coi grammi, fibre ≤ carboidrati (i modelli
+        // sbagliano spesso la coerenza kcal↔macro). Vedi reconcileRecipeMacros.
+        ...reconcileRecipeMacros({
+          kcal: parsed?.kcal, protein: parsed?.protein,
+          carbs: parsed?.carbs, fat: parsed?.fat, fiber: parsed?.fiber,
+        }),
         fitScore: Math.min(10, Math.max(1, Math.round(Number(parsed?.fitScore || 7)))),
         notes: String(parsed?.notes || '').slice(0, 280),
         science: String(parsed?.science || '').slice(0, 280),
@@ -3218,15 +3225,20 @@ Rispondi SOLO con un array JSON valido di esattamente ${chunkSize} oggetti, in q
           }
         }
         rawItems.slice(0, chunkSize).forEach((item, i) => {
+          // Macro riconciliati anche qui: prima le card mostravano le kcal grezze del
+          // modello, spesso incoerenti con i grammi. reconcileRecipeMacros le fa quadrare.
+          const macros = reconcileRecipeMacros({
+            kcal: item?.kcal, protein: item?.protein, carbs: item?.carbs, fat: item?.fat,
+          });
           cards.push({
             id: `${Date.now()}-${cards.length}-${i}`,
             title: String(item?.title || 'Ricetta misteriosa').slice(0, 80),
             emoji: String(item?.emoji || '🍽️').slice(0, 8),
             tagline: String(item?.tagline || '').slice(0, 120),
-            kcal: Math.max(0, Math.round(Number(item?.kcal || 0))),
-            protein: Math.max(0, Math.round(Number(item?.protein || 0))),
-            carbs: Math.max(0, Math.round(Number(item?.carbs || 0))),
-            fat: Math.max(0, Math.round(Number(item?.fat || 0))),
+            kcal: macros.kcal,
+            protein: macros.protein,
+            carbs: macros.carbs,
+            fat: macros.fat,
             prepMin: Math.max(0, Math.min(120, Math.round(Number(item?.prepMin || 15)))),
             difficulty: ['facile', 'medio', 'avanzato'].includes(item?.difficulty) ? item.difficulty : 'facile',
             revealed: false,
@@ -3319,6 +3331,11 @@ Rispondi SOLO JSON valido:
       };
       setForgeBatch((prev) => prev ? { ...prev, cards: prev.cards.map((c) => c.id === cardId ? { ...c, full, loadingFull: false } : c) } : prev);
       setForgeDetailCardId(cardId);
+      // Gli ingredienti appena caricati confluiscono automaticamente nel carrello in alto:
+      // un tocco di feedback lo rende scopribile senza essere invasivo.
+      if (full.ingredients.length > 0) {
+        emitUiToast({ message: `🛒 ${full.ingredients.length} ingredienti nel carrello`, tone: 'success', durationMs: 2200 });
+      }
     } catch (error) {
       const detail = formatAiErrorDetail(error?.message || 'errore ricetta').slice(0, 90);
       setForgeBatch((prev) => prev ? { ...prev, cards: prev.cards.map((c) => c.id === cardId ? { ...c, loadingFull: false } : c) } : prev);
@@ -3327,6 +3344,64 @@ Rispondi SOLO JSON valido:
   };
 
   const closeForgeBatch = () => { setForgeBatch(null); setForgeDetailCardId(null); };
+
+  // ── Carrello della spesa ──────────────────────────────────────────────────────
+  // Aggrega gli ingredienti di tutte le card forge già APERTE (card.full.ingredients).
+  // Somma le quantità degli ingredienti uguali quando hanno la stessa unità (es. due
+  // ricette con "200 g" e "150 g" di pollo → "350 g"); le quantità in unità diverse o
+  // non numeriche ("q.b.", "1 cucchiaio") vengono elencate affiancate con " + ".
+  const forgeCart = useMemo(() => {
+    const cards = forgeBatch?.cards || [];
+    const map = new Map();
+    for (const c of cards) {
+      const ings = c?.full?.ingredients;
+      if (!Array.isArray(ings)) continue;
+      for (const ing of ings) {
+        const item = String(ing?.item || '').trim();
+        if (!item) continue;
+        const key = item.toLowerCase();
+        if (!map.has(key)) map.set(key, { item, units: new Map(), freeforms: [], recipes: new Set() });
+        const entry = map.get(key);
+        entry.recipes.add(c.id);
+        const amt = String(ing?.amount || '').trim();
+        if (!amt) continue;
+        const m = amt.match(/^(\d+(?:[.,]\d+)?)\s*(.*)$/);
+        const qty = m ? parseFloat(m[1].replace(',', '.')) : NaN;
+        if (m && Number.isFinite(qty)) {
+          const unit = m[2].trim().toLowerCase();
+          entry.units.set(unit, (entry.units.get(unit) || 0) + qty);
+        } else {
+          if (!entry.freeforms.includes(amt)) entry.freeforms.push(amt);
+        }
+      }
+    }
+    return [...map.values()].map((e) => {
+      const parts = [];
+      for (const [unit, qty] of e.units) {
+        const n = Number.isInteger(qty) ? qty : Math.round(qty * 100) / 100;
+        parts.push(unit ? `${n} ${unit}` : `${n}`);
+      }
+      for (const f of e.freeforms) parts.push(f);
+      return { key: e.item.toLowerCase(), item: e.item, amount: parts.join(' + '), recipeCount: e.recipes.size };
+    }).sort((a, b) => a.item.localeCompare(b.item, 'it'));
+  }, [forgeBatch]);
+
+  useEffect(() => {
+    try { localStorage.setItem('shadow_monarch_forge_cart_checked', JSON.stringify(cartChecked || {})); } catch (_) {}
+  }, [cartChecked]);
+
+  const toggleCartItem = (key) => setCartChecked((prev) => ({ ...prev, [key]: !prev[key] }));
+  const clearCartChecks = () => setCartChecked({});
+  const copyCartList = () => {
+    const lines = forgeCart.map((c) => `- ${c.item}${c.amount ? ` — ${c.amount}` : ''}`);
+    const text = `🛒 Lista della spesa (${forgeCart.length} ingredienti)\n${lines.join('\n')}`;
+    try {
+      navigator.clipboard?.writeText(text);
+      emitUiToast({ message: '🛒 Lista copiata negli appunti', tone: 'success', durationMs: 2400 });
+    } catch (_) {
+      emitUiToast({ message: 'Copia non riuscita', tone: 'warning', durationMs: 2400 });
+    }
+  };
 
   const saveBodyCompositionGoal = () => {
     const targetWeightKg = Number(bodyGoalInput.targetWeightKg || 0);
@@ -6529,6 +6604,90 @@ Rispondi SOLO JSON valido:
                 className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-white text-sm"
                 style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)' }}>✕</button>
             </div>
+
+            {/* 🛒 Carrello della spesa — aggrega gli ingredienti delle card aperte */}
+            <AnimatePresence>
+              {forgeCart.length > 0 && (() => {
+                const checkedCount = forgeCart.filter((c) => cartChecked[c.key]).length;
+                return (
+                  <motion.div
+                    initial={{ opacity: 0, y: -8, height: 0 }}
+                    animate={{ opacity: 1, y: 0, height: 'auto' }}
+                    exit={{ opacity: 0, y: -8, height: 0 }}
+                    transition={{ duration: 0.35, ease: [0.34, 1.4, 0.64, 1] }}
+                    className="mb-4 rounded-2xl overflow-hidden"
+                    style={{ background: 'linear-gradient(160deg, rgba(245,158,11,0.14), rgba(15,8,28,0.9))', border: '1px solid rgba(245,158,11,0.3)', boxShadow: '0 0 22px rgba(245,158,11,0.1)' }}>
+                    {/* Barra cliccabile: apre/chiude */}
+                    <button onClick={() => setCartOpen((v) => !v)} className="w-full flex items-center gap-2.5 p-3">
+                      <motion.span className="text-xl" animate={{ rotate: cartOpen ? [0, -12, 8, 0] : 0 }} transition={{ duration: 0.5 }}>🛒</motion.span>
+                      <div className="flex-1 text-left">
+                        <p className="text-[11px] font-black text-white leading-tight" style={{ fontFamily: 'Russo One, sans-serif' }}>Carrello della spesa</p>
+                        <p className="text-[8px] text-amber-200/80">{checkedCount}/{forgeCart.length} presi · dalle ricette aperte</p>
+                      </div>
+                      {/* Badge conteggio: pop-in quando entra un nuovo ingrediente */}
+                      <AnimatePresence mode="popLayout">
+                        <motion.span key={forgeCart.length}
+                          initial={{ scale: 1.6, backgroundColor: 'rgba(245,158,11,0.9)' }}
+                          animate={{ scale: 1, backgroundColor: 'rgba(245,158,11,0.25)' }}
+                          transition={{ type: 'spring', stiffness: 400, damping: 15 }}
+                          className="min-w-[24px] px-1.5 py-0.5 rounded-full text-center text-[10px] font-black"
+                          style={{ color: '#fcd34d', border: '1px solid rgba(245,158,11,0.45)' }}>
+                          {forgeCart.length}
+                        </motion.span>
+                      </AnimatePresence>
+                      <motion.span className="text-amber-300 text-xs" animate={{ rotate: cartOpen ? 180 : 0 }}>▾</motion.span>
+                    </button>
+                    {/* Lista ingredienti */}
+                    <AnimatePresence initial={false}>
+                      {cartOpen && (
+                        <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.3 }}>
+                          <div className="px-3 pb-3">
+                            <div className="max-h-64 overflow-y-auto pr-1 space-y-1">
+                              <AnimatePresence initial={false}>
+                                {forgeCart.map((c) => {
+                                  const checked = !!cartChecked[c.key];
+                                  return (
+                                    <motion.button key={c.key} layout onClick={() => toggleCartItem(c.key)}
+                                      initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 12 }}
+                                      transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                                      className="w-full flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left"
+                                      style={{ background: checked ? 'rgba(255,255,255,0.03)' : 'rgba(245,158,11,0.06)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                                      <span className="flex-shrink-0 w-4 h-4 rounded-md flex items-center justify-center text-[9px] font-black transition-colors"
+                                        style={checked
+                                          ? { background: '#f59e0b', color: '#1a1206', borderColor: '#f59e0b' }
+                                          : { border: '1.5px solid rgba(245,158,11,0.5)', color: 'transparent' }}>✓</span>
+                                      <span className={`flex-1 text-[11px] leading-tight ${checked ? 'line-through text-gray-500' : 'text-gray-200'}`}>
+                                        {c.item}
+                                        {c.recipeCount > 1 && <span className="ml-1 text-[8px] text-amber-300/70">×{c.recipeCount}</span>}
+                                      </span>
+                                      {c.amount && <span className={`text-[10px] flex-shrink-0 ${checked ? 'text-gray-600' : 'text-amber-200/70'}`}>{c.amount}</span>}
+                                    </motion.button>
+                                  );
+                                })}
+                              </AnimatePresence>
+                            </div>
+                            <div className="flex gap-2 mt-2.5">
+                              <button onClick={copyCartList}
+                                className="flex-1 text-[10px] font-black py-2 rounded-lg"
+                                style={{ background: 'linear-gradient(135deg,#f59e0b,#d97706)', color: '#1a1206' }}>
+                                📋 Copia lista
+                              </button>
+                              {checkedCount > 0 && (
+                                <button onClick={clearCartChecks}
+                                  className="text-[10px] font-bold py-2 px-3 rounded-lg"
+                                  style={{ background: 'rgba(255,255,255,0.06)', color: '#fcd34d', border: '1px solid rgba(245,158,11,0.3)' }}>
+                                  Azzera spunte
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </motion.div>
+                );
+              })()}
+            </AnimatePresence>
 
             {/* Barra di progresso mentre forgia */}
             {forgeBatch.generating && (
