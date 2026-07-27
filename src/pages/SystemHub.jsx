@@ -3165,13 +3165,21 @@ Rispondi SOLO JSON valido:
     // con 12 la scienza usciva vuota e le ricette ignoravano la knowledge base.
     const science = knowledgePromptFor(`${mealType} nutrizione proteine sazietà energia ${prefsCtx}`, 1800);
     const cards = [];
-    // Lotti più piccoli (12) con budget-token più ampio per oggetto: riduce drasticamente le
-    // troncature a metà array. Se un lotto arriva comunque tagliato, parseModelJsonArray salva
-    // le ricette complete e il while continua a colmare gli slot mancanti.
-    const CHUNK = 12;
+    // Lotti da 8 (non 12): Mistral NeMo — ora il modello di default per la qualità — premette
+    // spesso testo/ragionamento prima del JSON, quindi con lotti grandi solo ~7 oggetti interi
+    // sopravvivevano al max_tokens e i lotti successivi arrivavano vuoti → il batch si fermava
+    // sempre "a ~7" invece di raggiungere le N richieste. Con lotti da 8 e più budget-token per
+    // oggetto ogni chiamata si chiude completa; il while continua a colmare gli slot mancanti.
+    const CHUNK = 8;
+    // Guardia dura contro loop infiniti: al massimo un tot di chiamate anche nel caso pessimo in
+    // cui ogni lotto rende pochissimo. Con 365 ricette / lotti da 8 servono ~46 chiamate: ne
+    // concediamo il doppio + margine, così un modello lento non ci blocca all'infinito.
+    const MAX_CHUNKS = Math.ceil(total / CHUNK) * 2 + 4;
     try {
       let emptyStreak = 0;
-      while (cards.length < total) {
+      let chunkCount = 0;
+      while (cards.length < total && chunkCount < MAX_CHUNKS) {
+        chunkCount += 1;
         const chunkSize = Math.min(CHUNK, total - cards.length);
         const avoidTitles = cards.map((c) => c.title).slice(-30);
         const systemPrompt = `Sei uno chef nutrizionale d'élite specializzato in FITPORN — cibo esteticamente perfetto e ottimizzato per le performance atletiche, ma sempre fondato sulla scienza della nutrizione.
@@ -3184,23 +3192,30 @@ Rispondi SOLO con un array JSON valido di esattamente ${chunkSize} oggetti, in q
         const chunkRequest = (modelOverride) => requestSystemAI({
           model: modelOverride,
           temperature: 0.95,
-          max_tokens: Math.min(4096, 320 * chunkSize + 300),
+          // ~420 token/oggetto + 500 di margine per l'eventuale preambolo del modello: con lotti
+          // da 8 sta comodamente sotto i 4096, così il JSON non viene mai tagliato a metà.
+          max_tokens: Math.min(4096, 420 * chunkSize + 500),
           timeoutMs: 32000,
           messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userMsg },
           ],
         });
-        // Un chunk malformato non deve terminare l'INTERO batch: un retry con la
-        // catena di fallback del proxy salva questo lotto invece di abbandonare
-        // tutte le ricette ancora da generare.
-        let rawItems;
+        // Un chunk fallito NON deve terminare l'intero batch: proviamo prima il modello scelto,
+        // poi la catena di fallback del proxy; se anche quella lancia, trattiamo il lotto come
+        // "vuoto" e proseguiamo (contando lo streak) invece di far crollare tutta la forgiatura
+        // delle ricette ancora mancanti — era questo abort a lasciarti con poche card.
+        let rawItems = [];
         try {
           const data = await chunkRequest(getModelFor('recipe') || undefined);
           rawItems = parseModelJsonArray(data);
         } catch (chunkErr) {
-          const data = await chunkRequest(undefined);
-          rawItems = parseModelJsonArray(data);
+          try {
+            const data = await chunkRequest(undefined);
+            rawItems = parseModelJsonArray(data);
+          } catch (fallbackErr) {
+            rawItems = [];
+          }
         }
         rawItems.slice(0, chunkSize).forEach((item, i) => {
           cards.push({
@@ -3220,10 +3235,11 @@ Rispondi SOLO con un array JSON valido di esattamente ${chunkSize} oggetti, in q
           });
         });
         setForgeBatch({ total, mealType, cards: [...cards], generating: cards.length < total, error: null });
-        // Se un lotto non produce nulla di utile due volte di fila, fermati: evita loop infiniti
-        // quando il modello è in difficoltà, ma tollera un singolo lotto sfortunato.
+        // Fermati solo dopo 3 lotti a vuoto di fila: evita loop inutili quando il modello è
+        // davvero in difficoltà, ma tollera un paio di lotti sfortunati su batch grandi (30+)
+        // senza chiudere in anticipo — prima bastavano 2 buchi per troncare tutto.
         emptyStreak = rawItems.length ? 0 : emptyStreak + 1;
-        if (emptyStreak >= 2) break;
+        if (emptyStreak >= 3) break;
       }
       if (!cards.length) throw new Error('nessuna ricetta forgiata');
       playSfx('success', soundEnabled, soundTheme);
