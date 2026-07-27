@@ -2986,6 +2986,19 @@ ${deltaKg ? `- Obiettivo peso: ${pesoTarget}kg (${Number(deltaKg) > 0 ? '-' : '+
     const nearNoun = prompt.match(/(\d{1,2})\s*\S{0,12}?\s*(ricett|piatt|colazion|pranz|cen[ea]|spuntin|past|dessert|dolc|insalat)/i);
     const leading = prompt.match(/^\s*(\d{1,2})\b/);
     const total = autoMode ? 1 : Math.max(1, Math.min(12, nearNoun ? parseInt(nearNoun[1], 10) : leading ? parseInt(leading[1], 10) : 1));
+    // Tema pulito: via il numero e le parole di contorno ("idee", "ricette", "generami"…),
+    // così il modello riceve "fit porn per colazione" invece di "7 idee fit porn per colazione".
+    const theme = (prompt
+      .replace(/^\s*\d{1,2}\s*/, '')
+      .replace(/\b(idee?|ricett[ae]|piatti?|generami|genera|dammi|dai|voglio|fammi|creami|crea|prepara|un[ao]?)\b/gi, '')
+      .replace(/\s+/g, ' ')
+      .trim()) || prompt;
+    // Momento del pasto esplicito nel tema → lo ribadisco come vincolo forte.
+    const mealHint = /colazion/i.test(theme) ? 'COLAZIONE (cibi da prima colazione: uova, yogurt, avena, pancake, frutta, pane/toast, ecc.)'
+      : /pranz/i.test(theme) ? 'PRANZO'
+      : /cen[ea]/i.test(theme) ? 'CENA'
+      : /spuntin|snack/i.test(theme) ? 'SPUNTINO'
+      : '';
     setIsGeneratingRecipe(true);
     setGeneratedRecipes([]);   // nuova generazione: pulisci la lista precedente
     setRecipeActions({});
@@ -3020,7 +3033,7 @@ Rispondi SOLO con un array JSON valido di ESATTAMENTE ${chunkSize} ricett${chunk
 [{"title":"string","emoji":"emoji","tagline":"string max 15 parole","prepMin":numero,"cookMin":numero,"difficulty":"facile|medio|avanzato","mood":"performance|recovery|comfort|light","ingredients":[{"item":"nome pulito senza quantità","amount":"solo la quantità es 180 g"}],"steps":["string con emoji"],"kcal":numero,"protein":numero,"carbs":numero,"fat":numero,"fiber":numero,"fitScore":numero_1_10,"notes":"string hack","science":"string principio"}]`;
         const userMsg = autoMode
           ? `${profileCtx}${prefsCtx}\n\nCrea 1 ricetta fitporn straordinaria per questo momento. Sorprendimi, rispettando SEMPRE preferenze/allergie.`
-          : `${profileCtx}${prefsCtx}\n\nRICHIESTA DELL'UTENTE (rispettala alla lettera, è la cosa più importante): ${prompt}\n\nCrea ${chunkSize === 1 ? 'UNA ricetta' : `${chunkSize} ricette`} fitporn su questo tema, adattata ai macro residui e alle preferenze/allergie.${avoid.length ? `\nDiversifica: non ripetere questi titoli già usati: ${avoid.join(', ')}.` : ''}`;
+          : `${profileCtx}${prefsCtx}\n\nTEMA RICHIESTO (rispettalo alla lettera, è la cosa più importante): ${theme}${mealHint ? `\nPASTO OBBLIGATORIO: deve essere una ricetta da ${mealHint} — niente piatti da pranzo/cena.` : ''}\n\nCrea ${chunkSize === 1 ? 'UNA ricetta' : `${chunkSize} ricette`} autenticamente FITPORN (esteticamente magnifica E macro ottimizzati) su questo tema, adattata ai macro residui e alle preferenze/allergie.${avoid.length ? `\nDiversifica: non ripetere questi titoli già usati: ${avoid.join(', ')}.` : ''}`;
         const req = (modelOverride, opts = {}) => requestSystemAI({
           model: modelOverride,
           temperature: 0.85,
