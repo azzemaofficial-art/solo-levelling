@@ -10,8 +10,7 @@
 // rimossi Llama 4 Scout, Kimi K2.6 NIM e Mistral Large 3 → 404/no-key su provider.
 export const AI_MODELS = [
   { id: '', label: 'Automatico (fallback)' },
-  { id: 'agnes:agnes-2.5-flash', label: 'Agnes 2.5 Flash — contesto enorme (512K), da provare' },
-  { id: 'agnes:agnes-2.0-flash', label: 'Agnes 2.0 Flash — veloce, uso ampio' },
+  { id: 'agnes:agnes-2.0-flash', label: 'Agnes 2.0 Flash — contesto enorme, JSON pulito (~10s)' },
   { id: 'groq:openai/gpt-oss-120b', label: 'Groq GPT-OSS 120B — qualità alta, mai in coda' },
   { id: 'groq:llama-3.3-70b-versatile', label: 'Groq Llama 3.3 70B — veloce, JSON pulito' },
   { id: 'groq:openai/gpt-oss-20b', label: 'Groq GPT-OSS 20B — fulmineo' },
@@ -21,10 +20,12 @@ export const AI_MODELS = [
 
 // Default consigliati per funzione quando l'utente non ha scelto nulla.
 const TASK_DEFAULT = {
-  meal: 'groq:llama-3.3-70b-versatile',   // veloce e JSON pulito (no reasoning)
-  recipe: 'groq:openai/gpt-oss-120b',     // creativo, JSON solido, niente rate-limit 429
+  meal: 'agnes:agnes-2.0-flash',          // Agnes 2.0: stime realistiche, JSON pulito
+  recipe: 'agnes:agnes-2.0-flash',        // Agnes 2.0: ricette JSON solide, contesto ampio
   profile: '',                            // usa sempre /api/nvidia/coach direttamente
 };
+// NB: se AGNES_API_KEY non è impostata su Vercel, il proxy salta Agnes e usa la catena di
+// fallback (Groq → NVIDIA), quindi l'app resta funzionante anche senza la key.
 
 // Prefisso shadow_monarch_ → incluso nel backup cloud (createBackupPayload).
 const KEY_GLOBAL = 'shadow_monarch_ai_model_global';

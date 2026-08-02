@@ -3006,7 +3006,9 @@ ${deltaKg ? `- Obiettivo peso: ${pesoTarget}kg (${Number(deltaKg) > 0 ? '-' : '+
     try {
       const { profileCtx, prefsCtx, mealMoment } = computeRecipeContext();
       const science = knowledgePromptFor(`${prompt || mealMoment} nutrizione proteine sazietà energia`, 1800);
-      const userOverride = getTaskOverride('recipe');
+      // Modello scelto per le ricette: override utente → globale → default (Agnes 2.0).
+      // Senza AGNES_API_KEY il proxy salta Agnes e usa la catena di fallback (Groq/NVIDIA).
+      const recipeModel = getModelFor('recipe');
       const CHUNK = 1; // UNA ricetta per chiamata: zero troncamento e ognuna rispetta il tema
       //                  (il vecchio lotto da 3 in un array si fermava a 3 e ignorava la richiesta)
       const MAX_CALLS = Math.ceil(total / CHUNK) * 2 + 3;
@@ -3056,9 +3058,9 @@ Rispondi SOLO con un array JSON valido di ESATTAMENTE ${chunkSize} ricett${chunk
         // fallito non abortisce tutto: conta come vuoto e il while riprova/continua.
         let items = [];
         try {
-          items = extract(await req(userOverride || 'nvidia:mistralai/mistral-nemotron', { timeoutMs: 32000 }));
+          items = extract(await req(recipeModel || 'nvidia:mistralai/mistral-nemotron', { timeoutMs: 34000 }));
         } catch (e1) {
-          try { items = extract(await req(userOverride || undefined)); }
+          try { items = extract(await req(undefined)); }
           catch (e2) { items = []; }
         }
         for (const it of items.slice(0, chunkSize)) collected.push(it);

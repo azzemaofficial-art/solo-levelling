@@ -47,9 +47,10 @@ const NVIDIA_KEY_DEFAULT = () => firstKey('NVIDIA_API_KEY', 'LLAMA_NVIDIA_API_KE
 // gpt-oss-120b prima: qualità alta, JSON pulito e — a differenza del 70B — non va
 // in rate-limit 429 sotto carico (batch Recipe Forge da 12+ chiamate consecutive).
 const FALLBACK = [
-  // Agnes AI in cima: se AGNES_API_KEY è impostata la proviamo per prima (uso ampio,
-  // contesto grande). Senza key resolveProvider ritorna null e si passa oltre.
-  'agnes:agnes-2.5-flash',
+  // Agnes 2.0 Flash in cima: se AGNES_API_KEY è impostata la proviamo per prima (uso ampio,
+  // contesto grande, JSON pulito ~9-10s). Senza key resolveProvider ritorna null → si passa
+  // oltre. NB: agnes-2.5-flash è escluso dalla catena — in default consuma tutto il budget in
+  // reasoning e torna content vuoto (usabile solo con reasoning_effort:"none").
   'agnes:agnes-2.0-flash',
   'groq:openai/gpt-oss-120b',
   'groq:llama-3.3-70b-versatile',
@@ -162,13 +163,21 @@ export default async function handler(req, res) {
         if (typeof msg.content === 'string') {
           msg.content = msg.content.replace(/<think>[\s\S]*?<\/think>/gi, '').replace(/^\s*<\/?think>\s*/gi, '').trim();
         }
-        // gpt-oss (Groq) separa il ragionamento in message.reasoning: se il content
-        // arriva vuoto (finish per max_tokens durante il reasoning) usa quello.
+        // Alcuni modelli reasoning separano il ragionamento dal contenuto: se il content
+        // arriva vuoto (budget esaurito nel reasoning) prova gli altri campi noti —
+        // message.reasoning (gpt-oss Groq) e reasoning_content (Agnes).
         if (!msg.content && typeof msg.reasoning === 'string' && msg.reasoning.trim()) {
           msg.content = msg.reasoning.trim();
         }
-        res.setHeader('X-Shadow-Model', cand);
-        return res.status(200).json({ ...r.data, _shadowMeta: { model: cand, fallbackUsed: cand !== model, tried } });
+        // Content ancora vuoto → questo provider non ha prodotto una risposta usabile
+        // (tipico di un reasoning model troncato): non restituirlo, prova il successivo.
+        if (msg.content && String(msg.content).trim()) {
+          res.setHeader('X-Shadow-Model', cand);
+          return res.status(200).json({ ...r.data, _shadowMeta: { model: cand, fallbackUsed: cand !== model, tried } });
+        }
+        tried[tried.length - 1] = `${cand}:${r.status}(empty)`;
+        lastErr = 'risposta vuota (reasoning senza content)';
+        continue;
       }
       lastErr = r.data?.error?.message || r.data?.error || `HTTP ${r.status}`;
     } catch (e) {
