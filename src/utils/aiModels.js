@@ -10,6 +10,8 @@
 // rimossi Llama 4 Scout, Kimi K2.6 NIM e Mistral Large 3 → 404/no-key su provider.
 export const AI_MODELS = [
   { id: '', label: 'Automatico (fallback)' },
+  { id: 'agnes:agnes-2.5-flash', label: 'Agnes 2.5 Flash — contesto enorme (512K), da provare' },
+  { id: 'agnes:agnes-2.0-flash', label: 'Agnes 2.0 Flash — veloce, uso ampio' },
   { id: 'groq:openai/gpt-oss-120b', label: 'Groq GPT-OSS 120B — qualità alta, mai in coda' },
   { id: 'groq:llama-3.3-70b-versatile', label: 'Groq Llama 3.3 70B — veloce, JSON pulito' },
   { id: 'groq:openai/gpt-oss-20b', label: 'Groq GPT-OSS 20B — fulmineo' },

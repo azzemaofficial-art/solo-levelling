@@ -15,6 +15,9 @@ const GROQ_BASE = 'https://api.groq.com/openai/v1';
 // così si incastra nel proxy senza casi speciali. Attivo SOLO se esiste ANTHROPIC_API_KEY
 // (a pagamento) — senza key resolveProvider ritorna null e Claude viene saltato.
 const ANTHROPIC_BASE = 'https://api.anthropic.com/v1';
+// Agnes AI — gateway OpenAI-compatibile (POST /v1/chat/completions, auth Bearer). Uso ampio,
+// contesto grande (agnes-2.5-flash: 512K). Attivo solo se esiste AGNES_API_KEY.
+const AGNES_BASE = 'https://apihub.agnes-ai.com/v1';
 
 const firstKey = (...names) => {
   for (const n of names) { const v = process.env[n]; if (v && String(v).trim()) return String(v).trim(); }
@@ -23,6 +26,7 @@ const firstKey = (...names) => {
 
 const GROQ_KEY = () => firstKey('GROQ_API_KEY');
 const ANTHROPIC_KEY = () => firstKey('ANTHROPIC_API_KEY');
+const AGNES_KEY = () => firstKey('AGNES_API_KEY');
 
 // Mapping modello NVIDIA → chiave specifica (ogni modello ha la sua key su NIM)
 const NVIDIA_MODEL_KEY = {
@@ -43,6 +47,10 @@ const NVIDIA_KEY_DEFAULT = () => firstKey('NVIDIA_API_KEY', 'LLAMA_NVIDIA_API_KE
 // gpt-oss-120b prima: qualità alta, JSON pulito e — a differenza del 70B — non va
 // in rate-limit 429 sotto carico (batch Recipe Forge da 12+ chiamate consecutive).
 const FALLBACK = [
+  // Agnes AI in cima: se AGNES_API_KEY è impostata la proviamo per prima (uso ampio,
+  // contesto grande). Senza key resolveProvider ritorna null e si passa oltre.
+  'agnes:agnes-2.5-flash',
+  'agnes:agnes-2.0-flash',
   'groq:openai/gpt-oss-120b',
   'groq:llama-3.3-70b-versatile',
   'groq:openai/gpt-oss-20b',
@@ -71,6 +79,10 @@ function resolveProvider(modelId) {
   if (id.startsWith('anthropic:')) {
     const key = ANTHROPIC_KEY();
     return key ? { base: ANTHROPIC_BASE, key, model: id.slice(10), tag: id } : null;
+  }
+  if (id.startsWith('agnes:')) {
+    const key = AGNES_KEY();
+    return key ? { base: AGNES_BASE, key, model: id.slice(6), tag: id } : null;
   }
   return null; // id non prefissato (es. vecchi id OpenRouter) → salta al fallback
 }
@@ -115,6 +127,7 @@ export default async function handler(req, res) {
         groq: Boolean(GROQ_KEY()),
         nvidia: Boolean(NVIDIA_KEY_DEFAULT()),
         anthropic: Boolean(ANTHROPIC_KEY()),
+        agnes: Boolean(AGNES_KEY()),
       },
       nvidiaKeySource: ['NVIDIA_550B_API_KEY', 'DEEPSEEK_PRO_API_KEY', 'KIMI_NVIDIA_API_KEY', 'LLAMA_NVIDIA_API_KEY', 'MISTRAL_NVIDIA_API_KEY', 'NVIDIA_API_KEY']
         .filter((n) => process.env[n]),
