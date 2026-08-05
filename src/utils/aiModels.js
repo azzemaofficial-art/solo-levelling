@@ -22,6 +22,7 @@ export const AI_MODELS = [
 const TASK_DEFAULT = {
   meal: 'agnes:agnes-2.0-flash',          // Agnes 2.0: stime realistiche, JSON pulito
   recipe: 'agnes:agnes-2.0-flash',        // Agnes 2.0: ricette JSON solide, contesto ampio
+  french: 'groq:llama-3.3-70b-versatile', // lezioni brevi, rapide e con buona resa linguistica
   profile: '',                            // usa sempre /api/nvidia/coach direttamente
 };
 // NB: se AGNES_API_KEY non è impostata su Vercel, il proxy salta Agnes e usa la catena di

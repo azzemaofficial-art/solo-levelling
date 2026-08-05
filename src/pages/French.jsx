@@ -18,19 +18,19 @@ const CURRICULUM = [
     { id: 'a1-02', emoji: '🔢', title: 'Numeri 0–20', topic: 'numeri da 0 a 20, contare, età' },
     { id: 'a1-03', emoji: '🗓️', title: 'Giorni e mesi', topic: 'giorni della settimana, mesi, che giorno è' },
     { id: 'a1-04', emoji: '👨‍👩‍👧', title: 'La famiglia', topic: 'membri della famiglia, possessivi mon/ma/mes' },
-    { id: 'a1-05', emoji: '🍎', title: 'Cibo e bevande', topic: 'cibo, bevande, al bar, je voudrais' },
+    { id: 'a1-05', emoji: '🍎', title: 'Al bar e al ristorante', topic: 'ordinare cibo e bevande, chiedere il conto, je voudrais, l’addition' },
     { id: 'a1-06', emoji: '🎨', title: 'Colori e oggetti', topic: 'colori, oggetti comuni, c’est / il y a' },
-    { id: 'a1-07', emoji: '🕐', title: 'Che ore sono', topic: 'ore, quelle heure est-il, routine base' },
-    { id: 'a1-08', emoji: '🏠', title: 'La casa', topic: 'stanze della casa, mobili, preposizioni di luogo' },
+    { id: 'a1-07', emoji: '🕐', title: 'Orari e appuntamenti', topic: 'chiedere l’ora, orari di apertura, fissare un appuntamento' },
+    { id: 'a1-08', emoji: '🏠', title: 'Hotel e alloggio', topic: 'prenotare una camera, fare il check-in, chiedere servizi e problemi in hotel' },
     { id: 'a1-09', emoji: '🧍', title: 'Verbi être & avoir', topic: 'presente di être e avoir, frasi semplici' },
-    { id: 'a1-10', emoji: '🛒', title: 'Fare la spesa', topic: 'negozi, quantità, prezzi, combien ça coûte' },
+    { id: 'a1-10', emoji: '🛒', title: 'Shopping e necessità', topic: 'negozi, taglie, prezzi, pagare, chiedere aiuto in farmacia' },
   ] },
   { level: 'A2', color: '#7c5cc4', units: [
-    { id: 'a2-01', emoji: '🚆', title: 'Viaggiare', topic: 'trasporti, comprare biglietti, chiedere indicazioni' },
+    { id: 'a2-01', emoji: '🚆', title: 'Muoversi in viaggio', topic: 'stazione e aeroporto, biglietti, coincidenze, indicazioni e imprevisti' },
     { id: 'a2-02', emoji: '🕰️', title: 'Passato (passé composé)', topic: 'passé composé con avoir, participi comuni' },
     { id: 'a2-03', emoji: '🌤️', title: 'Il tempo e le stagioni', topic: 'meteo, stagioni, il fait beau/froid' },
     { id: 'a2-04', emoji: '💼', title: 'Lavoro e professioni', topic: 'professioni, descrivere il proprio lavoro' },
-    { id: 'a2-05', emoji: '🩺', title: 'Salute e corpo', topic: 'parti del corpo, dal medico, avoir mal à' },
+    { id: 'a2-05', emoji: '🩺', title: 'Salute in viaggio', topic: 'spiegare sintomi, farmacia, medico, emergenze e avoir mal à' },
     { id: 'a2-06', emoji: '🎭', title: 'Tempo libero', topic: 'hobby, faire du/de la, uscite' },
     { id: 'a2-07', emoji: '➡️', title: 'Futuro (futur proche)', topic: 'futur proche aller + infinito, progetti' },
     { id: 'a2-08', emoji: '🗣️', title: 'Opinioni', topic: 'esprimere opinioni, je pense que, perché' },
@@ -50,7 +50,7 @@ const unitById = (id) => ALL_UNITS.find((u) => u.id === id);
 
 const LS = {
   progress: 'shadow_monarch_fr_progress',   // { [unitId]: {done,bestScore,seenAt} }
-  cache: 'shadow_monarch_fr_cache',         // { [unitId]: {vocab,exercises} }
+  cache: 'shadow_monarch_fr_cache_v2',      // v2: invalida le lezioni generate col prompt vecchio
   srs: 'shadow_monarch_fr_srs',             // { [itemKey]: {box,dueTs,lapses,seen} }
   streak: 'shadow_monarch_fr_streak',       // { count, lastDate }
   daily: 'shadow_monarch_fr_daily',         // { date, xp }
@@ -60,6 +60,7 @@ const readLS = (k, fb) => { try { const v = localStorage.getItem(k); return v ? 
 const writeLS = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (_) {} };
 const todayStr = () => new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD
 const DAILY_GOAL_XP = 60;
+const LESSON_VERSION = 2;
 
 const French = ({ playerStats, setPlayerStats, soundEnabled = true, soundTheme = 'solo' }) => {
   const [view, setView] = useState('map');           // 'map' | 'loading' | 'lesson' | 'result'
@@ -128,43 +129,102 @@ const French = ({ playerStats, setPlayerStats, soundEnabled = true, soundTheme =
     })).filter((e) => e.q && e.answer && (e.type === 'type' || e.options.length >= 2));
   };
 
-  const generateLesson = async (unit) => {
-    const sys = `Sei un insegnante di francese madrelingua per italiani. Crea UNA micro-lezione sul tema "${unit.topic}" (livello ${unit.level}).
-Rispondi SOLO con JSON valido in questo formato, in italiano per le consegne e francese per le risposte:
-{"vocab":[{"fr":"parola/frase francese","it":"traduzione italiana"}],"exercises":[
-  {"type":"mc","q":"consegna in italiano","options":["4 opzioni in francese"],"answer":"l'opzione corretta ESATTA","explain":"breve spiegazione"},
-  {"type":"type","q":"Traduci in francese: ...","answer":"risposta francese esatta","explain":"nota"}
+  const cleanLesson = (parsed, unit) => {
+    const vocab = Array.isArray(parsed?.vocab)
+      ? parsed.vocab
+        .map((v) => ({ fr: String(v?.fr || '').trim(), it: String(v?.it || '').trim(), note: String(v?.note || '').trim() }))
+        .filter((v) => v.fr && v.it)
+        .filter((v, i, all) => all.findIndex((x) => x.fr.toLowerCase() === v.fr.toLowerCase()) === i)
+        .slice(0, 8)
+      : [];
+    const exercises = buildExercisesFromCache(parsed).filter((ex, i, all) => {
+      const sameQuestion = all.findIndex((x) => x.q.toLowerCase() === ex.q.toLowerCase());
+      if (sameQuestion !== i) return false;
+      // Una scelta multipla senza risposta tra le opzioni genera una lezione falsa.
+      return ex.type === 'type' || ex.options.some((o) => norm(o) === norm(ex.answer));
+    }).slice(0, 9);
+    if (vocab.length < 8 || exercises.length < 8) throw new Error(`Lezione ${unit.id} incompleta`);
+    return {
+      version: LESSON_VERSION,
+      title: String(parsed?.title || unit.title).trim().slice(0, 80),
+      objective: String(parsed?.objective || `Usare ${unit.topic} in frasi semplici.`).trim().slice(0, 180),
+      explanation: String(parsed?.explanation || '').trim().slice(0, 700),
+      pronunciation: String(parsed?.pronunciation || '').trim().slice(0, 260),
+      examples: Array.isArray(parsed?.examples) ? parsed.examples.map((x) => String(x || '').trim()).filter(Boolean).slice(0, 3) : [],
+      vocab,
+      exercises,
+      generatedAt: new Date().toISOString(),
+    };
+  };
+
+  // Ultima rete: una lezione utilizzabile anche quando il provider è offline,
+  // occupato o restituisce JSON corrotto. Non sostituisce l'AI: evita il blocco.
+  const buildOfflineLesson = (unit) => {
+    const vocab = [
+      ['bonjour', 'buongiorno / salve'], ['s’il vous plaît', 'per favore'], ['merci', 'grazie'],
+      ['je voudrais', 'vorrei'], ['où est… ?', 'dov’è… ?'], ['combien ça coûte ?', 'quanto costa?'],
+      ['je ne comprends pas', 'non capisco'], ['pouvez-vous répéter ?', 'può ripetere?'],
+    ].map(([fr, it]) => ({ fr, it, note: '' }));
+    const exercises = [
+      { type: 'mc', q: 'Come dici “vorrei” in francese?', options: ['Je voudrais', 'Je viens', 'Je prends', 'Je sais'], answer: 'Je voudrais', explain: 'Je voudrais è la formula educata per chiedere qualcosa.' },
+      { type: 'mc', q: 'Scegli la frase per chiedere dove si trova qualcosa.', options: ['Où est… ?', 'C’est combien ?', 'À bientôt !', 'Je suis désolé.'], answer: 'Où est… ?', explain: 'Où est… ? significa “Dov’è…?”.' },
+      { type: 'mc', q: 'Come chiedi il prezzo?', options: ['Combien ça coûte ?', 'Quelle est votre nom ?', 'Comment tu vas ?', 'Il est midi.'], answer: 'Combien ça coûte ?', explain: 'Combien ça coûte ? è la formula naturale per chiedere il prezzo.' },
+      { type: 'type', q: 'Traduci in francese: “Buongiorno, per favore.”', answer: 'Bonjour, s’il vous plaît.', explain: 'Con una persona sconosciuta usa la forma cortese vous.' },
+      { type: 'type', q: 'Traduci in francese: “Non capisco.”', answer: 'Je ne comprends pas.', explain: 'La negazione circonda il verbo: ne … pas.' },
+      { type: 'type', q: 'Traduci in francese: “Può ripetere?”', answer: 'Pouvez-vous répéter ?', explain: 'Pouvez-vous è la forma cortese per chiedere “può…?”.' },
+      { type: 'mc', q: 'Al ristorante, cosa significa “l’addition”?', options: ['Il conto', 'La prenotazione', 'La stazione', 'La camera'], answer: 'Il conto', explain: 'L’addition è il conto del ristorante.' },
+      { type: 'type', q: 'Traduci in francese: “Grazie, arrivederci.”', answer: 'Merci, au revoir.', explain: 'Au revoir è il saluto standard per congedarsi.' },
+      { type: 'mc', q: 'Quale frase è più adatta per chiedere aiuto?', options: ['Pouvez-vous m’aider ?', 'Je voudrais dormir.', 'Il fait lundi.', 'J’ai vingt ans.'], answer: 'Pouvez-vous m’aider ?', explain: 'Pouvez-vous m’aider ? significa “Può aiutarmi?”.' },
+    ];
+    return { version: LESSON_VERSION, title: `${unit.title} — base pratica`, objective: `Usare frasi essenziali per ${unit.topic}.`, explanation: 'Lezione di emergenza offline: frasi brevi, cortesi e riutilizzabili nella vita reale.', pronunciation: '', examples: ['Bonjour, je voudrais un café, s’il vous plaît. — Buongiorno, vorrei un caffè, per favore.'], vocab, exercises, generatedAt: new Date().toISOString(), offline: true };
+  };
+
+  const generateLesson = async (unit, compact = false) => {
+    const sys = `Sei un docente di francese madrelingua, specializzato in studenti italiani.
+Progetta UNA micro-lezione eccellente sul tema "${unit.topic}" per livello ${unit.level}.
+Deve insegnare una cosa precisa, farla usare subito e correggere gli errori tipici degli italiani.
+Rispondi SOLO con JSON valido, senza markdown e senza testo fuori dal JSON:
+{"title":"titolo breve","objective":"obiettivo misurabile in italiano","explanation":"regola chiara in italiano con 1-2 errori tipici da evitare","pronunciation":"nota di pronuncia solo se utile","examples":["frase francese — traduzione italiana"],"vocab":[{"fr":"espressione francese","it":"traduzione italiana","note":"genere/uso o pronuncia, breve"}],"exercises":[
+ {"type":"mc","q":"consegna italiana non ambigua","options":["4 risposte francesi"],"answer":"una delle options, identica carattere per carattere","explain":"perché è corretta e perché l'errore tipico è sbagliato"},
+ {"type":"type","q":"Traduci in francese: frase italiana naturale","answer":"risposta francese esatta","explain":"correzione breve"}
 ]}
-Regole: 8 parole di vocab; 9 esercizi (mix mc e type); le risposte "answer" degli mc devono coincidere ESATTAMENTE con una delle options; francese corretto con accenti; niente testo fuori dal JSON.`;
+Regole obbligatorie: esattamente 8 vocaboli e 9 esercizi; almeno 3 type e almeno 3 mc; ogni mc ha una sola risposta corretta e answer coincide ESATTAMENTE con una option; non usare domande-trabocchetto o traduzioni multiple valide; usa accenti e apostrofi francesi corretti; frasi brevi e realistiche; non ripetere lo stesso vocabolo o esercizio; spiegazioni in italiano, risposte/esempi in francese.\nTema: ${unit.title} — ${unit.topic}.`;
     const data = await requestSystemAI({
-      model: getModelFor('recipe') || undefined, // usa Agnes/Groq via proxy
-      temperature: 0.6,
-      max_tokens: 1400,
-      timeoutMs: 40000,
+      // Llama 3.3 70B è rapido e stabile per il francese; il proxy prova poi
+      // Agnes/GPT-OSS/NVIDIA se Groq è in rate-limit o senza chiave.
+      model: getModelFor('french') || 'groq:llama-3.3-70b-versatile',
+      temperature: 0.35,
+      max_tokens: compact ? 1600 : 2200,
+      maxRetries: 0,
+      timeoutMs: compact ? 12000 : 18000,
+      response_format: { type: 'json_object' },
       messages: [
         { role: 'system', content: sys },
         { role: 'user', content: `Genera la micro-lezione "${unit.title}" (${unit.topic}).` },
       ],
     });
     const parsed = looseJsonParse(data?.choices?.[0]?.message?.content, 'object');
-    const vocab = Array.isArray(parsed?.vocab) ? parsed.vocab.filter((v) => v?.fr && v?.it).slice(0, 12) : [];
-    const exercises = buildExercisesFromCache(parsed);
-    if (exercises.length < 4) throw new Error('lezione incompleta');
-    return { vocab, exercises, generatedAt: new Date().toISOString() };
+    return cleanLesson(parsed, unit);
   };
 
   const startUnit = async (unit) => {
     setActiveUnit(unit); setLoadErr(null);
-    let lesson = cache[unit.id];
+    let lesson = cache[unit.id]?.version === LESSON_VERSION ? cache[unit.id] : null;
     if (!lesson) {
       setView('loading');
       try {
-        lesson = await generateLesson(unit);
+        try {
+          lesson = await generateLesson(unit);
+        } catch (_) {
+          // Seconda passata più corta: spesso salva i casi di output troncato
+          // o di modello che aggiunge prosa al JSON.
+          lesson = await generateLesson(unit, true);
+        }
         setCache((prev) => ({ ...prev, [unit.id]: lesson })); // CACHE → mai più rigenerata
       } catch (e) {
-        setLoadErr('Generazione lezione fallita. Riprova tra poco.');
-        setView('map');
-        return;
+        lesson = buildOfflineLesson(unit);
+        // Non la mettiamo in cache: alla prossima apertura si ritenta l'AI.
+        setLoadErr('Modalità offline: lezione base caricata. La versione AI verrà ritentata alla prossima apertura.');
       }
     }
     const items = [...lesson.exercises];
@@ -281,6 +341,7 @@ Regole: 8 parole di vocab; 9 esercizi (mix mc e type); le risposte "answer" degl
   if (view === 'lesson' && queue[idx]) {
     const ex = queue[idx];
     const pct = Math.round((idx / queue.length) * 100);
+    const lessonGuide = activeUnit?.id !== 'review' ? cache[activeUnit?.id] : null;
     return (
       <div className="p-4 pb-24 min-h-full" style={{ background: 'radial-gradient(120% 80% at 50% -10%, rgba(59,95,196,0.14), transparent 60%)' }}>
         <div className="flex items-center gap-3 mb-3">
@@ -293,6 +354,21 @@ Regole: 8 parole di vocab; 9 esercizi (mix mc e type); le risposte "answer" degl
 
         <p className="text-[10px] uppercase tracking-widest text-blue-300/80 mb-1">{activeUnit?.emoji} {activeUnit?.title}</p>
         <h2 className="text-lg font-black text-white mb-4 leading-snug" style={{ fontFamily: 'Russo One, sans-serif' }}>{ex.q}</h2>
+
+        {idx === 0 && lessonGuide && (
+          <div className="mb-4 rounded-2xl p-3 space-y-2" style={{ background: 'rgba(59,95,196,0.12)', border: '1px solid rgba(59,95,196,0.35)' }}>
+            {lessonGuide.offline && <p className="text-[10px] uppercase tracking-widest text-amber-300">Modalità offline · contenuto base</p>}
+            <p className="text-[10px] uppercase tracking-widest text-blue-200">Obiettivo</p>
+            <p className="text-xs text-gray-200">{lessonGuide.objective}</p>
+            {lessonGuide.explanation && <p className="text-[11px] text-gray-300 leading-relaxed">{lessonGuide.explanation}</p>}
+            {lessonGuide.examples?.length > 0 && <p className="text-[11px] text-blue-100 italic">{lessonGuide.examples[0]}</p>}
+            {lessonGuide.vocab?.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                {lessonGuide.vocab.slice(0, 4).map((v) => <span key={v.fr} className="text-[10px] px-2 py-1 rounded-lg text-gray-200" style={{ background: 'rgba(255,255,255,0.08)' }}>{v.fr} · {v.it}</span>)}
+              </div>
+            )}
+          </div>
+        )}
 
         {ex.type === 'mc' ? (
           <div className="space-y-2">
