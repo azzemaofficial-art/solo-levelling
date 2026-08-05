@@ -465,7 +465,17 @@ useEffect(() => { localStorage.setItem('shadow_monarch_macros', JSON.stringify(m
   //    Coda completa: applica TUTTI gli import accodati (più messaggi Telegram non si perdono).
   //    Re-poll al focus/visibilità: il sito si aggiorna senza refresh manuale.
   useEffect(() => {
-    const chatId = '264863579';
+    // Il chat_id da cui importare è legato al BROWSER (localStorage), non fisso:
+    // ogni persona che apre il sito sul proprio telefono viene abbinata al proprio
+    // account Telegram tramite link personalizzato ?tg=<chat_id> (una tantum),
+    // così i dati di ognuno restano separati anche sul sito, non solo sul bot.
+    const TG_ID_KEY = 'shadow_monarch_tg_chat_id';
+    const urlTg = new URLSearchParams(window.location.search).get('tg');
+    if (urlTg && /^\d+$/.test(urlTg)) {
+      try { window.localStorage.setItem(TG_ID_KEY, urlTg); } catch {}
+    }
+    let chatId = '264863579';
+    try { chatId = window.localStorage.getItem(TG_ID_KEY) || chatId; } catch {}
     let polling = false;
     const claim = () => {
       if (polling) return;
