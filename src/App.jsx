@@ -1364,6 +1364,15 @@ useEffect(() => { localStorage.setItem('shadow_monarch_macros', JSON.stringify(m
           >
             Sono Emanuele
           </button>
+          <button
+            onClick={() => {
+              try { window.localStorage.setItem('shadow_monarch_tg_chat_id', '546598075'); } catch {}
+              window.location.reload();
+            }}
+            className="w-full max-w-[260px] border border-cursed-purple/40 bg-cursed-purple/10 text-white text-xs uppercase tracking-widest py-3 hover:bg-cursed-purple/20"
+          >
+            Sono Alessandro
+          </button>
           <input
             value={tgBindCustom}
             onChange={(e) => setTgBindCustom(e.target.value.replace(/\D/g, ''))}
