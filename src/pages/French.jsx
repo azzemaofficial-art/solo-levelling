@@ -50,7 +50,8 @@ const unitById = (id) => ALL_UNITS.find((u) => u.id === id);
 
 const LS = {
   progress: 'shadow_monarch_fr_progress',   // { [unitId]: {done,bestScore,seenAt} }
-  cache: 'shadow_monarch_fr_cache_v2',      // v2: invalida le lezioni generate col prompt vecchio
+  cache: 'shadow_monarch_fr_cache_v3',      // v3: lezioni personalizzate sul profilo adattivo
+  learner: 'shadow_monarch_fr_learner_v1',  // profilo adattivo: errori, abilità, velocità
   srs: 'shadow_monarch_fr_srs',             // { [itemKey]: {box,dueTs,lapses,seen} }
   streak: 'shadow_monarch_fr_streak',       // { count, lastDate }
   daily: 'shadow_monarch_fr_daily',         // { date, xp }
@@ -60,12 +61,17 @@ const readLS = (k, fb) => { try { const v = localStorage.getItem(k); return v ? 
 const writeLS = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (_) {} };
 const todayStr = () => new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD
 const DAILY_GOAL_XP = 60;
-const LESSON_VERSION = 2;
+const LESSON_VERSION = 3;
+const DEFAULT_LEARNER = {
+  totalAnswers: 0, totalCorrect: 0, totalSessions: 0, avgResponseMs: 0,
+  skills: {}, errors: {}, recentMistakes: [], lastFocus: '', lastSessionAt: '',
+};
 
 const French = ({ playerStats, setPlayerStats, soundEnabled = true, soundTheme = 'solo' }) => {
   const [view, setView] = useState('map');           // 'map' | 'loading' | 'lesson' | 'result'
   const [progress, setProgress] = useState(() => readLS(LS.progress, {}));
   const [cache, setCache] = useState(() => readLS(LS.cache, {}));
+  const [learner, setLearner] = useState(() => ({ ...DEFAULT_LEARNER, ...readLS(LS.learner, {}) }));
   const [srs, setSrs] = useState(() => readLS(LS.srs, {}));
   const [streak, setStreak] = useState(() => readLS(LS.streak, { count: 0, lastDate: '' }));
   const [daily, setDaily] = useState(() => {
@@ -83,9 +89,11 @@ const French = ({ playerStats, setPlayerStats, soundEnabled = true, soundTheme =
   const [loadErr, setLoadErr] = useState(null);
   const startRef = useRef(0);
   const gainedRef = useRef({ xp: 0, gold: 0 });
+  const sessionAnswersRef = useRef([]);
 
   useEffect(() => { writeLS(LS.progress, progress); }, [progress]);
   useEffect(() => { writeLS(LS.cache, cache); }, [cache]);
+  useEffect(() => { writeLS(LS.learner, learner); }, [learner]);
   useEffect(() => { writeLS(LS.srs, srs); }, [srs]);
   useEffect(() => { writeLS(LS.streak, streak); }, [streak]);
   useEffect(() => { writeLS(LS.daily, daily); }, [daily]);
@@ -117,7 +125,7 @@ const French = ({ playerStats, setPlayerStats, soundEnabled = true, soundTheme =
   }, [srs]);
 
   // ── Generazione lezione (cache-first): niente token se già in cache ──
-  const buildExercisesFromCache = (data) => {
+  const buildExercisesFromCache = (data, unit = null) => {
     const ex = Array.isArray(data?.exercises) ? data.exercises : [];
     return ex.map((e, i) => ({
       key: `${e.answer || e.q || i}`.toLowerCase().slice(0, 60),
@@ -126,6 +134,7 @@ const French = ({ playerStats, setPlayerStats, soundEnabled = true, soundTheme =
       options: Array.isArray(e.options) ? e.options.map((o) => String(o).slice(0, 60)).slice(0, 4) : [],
       answer: String(e.answer || '').trim(),
       explain: String(e.explain || '').slice(0, 160),
+      skill: String(e.skill || unit?.level || 'conversation').trim().slice(0, 40),
     })).filter((e) => e.q && e.answer && (e.type === 'type' || e.options.length >= 2));
   };
 
@@ -137,7 +146,7 @@ const French = ({ playerStats, setPlayerStats, soundEnabled = true, soundTheme =
         .filter((v, i, all) => all.findIndex((x) => x.fr.toLowerCase() === v.fr.toLowerCase()) === i)
         .slice(0, 8)
       : [];
-    const exercises = buildExercisesFromCache(parsed).filter((ex, i, all) => {
+    const exercises = buildExercisesFromCache(parsed, unit).filter((ex, i, all) => {
       const sameQuestion = all.findIndex((x) => x.q.toLowerCase() === ex.q.toLowerCase());
       if (sameQuestion !== i) return false;
       // Una scelta multipla senza risposta tra le opzioni genera una lezione falsa.
@@ -180,13 +189,19 @@ const French = ({ playerStats, setPlayerStats, soundEnabled = true, soundTheme =
   };
 
   const generateLesson = async (unit, compact = false) => {
+    const skillEntries = Object.entries(learner.skills || {}).sort((a, b) => (a[1]?.accuracy || 0) - (b[1]?.accuracy || 0));
+    const weakSkills = skillEntries.slice(0, 3).map(([name, data]) => `${name} (${Math.round((data.accuracy || 0) * 100)}%)`).join(', ') || 'nessun dato: fai una lezione equilibrata';
+    const recentMistakes = (learner.recentMistakes || []).slice(-5).map((x) => x.text).filter(Boolean).join(' | ') || 'nessuna';
     const sys = `Sei un docente di francese madrelingua, specializzato in studenti italiani.
 Progetta UNA micro-lezione eccellente sul tema "${unit.topic}" per livello ${unit.level}.
 Deve insegnare una cosa precisa, farla usare subito e correggere gli errori tipici degli italiani.
+Il profilo dello studente indica queste aree deboli: ${weakSkills}.
+Gli ultimi errori da rinforzare sono: ${recentMistakes}.
+Personalizza la lezione su questi dati, ma non parlare del profilo durante la lezione.
 Rispondi SOLO con JSON valido, senza markdown e senza testo fuori dal JSON:
 {"title":"titolo breve","objective":"obiettivo misurabile in italiano","explanation":"regola chiara in italiano con 1-2 errori tipici da evitare","pronunciation":"nota di pronuncia solo se utile","examples":["frase francese — traduzione italiana"],"vocab":[{"fr":"espressione francese","it":"traduzione italiana","note":"genere/uso o pronuncia, breve"}],"exercises":[
- {"type":"mc","q":"consegna italiana non ambigua","options":["4 risposte francesi"],"answer":"una delle options, identica carattere per carattere","explain":"perché è corretta e perché l'errore tipico è sbagliato"},
- {"type":"type","q":"Traduci in francese: frase italiana naturale","answer":"risposta francese esatta","explain":"correzione breve"}
+ {"type":"mc","skill":"vocabolo/grammatica/conversazione/viaggio","q":"consegna italiana non ambigua","options":["4 risposte francesi"],"answer":"una delle options, identica carattere per carattere","explain":"perché è corretta e perché l'errore tipico è sbagliato"},
+ {"type":"type","skill":"vocabolo/grammatica/conversazione/viaggio","q":"Traduci in francese: frase italiana naturale","answer":"risposta francese esatta","explain":"correzione breve"}
 ]}
 Regole obbligatorie: esattamente 8 vocaboli e 9 esercizi; almeno 3 type e almeno 3 mc; ogni mc ha una sola risposta corretta e answer coincide ESATTAMENTE con una option; non usare domande-trabocchetto o traduzioni multiple valide; usa accenti e apostrofi francesi corretti; frasi brevi e realistiche; non ripetere lo stesso vocabolo o esercizio; spiegazioni in italiano, risposte/esempi in francese.\nTema: ${unit.title} — ${unit.topic}.`;
     const data = await requestSystemAI({
@@ -254,6 +269,7 @@ Regole obbligatorie: esattamente 8 vocaboli e 9 esercizi; almeno 3 type e almeno
     setActiveUnit(unit); setQueue(items); setIdx(0); setSessionCorrect(0);
     setAnswer(''); setPicked(null); setFeedback(null);
     gainedRef.current = { xp: 0, gold: 0 };
+    sessionAnswersRef.current = [];
     startRef.current = performance.now();
     setView('lesson');
   };
@@ -284,6 +300,7 @@ Regole obbligatorie: esattamente 8 vocaboli e 9 esercizi; almeno 3 type e almeno
     if (given == null || (ex.type === 'type' && !given.trim())) return;
     const correct = norm(given) === norm(ex.answer);
     const ms = Math.round(performance.now() - startRef.current);
+    sessionAnswersRef.current.push({ correct, skill: ex.skill || activeUnit?.level || 'conversation', text: ex.q, ms });
     logAnswer(ex, correct, ms);
     if (correct) { setSessionCorrect((c) => c + 1); gainedRef.current.xp += 8; gainedRef.current.gold += 3; }
     setFeedback(correct ? 'ok' : 'ko');
@@ -302,6 +319,37 @@ Regole obbligatorie: esattamente 8 vocaboli e 9 esercizi; almeno 3 type e almeno
     const bonus = acc === 1 ? 20 : acc >= 0.8 ? 10 : 0; // bonus precisione
     const gxp = gainedRef.current.xp + bonus;
     const ggold = gainedRef.current.gold + Math.round(bonus / 2);
+
+    // Memoria linguistica: non conserva solo il punteggio, ma individua le aree
+    // deboli e la velocità reale di risposta per adattare le prossime lezioni.
+    const answers = sessionAnswersRef.current;
+    setLearner((prev) => {
+      const next = { ...prev, skills: { ...(prev.skills || {}) }, errors: { ...(prev.errors || {}) }, recentMistakes: [...(prev.recentMistakes || [])] };
+      const oldTotal = prev.totalAnswers || 0;
+      const newTotal = oldTotal + answers.length;
+      next.totalAnswers = newTotal;
+      next.totalCorrect = (prev.totalCorrect || 0) + answers.filter((a) => a.correct).length;
+      next.totalSessions = (prev.totalSessions || 0) + 1;
+      const msTotal = answers.reduce((sum, a) => sum + a.ms, 0);
+      next.avgResponseMs = Math.round((((prev.avgResponseMs || 0) * oldTotal) + msTotal) / Math.max(1, newTotal));
+      answers.forEach((a) => {
+        const key = a.skill || 'conversation';
+        const current = next.skills[key] || { seen: 0, correct: 0, accuracy: 0, avgMs: 0 };
+        current.seen += 1;
+        if (a.correct) current.correct += 1;
+        current.accuracy = current.correct / Math.max(1, current.seen);
+        current.avgMs = Math.round(((current.avgMs || 0) * (current.seen - 1) + a.ms) / current.seen);
+        next.skills[key] = current;
+        if (!a.correct) {
+          next.errors[key] = (next.errors[key] || 0) + 1;
+          next.recentMistakes.push({ skill: key, text: a.text, at: Date.now() });
+        }
+      });
+      next.recentMistakes = next.recentMistakes.slice(-20);
+      next.lastFocus = Object.entries(next.skills).sort((a, b) => (a[1].accuracy || 0) - (b[1].accuracy || 0))[0]?.[0] || '';
+      next.lastSessionAt = new Date().toISOString();
+      return next;
+    });
 
     // XP/oro nel profilo (stesso modello di Quests: level*100 per salire).
     setPlayerStats((prev) => {
@@ -493,6 +541,18 @@ Regole obbligatorie: esattamente 8 vocaboli e 9 esercizi; almeno 3 type e almeno
             <div className="h-full rounded-full" style={{ width: `${Math.min(100, (exp / expNeed) * 100)}%`, background: '#a78bfa' }} />
           </div>
         </div>
+      </div>
+
+      <div className="mb-4 rounded-2xl p-3" style={{ background: 'rgba(34,176,125,0.08)', border: '1px solid rgba(34,176,125,0.25)' }}>
+        <div className="flex items-center justify-between mb-1">
+          <p className="text-[10px] uppercase tracking-widest text-emerald-300">French Brain</p>
+          <span className="text-[10px] text-gray-500">{learner.totalAnswers || 0} risposte analizzate</span>
+        </div>
+        <p className="text-xs text-gray-200">
+          {learner.totalAnswers
+            ? `Il tuo prossimo focus: ${learner.lastFocus || 'conversazione'}. L’app sta adattando le lezioni ai tuoi errori.`
+            : 'Completa la prima lezione: da lì inizierò a riconoscere i tuoi punti forti e deboli.'}
+        </p>
       </div>
 
       {/* ripasso */}
