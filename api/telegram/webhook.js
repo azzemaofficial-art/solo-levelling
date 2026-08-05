@@ -826,6 +826,11 @@ async function sendBossQuestion(token, id, st) {
 export default async function handler(req, res) {
   const botToken = process.env.SHADOW_BOT_TOKEN;
   const chatId = process.env.SHADOW_BOT_CHAT_ID;
+  // Allow-list multi-utente: SHADOW_BOT_CHAT_ID può contenere più ID separati da
+  // virgola/spazio (es. "123, 456"). Ogni utente ha i propri pasti/XP (chiavi
+  // per-chatId), quindi i dati restano separati per persona. Lista vuota = aperto a tutti.
+  const allowedChats = new Set(String(chatId || '').split(/[\s,]+/).map((s) => s.trim()).filter(Boolean));
+  const isAllowed = (id) => allowedChats.size === 0 || allowedChats.has(String(id));
 
   if (!botToken) return res.status(500).json({ error: 'SHADOW_BOT_TOKEN mancante' });
 
@@ -845,6 +850,7 @@ export default async function handler(req, res) {
       { command: 'integratori', description: '💊 Lista integratori consigliati' },
       { command: 'analisi', description: '🔍 Analisi AI del tuo profilo + dati di oggi' },
       { command: 'help', description: 'ℹ️ Cosa posso fare' },
+      { command: 'id', description: '🆔 Mostra il tuo chat_id Telegram' },
     ];
     const c = await fetch(`https://api.telegram.org/bot${botToken}/setMyCommands`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -862,7 +868,7 @@ export default async function handler(req, res) {
   const cbq = update?.callback_query;
   if (cbq) {
     const cChat = cbq.message?.chat?.id;
-    if (chatId && String(cChat) !== String(chatId)) { await answerCbq(botToken, cbq.id); return res.status(200).json({ ok: true }); }
+    if (!isAllowed(cChat)) { await answerCbq(botToken, cbq.id); return res.status(200).json({ ok: true }); }
     const data = String(cbq.data || '');
     // ▶️ prossima domanda normale
     if (data === 'lnext') {
@@ -959,7 +965,13 @@ export default async function handler(req, res) {
   if (!message) return res.status(200).json({ ok: true });
 
   const incomingChatId = message.chat?.id;
-  if (chatId && String(incomingChatId) !== String(chatId)) {
+  // /id → risponde a CHIUNQUE (prima del filtro) col proprio chat_id, così puoi
+  // aggiungerlo alla allow-list SHADOW_BOT_CHAT_ID su Vercel.
+  if (String(message.text || '').trim().toLowerCase().replace(/^\//, '') === 'id') {
+    await sendTelegramMessage(botToken, incomingChatId, `🆔 Il tuo chat_id è: <b>${incomingChatId}</b>`);
+    return res.status(200).json({ ok: true });
+  }
+  if (!isAllowed(incomingChatId)) {
     return res.status(200).json({ ok: true });
   }
 
