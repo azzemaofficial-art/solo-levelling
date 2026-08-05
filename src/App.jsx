@@ -78,6 +78,8 @@ function App() {
   const [tapPulseTick, setTapPulseTick] = useState(0);
   const [toastState, setToastState] = useState(null);
   const [toastDurationMs, setToastDurationMs] = useState(9000);
+  const [tgBindPrompt, setTgBindPrompt] = useState(false);
+  const [tgBindCustom, setTgBindCustom] = useState('');
   const { fxPulseKey, fxBurstKey, surgeKey, comboProgress, triggerFxBurst } = useFxCombo();
   const pagesOrder = ['system', 'systemplus', 'training', 'recovery', 'quests', 'boss', 'calendar', 'stats', 'help', 'lab', 'coach', 'news'];
   const [soundEnabled, setSoundEnabled] = useState(() => {
@@ -465,17 +467,19 @@ useEffect(() => { localStorage.setItem('shadow_monarch_macros', JSON.stringify(m
   //    Coda completa: applica TUTTI gli import accodati (più messaggi Telegram non si perdono).
   //    Re-poll al focus/visibilità: il sito si aggiorna senza refresh manuale.
   useEffect(() => {
-    // Il chat_id da cui importare è legato al BROWSER (localStorage), non fisso:
-    // ogni persona che apre il sito sul proprio telefono viene abbinata al proprio
-    // account Telegram tramite link personalizzato ?tg=<chat_id> (una tantum),
-    // così i dati di ognuno restano separati anche sul sito, non solo sul bot.
+    // Il chat_id da cui importare è legato al BROWSER (localStorage), non fisso.
+    // Nota iOS: "Aggiungi a Home" ignora l'URL corrente e riapre sempre lo
+    // start_url del manifest (senza ?tg=), e l'icona ha memoria isolata da Safari.
+    // Per questo l'abbinamento NON può dipendere solo dal query param: se manca,
+    // chiediamolo una volta in-app (tgBindPrompt) — da lì resta salvato nell'icona.
     const TG_ID_KEY = 'shadow_monarch_tg_chat_id';
     const urlTg = new URLSearchParams(window.location.search).get('tg');
     if (urlTg && /^\d+$/.test(urlTg)) {
       try { window.localStorage.setItem(TG_ID_KEY, urlTg); } catch {}
     }
-    let chatId = '264863579';
-    try { chatId = window.localStorage.getItem(TG_ID_KEY) || chatId; } catch {}
+    let chatId = '';
+    try { chatId = window.localStorage.getItem(TG_ID_KEY) || ''; } catch {}
+    if (!chatId) { setTgBindPrompt(true); return undefined; }
     let polling = false;
     const claim = () => {
       if (polling) return;
@@ -1345,6 +1349,42 @@ useEffect(() => { localStorage.setItem('shadow_monarch_macros', JSON.stringify(m
     <div
       className={`app-shell-fs gameframe-shell premium-shell system-scanlines neon-cinema theme-${activePage} ${shouldReduceFx ? 'fx-lite' : ''} max-w-[390px] mx-auto bg-void-black relative shadow-2xl overflow-hidden border-x border-white/5 flex flex-col`}>
       {showIntro && <NeuralIntro onDone={() => setShowIntro(false)} />}
+      {tgBindPrompt ? (
+        <div className="fixed inset-0 z-[999] bg-black/95 backdrop-blur-sm p-5 flex flex-col items-center justify-center gap-4 text-center">
+          <p className="text-[10px] uppercase tracking-[0.3em] text-cyan-300">Chi sei?</p>
+          <p className="text-[11px] text-gray-400 max-w-[280px]">
+            Abbina questo telefono al tuo account Telegram, così i tuoi dati restano separati. Serve una sola volta.
+          </p>
+          <button
+            onClick={() => {
+              try { window.localStorage.setItem('shadow_monarch_tg_chat_id', '264863579'); } catch {}
+              window.location.reload();
+            }}
+            className="w-full max-w-[260px] border border-cyan-300/40 bg-cyan-300/10 text-white text-xs uppercase tracking-widest py-3 hover:bg-cyan-300/20"
+          >
+            Sono Emanuele
+          </button>
+          <input
+            value={tgBindCustom}
+            onChange={(e) => setTgBindCustom(e.target.value.replace(/\D/g, ''))}
+            placeholder="Il tuo chat_id (scrivi /id al bot)"
+            inputMode="numeric"
+            className="w-full max-w-[260px] bg-black/60 border border-white/15 text-white text-xs p-2 text-center outline-none focus:border-cyan-300/50"
+          />
+          <button
+            onClick={() => {
+              const id = tgBindCustom.trim();
+              if (!/^\d+$/.test(id)) return;
+              try { window.localStorage.setItem('shadow_monarch_tg_chat_id', id); } catch {}
+              window.location.reload();
+            }}
+            disabled={!/^\d+$/.test(tgBindCustom.trim())}
+            className="w-full max-w-[260px] border border-white/15 bg-white/5 text-white text-xs uppercase tracking-widest py-3 hover:bg-white/10 disabled:opacity-30"
+          >
+            Conferma
+          </button>
+        </div>
+      ) : null}
       <TouchSparks />
       <AnimatePresence>
         {levelUpTo != null && <LevelUpOverlay key="levelup" level={levelUpTo} onDone={() => setLevelUpTo(null)} />}
