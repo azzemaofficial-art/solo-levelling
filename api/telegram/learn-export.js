@@ -21,7 +21,10 @@ export default async function handler(req, res) {
   const provided = req.query?.secret || (req.headers?.authorization || '').replace('Bearer ', '');
   if (provided !== secret) return res.status(401).json({ error: 'unauthorized' });
 
-  const chatId = req.query?.chat_id || process.env.SHADOW_BOT_CHAT_ID;
+  // SHADOW_BOT_CHAT_ID può contenere più ID (allow-list multi-utente, separati
+  // da virgola): senza ?chat_id esplicito, l'alveare Obsidian sincronizza solo
+  // il proprietario (primo ID), non la stringa intera come chiave letterale.
+  const chatId = req.query?.chat_id || String(process.env.SHADOW_BOT_CHAT_ID || '').split(/[\s,]+/)[0];
   if (!chatId) return res.status(400).json({ error: 'chat_id mancante' });
 
   const learn = normalize((await kvGet(`tg_learn:${chatId}`)) || {});

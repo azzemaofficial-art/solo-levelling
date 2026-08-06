@@ -40,7 +40,9 @@ const SLOTS = {
 
 export default async function handler(req, res) {
   const botToken = process.env.SHADOW_BOT_TOKEN;
-  const chatId = process.env.SHADOW_BOT_CHAT_ID;
+  // SHADOW_BOT_CHAT_ID può contenere più ID (allow-list multi-utente, separati da
+  // virgola): questo è un promemoria personale, va solo al primo (il proprietario).
+  const chatId = String(process.env.SHADOW_BOT_CHAT_ID || '').split(/[\s,]+/)[0];
   if (!botToken || !chatId) return res.status(500).json({ error: 'SHADOW_BOT_TOKEN o SHADOW_BOT_CHAT_ID mancante' });
 
   const now = new Date();

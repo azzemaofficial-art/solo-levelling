@@ -36,7 +36,8 @@ function getSlot(utcHour) {
 
 export default async function handler(req, res) {
   const botToken = process.env.SHADOW_BOT_TOKEN;
-  const chatId = process.env.SHADOW_BOT_CHAT_ID;
+  // Promemoria personale: solo il primo ID della allow-list (il proprietario).
+  const chatId = String(process.env.SHADOW_BOT_CHAT_ID || '').split(/[\s,]+/)[0];
 
   if (!botToken || !chatId) {
     return res.status(500).json({ error: 'SHADOW_BOT_TOKEN o SHADOW_BOT_CHAT_ID mancante' });

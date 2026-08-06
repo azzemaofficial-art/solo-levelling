@@ -43,7 +43,8 @@ export default async function handler(req, res) {
   if (secret && provided !== secret) return res.status(401).json({ error: 'unauthorized' });
 
   const token = process.env.SHADOW_BOT_TOKEN;
-  const chatId = process.env.SHADOW_BOT_CHAT_ID;
+  // Cron personale: solo il primo ID della allow-list (il proprietario).
+  const chatId = String(process.env.SHADOW_BOT_CHAT_ID || '').split(/[\s,]+/)[0];
   if (!token || !chatId) return res.status(500).json({ error: 'bot non configurato' });
 
   const slot = String(req.query?.slot || '').toLowerCase();

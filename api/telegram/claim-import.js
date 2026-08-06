@@ -6,7 +6,9 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
 
-  const chatId = req.query.chat_id || process.env.SHADOW_BOT_CHAT_ID;
+  // Il sito passa sempre ?chat_id esplicito; il fallback usa solo il primo ID
+  // della allow-list SHADOW_BOT_CHAT_ID (non la stringa multi-utente intera).
+  const chatId = req.query.chat_id || String(process.env.SHADOW_BOT_CHAT_ID || '').split(/[\s,]+/)[0];
   if (!chatId) return res.status(400).json({ error: 'chat_id mancante' });
 
   const url = process.env.KV_REST_API_URL;
