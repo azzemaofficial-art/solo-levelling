@@ -7,6 +7,7 @@ import AnimeStrip from '../components/AnimeStrip';
 import { formatAiErrorDetail, looseJsonParse, parseModelJson, reconcileRecipeMacros, requestSystemAI } from '../utils/aiClient';
 import { AI_MODELS, getModelFor, getGlobalModel, setGlobalModel, getTaskOverride, setTaskOverride } from '../utils/aiModels';
 import { computeReadinessOutcome, computeSleepCoach, computeWeightTrendGuard, computeWeeklyOverview, evaluateDataQuality } from '../utils/healthLogic';
+import { applyXp } from '../utils/xpLogic';
 import { emitShadowFxBurst } from '../utils/fxEvents';
 import { emitUiToast } from '../utils/uiEvents';
 import { knowledgePrompt, knowledgePromptFor, NUTRITION_PRINCIPLES } from '../../lib/knowledgeBase.js';
@@ -2350,15 +2351,19 @@ const SystemHub = ({ systemLogs, setSystemLogs, dailyGoal, setDailyGoal, hydrati
     if ((activeBlockProgram.checkpointsClaimed || []).includes(checkpointKey)) return;
     const rewardExp = Math.round((30 + (blockWeek * 20)) * rewardHealthMultiplier);
     const rewardGold = Math.round((25 + (blockWeek * 25)) * rewardHealthMultiplier);
-    updatePlayerStats((prev) => ({
-      ...prev,
-      exp: Number(prev.exp || 0) + rewardExp,
-      gold: Number(prev.gold || 0) + rewardGold,
-      blockProgram: {
-        ...(prev.blockProgram || {}),
-        checkpointsClaimed: [...((prev.blockProgram?.checkpointsClaimed) || []), checkpointKey]
-      }
-    }));
+    updatePlayerStats((prev) => {
+      const { level, exp } = applyXp(prev, rewardExp);
+      return {
+        ...prev,
+        level,
+        exp,
+        gold: Number(prev.gold || 0) + rewardGold,
+        blockProgram: {
+          ...(prev.blockProgram || {}),
+          checkpointsClaimed: [...((prev.blockProgram?.checkpointsClaimed) || []), checkpointKey]
+        }
+      };
+    });
     playSfx('success', soundEnabled, soundTheme);
     emitFxBurst();
   };
@@ -2388,15 +2393,19 @@ const SystemHub = ({ systemLogs, setSystemLogs, dailyGoal, setDailyGoal, hydrati
 
   const claimAdaptiveQuest = () => {
     if (!adaptiveQuest || adaptiveQuest.claimed || !adaptiveQuestDone) return;
-    updatePlayerStats((prev) => ({
-      ...prev,
-      exp: Number(prev.exp || 0) + Math.round(Number(adaptiveQuest.reward?.exp || 20) * rewardHealthMultiplier),
-      gold: Number(prev.gold || 0) + Math.round(Number(adaptiveQuest.reward?.gold || 15) * rewardHealthMultiplier),
-      adaptiveQuest: {
-        ...(prev.adaptiveQuest || {}),
-        claimed: true
-      }
-    }));
+    updatePlayerStats((prev) => {
+      const { level, exp } = applyXp(prev, Math.round(Number(adaptiveQuest.reward?.exp || 20) * rewardHealthMultiplier));
+      return {
+        ...prev,
+        level,
+        exp,
+        gold: Number(prev.gold || 0) + Math.round(Number(adaptiveQuest.reward?.gold || 15) * rewardHealthMultiplier),
+        adaptiveQuest: {
+          ...(prev.adaptiveQuest || {}),
+          claimed: true
+        }
+      };
+    });
     playSfx('success', soundEnabled, soundTheme);
     emitFxBurst();
   };
@@ -2469,9 +2478,11 @@ const SystemHub = ({ systemLogs, setSystemLogs, dailyGoal, setDailyGoal, hydrati
     updatePlayerStats((prev) => {
       const pack = prev?.weeklyMissionPack;
       if (!pack || pack.weekKey !== currentWeekKey) return prev;
+      const { level, exp } = applyXp(prev, Math.round(Number(target.reward?.exp || 30) * rewardHealthMultiplier));
       return {
         ...prev,
-        exp: Number(prev.exp || 0) + Math.round(Number(target.reward?.exp || 30) * rewardHealthMultiplier),
+        level,
+        exp,
         gold: Number(prev.gold || 0) + Math.round(Number(target.reward?.gold || 24) * rewardHealthMultiplier),
         weeklyMissionPack: {
           ...pack,
@@ -4097,12 +4108,16 @@ Rispondi SOLO JSON valido:
       gold: Math.round(Number(reward.gold || 0) * rewardHealthMultiplier),
       exp: Math.round(Number(reward.exp || 0) * rewardHealthMultiplier)
     };
-    setPlayerStats((prev) => ({
-      ...prev,
-      gold: (prev.gold || 0) + scaledReward.gold,
-      exp: (prev.exp || 0) + scaledReward.exp,
-      streakMilestonesClaimed: [...(prev.streakMilestonesClaimed || []), claimableMilestone]
-    }));
+    setPlayerStats((prev) => {
+      const { level, exp } = applyXp(prev, scaledReward.exp);
+      return {
+        ...prev,
+        level,
+        exp,
+        gold: (prev.gold || 0) + scaledReward.gold,
+        streakMilestonesClaimed: [...(prev.streakMilestonesClaimed || []), claimableMilestone]
+      };
+    });
     playSfx('success', soundEnabled, soundTheme);
     speakEvent('milestone_claim', voiceEnabled, voicePack);
     emitFxBurst();
@@ -4405,12 +4420,16 @@ Rispondi SOLO JSON valido:
       gold: Math.round(24 * rewardHealthMultiplier),
       exp: Math.round(24 * rewardHealthMultiplier)
     };
-    setPlayerStats((prev) => ({
-      ...prev,
-      gold: (prev.gold || 0) + scaledReward.gold,
-      exp: (prev.exp || 0) + scaledReward.exp,
-      lastStreakQuestClaimDate: today
-    }));
+    setPlayerStats((prev) => {
+      const { level, exp } = applyXp(prev, scaledReward.exp);
+      return {
+        ...prev,
+        level,
+        exp,
+        gold: (prev.gold || 0) + scaledReward.gold,
+        lastStreakQuestClaimDate: today
+      };
+    });
     playSfx('success', soundEnabled, soundTheme);
     speakEvent('quest_clear', voiceEnabled, voicePack);
     emitFxBurst();
@@ -4491,13 +4510,17 @@ Rispondi SOLO JSON valido:
       exp: Math.round(40 * rewardHealthMultiplier),
       gold: Math.round(30 * rewardHealthMultiplier)
     };
-    setPlayerStats((prev) => ({
-      ...prev,
-      exp: (prev.exp || 0) + scaledReward.exp,
-      gold: (prev.gold || 0) + scaledReward.gold,
-      keys: (prev.keys || 0) + 1,
-      lastVictoryLoopClaimDate: todayIso
-    }));
+    setPlayerStats((prev) => {
+      const { level, exp } = applyXp(prev, scaledReward.exp);
+      return {
+        ...prev,
+        level,
+        exp,
+        gold: (prev.gold || 0) + scaledReward.gold,
+        keys: (prev.keys || 0) + 1,
+        lastVictoryLoopClaimDate: todayIso
+      };
+    });
     playSfx('streak', soundEnabled, soundTheme);
     speakEvent('quest_clear', voiceEnabled, voicePack);
     emitFxBurst();
@@ -4552,9 +4575,11 @@ Rispondi SOLO JSON valido:
           };
         }
       }
+      const { level, exp } = applyXp(prev, reward.exp);
       return {
         ...prev,
-        exp: Number(prev.exp || 0) + reward.exp,
+        level,
+        exp,
         gold: Number(prev.gold || 0) + reward.gold,
         battlePass: {
           ...base,
@@ -4597,9 +4622,11 @@ Rispondi SOLO JSON valido:
         gold: Math.round(95 * rewardHealthMultiplier * rewardMulUsed),
         keys: 1
       };
+      const { level, exp } = applyXp(prev, reward.exp);
       return {
         ...prev,
-        exp: Number(prev.exp || 0) + reward.exp,
+        level,
+        exp,
         gold: Number(prev.gold || 0) + reward.gold,
         keys: Number(prev.keys || 0) + reward.keys,
         battlePass: {

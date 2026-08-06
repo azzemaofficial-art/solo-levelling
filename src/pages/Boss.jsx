@@ -4,6 +4,7 @@ import { playSfx, playMonsterGrowl } from '../utils/sfx';
 import { speakLine } from '../utils/voice';
 import DungeonBoss3D from '../components/DungeonBoss3D';
 import { parseModelJson, requestSystemAI } from '../utils/aiClient';
+import { applyXp } from '../utils/xpLogic';
 
 const RELIC_LIBRARY = [
   { id: 'monarch_fang', name: 'Monarch Fang', rarity: 'Epic', desc: '+18% danno base', effects: { damagePct: 0.18 } },
@@ -475,15 +476,19 @@ const Boss = ({ playerStats, setPlayerStats, soundEnabled, soundTheme, voiceEnab
       .filter((entry) => nextPrestige >= entry.level)
       .map((entry) => entry.title)
       .slice(-1)[0] || 'Monarch Ascendant';
-    setPlayerStats((prev) => ({
-      ...prev,
-      gold: (prev.gold || 0) + prestigeGold,
-      exp: (prev.exp || 0) + prestigeExp,
-      keys: (prev.keys || 0) + prestigeKeys,
-      ap: (prev.ap || 0) + 2,
-      titlesUnlocked: Array.from(new Set([...(prev.titlesUnlocked || []), unlockedTitle])),
-      activeTitle: unlockedTitle
-    }));
+    setPlayerStats((prev) => {
+      const { level, exp } = applyXp(prev, prestigeExp);
+      return {
+        ...prev,
+        level,
+        exp,
+        gold: (prev.gold || 0) + prestigeGold,
+        keys: (prev.keys || 0) + prestigeKeys,
+        ap: (prev.ap || 0) + 2,
+        titlesUnlocked: Array.from(new Set([...(prev.titlesUnlocked || []), unlockedTitle])),
+        activeTitle: unlockedTitle
+      };
+    });
     setRaidSeason((prev) => ({
       ...prev,
       mastery: 0,
@@ -1399,14 +1404,12 @@ const Boss = ({ playerStats, setPlayerStats, soundEnabled, soundTheme, voiceEnab
       
       const expReward = 300 * boss.level;
       const goldReward = 150 * boss.level;
-      const expNeeded = updatedStats.level * 100;
-      let newExp = updatedStats.exp + expReward;
-      let newLevel = updatedStats.level;
+      // Modello sottrattivo condiviso: gestisce anche level-up multipli in un
+      // colpo (expReward può superare più soglie level*100).
+      const { level: newLevel, exp: newExp, levelsGained } = applyXp(updatedStats, expReward);
       let newAp = updatedStats.ap || 0;
 
-      if (newExp >= expNeeded) {
-        newLevel += 1;
-        newExp -= expNeeded;
+      if (levelsGained > 0) {
         newAp += 3;
         alert(`☠️ IL BOSS È STATO POLVERIZZATO! LEVEL UP! Sei al Livello ${newLevel}!`);
       } else {

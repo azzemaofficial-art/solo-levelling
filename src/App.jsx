@@ -4,6 +4,7 @@ import { Zap, Swords, BrainCircuit, Activity } from 'lucide-react';
 import { playSfx } from './utils/sfx';
 import { formatAiErrorDetail, requestSystemAI, subscribeAiStatus } from './utils/aiClient';
 import { runStorageMigrations } from './utils/storageMigrations';
+import { applyXp } from './utils/xpLogic';
 import { useFxCombo } from './hooks/useFxCombo';
 import { subscribeUiToast, emitUiToast } from './utils/uiEvents';
 import { cloudPush, getCloudSession, refreshCloudSession } from './utils/cloudSync';
@@ -388,9 +389,11 @@ useEffect(() => { localStorage.setItem('shadow_monarch_macros', JSON.stringify(m
       const gained = Number(payload.amount || 0);
       if (gained > 0) {
         setPlayerStats?.((prev) => {
-          const exp = Number(prev?.exp || 0) + gained;
-          const nextLevel = Math.floor(exp / 100) + 1;            // 100 XP/livello → fa scattare il Level-Up cinematico
-          return { ...prev, exp, level: Math.max(Number(prev?.level || 1), nextLevel) };
+          // Modello sottrattivo condiviso (level*100 per salire), stesso di
+          // Boss/Quests/French: prima qui si usava exp cumulativa e i due
+          // modelli si sovrascrivevano a vicenda sullo stesso playerStats.
+          const { level, exp } = applyXp(prev, gained);
+          return { ...prev, level, exp };
         });
         const msg = payload.type === 'learn_boss'
           ? `🐉 Boss del Sapere sconfitto! +${gained} XP (${payload.score}/${payload.of})`

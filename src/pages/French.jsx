@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion';
 import { requestSystemAI, looseJsonParse } from '../utils/aiClient';
 import { getModelFor } from '../utils/aiModels';
+import { applyXp } from '../utils/xpLogic';
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Français — corso di francese gamificato e adattivo.
@@ -351,11 +352,9 @@ Regole obbligatorie: esattamente 8 vocaboli e 9 esercizi; almeno 3 type e almeno
       return next;
     });
 
-    // XP/oro nel profilo (stesso modello di Quests: level*100 per salire).
+    // XP/oro nel profilo (modello sottrattivo condiviso: level*100 per salire).
     setPlayerStats((prev) => {
-      let level = prev?.level || 1;
-      let exp = (prev?.exp || 0) + gxp;
-      while (exp >= level * 100) { exp -= level * 100; level += 1; }
+      const { level, exp } = applyXp(prev, gxp);
       return { ...prev, level, exp, gold: (prev?.gold || 0) + ggold };
     });
 

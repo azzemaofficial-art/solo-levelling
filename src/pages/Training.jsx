@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { playSfx } from '../utils/sfx';
 import { speakEvent } from '../utils/voice';
 import { formatAiErrorDetail, getAiHistory, parseModelJson, pushAiHistory, requestSystemAI } from '../utils/aiClient';
+import { applyXp } from '../utils/xpLogic';
 import { emitUiToast } from '../utils/uiEvents';
 
 const WORKOUT_PROMPT_PRESETS = [
@@ -1416,13 +1417,17 @@ const Training = ({ playerStats, setPlayerStats, systemLogs = [], setSystemLogs,
     const longJourneyFactor = 0.55;
     const gainedExp = Math.round(60 * streakMultiplier * longJourneyFactor);
     const gainedGold = Math.round(35 * streakMultiplier * longJourneyFactor);
-    setPlayerStats((prev) => ({
-      ...prev,
-      exp: (prev.exp || 0) + gainedExp,
-      gold: (prev.gold || 0) + gainedGold,
-      completedWorkouts: (prev.completedWorkouts || 0) + 1,
-      lastWorkoutDate: today
-    }));
+    setPlayerStats((prev) => {
+      const { level, exp } = applyXp(prev, gainedExp);
+      return {
+        ...prev,
+        level,
+        exp,
+        gold: (prev.gold || 0) + gainedGold,
+        completedWorkouts: (prev.completedWorkouts || 0) + 1,
+        lastWorkoutDate: today
+      };
+    });
     playSfx('success', soundEnabled, soundTheme);
     speakEvent('workout_clear', voiceEnabled, voicePack);
   };
@@ -1925,26 +1930,34 @@ const Training = ({ playerStats, setPlayerStats, systemLogs = [], setSystemLogs,
   useEffect(() => {
     if (currentWeekSessions < weeklyGoal) return;
     if (playerStats.lastWeeklyTrainingClaimWeek === currentWeekKey) return;
-    setPlayerStats((prev) => ({
-      ...prev,
-      exp: (prev.exp || 0) + 70,
-      gold: (prev.gold || 0) + 50,
-      weeklyTrainingStreak: (prev.weeklyTrainingStreak || 0) + 1,
-      lastWeeklyTrainingClaimWeek: currentWeekKey
-    }));
+    setPlayerStats((prev) => {
+      const { level, exp } = applyXp(prev, 70);
+      return {
+        ...prev,
+        level,
+        exp,
+        gold: (prev.gold || 0) + 50,
+        weeklyTrainingStreak: (prev.weeklyTrainingStreak || 0) + 1,
+        lastWeeklyTrainingClaimWeek: currentWeekKey
+      };
+    });
     setWeeklyBurst(true);
     playSfx(crownAnthemEnabled ? 'crown_anthem' : 'streak', soundEnabled, soundTheme);
   }, [currentWeekSessions, currentWeekKey, playerStats.lastWeeklyTrainingClaimWeek, setPlayerStats, soundEnabled, soundTheme, crownAnthemEnabled]);
   useEffect(() => {
     if (!weeklyQuestBoard.allDone) return;
     if (playerStats.lastWeeklyQuestClaimWeek === currentWeekKey) return;
-    setPlayerStats((prev) => ({
-      ...prev,
-      exp: (prev.exp || 0) + 120,
-      gold: (prev.gold || 0) + 90,
-      weeklyQuestWins: (prev.weeklyQuestWins || 0) + 1,
-      lastWeeklyQuestClaimWeek: currentWeekKey
-    }));
+    setPlayerStats((prev) => {
+      const { level, exp } = applyXp(prev, 120);
+      return {
+        ...prev,
+        level,
+        exp,
+        gold: (prev.gold || 0) + 90,
+        weeklyQuestWins: (prev.weeklyQuestWins || 0) + 1,
+        lastWeeklyQuestClaimWeek: currentWeekKey
+      };
+    });
     emitUiToast({ message: 'Weekly Quest completata: +120 EXP +90 Gold', tone: 'success', durationMs: 3600 });
     playSfx('success', soundEnabled, soundTheme);
   }, [weeklyQuestBoard.allDone, playerStats.lastWeeklyQuestClaimWeek, currentWeekKey, setPlayerStats, soundEnabled, soundTheme]);

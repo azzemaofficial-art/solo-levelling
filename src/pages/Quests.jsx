@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { playSfx } from '../utils/sfx';
+import { applyXp } from '../utils/xpLogic';
 
 const Quests = ({ playerStats, setPlayerStats, soundEnabled = true, soundTheme = 'solo' }) => {
   const today = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit' });
@@ -112,13 +113,10 @@ const Quests = ({ playerStats, setPlayerStats, soundEnabled = true, soundTheme =
 
     // Calcola l'EXP e l'Oro
     setPlayerStats((prev) => {
-      const expNeeded = (prev.level || 1) * 100;
-      let newExp = (prev.exp || 0) + Math.round(quest.rewardExp * longJourneyQuestFactor);
-      let newLevel = prev.level || 1;
+      const gained = Math.round(quest.rewardExp * longJourneyQuestFactor);
       const newGold = (prev.gold || 0) + Math.round(quest.rewardGold * longJourneyQuestFactor);
-      if (newExp >= expNeeded) {
-        newLevel += 1;
-        newExp -= expNeeded;
+      const { level: newLevel, exp: newExp, levelsGained } = applyXp(prev, gained);
+      if (levelsGained > 0) {
         alert(`🔥 SYSTEM MESSAGE: LEVEL UP! Sei salito al Livello ${newLevel}!`);
       }
       return { ...prev, level: newLevel, exp: newExp, gold: newGold };
@@ -213,15 +211,19 @@ const Quests = ({ playerStats, setPlayerStats, soundEnabled = true, soundTheme =
     const dayUnlocked = chainDayIndex >= idx;
     if (alreadyClaimed || !prevClaimed || !dayUnlocked || !chapter.completed) return;
 
-    setPlayerStats((prev) => ({
-      ...prev,
-      exp: (prev.exp || 0) + Math.round((chapter.rewards.exp || 0) * longJourneyChapterFactor),
-      gold: (prev.gold || 0) + Math.round((chapter.rewards.gold || 0) * longJourneyChapterFactor),
-      keys: (prev.keys || 0) + (chapter.rewards.keys || 0),
-      streakShieldTokens: (prev.streakShieldTokens || 0) + (chapter.rewards.shield || 0),
-      storyTitleTokens: (prev.storyTitleTokens || 0) + (chapter.rewards.titleToken || 0),
-      weeklyStoryWins: chapter.id === 'day7_monarch' ? (prev.weeklyStoryWins || 0) + 1 : (prev.weeklyStoryWins || 0)
-    }));
+    setPlayerStats((prev) => {
+      const { level, exp } = applyXp(prev, Math.round((chapter.rewards.exp || 0) * longJourneyChapterFactor));
+      return {
+        ...prev,
+        level,
+        exp,
+        gold: (prev.gold || 0) + Math.round((chapter.rewards.gold || 0) * longJourneyChapterFactor),
+        keys: (prev.keys || 0) + (chapter.rewards.keys || 0),
+        streakShieldTokens: (prev.streakShieldTokens || 0) + (chapter.rewards.shield || 0),
+        storyTitleTokens: (prev.storyTitleTokens || 0) + (chapter.rewards.titleToken || 0),
+        weeklyStoryWins: chapter.id === 'day7_monarch' ? (prev.weeklyStoryWins || 0) + 1 : (prev.weeklyStoryWins || 0)
+      };
+    });
 
     setStoryChainState((prev) => ({
       ...prev,
@@ -304,14 +306,18 @@ const Quests = ({ playerStats, setPlayerStats, soundEnabled = true, soundTheme =
     const unlocked = idx === 0 || chapterClaims.includes(seasonChapters[idx - 1].id);
     if (!unlocked || alreadyClaimed || !chapter.completed) return;
 
-    setPlayerStats((prev) => ({
-      ...prev,
-      exp: (prev.exp || 0) + Math.round((chapter.rewards.exp || 0) * longJourneyChapterFactor),
-      gold: (prev.gold || 0) + Math.round((chapter.rewards.gold || 0) * longJourneyChapterFactor),
-      keys: (prev.keys || 0) + (chapter.rewards.keys || 0),
-      streakShieldTokens: (prev.streakShieldTokens || 0) + (chapter.rewards.shield || 0),
-      seasonChapterClaims: [...(prev.seasonChapterClaims || []), chapter.id]
-    }));
+    setPlayerStats((prev) => {
+      const { level, exp } = applyXp(prev, Math.round((chapter.rewards.exp || 0) * longJourneyChapterFactor));
+      return {
+        ...prev,
+        level,
+        exp,
+        gold: (prev.gold || 0) + Math.round((chapter.rewards.gold || 0) * longJourneyChapterFactor),
+        keys: (prev.keys || 0) + (chapter.rewards.keys || 0),
+        streakShieldTokens: (prev.streakShieldTokens || 0) + (chapter.rewards.shield || 0),
+        seasonChapterClaims: [...(prev.seasonChapterClaims || []), chapter.id]
+      };
+    });
     triggerChapterCinematic('SEASON CHAPTER CLEAR', chapter.title, getRewardTier(chapter.rewards));
   };
 
