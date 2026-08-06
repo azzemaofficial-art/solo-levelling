@@ -3,19 +3,20 @@
 //  Auth: ?secret=<HIVE_SECRET>. Ritorna progresso apprendimento + campioni coach.
 // ─────────────────────────────────────────────────────────────────────────────
 import { GATES, GATE_IDS, normalize, levelOf } from '../../lib/learn.js';
-
-async function kvGet(key) {
-  const url = process.env.KV_REST_API_URL, token = process.env.KV_REST_API_TOKEN;
-  if (!url || !token) return null;
-  try {
-    const r = await fetch(`${url}/get/${encodeURIComponent(key)}`, { headers: { Authorization: `Bearer ${token}` } });
-    const d = await r.json();
-    if (d?.result == null) return null;
-    try { return JSON.parse(d.result); } catch { return d.result; }
-  } catch { return null; }
-}
+import { kvGet, KvError } from '../../lib/kv.js';
 
 export default async function handler(req, res) {
+  try {
+    return await dispatch(req, res);
+  } catch (err) {
+    // KV irraggiungibile → 503: il ponte Obsidian abortisce invece di scrivere
+    // nel vault uno snapshot pieno di zeri (che avvelenerebbe la memoria AI).
+    if (err?.name === 'KvError') return res.status(503).json({ ok: false, error: 'kv offline', detail: err.message });
+    throw err;
+  }
+}
+
+async function dispatch(req, res) {
   const secret = process.env.HIVE_SECRET;
   if (!secret) return res.status(403).json({ error: 'HIVE_SECRET non impostato su Vercel' });
   const provided = req.query?.secret || (req.headers?.authorization || '').replace('Bearer ', '');

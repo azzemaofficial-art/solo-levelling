@@ -6,27 +6,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { nextQuestion, initLearn, normalize, loadGen } from '../../lib/learn.js';
+import { kvGet, kvSet, KvError } from '../../lib/kv.js';
 
-async function kvGet(key) {
-  const url = process.env.KV_REST_API_URL, token = process.env.KV_REST_API_TOKEN;
-  if (!url || !token) return null;
-  try {
-    const r = await fetch(`${url}/get/${encodeURIComponent(key)}`, { headers: { Authorization: `Bearer ${token}` } });
-    const d = await r.json();
-    if (d?.result == null) return null;
-    try { return JSON.parse(d.result); } catch { return d.result; }
-  } catch { return null; }
-}
-async function kvSet(key, value, ttl = 2592000) {
-  const url = process.env.KV_REST_API_URL, token = process.env.KV_REST_API_TOKEN;
-  if (!url || !token) return;
-  try {
-    await fetch(`${url}/pipeline`, {
-      method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify([['SET', key, JSON.stringify(value), 'EX', String(ttl)]]),
-    });
-  } catch (_) {}
-}
 async function sendMessage(token, chatId, text, replyMarkup) {
   const body = { chat_id: chatId, text, parse_mode: 'HTML' };
   if (replyMarkup) body.reply_markup = replyMarkup;
@@ -38,6 +19,17 @@ async function sendMessage(token, chatId, text, replyMarkup) {
 const SLOT_GATE = { morning: 'english', afternoon: 'prog-ia', evening: 'scienza' }; // sera = Scienza & Biohacking (i ripassi SRS scaduti hanno comunque priorità)
 
 export default async function handler(req, res) {
+  try {
+    return await dispatch(req, res);
+  } catch (err) {
+    // KV giù → NON scrivere uno stato fresco sopra quello reale: segnala errore,
+    // il cron riproverà al prossimo giro.
+    if (err?.name === 'KvError') return res.status(502).json({ ok: false, error: 'kv offline', detail: err.message });
+    throw err;
+  }
+}
+
+async function dispatch(req, res) {
   const secret = process.env.CRON_SECRET;
   const provided = req.query?.secret || (req.headers?.authorization || '').replace('Bearer ', '');
   if (secret && provided !== secret) return res.status(401).json({ error: 'unauthorized' });

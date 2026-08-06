@@ -3,56 +3,11 @@
 
 import { GATES, GATE_IDS, nextQuestion, gradeAnswer, startBoss, bossQuestion, gradeBoss, progressLine, progressCard, initLearn, normalize as normLearn, gateButtons, levelOf, loadGen, baseCount, existingStems, safeHtml, studyLabel, difficultyForLevel } from '../../lib/learn.js';
 import { NUTRITION_PRINCIPLES, knowledgePromptFor } from '../../lib/knowledgeBase.js';
+import { kvGet, kvSet, kvPush, KvError } from '../../lib/kv.js';
 
 const NVIDIA_BASE = 'https://integrate.api.nvidia.com/v1';
 const GROQ_BASE   = 'https://api.groq.com/openai/v1';
 const SITE_URL = 'https://solo-levelling-steel.vercel.app';
-
-// Upstash Redis REST — salva il payload lato server (TTL default 24h)
-async function kvSet(key, value, ttl = 86400) {
-  const url = process.env.KV_REST_API_URL;
-  const token = process.env.KV_REST_API_TOKEN;
-  if (!url || !token) return;
-  try {
-    await fetch(`${url}/pipeline`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify([['SET', key, JSON.stringify(value), 'EX', String(ttl)]]),
-    });
-  } catch (_) {}
-}
-
-async function kvGet(key) {
-  const url = process.env.KV_REST_API_URL;
-  const token = process.env.KV_REST_API_TOKEN;
-  if (!url || !token) return null;
-  try {
-    const r = await fetch(`${url}/get/${encodeURIComponent(key)}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    const d = await r.json();
-    if (d?.result == null) return null;
-    try { return JSON.parse(d.result); } catch { return d.result; }
-  } catch { return null; }
-}
-
-// Accoda un import in una LIST Redis (RPUSH) + TTL: più messaggi non si sovrascrivono
-async function kvPush(key, value, ttl = 86400) {
-  const url = process.env.KV_REST_API_URL;
-  const token = process.env.KV_REST_API_TOKEN;
-  if (!url || !token) return;
-  try {
-    await fetch(`${url}/pipeline`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify([
-        ['RPUSH', key, JSON.stringify(value)],
-        ['LTRIM', key, '-50', '-1'],
-        ['EXPIRE', key, String(ttl)],
-      ]),
-    });
-  } catch (_) {}
-}
 
 // Totale nutrizionale del giorno (per il comando /oggi)
 const todayKey = (chatId) => `tg_day:${chatId}:${new Date().toISOString().slice(0, 10)}`;
@@ -823,7 +778,7 @@ async function sendBossQuestion(token, id, st) {
   await sendTelegramMessage(token, id, q.text, q.keyboard);
 }
 
-export default async function handler(req, res) {
+async function dispatch(req, res) {
   const botToken = process.env.SHADOW_BOT_TOKEN;
   const chatId = process.env.SHADOW_BOT_CHAT_ID;
   // Allow-list multi-utente: SHADOW_BOT_CHAT_ID può contenere più ID separati da
@@ -1285,4 +1240,24 @@ Se l'utente descrive SINTOMI o SENSAZIONI (stanchezza, sonno scarso, poca energi
   ], isSimpleQuery(text));
   await sendTelegramMessage(botToken, incomingChatId, safeHtml(coachReply || parsed?.text || raw));
   return res.status(200).json({ ok: true });
+}
+
+// Se il KV è irraggiungibile (429/timeout) è MEGLIO fermarsi che proseguire con
+// uno stato fresco: i flussi read→write azzererebbero XP/streak/pasti reali.
+export default async function handler(req, res) {
+  try {
+    return await dispatch(req, res);
+  } catch (err) {
+    if (err?.name === 'KvError') {
+      const chatId = req.body?.callback_query?.message?.chat?.id || req.body?.message?.chat?.id;
+      if (chatId && process.env.SHADOW_BOT_TOKEN) {
+        try {
+          await sendTelegramMessage(process.env.SHADOW_BOT_TOKEN, chatId,
+            '⚠️ Memoria temporaneamente offline: per non rischiare di perdere il progresso non ho salvato nulla. Riprova tra qualche secondo.');
+        } catch (_) {}
+      }
+      return res.status(503).json({ ok: false, error: 'kv offline', detail: err.message });
+    }
+    throw err;
+  }
 }
