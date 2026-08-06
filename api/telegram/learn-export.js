@@ -2,9 +2,11 @@
 //  Export dati per l'Alveare Obsidian — usato dal ponte (tools/obsidian-hive.mjs).
 //  Auth: ?secret=<HIVE_SECRET>. Ritorna progresso apprendimento + campioni coach.
 // ─────────────────────────────────────────────────────────────────────────────
-import { GATES, GATE_IDS, normalize, levelOf } from '../../lib/learn.js';
-import { kvGet, KvError } from '../../lib/kv.js';
+import { GATES, GATE_IDS, normalize, levelOf, initLearn } from '../../lib/learn.js';
+import { kvGet, kvSet, KvError } from '../../lib/kv.js';
 import { safeEqual } from '../../lib/secrets.js';
+
+const LEARN_TTL = 2592000; // 30 giorni, come il resto del flusso learn
 
 export default async function handler(req, res) {
   try {
@@ -28,6 +30,27 @@ async function dispatch(req, res) {
   // il proprietario (primo ID), non la stringa intera come chiave letterale.
   const chatId = req.query?.chat_id || String(process.env.SHADOW_BOT_CHAT_ID || '').split(/[\s,]+/)[0];
   if (!chatId) return res.status(400).json({ error: 'chat_id mancante' });
+
+  // ── Modalità RIPRISTINO (?restore=1) ──────────────────────────────────────
+  // Recupera lo stato learn da uno snapshot noto (es. dataset/learning.csv
+  // dell'alveare), dopo un azzeramento accidentale. Merge-only e monotono:
+  // prende il MAX tra stato attuale e valori forniti, non riduce mai nulla,
+  // non tocca srs/pending/boss. Vive DENTRO learn-export (funzione già
+  // esistente) perché questo progetto Vercel rifiuta i deploy che aggiungono
+  // nuove funzioni serverless.
+  if (req.query?.restore === '1') {
+    const KEY = `tg_learn:${chatId}`;
+    const cur = normalize((await kvGet(KEY)) || initLearn());
+    cur.xp = Math.max(Number(cur.xp) || 0, Number(req.query?.xp) || 0);
+    cur.streak = Math.max(Number(cur.streak) || 0, Number(req.query?.streak) || 0);
+    await kvSet(KEY, cur, LEARN_TTL);
+    return res.status(200).json({
+      ok: true,
+      chatId,
+      restored: { xp: cur.xp, level: levelOf(cur.xp), streak: cur.streak },
+      note: 'merge-only: nessun valore ridotto',
+    });
+  }
 
   const learn = normalize((await kvGet(`tg_learn:${chatId}`)) || {});
   const samples = (await kvGet(`coach_samples:${chatId}`)) || [];
