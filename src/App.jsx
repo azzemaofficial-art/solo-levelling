@@ -21,7 +21,6 @@ const Boss = lazy(() => import('./pages/Boss'));
 const Training = lazy(() => import('./pages/Training'));
 const Recovery = lazy(() => import('./pages/Recovery'));
 const Help = lazy(() => import('./pages/Help'));
-const MixamoLab = lazy(() => import('./pages/MixamoLab'));
 const Coach = lazy(() => import('./pages/Coach'));
 const News = lazy(() => import('./pages/News'));
 const French = lazy(() => import('./pages/French'));
@@ -82,7 +81,7 @@ function App() {
   const [tgBindPrompt, setTgBindPrompt] = useState(false);
   const [tgBindCustom, setTgBindCustom] = useState('');
   const { fxPulseKey, fxBurstKey, surgeKey, comboProgress, triggerFxBurst } = useFxCombo();
-  const pagesOrder = ['system', 'systemplus', 'training', 'recovery', 'quests', 'boss', 'calendar', 'stats', 'help', 'lab', 'coach', 'news'];
+  const pagesOrder = ['system', 'systemplus', 'training', 'recovery', 'quests', 'boss', 'calendar', 'stats', 'help', 'coach', 'news'];
   const [soundEnabled, setSoundEnabled] = useState(() => {
     const saved = localStorage.getItem('shadow_monarch_sound');
     return saved ? saved === '1' : true;
@@ -1555,9 +1554,6 @@ useEffect(() => { localStorage.setItem('shadow_monarch_macros', JSON.stringify(m
               <button onClick={() => { handleTabChange('french'); setMenuOpen(false); }} className="col-span-2 text-[10px] px-2 py-3 border border-blue-300/40 text-blue-200 uppercase tracking-widest flex items-center gap-1.5">
                 <span>🇫🇷</span> Français
               </button>
-              <button onClick={() => handleTabChange('lab')} className="col-span-2 text-[10px] px-2 py-3 border border-fuchsia-300/40 text-fuchsia-200 uppercase tracking-widest flex items-center gap-1.5">
-                <span>🧪</span> Lab
-              </button>
             </div>
 
             <p className="text-[9px] uppercase tracking-widest text-gray-400 mb-2">Audio & Voice</p>
@@ -1763,7 +1759,6 @@ useEffect(() => { localStorage.setItem('shadow_monarch_macros', JSON.stringify(m
             )}
             {activePage === 'stats' && <Stats systemLogs={systemLogs} dailyGoal={dailyGoal} hydrationGoal={hydrationGoal} macroGoals={macroGoals} playerStats={playerStats} />}
             {activePage === 'help' && <Help createBackupPayload={createBackupPayload} importBackupPayload={importBackupPayload} resetAppData={resetAppData} playerStats={playerStats} onNavigate={handleTabChange} />}
-            {activePage === 'lab' && <MixamoLab />}
             {activePage === 'french' && <French playerStats={playerStats} setPlayerStats={setPlayerStats} soundEnabled={soundEnabled} soundTheme={soundTheme} />}
             {activePage === 'coach' && <Coach />}
             {activePage === 'news' && (
