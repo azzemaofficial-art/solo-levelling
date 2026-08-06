@@ -1,5 +1,6 @@
 // Notifica Telegram integratori personalizzata — chiamata da cron-job.org 1x/giorno
 // Suggerisce integratori in base a obiettivo, ora del giorno, profilo
+import { safeEqual } from '../../lib/secrets.js';
 
 const SLOT_SUPPLEMENTS = {
   morning: [
@@ -35,6 +36,13 @@ function getSlot(utcHour) {
 }
 
 export default async function handler(req, res) {
+  // Fail-closed: prima era aperto a chiunque (spam notifiche verso la chat).
+  // I job cron-job.org devono chiamare con ?secret=<CRON_SECRET>.
+  const cronSecret = process.env.CRON_SECRET;
+  if (!cronSecret) return res.status(500).json({ error: 'CRON_SECRET non impostato su Vercel' });
+  const provided = req.query?.secret || (req.headers?.authorization || '').replace('Bearer ', '');
+  if (!safeEqual(String(provided || ''), cronSecret)) return res.status(401).json({ error: 'unauthorized' });
+
   const botToken = process.env.SHADOW_BOT_TOKEN;
   // Promemoria personale: solo il primo ID della allow-list (il proprietario).
   const chatId = String(process.env.SHADOW_BOT_CHAT_ID || '').split(/[\s,]+/)[0];

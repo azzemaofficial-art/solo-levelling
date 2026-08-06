@@ -1,4 +1,5 @@
 export const config = { maxDuration: 60 }; // i modelli NIM superano i 15s di default Vercel
+import { guardApi } from '../../lib/apiGuard.js';
 
 // Personal Trainer AI — Shadow Coach
 // Gestisce: calorie/macro, ricette, schede allenamento, integratori
@@ -107,13 +108,9 @@ async function callProvider(apiKey, model, baseUrl, messages) {
 }
 
 export default async function handler(req, res) {
+  if (!guardApi(req, res)) return;
   if (req.method === 'GET') {
-    return res.status(200).json({
-      ok: true,
-      endpoint: '/api/nvidia/trainer',
-      primaryAgent: 'kimi-k2.6',
-      capabilities: ['calorie/macro', 'ricette', 'schede allenamento', 'integratori', 'arti marziali'],
-    });
+    return res.status(200).json({ ok: true, endpoint: '/api/nvidia/trainer' });
   }
 
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });

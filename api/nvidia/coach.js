@@ -1,4 +1,5 @@
 export const config = { maxDuration: 60 }; // i modelli NIM superano i 15s di default Vercel
+import { guardApi } from '../../lib/apiGuard.js';
 
 // NVIDIA NIM fitness/nutrition AI coach
 // tier: 'max' → tenta 550B prima; default → chain veloce
@@ -127,8 +128,9 @@ async function callProvider(apiKey, model, baseUrl, messages, maxTokens = 1024) 
 }
 
 export default async function handler(req, res) {
+  if (!guardApi(req, res)) return;
   if (req.method === 'GET') {
-    return res.status(200).json({ ok: true, endpoint: '/api/nvidia/coach', tiers: ['fast', 'max'], web: !!process.env.TAVILY_API_KEY });
+    return res.status(200).json({ ok: true, endpoint: '/api/nvidia/coach' });
   }
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 

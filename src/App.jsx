@@ -484,7 +484,8 @@ useEffect(() => { localStorage.setItem('shadow_monarch_macros', JSON.stringify(m
     const claim = () => {
       if (polling) return;
       polling = true;
-      fetch(`/api/telegram/claim-import?chat_id=${chatId}`)
+      // POST: il claim svuota la coda (DEL), non deve essere un GET innescabile da prefetch
+      fetch(`/api/telegram/claim-import?chat_id=${chatId}`, { method: 'POST' })
         .then((r) => r.json())
         .then(({ items, data }) => {
           const list = Array.isArray(items) && items.length ? items : (data ? [data] : []);

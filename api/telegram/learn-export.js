@@ -4,6 +4,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { GATES, GATE_IDS, normalize, levelOf } from '../../lib/learn.js';
 import { kvGet, KvError } from '../../lib/kv.js';
+import { safeEqual } from '../../lib/secrets.js';
 
 export default async function handler(req, res) {
   try {
@@ -20,7 +21,7 @@ async function dispatch(req, res) {
   const secret = process.env.HIVE_SECRET;
   if (!secret) return res.status(403).json({ error: 'HIVE_SECRET non impostato su Vercel' });
   const provided = req.query?.secret || (req.headers?.authorization || '').replace('Bearer ', '');
-  if (provided !== secret) return res.status(401).json({ error: 'unauthorized' });
+  if (!safeEqual(String(provided || ''), secret)) return res.status(401).json({ error: 'unauthorized' });
 
   // SHADOW_BOT_CHAT_ID può contenere più ID (allow-list multi-utente, separati
   // da virgola): senza ?chat_id esplicito, l'alveare Obsidian sincronizza solo

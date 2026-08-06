@@ -7,6 +7,7 @@
 
 import { nextQuestion, initLearn, normalize, loadGen } from '../../lib/learn.js';
 import { kvGet, kvSet, KvError } from '../../lib/kv.js';
+import { safeEqual } from '../../lib/secrets.js';
 
 async function sendMessage(token, chatId, text, replyMarkup) {
   const body = { chat_id: chatId, text, parse_mode: 'HTML' };
@@ -30,9 +31,11 @@ export default async function handler(req, res) {
 }
 
 async function dispatch(req, res) {
+  // Fail-closed: senza CRON_SECRET l'endpoint rifiuta tutto (prima era aperto).
   const secret = process.env.CRON_SECRET;
+  if (!secret) return res.status(500).json({ error: 'CRON_SECRET non impostato su Vercel' });
   const provided = req.query?.secret || (req.headers?.authorization || '').replace('Bearer ', '');
-  if (secret && provided !== secret) return res.status(401).json({ error: 'unauthorized' });
+  if (!safeEqual(String(provided || ''), secret)) return res.status(401).json({ error: 'unauthorized' });
 
   const token = process.env.SHADOW_BOT_TOKEN;
   // Cron personale: solo il primo ID della allow-list (il proprietario).

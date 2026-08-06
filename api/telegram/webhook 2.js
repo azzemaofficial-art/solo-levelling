@@ -3,12 +3,56 @@
 
 import { GATES, GATE_IDS, nextQuestion, gradeAnswer, startBoss, bossQuestion, gradeBoss, progressLine, progressCard, initLearn, normalize as normLearn, gateButtons, levelOf, loadGen, baseCount, existingStems, safeHtml, studyLabel, difficultyForLevel } from '../../lib/learn.js';
 import { NUTRITION_PRINCIPLES, knowledgePromptFor } from '../../lib/knowledgeBase.js';
-import { kvGet, kvSet, kvPush, KvError } from '../../lib/kv.js';
-import { safeEqual } from '../../lib/secrets.js';
 
 const NVIDIA_BASE = 'https://integrate.api.nvidia.com/v1';
 const GROQ_BASE   = 'https://api.groq.com/openai/v1';
 const SITE_URL = 'https://solo-levelling-steel.vercel.app';
+
+// Upstash Redis REST — salva il payload lato server (TTL default 24h)
+async function kvSet(key, value, ttl = 86400) {
+  const url = process.env.KV_REST_API_URL;
+  const token = process.env.KV_REST_API_TOKEN;
+  if (!url || !token) return;
+  try {
+    await fetch(`${url}/pipeline`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify([['SET', key, JSON.stringify(value), 'EX', String(ttl)]]),
+    });
+  } catch (_) {}
+}
+
+async function kvGet(key) {
+  const url = process.env.KV_REST_API_URL;
+  const token = process.env.KV_REST_API_TOKEN;
+  if (!url || !token) return null;
+  try {
+    const r = await fetch(`${url}/get/${encodeURIComponent(key)}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const d = await r.json();
+    if (d?.result == null) return null;
+    try { return JSON.parse(d.result); } catch { return d.result; }
+  } catch { return null; }
+}
+
+// Accoda un import in una LIST Redis (RPUSH) + TTL: più messaggi non si sovrascrivono
+async function kvPush(key, value, ttl = 86400) {
+  const url = process.env.KV_REST_API_URL;
+  const token = process.env.KV_REST_API_TOKEN;
+  if (!url || !token) return;
+  try {
+    await fetch(`${url}/pipeline`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify([
+        ['RPUSH', key, JSON.stringify(value)],
+        ['LTRIM', key, '-50', '-1'],
+        ['EXPIRE', key, String(ttl)],
+      ]),
+    });
+  } catch (_) {}
+}
 
 // Totale nutrizionale del giorno (per il comando /oggi)
 const todayKey = (chatId) => `tg_day:${chatId}:${new Date().toISOString().slice(0, 10)}`;
@@ -779,10 +823,9 @@ async function sendBossQuestion(token, id, st) {
   await sendTelegramMessage(token, id, q.text, q.keyboard);
 }
 
-async function dispatch(req, res) {
+export default async function handler(req, res) {
   const botToken = process.env.SHADOW_BOT_TOKEN;
   const chatId = process.env.SHADOW_BOT_CHAT_ID;
-  const webhookSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
   // Allow-list multi-utente: SHADOW_BOT_CHAT_ID può contenere più ID separati da
   // virgola/spazio (es. "123, 456"). Ogni utente ha i propri pasti/XP (chiavi
   // per-chatId), quindi i dati restano separati per persona. Lista vuota = aperto a tutti.
@@ -792,18 +835,8 @@ async function dispatch(req, res) {
   if (!botToken) return res.status(500).json({ error: 'SHADOW_BOT_TOKEN mancante' });
 
   if (req.method === 'GET' && req.query?.setup === '1') {
-    // Se è configurato un secret, il setup stesso richiede la stessa chiave:
-    // GET /api/telegram/webhook?setup=1&key=<TELEGRAM_WEBHOOK_SECRET>
-    if (webhookSecret && !safeEqual(String(req.query?.key || ''), webhookSecret)) {
-      return res.status(401).json({ ok: false, error: 'setup non autorizzato: aggiungi ?key=<TELEGRAM_WEBHOOK_SECRET>' });
-    }
     const webhookUrl = `${SITE_URL}/api/telegram/webhook`;
-    // secret_token (opzionale ma raccomandato): Telegram lo rimanda in
-    // X-Telegram-Bot-Api-Secret-Token a ogni update → possiamo verificare
-    // che la richiesta arrivi davvero da Telegram e non da chiunque altro.
-    let setupUrl = `https://api.telegram.org/bot${botToken}/setWebhook?url=${encodeURIComponent(webhookUrl)}`;
-    if (webhookSecret) setupUrl += `&secret_token=${encodeURIComponent(webhookSecret)}`;
-    const r = await fetch(setupUrl);
+    const r = await fetch(`https://api.telegram.org/bot${botToken}/setWebhook?url=${encodeURIComponent(webhookUrl)}`);
     const d = await r.json();
     // Registra il MENU comandi del bot (la lista che appare toccando "/")
     const commands = [
@@ -828,14 +861,6 @@ async function dispatch(req, res) {
   }
 
   if (req.method !== 'POST') return res.status(200).json({ ok: true });
-
-  // Verifica provenienza: se il webhook è stato registrato con secret_token,
-  // ogni update autentico porta l'header X-Telegram-Bot-Api-Secret-Token.
-  // Senza TELEGRAM_WEBHOOK_SECRET configurato il controllo è skipped
-  // (retrocompatibilità: si attiva impostando l'env e rilanciando ?setup=1).
-  if (webhookSecret && !safeEqual(String(req.headers?.['x-telegram-bot-api-secret-token'] || ''), webhookSecret)) {
-    return res.status(401).json({ ok: false, error: 'secret token mancante o errato' });
-  }
 
   const update = req.body;
 
@@ -1260,24 +1285,4 @@ Se l'utente descrive SINTOMI o SENSAZIONI (stanchezza, sonno scarso, poca energi
   ], isSimpleQuery(text));
   await sendTelegramMessage(botToken, incomingChatId, safeHtml(coachReply || parsed?.text || raw));
   return res.status(200).json({ ok: true });
-}
-
-// Se il KV è irraggiungibile (429/timeout) è MEGLIO fermarsi che proseguire con
-// uno stato fresco: i flussi read→write azzererebbero XP/streak/pasti reali.
-export default async function handler(req, res) {
-  try {
-    return await dispatch(req, res);
-  } catch (err) {
-    if (err?.name === 'KvError') {
-      const chatId = req.body?.callback_query?.message?.chat?.id || req.body?.message?.chat?.id;
-      if (chatId && process.env.SHADOW_BOT_TOKEN) {
-        try {
-          await sendTelegramMessage(process.env.SHADOW_BOT_TOKEN, chatId,
-            '⚠️ Memoria temporaneamente offline: per non rischiare di perdere il progresso non ho salvato nulla. Riprova tra qualche secondo.');
-        } catch (_) {}
-      }
-      return res.status(503).json({ ok: false, error: 'kv offline', detail: err.message });
-    }
-    throw err;
-  }
 }

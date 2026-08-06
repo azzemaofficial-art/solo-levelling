@@ -5,6 +5,8 @@
 //  Ids non prefissati/sconosciuti → ignorati, si passa alla catena di fallback.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { guardApi } from '../../lib/apiGuard.js';
+
 // I modelli NIM (es. Nemotron 550B) possono superare i 15s di default: senza questo
 // Vercel uccide la funzione a metà risposta e il client vede "Ricetta fallita".
 export const config = { maxDuration: 60 };
@@ -120,20 +122,10 @@ async function callProvider(prov, body) {
 }
 
 export default async function handler(req, res) {
+  if (!guardApi(req, res)) return;
   if (req.method === 'GET') {
-    return res.status(200).json({
-      ok: true,
-      endpoint: '/api/ai/chat',
-      providers: {
-        groq: Boolean(GROQ_KEY()),
-        nvidia: Boolean(NVIDIA_KEY_DEFAULT()),
-        anthropic: Boolean(ANTHROPIC_KEY()),
-        agnes: Boolean(AGNES_KEY()),
-      },
-      nvidiaKeySource: ['NVIDIA_550B_API_KEY', 'DEEPSEEK_PRO_API_KEY', 'KIMI_NVIDIA_API_KEY', 'LLAMA_NVIDIA_API_KEY', 'MISTRAL_NVIDIA_API_KEY', 'NVIDIA_API_KEY']
-        .filter((n) => process.env[n]),
-      fallback: FALLBACK,
-    });
+    // Niente più elenco provider/nomi delle chiavi env attive: era ricognizione gratuita.
+    return res.status(200).json({ ok: true, endpoint: '/api/ai/chat' });
   }
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST, GET');

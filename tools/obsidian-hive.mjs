@@ -133,8 +133,10 @@ ${profileLine(P) || '- *(nessuna misurazione — scrivi al bot es. "peso 78kg")*
     (profileLine(P) ? ` Profilo: ${profileLine(P).replace(/\n?- /g, ' ').trim()}.` : '');
   let memory = '';
   try {
+    // Da Node non c'è header Origin: il guard del proxy AI ci accetta via
+    // x-solo-client (HIVE_SECRET è già una credenziale valida per il guard).
     const ai = await fetch(`${BASE}/api/ai/chat`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'x-solo-client': SECRET },
       body: JSON.stringify({ messages: [
         { role: 'system', content: 'Sei la memoria di un coach personale (apprendimento + allenamento + NUTRIZIONE). Dai dati, scrivi un breve profilo in italiano (~140 parole) su questa persona: cosa sta imparando, punti di forza, dove è debole, com\'è la sua dieta (calorie/proteine vs fisico e obiettivo) e 2-3 consigli mirati anche alimentari. Tono diretto e personale ("tu"). Solo testo semplice, niente markdown.' },
         { role: 'user', content: ctx },

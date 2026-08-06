@@ -10,6 +10,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { GATES, initLearn, normalize, levelOf } from '../../lib/learn.js';
 import { kvGet, kvSet, KvError } from '../../lib/kv.js';
+import { safeEqual } from '../../lib/secrets.js';
 
 const TTL = 2592000; // 30 giorni, come il resto del flusso learn
 
@@ -17,7 +18,7 @@ export default async function handler(req, res) {
   const secret = process.env.HIVE_SECRET;
   if (!secret) return res.status(403).json({ error: 'HIVE_SECRET non impostato su Vercel' });
   const provided = req.query?.secret || (req.headers?.authorization || '').replace('Bearer ', '');
-  if (provided !== secret) return res.status(401).json({ error: 'unauthorized' });
+  if (!safeEqual(String(provided || ''), secret)) return res.status(401).json({ error: 'unauthorized' });
 
   const body = (req.method === 'POST' && req.body && typeof req.body === 'object') ? req.body : req.query;
   const chatId = String(body.chatId || '').split(/[\s,]+/)[0]

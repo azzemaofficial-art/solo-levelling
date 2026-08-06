@@ -1,4 +1,5 @@
 export const config = { maxDuration: 60 }; // pipeline 2 coach vision + cervello supera i 15s default
+import { guardApi } from '../../lib/apiGuard.js';
 
 // NVIDIA NIM visual live coach — Llama Vision 90B primary, Groq fallback
 // Discipline: muaythai, boxing, kickboxing, bjj, wrestling, karate, mma, kravmaga, general, fitness
@@ -2059,13 +2060,10 @@ async function kvSetRaw(key, value, ttl = 7776000) {
 const num = (v) => (v == null || v === '' || Number.isNaN(Number(v)) ? null : Math.round(Number(v)));
 
 export default async function handler(req, res) {
+  // Pipeline costosa (2 vision + brain): rate-limit più stretto del default.
+  if (!guardApi(req, res, { maxPerMinute: 12 })) return;
   if (req.method === 'GET') {
-    return res.status(200).json({
-      ok: true,
-      endpoint: '/api/nvidia/visual',
-      disciplines: Object.keys(SYSTEM_PROMPTS),
-      primaryModel: 'Groq llama-4-scout + Cosmos Reason1 (parallel) → NVIDIA fallback',
-    });
+    return res.status(200).json({ ok: true, endpoint: '/api/nvidia/visual', disciplines: Object.keys(SYSTEM_PROMPTS) });
   }
 
   if (req.method !== 'POST') {

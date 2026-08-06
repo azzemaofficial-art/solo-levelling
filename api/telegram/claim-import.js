@@ -1,10 +1,20 @@
 // Recupera e consuma TUTTI i pending import da Upstash Redis
-// GET /api/telegram/claim-import?chat_id=264863579
+// POST /api/telegram/claim-import?chat_id=264863579
 // Ritorna { items: [...] } (coda completa) + { data } (ultimo, retrocompat)
+//
+// Era un GET: pericoloso perché fa LRANGE+DEL e un <img>/prefetch poteva
+// svuotare la coda di un utente a sua insaputa. Ora è POST + guard.
+import { guardApi } from '../../lib/apiGuard.js';
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+  if (req.method === 'OPTIONS') {
+    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-solo-client');
+    return res.status(204).end();
+  }
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  if (!guardApi(req, res)) return;
 
   // Il sito passa sempre ?chat_id esplicito; il fallback usa solo il primo ID
   // della allow-list SHADOW_BOT_CHAT_ID (non la stringa multi-utente intera).

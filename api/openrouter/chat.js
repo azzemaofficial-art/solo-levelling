@@ -1,5 +1,6 @@
 // Proxy universale AI — gestisce groq: / nvidia: / modelli OpenRouter.
 // VITE_SYSTEM_AI_PROXY punta qui; il prefisso nel model ID determina il provider.
+import { guardApi } from '../../lib/apiGuard.js';
 
 const GROQ_BASE    = 'https://api.groq.com/openai/v1';
 const NVIDIA_BASE  = 'https://integrate.api.nvidia.com/v1';
@@ -82,17 +83,9 @@ async function callProvider(prov, body, isOpenRouter) {
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 export default async function handler(req, res) {
+  if (!guardApi(req, res)) return;
   if (req.method === 'GET') {
-    return res.status(200).json({
-      ok: true,
-      endpoint: '/api/openrouter/chat',
-      providers: {
-        groq: Boolean(firstKey('GROQ_API_KEY')),
-        nvidia: Boolean(NVIDIA_KEY_DEFAULT()),
-        openrouter: Boolean(firstKey('OPENROUTER_API_KEY')),
-      },
-      fallback: GROQ_FALLBACK,
-    });
+    return res.status(200).json({ ok: true, endpoint: '/api/openrouter/chat' });
   }
 
   if (req.method !== 'POST') {

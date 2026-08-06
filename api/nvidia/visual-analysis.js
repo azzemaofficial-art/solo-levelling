@@ -1,4 +1,5 @@
 export const config = { maxDuration: 60 }; // analisi lunga su modelli NIM
+import { guardApi } from '../../lib/apiGuard.js';
 
 // Visual Coach Session Analyzer
 // Riceve tutti i feedback AI raccolti durante la sessione e produce un'analisi completa:
@@ -67,6 +68,7 @@ async function callAI(apiKey, model, base, messages) {
 }
 
 export default async function handler(req, res) {
+  if (!guardApi(req, res)) return;
   if (req.method === 'GET') {
     return res.status(200).json({ ok: true, endpoint: '/api/nvidia/visual-analysis' });
   }
