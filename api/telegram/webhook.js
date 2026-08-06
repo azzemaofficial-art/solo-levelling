@@ -10,8 +10,13 @@ const NVIDIA_BASE = 'https://integrate.api.nvidia.com/v1';
 const GROQ_BASE   = 'https://api.groq.com/openai/v1';
 const SITE_URL = 'https://solo-levelling-steel.vercel.app';
 
+// Giorno "oggi" in fuso Europe/Rome: con toISOString() (UTC) il contatore
+// giornaliero scattava alle 01:00/02:00 ora italiana, sfalsando i totali.
+const romeDayFmt = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Rome', year: 'numeric', month: '2-digit', day: '2-digit' });
+const romeDayStr = () => romeDayFmt.format(new Date());
+
 // Totale nutrizionale del giorno (per il comando /oggi)
-const todayKey = (chatId) => `tg_day:${chatId}:${new Date().toISOString().slice(0, 10)}`;
+const todayKey = (chatId) => `tg_day:${chatId}:${romeDayStr()}`;
 
 async function addDaily(chatId, m) {
   const k = todayKey(chatId);
@@ -556,7 +561,7 @@ async function processLabelMeal(botToken, chatId, label, gramsArg, slotArg) {
 
   await kvPush(`tg_queue:${chatId}`, { type: 'meal', ts: Date.now(), kcal: m.kcal, protein: m.protein, carbs: m.carbs, fat: m.fat, name, slot });
   const day = await addDaily(chatId, m);
-  await logMeal(chatId, { ts: Date.now(), date: new Date().toISOString().slice(0, 10), slot, name, kcal: m.kcal, protein: m.protein, carbs: m.carbs, fat: m.fat });
+  await logMeal(chatId, { ts: Date.now(), date: romeDayStr(), slot, name, kcal: m.kcal, protein: m.protein, carbs: m.carbs, fat: m.fat });
 
   const baseLbl = label.basis === 'porzione' && label.portion_g ? `porzione ${label.portion_g}g` : label.basis;
   let reply = `🏷️ <b>${name}</b> — etichetta letta\n`;
@@ -637,7 +642,7 @@ async function processMeal(botToken, chatId, parsed) {
   });
   const day = await addDaily(chatId, m);
   await logMeal(chatId, {
-    ts: Date.now(), date: new Date().toISOString().slice(0, 10),
+    ts: Date.now(), date: romeDayStr(),
     slot, name, kcal: m.kcal, protein: m.protein, carbs: m.carbs, fat: m.fat,
   });
 
@@ -916,8 +921,6 @@ async function dispatch(req, res) {
       if (!g.ok) { await answerCbq(botToken, cbq.id, 'Già risposta'); return res.status(200).json({ ok: true }); }
       await kvSet(LEARN_KEY(cChat), g.state, 2592000);
       await kvPush(`tg_queue:${cChat}`, { type: 'learn_xp', amount: g.xpGained, gate, ts: Date.now() }); // sync XP all'app
-      // cambio livello → genera subito domande al nuovo livello (fire & forget)
-      if (g.levelDelta !== 0) generateQuestions(gate, 8, g.level).catch(() => {});
       await answerCbq(botToken, cbq.id, g.correct ? `✅ +${g.xpGained} XP` : '❌');
       const head = g.correct ? `✅ <b>Giusto!</b> +${g.xpGained} XP${g.review ? ' (ripasso)' : ''}` : `❌ <b>Sbagliato.</b> +${g.xpGained} XP`;
       // feedback livello di studio adattivo
@@ -930,6 +933,17 @@ async function dispatch(req, res) {
           [{ text: '📖 Spiega meglio', callback_data: `lx|${gate}|${qidS}` }],
           [{ text: '▶️ Prossima domanda', callback_data: 'lnext' }],
         ] });
+      // Cambio livello → genera domande al nuovo livello PRIMA di chiudere la
+      // risposta: su Vercel la funzione può congelarsi appena `res` è inviata,
+      // quindi un fire-and-forget qui morirebbe in silenzio. Il feedback è già
+      // stato consegnato, quindi attendere non peggiora la UX. Cap di 25s
+      // (budget maxDuration 60); se sfora, sendQuiz rimpolpa on-demand.
+      if (g.levelDelta !== 0) {
+        await Promise.race([
+          generateQuestions(gate, 8, g.level),
+          new Promise((r) => setTimeout(r, 25000)),
+        ]).catch(() => {});
+      }
       return res.status(200).json({ ok: true });
     }
     await answerCbq(botToken, cbq.id);
