@@ -814,7 +814,7 @@ async function dispatch(req, res) {
     const commands = [
       { command: 'scienza', description: '🔬 Quiz Scienza & Biohacking (dai paper veri)' },
       { command: 'quiz', description: '🧠 Quiz del Gate attivo (+XP, livelli, streak)' },
-      { command: 'gate', description: '🚪 Cambia materia (IA · Inglese · Cultura · Scienza)' },
+      { command: 'gate', description: '🚪 Cambia materia (IA · Inglese · Français · Cultura · Scienza)' },
       { command: 'boss', description: '🐉 Boss Quiz: 6 domande, bonus XP' },
       { command: 'lezione', description: '📖 Micro-lezione di teoria sul Gate attivo' },
       { command: 'progressi', description: '📈 Livello, streak, ripassi e avanzamento' },
