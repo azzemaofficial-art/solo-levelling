@@ -5,6 +5,7 @@ import { GATES, GATE_IDS, nextQuestion, gradeAnswer, startBoss, bossQuestion, gr
 import { NUTRITION_PRINCIPLES, knowledgePromptFor } from '../../lib/knowledgeBase.js';
 import { kvGet, kvSet, kvPush, KvError } from '../../lib/kv.js';
 import { safeEqual } from '../../lib/secrets.js';
+import { FR_ALL_UNITS, frUnitByIndex } from '../../lib/frenchCurriculum.js';
 
 const NVIDIA_BASE = 'https://integrate.api.nvidia.com/v1';
 const GROQ_BASE   = 'https://api.groq.com/openai/v1';
@@ -701,6 +702,62 @@ async function answerCbq(token, cbqId, text = '') {
 const LEARN_KEY = (id) => `tg_learn:${id}`;
 const GENQ_KEY = (gate) => `tg_genq:${gate}`;
 
+// ── Lezioni di Francese (curriculum condiviso con l'app web, lib/frenchCurriculum.js) ──
+// Progresso per utente: quale unità è la prossima. Contenuto generato UNA VOLTA per
+// unità (cache condivisa tra tutti gli utenti, come sull'app web) e mai rigenerato.
+const FR_PROGRESS_KEY = (id) => `tg_fr_progress:${id}`;
+const FR_LESSON_KEY = (unitId) => `fr_lesson:${unitId}`;
+const FR_LESSON_TTL = 31536000; // 1 anno: il contenuto di una lezione non cambia
+
+async function generateFrLesson(unit) {
+  const out = await callAI([
+    { role: 'system', content: 'Sei un insegnante di francese che scrive micro-lezioni chiare per italiani. Rispondi SOLO con JSON valido, questo schema esatto: {"explanation":"spiegazione in italiano ~100 parole del punto grammaticale/lessicale","examples":["frase in francese — traduzione italiana", "..."] (3 esempi),"vocab":[{"fr":"parola/espressione francese","it":"traduzione italiana"}] (5 voci),"exercise":{"q":"una frase da completare o tradurre, in italiano","hint":"suggerimento breve"}}. Niente markdown, niente testo fuori dal JSON, niente ragionamento visibile.' },
+    { role: 'user', content: `Livello ${unit.level}. Unità: "${unit.title}". Argomento: ${unit.topic}.` },
+  ], true);
+  const parsed = parseAIResponse(out);
+  if (!parsed?.explanation) return null;
+  return {
+    explanation: String(parsed.explanation || '').slice(0, 800),
+    examples: Array.isArray(parsed.examples) ? parsed.examples.slice(0, 4).map((e) => String(e).slice(0, 200)) : [],
+    vocab: Array.isArray(parsed.vocab) ? parsed.vocab.slice(0, 6).map((v) => ({ fr: String(v?.fr || '').slice(0, 60), it: String(v?.it || '').slice(0, 60) })) : [],
+    exercise: parsed.exercise ? { q: String(parsed.exercise.q || '').slice(0, 300), hint: String(parsed.exercise.hint || '').slice(0, 200) } : null,
+  };
+}
+
+function formatFrLesson(unit, lesson, idx) {
+  let msg = `${unit.emoji} <b>${unit.level} · ${unit.title}</b>\n<i>Lezione ${idx + 1}/${FR_ALL_UNITS.length}</i>\n\n`;
+  msg += `${safeHtml(lesson.explanation)}\n`;
+  if (lesson.examples.length) {
+    msg += `\n📝 <b>Esempi</b>\n` + lesson.examples.map((e) => `• ${safeHtml(e)}`).join('\n') + '\n';
+  }
+  if (lesson.vocab.length) {
+    msg += `\n📚 <b>Vocabolario</b>\n` + lesson.vocab.map((v) => `• <b>${safeHtml(v.fr)}</b> — ${safeHtml(v.it)}`).join('\n') + '\n';
+  }
+  if (lesson.exercise?.q) {
+    msg += `\n✏️ <b>Prova tu</b>\n${safeHtml(lesson.exercise.q)}`;
+    if (lesson.exercise.hint) msg += `\n<i>💡 ${safeHtml(lesson.exercise.hint)}</i>`;
+  }
+  return msg;
+}
+
+async function sendFrLesson(botToken, chatId, idx) {
+  const unit = frUnitByIndex(idx);
+  let lesson = await kvGet(FR_LESSON_KEY(unit.id));
+  if (!lesson) {
+    lesson = await generateFrLesson(unit);
+    if (lesson) await kvSet(FR_LESSON_KEY(unit.id), lesson, FR_LESSON_TTL);
+  }
+  if (!lesson) {
+    await sendTelegramMessage(botToken, chatId, '⚠️ Lezione non disponibile al momento, riprova tra poco con /francese.');
+    return;
+  }
+  const isLast = idx >= FR_ALL_UNITS.length - 1;
+  const keyboard = { inline_keyboard: [[
+    { text: isLast ? '🏆 Ultima lezione — completa (+20 XP)' : '✅ Fatto, prossima lezione (+20 XP)', callback_data: `fr|done|${idx}` },
+  ]] };
+  await sendTelegramMessage(botToken, chatId, formatFrLesson(unit, lesson, idx), keyboard);
+}
+
 // Carica nel motore le domande generate dall'AI per un gate (pool infinito)
 async function hydrateGen(gate) {
   if (!GATES[gate]) return [];
@@ -817,6 +874,7 @@ async function dispatch(req, res) {
       { command: 'gate', description: '🚪 Cambia materia (IA · Inglese · Français · Cultura · Scienza)' },
       { command: 'boss', description: '🐉 Boss Quiz: 6 domande, bonus XP' },
       { command: 'lezione', description: '📖 Micro-lezione di teoria sul Gate attivo' },
+      { command: 'francese', description: '🇫🇷 Lezione di francese, in ordine (A1→B2)' },
       { command: 'progressi', description: '📈 Livello, streak, ripassi e avanzamento' },
       { command: 'oggi', description: '📅 Totale calorie e macro di oggi' },
       { command: 'integratori', description: '💊 Lista integratori consigliati' },
@@ -946,6 +1004,21 @@ async function dispatch(req, res) {
       }
       return res.status(200).json({ ok: true });
     }
+    // ── Lezione di Francese completata → +XP, avanza all'unità successiva ──
+    if (data.startsWith('fr|done|')) {
+      const idx = parseInt(data.split('|')[2], 10) || 0;
+      await answerCbq(botToken, cbq.id, '✅ +20 XP');
+      await kvPush(`tg_queue:${cChat}`, { type: 'learn_xp', amount: 20, gate: 'french', ts: Date.now() });
+      const nextIdx = Math.min(idx + 1, FR_ALL_UNITS.length - 1);
+      const isLast = idx >= FR_ALL_UNITS.length - 1;
+      await kvSet(FR_PROGRESS_KEY(cChat), { idx: nextIdx }, 31536000);
+      if (isLast) {
+        await sendTelegramMessage(botToken, cChat, '🏆 <b>Complimenti!</b> Hai completato tutte le lezioni di francese (A1→B2). Scrivi /francese per ripassare dall\'inizio quando vuoi.');
+        return res.status(200).json({ ok: true });
+      }
+      await sendFrLesson(botToken, cChat, nextIdx);
+      return res.status(200).json({ ok: true });
+    }
     await answerCbq(botToken, cbq.id);
     return res.status(200).json({ ok: true });
   }
@@ -1045,9 +1118,10 @@ Consiglia SOLO integratori presenti nei PRINCIPI scientifici. Ricorda: gli integ
       '💊 /integratori — lista integratori consigliati\n' +
       '🧠 /quiz — Gate della Conoscenza: impara a pillole (+XP, livelli, streak)\n' +
       '🔬 /scienza — quiz Scienza & Biohacking (dai paper veri)\n' +
-      '🚪 /gate — cambia materia (Programmazione+IA · Inglese · Cultura · 🔬 Scienza)\n' +
+      '🚪 /gate — cambia materia (Programmazione+IA · Inglese · Français · Cultura · 🔬 Scienza)\n' +
       '🐉 /boss — Boss Quiz: 6 domande, bonus XP\n' +
       '📖 /lezione — micro-lezione di teoria sul Gate attivo\n' +
+      '🇫🇷 /francese — lezione di francese in ordine, dalla A1 alla B2\n' +
       '📈 /progressi — livello, streak, ripassi e avanzamento\n\n' +
       'I macro sono calcolati su database nutrizionale reale, non stimati a caso 📊'
     );
@@ -1091,6 +1165,13 @@ Consiglia SOLO integratori presenti nei PRINCIPI scientifici. Ricorda: gli integ
     await sendTelegramMessage(botToken, incomingChatId,
       lesson ? `📖 <b>${G.name} — micro-lezione</b>\n\n${lesson}` : '⚠️ Lezione non disponibile, riprova tra poco.',
       { inline_keyboard: [[{ text: '🧠 Quiz su questo', callback_data: 'lnext' }]] });
+    return res.status(200).json({ ok: true });
+  }
+  if (text === '/francese' || text === '/french') {
+    const prog = (await kvGet(FR_PROGRESS_KEY(incomingChatId))) || { idx: 0 };
+    const idx = Math.max(0, Math.min(FR_ALL_UNITS.length - 1, prog.idx || 0));
+    await sendTelegramMessage(botToken, incomingChatId, '🇫🇷 Preparo la tua lezione di francese…');
+    await sendFrLesson(botToken, incomingChatId, idx);
     return res.status(200).json({ ok: true });
   }
   if (text === '/progressi') {
