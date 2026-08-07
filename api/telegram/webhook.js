@@ -752,9 +752,10 @@ async function sendFrLesson(botToken, chatId, idx) {
     return;
   }
   const isLast = idx >= FR_ALL_UNITS.length - 1;
-  const keyboard = { inline_keyboard: [[
-    { text: isLast ? '🏆 Ultima lezione — completa (+20 XP)' : '✅ Fatto, prossima lezione (+20 XP)', callback_data: `fr|done|${idx}` },
-  ]] };
+  const keyboard = { inline_keyboard: [
+    [{ text: isLast ? '🏆 Ultima lezione — completa (+20 XP)' : '✅ Fatto, prossima lezione (+20 XP)', callback_data: `fr|done|${idx}` }],
+    [{ text: '🧠 Fai un quiz di Francese', callback_data: 'lg|french' }],
+  ] };
   await sendTelegramMessage(botToken, chatId, formatFrLesson(unit, lesson, idx), keyboard);
 }
 
@@ -875,6 +876,7 @@ async function dispatch(req, res) {
       { command: 'boss', description: '🐉 Boss Quiz: 6 domande, bonus XP' },
       { command: 'lezione', description: '📖 Micro-lezione di teoria sul Gate attivo' },
       { command: 'francese', description: '🇫🇷 Lezione di francese, in ordine (A1→B2)' },
+      { command: 'quizfrancese', description: '🧠 Quiz veloce di francese (+XP, senza cambiare Gate)' },
       { command: 'progressi', description: '📈 Livello, streak, ripassi e avanzamento' },
       { command: 'oggi', description: '📅 Totale calorie e macro di oggi' },
       { command: 'integratori', description: '💊 Lista integratori consigliati' },
@@ -1122,6 +1124,7 @@ Consiglia SOLO integratori presenti nei PRINCIPI scientifici. Ricorda: gli integ
       '🐉 /boss — Boss Quiz: 6 domande, bonus XP\n' +
       '📖 /lezione — micro-lezione di teoria sul Gate attivo\n' +
       '🇫🇷 /francese — lezione di francese in ordine, dalla A1 alla B2\n' +
+      '🧠 /quizfrancese — quiz veloce di francese (senza passare da /gate)\n' +
       '📈 /progressi — livello, streak, ripassi e avanzamento\n\n' +
       'I macro sono calcolati su database nutrizionale reale, non stimati a caso 📊'
     );
@@ -1138,6 +1141,13 @@ Consiglia SOLO integratori presenti nei PRINCIPI scientifici. Ricorda: gli integ
     return res.status(200).json({ ok: true });
   }
   // 🔬 scorciatoia: imposta il gate Scienza e manda subito un quiz
+  if (text === '/quizfrancese' || text === '/quizfr') {
+    const st = normLearn((await kvGet(LEARN_KEY(incomingChatId))) || initLearn());
+    st.activeGate = 'french'; st.pending = null;
+    await kvSet(LEARN_KEY(incomingChatId), st, 2592000);
+    await sendQuiz(botToken, incomingChatId, 'french');
+    return res.status(200).json({ ok: true });
+  }
   if (text === '/scienza' || text === '/salute' || text === '/biohacking') {
     const st = normLearn((await kvGet(LEARN_KEY(incomingChatId))) || initLearn());
     st.activeGate = 'scienza'; st.pending = null;
