@@ -4563,6 +4563,22 @@ function VisualCoach() {
           </div>
         )}
 
+        {/* 🥋 La via della disciplina: filosofia, respiro ed etiqueta dell'arte scelta */}
+        {(() => {
+          const kd = getDiscipline(mode);
+          if (!kd) return null;
+          return (
+            <div className="p-3 rounded-xl" style={{ background: 'rgba(180,120,30,0.07)', border: `1px solid ${C.amber.border}` }}>
+              <p className="text-[10px] font-black tracking-widest mb-1.5" style={{ color: C.amber.hex, fontFamily: 'Orbitron, sans-serif' }}>
+                {kd.emoji} LA VIA — {kd.name.toUpperCase()}
+              </p>
+              <p className="text-[11px] leading-snug mb-1" style={{ color: '#d1d5db' }}>{kd.philosophy}</p>
+              <p className="text-[10px] leading-snug mb-1" style={{ color: '#9ca3af' }}>🫁 Respiro: {kd.breathing.principle}</p>
+              <p className="text-[10px] leading-snug" style={{ color: '#9ca3af' }}>🙏 {kd.etiquette[0]}</p>
+            </div>
+          );
+        })()}
+
         <div>
           <p className="text-[10px] text-gray-600 mb-1.5 font-mono tracking-widest">DESCRIVI LA SESSIONE <span className="text-gray-700">(OPZIONALE)</span></p>
           <textarea value={sessionContext} onChange={(e) => setSessionContext(e.target.value)} rows={2}

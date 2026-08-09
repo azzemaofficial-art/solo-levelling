@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  MARTIAL_DISCIPLINES, DISCIPLINE_IDS, getDiscipline, coachKnowledgePrompt, disciplineOptions,
+  MARTIAL_DISCIPLINES, DISCIPLINE_IDS, getDiscipline, coachKnowledgePrompt,
+  disciplineOptions, maestroContext, pickDrill,
 } from '../lib/martialKnowledge.js';
 
 test('tutte le discipline hanno la struttura completa', () => {
@@ -70,4 +71,24 @@ test('combo seed autentici e senza ripetizioni', () => {
     const uniq = new Set(d.combosSeed);
     assert.equal(uniq.size, d.combosSeed.length, `${d.id}: combo duplicate`);
   }
+});
+
+test('maestroContext compatto per il cervello live', () => {
+  for (const id of DISCIPLINE_IDS) {
+    const c = maestroContext(id);
+    assert.ok(c.startsWith('KNOWLEDGE'), `${id}: incipit`);
+    assert.ok(c.includes('Respiro →') && c.includes('Disciplina →'), `${id}: respiro+disciplina`);
+    assert.ok(c.length < 500, `${id}: deve restare compatto (${c.length})`);
+  }
+  assert.equal(maestroContext('inesistente'), '');
+});
+
+test('pickDrill ritorna drill reali della disciplina', () => {
+  const d = pickDrill('muaythai');
+  assert.ok(d && d.technique && d.drill && Array.isArray(d.cues), 'campi drill');
+  // seed deterministico: stesso seed → stesso drill
+  const a = pickDrill('bjj', 3);
+  const b = pickDrill('bjj', 3);
+  assert.equal(a.technique, b.technique);
+  assert.equal(pickDrill(null), null);
 });

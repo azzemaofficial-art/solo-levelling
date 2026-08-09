@@ -1,5 +1,6 @@
 export const config = { maxDuration: 60 }; // pipeline 2 coach vision + cervello supera i 15s default
 import { guardApi } from '../../lib/apiGuard.js';
+import { maestroContext } from '../../lib/martialKnowledge.js';
 
 // NVIDIA NIM visual live coach — Llama Vision 90B primary, Groq fallback
 // Discipline: muaythai, boxing, kickboxing, bjj, wrestling, karate, mma, kravmaga, general, fitness
@@ -1793,6 +1794,7 @@ REGOLE DI PRECISIONE (fondamentali):
 - Se gli osservatori si contraddicono, fidati della biomeccanica per equilibrio/baricentro e della tecnica per il gesto.
 - Quando l'errore ha origine biomeccanica ancestrale (es. anca che non ruota → catena cinetica spezzata), citalo brevemente nel PERCHÉ.
 - Resta specifico per la disciplina indicata e per quello che è davvero visibile nel frame.
+- Se il blocco KNOWLEDGE è presente e vedi apnea, tensione o perdita di compostezza, il COMANDO può essere un cue di respirazione o di disciplina marziale (sempre imperativo e specifico).
 
 FORMATO (esatto, max 4 righe, NO markdown, NO emoji):
 COMANDO: <la cosa #1 da CORREGGERE: verbo imperativo + parte del corpo specifica + angolo o riferimento misurabile se utile>
@@ -1840,6 +1842,7 @@ async function callBrainOrchestrator({ isSparring, disciplineLabel, techObs, bio
     biomechObs ? `\nOSSERVATORE BIOMECCANICO:\n${biomechObs}` : '',
     antiRepeatContext ? `\n${antiRepeatContext}` : '',
     errorsRubric(disciplineMode, disciplineLabel),
+    maestroContext(disciplineMode),
     strikeMasteryRubric(`${techObs || ''} ${biomechObs || ''}`, true),
     `\nFondi e restituisci il comando di coaching nel formato richiesto.`,
   ].filter(Boolean).join('\n');
