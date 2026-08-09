@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Eye, Lightbulb, Trophy, ScanSearch, Play, Pause, Target, FlipHorizontal2, Volume2, VolumeX, Bone, X, Move, ThumbsUp, ThumbsDown } from 'lucide-react';
+import { BREATHING_PROTOCOLS } from '../../lib/breathingProtocols.js';
+import { getDiscipline } from '../../lib/martialKnowledge.js';
 
 // ─── Quick prompts ─────────────────────────────────────────────────────────────
 const COACH_QUICK = [
@@ -2459,90 +2461,7 @@ const isSparring = (id) => id.startsWith('sparring_') || id === 'partner_drills'
 // ─── Protocolli di respirazione guidata ────────────────────────────────────────
 // Ogni protocollo = fasi temporizzate (label + secondi). sec:0 = fase assente
 // (es. niente ritenzione). `rounds` = quante volte ripetere il ciclo di fasi.
-const BREATHING_PROTOCOLS = [
-  {
-    id: 'box',
-    name: 'Box Breathing',
-    subtitle: 'Calma e controllo sotto pressione (Navy SEAL)',
-    phases: [
-      { label: 'Inspira', sec: 4 },
-      { label: 'Trattieni', sec: 4 },
-      { label: 'Espira', sec: 4 },
-      { label: 'Trattieni', sec: 4 },
-    ],
-    rounds: 6,
-    when: 'Prima di uno sparring, in un momento di stress, per abbassare il battito rapidamente',
-    cue: 'Respira come se stessi disegnando i quattro lati di un quadrato',
-  },
-  {
-    id: '478',
-    name: '4-7-8',
-    subtitle: 'Calma profonda, pre-sonno, pre-gara',
-    phases: [
-      { label: 'Inspira', sec: 4 },
-      { label: 'Trattieni', sec: 7 },
-      { label: 'Espira', sec: 8 },
-      { label: 'Pausa', sec: 0 },
-    ],
-    rounds: 4,
-    when: 'Prima di dormire, prima di una gara/verifica, o quando la mente corre e serve staccare',
-    cue: 'Espira dalla bocca con un leggero soffio, come se spegnessi una candela lontana',
-  },
-  {
-    id: 'wimhof',
-    name: 'Wim Hof (semplificato)',
-    subtitle: 'Iperventilazione controllata + ritenzione',
-    phases: [
-      { label: 'Respira veloce', sec: 30 },
-      { label: 'Espira e trattieni', sec: 15 },
-      { label: 'Inspira e trattieni 10s', sec: 10 },
-      { label: 'Recupero', sec: 5 },
-    ],
-    rounds: 3,
-    when: 'Al mattino a stomaco vuoto, per energia e resistenza al freddo/stress — mai in acqua o alla guida',
-    cue: '30 respiri profondi e veloci (pieno-vuoto), poi svuota i polmoni e resta in apnea finché senti il bisogno di respirare',
-  },
-  {
-    id: 'nadishodhana',
-    name: 'Nadi Shodhana',
-    subtitle: 'Respirazione alternata, equilibrio yoga',
-    phases: [
-      { label: 'Inspira narice sx', sec: 4 },
-      { label: 'Trattieni (chiudi entrambe)', sec: 4 },
-      { label: 'Espira narice dx', sec: 4 },
-      { label: 'Inspira narice dx', sec: 4 },
-    ],
-    rounds: 5,
-    when: 'A inizio o fine sessione yoga, per riequilibrare mente e sistema nervoso',
-    cue: 'Pollice destro chiude la narice destra, anulare la sinistra — alterna a ogni fase',
-  },
-  {
-    id: 'warrior',
-    name: 'Respiro del guerriero',
-    subtitle: 'Carica pre-combattimento (Muay Thai)',
-    phases: [
-      { label: 'Sbuffo corto', sec: 2 },
-      { label: 'Sbuffo corto', sec: 2 },
-      { label: 'Inspira e carica', sec: 3 },
-      { label: 'Espira esplosiva', sec: 1 },
-    ],
-    rounds: 8,
-    when: 'Nel corner prima della campana, o subito prima di un round di sparring, per attivare il sistema nervoso',
-    cue: 'Due sbuffi corti dal naso come un toro, poi carica e libera l\'aria con un colpo secco, come su un pao',
-  },
-  {
-    id: 'coherence',
-    name: 'Coerenza cardiaca 5-5',
-    subtitle: 'Uso quotidiano, recupero, baseline',
-    phases: [
-      { label: 'Inspira', sec: 5 },
-      { label: 'Espira', sec: 5 },
-    ],
-    rounds: 6,
-    when: 'Ogni giorno, 3 volte al giorno (mattina, pranzo, sera) — o nei minuti dopo l\'allenamento per il recupero',
-    cue: 'Nessuna ritenzione: un flusso continuo, come un\'onda che sale e scende senza pause',
-  },
-];
+// Fonte unica: lib/breathingProtocols.js (import in testa al file).
 
 // Classifica la fase per l'animazione dell'anello: espande su "inspira",
 // contrae su "espira", resta ferma per ritenzioni/pause/altro.
