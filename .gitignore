@@ -10,6 +10,7 @@ server/data/*.json
 .netlify
 .vercel
 .claude
+.qwen
 
 # Copie-duplicato create da iCloud durante l'editing (il vero file è senza suffisso)
 api/telegram/webhook 2.js

@@ -24,6 +24,7 @@ const Help = lazy(() => import('./pages/Help'));
 const Coach = lazy(() => import('./pages/Coach'));
 const News = lazy(() => import('./pages/News'));
 const French = lazy(() => import('./pages/French'));
+const Polish = lazy(() => import('./pages/Polish'));
 runStorageMigrations();
 const isWorkoutLog = (log) => Number(log?.workoutBurn ?? log?.burned ?? 0) >= 180 || Number(log?.strength || 0) > 0;
 const getIsoWeekKey = (value = new Date()) => {
@@ -1551,8 +1552,11 @@ useEffect(() => { localStorage.setItem('shadow_monarch_macros', JSON.stringify(m
               <button onClick={() => { handleTabChange('news'); setMenuOpen(false); }} className="text-[10px] px-2 py-3 border border-sky-300/40 text-sky-200 uppercase tracking-widest flex items-center gap-1.5">
                 <span>🔬</span> News
               </button>
-              <button onClick={() => { handleTabChange('french'); setMenuOpen(false); }} className="col-span-2 text-[10px] px-2 py-3 border border-blue-300/40 text-blue-200 uppercase tracking-widest flex items-center gap-1.5">
+              <button onClick={() => { handleTabChange('french'); setMenuOpen(false); }} className="text-[10px] px-2 py-3 border border-blue-300/40 text-blue-200 uppercase tracking-widest flex items-center gap-1.5">
                 <span>🇫🇷</span> Français
+              </button>
+              <button onClick={() => { handleTabChange('polish'); setMenuOpen(false); }} className="text-[10px] px-2 py-3 border border-red-300/40 text-red-200 uppercase tracking-widest flex items-center gap-1.5">
+                <span>🇵🇱</span> Polski
               </button>
             </div>
 
@@ -1760,6 +1764,7 @@ useEffect(() => { localStorage.setItem('shadow_monarch_macros', JSON.stringify(m
             {activePage === 'stats' && <Stats systemLogs={systemLogs} dailyGoal={dailyGoal} hydrationGoal={hydrationGoal} macroGoals={macroGoals} playerStats={playerStats} />}
             {activePage === 'help' && <Help createBackupPayload={createBackupPayload} importBackupPayload={importBackupPayload} resetAppData={resetAppData} playerStats={playerStats} onNavigate={handleTabChange} />}
             {activePage === 'french' && <French playerStats={playerStats} setPlayerStats={setPlayerStats} soundEnabled={soundEnabled} soundTheme={soundTheme} />}
+            {activePage === 'polish' && <Polish playerStats={playerStats} setPlayerStats={setPlayerStats} soundEnabled={soundEnabled} soundTheme={soundTheme} />}
             {activePage === 'coach' && <Coach />}
             {activePage === 'news' && (
               <News

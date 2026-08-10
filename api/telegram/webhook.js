@@ -6,6 +6,7 @@ import { NUTRITION_PRINCIPLES, knowledgePromptFor } from '../../lib/knowledgeBas
 import { kvGet, kvSet, kvPush, KvError } from '../../lib/kv.js';
 import { safeEqual } from '../../lib/secrets.js';
 import { FR_ALL_UNITS, frUnitByIndex } from '../../lib/frenchCurriculum.js';
+import { PL_ALL_UNITS, plUnitByIndex } from '../../lib/polishCurriculum.js';
 
 const NVIDIA_BASE = 'https://integrate.api.nvidia.com/v1';
 const GROQ_BASE   = 'https://api.groq.com/openai/v1';
@@ -702,16 +703,22 @@ async function answerCbq(token, cbqId, text = '') {
 const LEARN_KEY = (id) => `tg_learn:${id}`;
 const GENQ_KEY = (gate) => `tg_genq:${gate}`;
 
-// ── Lezioni di Francese (curriculum condiviso con l'app web, lib/frenchCurriculum.js) ──
+// ── Lezioni di lingua (curriculum condivisi con l'app web, lib/*Curriculum.js) ──
 // Progresso per utente: quale unità è la prossima. Contenuto generato UNA VOLTA per
 // unità (cache condivisa tra tutti gli utenti, come sull'app web) e mai rigenerato.
-const FR_PROGRESS_KEY = (id) => `tg_fr_progress:${id}`;
-const FR_LESSON_KEY = (unitId) => `fr_lesson:${unitId}`;
-const FR_LESSON_TTL = 31536000; // 1 anno: il contenuto di una lezione non cambia
+// LANG_PACKS: un pacchetto per lingua, così /francese e /polacco condividono lo
+// stesso motore invece di duplicare generateLesson/formatLesson/sendLesson.
+const LANG_PACKS = {
+  fr: { code: 'fr', label: 'francese', gate: 'french', allUnits: FR_ALL_UNITS, unitByIndex: frUnitByIndex, command: '/francese' },
+  pl: { code: 'pl', label: 'polacco', gate: 'polish', allUnits: PL_ALL_UNITS, unitByIndex: plUnitByIndex, command: '/polacco' },
+};
+const LANG_PROGRESS_KEY = (lang, id) => `tg_${lang}_progress:${id}`;
+const LANG_LESSON_KEY = (lang, unitId) => `${lang}_lesson:${unitId}`;
+const LANG_LESSON_TTL = 31536000; // 1 anno: il contenuto di una lezione non cambia
 
-async function generateFrLesson(unit) {
+async function generateLangLesson(pack, unit) {
   const out = await callAI([
-    { role: 'system', content: 'Sei un insegnante di francese che scrive micro-lezioni chiare per italiani. Rispondi SOLO con JSON valido, questo schema esatto: {"explanation":"spiegazione in italiano ~100 parole del punto grammaticale/lessicale","examples":["frase in francese — traduzione italiana", "..."] (3 esempi),"vocab":[{"fr":"parola/espressione francese","it":"traduzione italiana"}] (5 voci),"exercise":{"q":"una frase da completare o tradurre, in italiano","hint":"suggerimento breve"}}. Niente markdown, niente testo fuori dal JSON, niente ragionamento visibile.' },
+    { role: 'system', content: `Sei un insegnante di ${pack.label} che scrive micro-lezioni chiare per italiani. Rispondi SOLO con JSON valido, questo schema esatto: {"explanation":"spiegazione in italiano ~100 parole del punto grammaticale/lessicale","examples":["frase in ${pack.label} — traduzione italiana", "..."] (3 esempi),"vocab":[{"w":"parola/espressione in ${pack.label}","it":"traduzione italiana"}] (5 voci),"exercise":{"q":"una frase da completare o tradurre, in italiano","hint":"suggerimento breve"}}. Niente markdown, niente testo fuori dal JSON, niente ragionamento visibile.` },
     { role: 'user', content: `Livello ${unit.level}. Unità: "${unit.title}". Argomento: ${unit.topic}.` },
   ], true);
   const parsed = parseAIResponse(out);
@@ -719,19 +726,19 @@ async function generateFrLesson(unit) {
   return {
     explanation: String(parsed.explanation || '').slice(0, 800),
     examples: Array.isArray(parsed.examples) ? parsed.examples.slice(0, 4).map((e) => String(e).slice(0, 200)) : [],
-    vocab: Array.isArray(parsed.vocab) ? parsed.vocab.slice(0, 6).map((v) => ({ fr: String(v?.fr || '').slice(0, 60), it: String(v?.it || '').slice(0, 60) })) : [],
+    vocab: Array.isArray(parsed.vocab) ? parsed.vocab.slice(0, 6).map((v) => ({ w: String(v?.w || '').slice(0, 60), it: String(v?.it || '').slice(0, 60) })) : [],
     exercise: parsed.exercise ? { q: String(parsed.exercise.q || '').slice(0, 300), hint: String(parsed.exercise.hint || '').slice(0, 200) } : null,
   };
 }
 
-function formatFrLesson(unit, lesson, idx) {
-  let msg = `${unit.emoji} <b>${unit.level} · ${unit.title}</b>\n<i>Lezione ${idx + 1}/${FR_ALL_UNITS.length}</i>\n\n`;
+function formatLangLesson(pack, unit, lesson, idx) {
+  let msg = `${unit.emoji} <b>${unit.level} · ${unit.title}</b>\n<i>Lezione ${idx + 1}/${pack.allUnits.length}</i>\n\n`;
   msg += `${safeHtml(lesson.explanation)}\n`;
   if (lesson.examples.length) {
     msg += `\n📝 <b>Esempi</b>\n` + lesson.examples.map((e) => `• ${safeHtml(e)}`).join('\n') + '\n';
   }
   if (lesson.vocab.length) {
-    msg += `\n📚 <b>Vocabolario</b>\n` + lesson.vocab.map((v) => `• <b>${safeHtml(v.fr)}</b> — ${safeHtml(v.it)}`).join('\n') + '\n';
+    msg += `\n📚 <b>Vocabolario</b>\n` + lesson.vocab.map((v) => `• <b>${safeHtml(v.w)}</b> — ${safeHtml(v.it)}`).join('\n') + '\n';
   }
   if (lesson.exercise?.q) {
     msg += `\n✏️ <b>Prova tu</b>\n${safeHtml(lesson.exercise.q)}`;
@@ -740,23 +747,23 @@ function formatFrLesson(unit, lesson, idx) {
   return msg;
 }
 
-async function sendFrLesson(botToken, chatId, idx) {
-  const unit = frUnitByIndex(idx);
-  let lesson = await kvGet(FR_LESSON_KEY(unit.id));
+async function sendLangLesson(pack, botToken, chatId, idx) {
+  const unit = pack.unitByIndex(idx);
+  let lesson = await kvGet(LANG_LESSON_KEY(pack.code, unit.id));
   if (!lesson) {
-    lesson = await generateFrLesson(unit);
-    if (lesson) await kvSet(FR_LESSON_KEY(unit.id), lesson, FR_LESSON_TTL);
+    lesson = await generateLangLesson(pack, unit);
+    if (lesson) await kvSet(LANG_LESSON_KEY(pack.code, unit.id), lesson, LANG_LESSON_TTL);
   }
   if (!lesson) {
-    await sendTelegramMessage(botToken, chatId, '⚠️ Lezione non disponibile al momento, riprova tra poco con /francese.');
+    await sendTelegramMessage(botToken, chatId, `⚠️ Lezione non disponibile al momento, riprova tra poco con ${pack.command}.`);
     return;
   }
-  const isLast = idx >= FR_ALL_UNITS.length - 1;
+  const isLast = idx >= pack.allUnits.length - 1;
   const keyboard = { inline_keyboard: [
-    [{ text: isLast ? '🏆 Ultima lezione — completa (+20 XP)' : '✅ Fatto, prossima lezione (+20 XP)', callback_data: `fr|done|${idx}` }],
-    [{ text: '🧠 Fai un quiz di Francese', callback_data: 'lg|french' }],
+    [{ text: isLast ? '🏆 Ultima lezione — completa (+20 XP)' : '✅ Fatto, prossima lezione (+20 XP)', callback_data: `lang|${pack.code}|done|${idx}` }],
+    [{ text: `🧠 Fai un quiz di ${GATES[pack.gate].name}`, callback_data: `lg|${pack.gate}` }],
   ] };
-  await sendTelegramMessage(botToken, chatId, formatFrLesson(unit, lesson, idx), keyboard);
+  await sendTelegramMessage(botToken, chatId, formatLangLesson(pack, unit, lesson, idx), keyboard);
 }
 
 // Carica nel motore le domande generate dall'AI per un gate (pool infinito)
@@ -872,11 +879,13 @@ async function dispatch(req, res) {
     const commands = [
       { command: 'scienza', description: '🔬 Quiz Scienza & Biohacking (dai paper veri)' },
       { command: 'quiz', description: '🧠 Quiz del Gate attivo (+XP, livelli, streak)' },
-      { command: 'gate', description: '🚪 Cambia materia (IA · Inglese · Français · Cultura · Scienza)' },
+      { command: 'gate', description: '🚪 Cambia materia (IA · Inglese · Français · Polski · Cultura · Scienza)' },
       { command: 'boss', description: '🐉 Boss Quiz: 6 domande, bonus XP' },
       { command: 'lezione', description: '📖 Micro-lezione di teoria sul Gate attivo' },
-      { command: 'francese', description: '🇫🇷 Lezione di francese, in ordine (A1→B2)' },
+      { command: 'francese', description: '🇫🇷 Lezione di francese, in ordine (A1→C1)' },
       { command: 'quizfrancese', description: '🧠 Quiz veloce di francese (+XP, senza cambiare Gate)' },
+      { command: 'polacco', description: '🇵🇱 Lezione di polacco, in ordine (A1→B2)' },
+      { command: 'quizpolacco', description: '🧠 Quiz veloce di polacco (+XP, senza cambiare Gate)' },
       { command: 'progressi', description: '📈 Livello, streak, ripassi e avanzamento' },
       { command: 'oggi', description: '📅 Totale calorie e macro di oggi' },
       { command: 'integratori', description: '💊 Lista integratori consigliati' },
@@ -1006,19 +1015,22 @@ async function dispatch(req, res) {
       }
       return res.status(200).json({ ok: true });
     }
-    // ── Lezione di Francese completata → +XP, avanza all'unità successiva ──
-    if (data.startsWith('fr|done|')) {
-      const idx = parseInt(data.split('|')[2], 10) || 0;
+    // ── Lezione di lingua completata → +XP, avanza all'unità successiva ──
+    if (data.startsWith('lang|')) {
+      const [, langCode, , idxS] = data.split('|');
+      const pack = LANG_PACKS[langCode];
+      const idx = parseInt(idxS, 10) || 0;
+      if (!pack) { await answerCbq(botToken, cbq.id); return res.status(200).json({ ok: true }); }
       await answerCbq(botToken, cbq.id, '✅ +20 XP');
-      await kvPush(`tg_queue:${cChat}`, { type: 'learn_xp', amount: 20, gate: 'french', ts: Date.now() });
-      const nextIdx = Math.min(idx + 1, FR_ALL_UNITS.length - 1);
-      const isLast = idx >= FR_ALL_UNITS.length - 1;
-      await kvSet(FR_PROGRESS_KEY(cChat), { idx: nextIdx }, 31536000);
+      await kvPush(`tg_queue:${cChat}`, { type: 'learn_xp', amount: 20, gate: pack.gate, ts: Date.now() });
+      const nextIdx = Math.min(idx + 1, pack.allUnits.length - 1);
+      const isLast = idx >= pack.allUnits.length - 1;
+      await kvSet(LANG_PROGRESS_KEY(pack.code, cChat), { idx: nextIdx }, 31536000);
       if (isLast) {
-        await sendTelegramMessage(botToken, cChat, '🏆 <b>Complimenti!</b> Hai completato tutte le lezioni di francese (A1→B2). Scrivi /francese per ripassare dall\'inizio quando vuoi.');
+        await sendTelegramMessage(botToken, cChat, `🏆 <b>Complimenti!</b> Hai completato tutte le lezioni di ${pack.label} (A1→${pack.allUnits[pack.allUnits.length - 1].level}). Scrivi ${pack.command} per ripassare dall'inizio quando vuoi.`);
         return res.status(200).json({ ok: true });
       }
-      await sendFrLesson(botToken, cChat, nextIdx);
+      await sendLangLesson(pack, botToken, cChat, nextIdx);
       return res.status(200).json({ ok: true });
     }
     await answerCbq(botToken, cbq.id);
@@ -1120,11 +1132,13 @@ Consiglia SOLO integratori presenti nei PRINCIPI scientifici. Ricorda: gli integ
       '💊 /integratori — lista integratori consigliati\n' +
       '🧠 /quiz — Gate della Conoscenza: impara a pillole (+XP, livelli, streak)\n' +
       '🔬 /scienza — quiz Scienza & Biohacking (dai paper veri)\n' +
-      '🚪 /gate — cambia materia (Programmazione+IA · Inglese · Français · Cultura · 🔬 Scienza)\n' +
+      '🚪 /gate — cambia materia (Programmazione+IA · Inglese · Français · Polski · Cultura · 🔬 Scienza)\n' +
       '🐉 /boss — Boss Quiz: 6 domande, bonus XP\n' +
       '📖 /lezione — micro-lezione di teoria sul Gate attivo\n' +
-      '🇫🇷 /francese — lezione di francese in ordine, dalla A1 alla B2\n' +
+      '🇫🇷 /francese — lezione di francese in ordine, dalla A1 alla C1\n' +
       '🧠 /quizfrancese — quiz veloce di francese (senza passare da /gate)\n' +
+      '🇵🇱 /polacco — lezione di polacco in ordine, dalla A1 alla B2\n' +
+      '🧠 /quizpolacco — quiz veloce di polacco (senza passare da /gate)\n' +
       '📈 /progressi — livello, streak, ripassi e avanzamento\n\n' +
       'I macro sono calcolati su database nutrizionale reale, non stimati a caso 📊'
     );
@@ -1146,6 +1160,13 @@ Consiglia SOLO integratori presenti nei PRINCIPI scientifici. Ricorda: gli integ
     st.activeGate = 'french'; st.pending = null;
     await kvSet(LEARN_KEY(incomingChatId), st, 2592000);
     await sendQuiz(botToken, incomingChatId, 'french');
+    return res.status(200).json({ ok: true });
+  }
+  if (text === '/quizpolacco' || text === '/quizpl') {
+    const st = normLearn((await kvGet(LEARN_KEY(incomingChatId))) || initLearn());
+    st.activeGate = 'polish'; st.pending = null;
+    await kvSet(LEARN_KEY(incomingChatId), st, 2592000);
+    await sendQuiz(botToken, incomingChatId, 'polish');
     return res.status(200).json({ ok: true });
   }
   if (text === '/scienza' || text === '/salute' || text === '/biohacking') {
@@ -1178,10 +1199,19 @@ Consiglia SOLO integratori presenti nei PRINCIPI scientifici. Ricorda: gli integ
     return res.status(200).json({ ok: true });
   }
   if (text === '/francese' || text === '/french') {
-    const prog = (await kvGet(FR_PROGRESS_KEY(incomingChatId))) || { idx: 0 };
-    const idx = Math.max(0, Math.min(FR_ALL_UNITS.length - 1, prog.idx || 0));
+    const pack = LANG_PACKS.fr;
+    const prog = (await kvGet(LANG_PROGRESS_KEY(pack.code, incomingChatId))) || { idx: 0 };
+    const idx = Math.max(0, Math.min(pack.allUnits.length - 1, prog.idx || 0));
     await sendTelegramMessage(botToken, incomingChatId, '🇫🇷 Preparo la tua lezione di francese…');
-    await sendFrLesson(botToken, incomingChatId, idx);
+    await sendLangLesson(pack, botToken, incomingChatId, idx);
+    return res.status(200).json({ ok: true });
+  }
+  if (text === '/polacco' || text === '/polish') {
+    const pack = LANG_PACKS.pl;
+    const prog = (await kvGet(LANG_PROGRESS_KEY(pack.code, incomingChatId))) || { idx: 0 };
+    const idx = Math.max(0, Math.min(pack.allUnits.length - 1, prog.idx || 0));
+    await sendTelegramMessage(botToken, incomingChatId, '🇵🇱 Preparo la tua lezione di polacco…');
+    await sendLangLesson(pack, botToken, incomingChatId, idx);
     return res.status(200).json({ ok: true });
   }
   if (text === '/progressi') {
