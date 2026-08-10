@@ -884,7 +884,7 @@ async function dispatch(req, res) {
       { command: 'lezione', description: '📖 Micro-lezione di teoria sul Gate attivo' },
       { command: 'francese', description: '🇫🇷 Lezione di francese, in ordine (A1→C1)' },
       { command: 'quizfrancese', description: '🧠 Quiz veloce di francese (+XP, senza cambiare Gate)' },
-      { command: 'polacco', description: '🇵🇱 Lezione di polacco, in ordine (A1→B2)' },
+      { command: 'polacco', description: '🇵🇱 Lezione di polacco, in ordine (A1→C1)' },
       { command: 'quizpolacco', description: '🧠 Quiz veloce di polacco (+XP, senza cambiare Gate)' },
       { command: 'progressi', description: '📈 Livello, streak, ripassi e avanzamento' },
       { command: 'oggi', description: '📅 Totale calorie e macro di oggi' },
@@ -1137,7 +1137,7 @@ Consiglia SOLO integratori presenti nei PRINCIPI scientifici. Ricorda: gli integ
       '📖 /lezione — micro-lezione di teoria sul Gate attivo\n' +
       '🇫🇷 /francese — lezione di francese in ordine, dalla A1 alla C1\n' +
       '🧠 /quizfrancese — quiz veloce di francese (senza passare da /gate)\n' +
-      '🇵🇱 /polacco — lezione di polacco in ordine, dalla A1 alla B2\n' +
+      '🇵🇱 /polacco — lezione di polacco in ordine, dalla A1 alla C1\n' +
       '🧠 /quizpolacco — quiz veloce di polacco (senza passare da /gate)\n' +
       '📈 /progressi — livello, streak, ripassi e avanzamento\n\n' +
       'I macro sono calcolati su database nutrizionale reale, non stimati a caso 📊'
