@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Eye, Lightbulb, Trophy, ScanSearch, Play, Pause, Target, FlipHorizontal2, Volume2, VolumeX, Bone, X, Move, ThumbsUp, ThumbsDown } from 'lucide-react';
 import { BREATHING_PROTOCOLS } from '../../lib/breathingProtocols.js';
 import { getDiscipline } from '../../lib/martialKnowledge.js';
+import { MARKER_RE, canonicalMarker, normalizeCoachingText, extractCommand } from '../../lib/coachingText.js';
 
 // ─── Quick prompts ─────────────────────────────────────────────────────────────
 const COACH_QUICK = [
@@ -3459,11 +3460,11 @@ function VisualCoach() {
     const text = speakQueueRef.current.shift();
     if (text == null) return;
 
-    const clean = String(text)
+    const clean = normalizeCoachingText(String(text))
       .replace(/\*\*/g, '').replace(/[*#_~`]/g, '')
       .replace(/RIGA\s*\d+\s*[—-]/g, '')
       .replace(/\bBENE\s*:/gi, 'Bene,').replace(/\bPROVA\s*:/gi, 'Prova')
-      .replace(/(COMANDO|VISTO|PERCHÉ|SITUAZIONE|ISTRUZIONE|PUNTO)\s*:/gi, '')
+      .replace(/([A-ZÀ]{0,4}ANDO|VISTO|PERCHÉ|SITUAZIONE|ISTRUZIONE|PUNTO)\s*:/gi, '')
       .replace(/[^\x00-\x7F]/g, (c) => /\p{Emoji}/u.test(c) ? '' : c)
       .replace(/\n+/g, '. ')
       .trim();
@@ -4043,9 +4044,11 @@ function VisualCoach() {
       alerts: alerts || [],
       label: '',
     };
-    // Accumula la riga COMANDO/chiave per la pagella di fine sessione (max 40)
+    // Accumula la riga COMANDO/chiave per la pagella di fine sessione (max 40).
+    // Tollera marker tronchi ("ANDO:" invece di "COMANDO:") via MARKER_RE.
     const lines = String(verdict || '').split('\n').map((l) => l.trim()).filter(Boolean);
-    const key = (lines.find((l) => /^COMANDO\s*:/i.test(l)) || lines[0] || '').replace(/^COMANDO\s*:\s*/i, '').slice(0, 220);
+    const cmdLine = lines.find((l) => { const m = l.match(MARKER_RE); return m && canonicalMarker(m[1]) === 'COMANDO'; });
+    const key = normalizeCoachingText((cmdLine || lines[0] || '').replace(MARKER_RE, '')).slice(0, 220);
     if (key) sessionVerdictsRef.current = [...sessionVerdictsRef.current, key].slice(-40);
     setSampleFeedback('shown');
   }, [mode, postSample]);
@@ -4217,7 +4220,7 @@ function VisualCoach() {
           enqueueSpeak(data.content);
           stageSample(data.content, pose.angles, pose.alerts); // cattura per l'alveare (angoli reali)
           // Registra su cosa ha già insistito stasera → se ricapita, rincara invece di ricominciare da zero.
-          const cmd = (data.content.match(/COMANDO:\s*(.+)/i) || [])[1];
+          const cmd = extractCommand(data.content) || data.content;
           if (cmd) {
             anchorsOf(cmd).forEach((a) => {
               const prev = insistedRef.current.find((x) => x.startsWith(`${a} ×`));
@@ -5078,8 +5081,9 @@ function VisualCoach() {
                 ? (() => {
                     const parts = {};
                     String(analysis.content).split('\n').forEach((line) => {
-                      const m = line.match(/^\s*(COMANDO|BENE|PROVA|VISTO|PERCH[ÉE]|SITUAZIONE|ISTRUZIONE|PUNTO)\s*:\s*(.*)/i);
-                      if (m) parts[m[1].toUpperCase().replace('PERCHE', 'PERCHÉ')] = m[2].trim();
+                      const t = line.trim();
+                      const m = t.match(MARKER_RE);
+                      if (m) parts[canonicalMarker(m[1])] = normalizeCoachingText(t.slice(m[0].length));
                     });
                     const cmd = parts.COMANDO || parts.ISTRUZIONE || parts.SITUAZIONE;
                     if (!cmd) return <p className="text-sm text-white leading-snug whitespace-pre-wrap font-medium">{analysis.content}</p>;

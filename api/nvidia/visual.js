@@ -1795,6 +1795,7 @@ REGOLE DI PRECISIONE (fondamentali):
 - Quando l'errore ha origine biomeccanica ancestrale (es. anca che non ruota → catena cinetica spezzata), citalo brevemente nel PERCHÉ.
 - Resta specifico per la disciplina indicata e per quello che è davvero visibile nel frame.
 - Se il blocco KNOWLEDGE è presente e vedi apnea, tensione o perdita di compostezza, il COMANDO può essere un cue di respirazione o di disciplina marziale (sempre imperativo e specifico).
+- Rileggi prima di rispondere: MAI parole o suffissi ripetuti/duplicati nella stessa riga (es. NO "allinearloallo", NO "piede piede").
 
 FORMATO (esatto, max 4 righe, NO markdown, NO emoji):
 COMANDO: <la cosa #1 da CORREGGERE: verbo imperativo + parte del corpo specifica + angolo o riferimento misurabile se utile>
