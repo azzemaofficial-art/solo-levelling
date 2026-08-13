@@ -5,6 +5,7 @@ import { Eye, Lightbulb, Trophy, ScanSearch, Play, Pause, Target, FlipHorizontal
 import { BREATHING_PROTOCOLS } from '../../lib/breathingProtocols.js';
 import { getDiscipline } from '../../lib/martialKnowledge.js';
 import { MARKER_RE, canonicalMarker, normalizeCoachingText, extractCommand } from '../../lib/coachingText.js';
+import { buildCoachWorkout } from '../../lib/workouts.js';
 import { applyXp } from '../utils/xpLogic';
 
 // ─── Quick prompts ─────────────────────────────────────────────────────────────
@@ -324,6 +325,9 @@ function playGong(freq = 523) {
     osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 3);
   } catch {}
 }
+
+// ─── Lodi brevi del coach (rinforzo positivo quando correggi l'errore) ──────
+const PRAISE = ['Così!', 'Bene così!', 'Perfetto, tienila!', 'Ecco, questo è il movimento!', 'Ottimo, continua così!'];
 
 // ─── Parse AI punto assegnato ─────────────────────────────────────────────────
 function parsePoint(text) {
@@ -2716,6 +2720,10 @@ function VisualCoach({ setPlayerStats }) {
   const mirrorMatchRef = useRef(null);
   const mirrorStateAtRef = useRef(0);
   const mirrorSpeakRef = useRef({ t: 0, msg: '' });
+  // ── Workout del maestro: fasi guidate con insegnamento + correzione live ──
+  const [workout, setWorkout] = useState(null);        // { phases, idx, left }
+  const workoutRef = useRef(null);
+  const workoutSeedRef = useRef(0);
   const observationsRef = useRef([]);  // osservazioni accumulate in auto (osserva N → 1 verdetto)
   const [observeProgress, setObserveProgress] = useState(0);
   // ── Cattura dati per l'alveare: ogni verdetto = 1 campione (angoli + esito + 👍/👎) ──
@@ -3958,10 +3966,12 @@ function VisualCoach({ setPlayerStats }) {
 
   // Specchio: sincronizza il ref on/off e reset stato
   useEffect(() => { mirrorOnRef.current = mirrorOn; if (!mirrorOn) setMirrorState(null); }, [mirrorOn]);
-  // Specchio: la tecnica da rispecchiare segue il guidato/combo, altrimenti la scelta manuale
+  // Specchio: la tecnica da rispecchiare segue il workout/guidato/combo, altrimenti la scelta manuale
   useEffect(() => {
     let key;
-    if (guidedOn && (guidedPhase === 'running' || guidedPhase === 'ready') && guidedPlan[guidedIdx]) {
+    if (workout && workout.phases[workout.idx]) {
+      key = workout.phases[workout.idx].mirror;
+    } else if (guidedOn && (guidedPhase === 'running' || guidedPhase === 'ready') && guidedPlan[guidedIdx]) {
       key = resolvePose((guidedPlan[guidedIdx].name || '').split(/[-–—,]/)[0].trim());
     } else if (comboOn && currentCombo) {
       key = resolvePose(currentCombo.split('-')[0].trim());
@@ -3969,19 +3979,85 @@ function VisualCoach({ setPlayerStats }) {
       key = mirrorTech;
     }
     mirrorTargetRef.current = key; setMirrorTargetKey(key);
-  }, [guidedOn, guidedPhase, guidedIdx, guidedPlan, comboOn, currentCombo, mirrorTech]);
+  }, [workout, guidedOn, guidedPhase, guidedIdx, guidedPlan, comboOn, currentCombo, mirrorTech]);
 
-  // Specchio: legge a voce la correzione principale (max ogni 6s, solo se punteggio basso)
+  // ── COACH VOCALE CONTINUO: corregge ad alta voce finché l'errore persiste ──
+  // Prima: 1 correzione ogni 6s e solo con score <70. Ora: correzione ogni
+  // ~2.5s quando c'è un errore (score <85), ripetuta con insistenza se non
+  // viene corretta, + lode breve quando la posa torna giusta.
   useEffect(() => {
     if (!mirrorOn || !voiceOn || !mirrorState) return;
     const h = mirrorState.hints?.[0];
-    if (!h || (mirrorState.score ?? 0) >= 70) return;
+    const score = mirrorState.score ?? 0;
     const now = Date.now();
-    if (now - mirrorSpeakRef.current.t > 6000 && h !== mirrorSpeakRef.current.msg) {
-      mirrorSpeakRef.current = { t: now, msg: h };
-      enqueueSpeak(h);
+    if (h && score < 85) {
+      const same = h === mirrorSpeakRef.current.msg;
+      const gap = same ? 9000 : 2500; // stesso errore: ripeti meno spesso ma non mollare
+      if (now - mirrorSpeakRef.current.t > gap) {
+        mirrorSpeakRef.current = { t: now, msg: h };
+        enqueueSpeak(h);
+      }
+    } else if (!h && score >= 92 && mirrorSpeakRef.current.msg) {
+      // l'errore è stato corretto: rinforzo positivo (max 1 lode ogni 10s)
+      if (now - mirrorSpeakRef.current.t > 10000) {
+        mirrorSpeakRef.current = { t: now, msg: '' };
+        enqueueSpeak(PRAISE[Math.floor(Math.random() * PRAISE.length)]);
+      }
     }
   }, [mirrorState, mirrorOn, voiceOn, enqueueSpeak]);
+
+  // ── Motore workout: timer 1s, countdown vocale, gong e insegnamento a ogni fase ──
+  const startCoachWorkout = useCallback(() => {
+    const phases = buildCoachWorkout(mode, workoutSeedRef.current);
+    workoutSeedRef.current += 1;
+    const w = { phases, idx: 0, left: phases[0].seconds };
+    workoutRef.current = w;
+    setWorkout({ ...w });
+    setMirrorOn(true); // lo specchio corregge live durante tutto il workout
+    const dName = getDiscipline(mode)?.name || mode;
+    enqueueSpeak(`Workout di ${dName}: ${phases.length} fasi. Prima: ${phases[0].name}. ${phases[0].teach}`, true);
+  }, [mode, enqueueSpeak]);
+
+  const stopCoachWorkout = useCallback(() => {
+    workoutRef.current = null;
+    setWorkout(null);
+    enqueueSpeak('Workout interrotto.', true);
+  }, [enqueueSpeak]);
+
+  useEffect(() => {
+    if (!workout) return undefined;
+    const id = setInterval(() => {
+      const w = workoutRef.current;
+      if (!w) return;
+      w.left -= 1;
+      if (w.left === 3) enqueueSpeak('Tre', true);
+      else if (w.left === 2) enqueueSpeak('due', true);
+      else if (w.left === 1) enqueueSpeak('uno', true);
+      else if (w.left <= 0) {
+        if (w.idx + 1 >= w.phases.length) {
+          workoutRef.current = null;
+          setWorkout(null);
+          playGong(); setTimeout(() => playGong(660), 500);
+          enqueueSpeak('Workout completato. Ben fatto, guerriero.', true);
+          if (setPlayerStats) { // XP del workout nel System
+            setPlayerStats((prev) => {
+              const { level, exp } = applyXp(prev, w.phases.length * 8);
+              return { ...prev, level, exp };
+            });
+          }
+          return;
+        }
+        playGong();
+        w.idx += 1;
+        const ph = w.phases[w.idx];
+        w.left = ph.seconds;
+        enqueueSpeak(`${ph.name}. ${ph.teach}`, true);
+      }
+      setWorkout({ ...w });
+    }, 1000);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workout ? 1 : 0]);
 
   const buildPrompt = useCallback((basePrompt) => {
     let p = basePrompt || '';
@@ -4624,6 +4700,20 @@ function VisualCoach({ setPlayerStats }) {
           );
         })()}
 
+        {/* 💪 Workout del maestro: allenamento guidato con voce + correzione live */}
+        {!workout && (
+          <button onClick={startCoachWorkout}
+            className="w-full p-3.5 rounded-xl text-left transition-transform active:scale-[0.98]"
+            style={{ background: 'linear-gradient(135deg, rgba(217,119,6,0.28), rgba(180,83,9,0.14))', border: `1px solid ${C.amber.hex}55` }}>
+            <p className="text-[11px] font-black tracking-widest" style={{ color: '#fbbf24', fontFamily: 'Orbitron, sans-serif' }}>
+              💪 DAMMI UN WORKOUT
+            </p>
+            <p className="text-[10px] mt-1 leading-snug" style={{ color: '#d1d5db' }}>
+              Il maestro ti guida con la voce: riscaldamento → tecniche di {currentDisc?.label || 'questa arte'} → condizionamento → respiro. Ti insegna ogni esercizio e ti corregge in tempo reale. Attiva la fotocamera e l'audio.
+            </p>
+          </button>
+        )}
+
         <div>
           <p className="text-[10px] text-gray-600 mb-1.5 font-mono tracking-widest">DESCRIVI LA SESSIONE <span className="text-gray-700">(OPZIONALE)</span></p>
           <textarea value={sessionContext} onChange={(e) => setSessionContext(e.target.value)} rows={2}
@@ -4769,6 +4859,33 @@ function VisualCoach({ setPlayerStats }) {
           </motion.button>
         </div>
       </div>
+
+      {/* 💪 WORKOUT HUD: fase corrente, timer, insegnamento, stop */}
+      {workout && workout.phases[workout.idx] && (
+        <div className="absolute inset-x-0 z-20 px-3" style={{ top: 'calc(max(12px, env(safe-area-inset-top)) + 52px)' }}>
+          <div className="rounded-xl p-3" style={{ background: 'rgba(0,0,0,0.78)', border: `1px solid ${C.amber.hex}66`, backdropFilter: 'blur(6px)' }}>
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-[12px] font-black text-white truncate" style={{ fontFamily: 'Orbitron, sans-serif' }}>
+                {workout.phases[workout.idx].emoji} {workout.phases[workout.idx].name.toUpperCase()}
+              </p>
+              <p className="text-lg font-black font-mono leading-none" style={{ color: workout.left <= 5 ? '#ef4444' : '#fbbf24' }}>{workout.left}s</p>
+            </div>
+            <div className="flex gap-1 my-1.5">
+              {workout.phases.map((ph, i) => (
+                <div key={ph.name + i} className="h-1 flex-1 rounded-full" style={{ background: i < workout.idx ? C.amber.hex : i === workout.idx ? '#fbbf24' : 'rgba(255,255,255,0.15)' }} />
+              ))}
+            </div>
+            <p className="text-[10px] leading-snug" style={{ color: '#d1d5db' }}>{workout.phases[workout.idx].teach}</p>
+            {workout.phases[workout.idx].drill && (
+              <p className="text-[9px] mt-0.5" style={{ color: '#9ca3af' }}>🎯 {workout.phases[workout.idx].drill}</p>
+            )}
+            <button onClick={stopCoachWorkout} className="mt-2 w-full py-1.5 rounded-lg text-[10px] font-bold"
+              style={{ background: 'rgba(185,28,28,0.4)', border: `1px solid ${C.red.border}`, color: '#fecaca' }}>
+              ✕ FERMA IL WORKOUT
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ROUND (sparring o solo): timer + angolo con respiro — sotto la top bar */}
       {(isPartnerMode || roundsOn) && (
