@@ -76,6 +76,16 @@ async function main() {
   writeTrainingJournal(sessions, train);
   console.log(`🥋 Sessioni coach: ${sessions.length} (${train.count ? `voto medio ${train.avgScore}, ultimo ${train.lastScore}` : 'nessuna pagella'})`);
 
+  // 2e) dataset/coach-progress.csv — progressione per disciplina (snapshot riscritto a ogni run)
+  const prog = data.coachProgress && typeof data.coachProgress === 'object' ? data.coachProgress : {};
+  const progRows = Object.entries(prog)
+    .filter(([, p]) => p && typeof p === 'object')
+    .map(([disc, p]) => [nowISO, csv(disc), Number(p.xp) || 0, Number(p.sessions) || 0, Number(p.best) || 0, Math.floor((Number(p.xp) || 0) / 150) + 1].join(','));
+  if (progRows.length) {
+    write('dataset/coach-progress.csv', `ts,discipline,xp,sessions,best,level\n${progRows.join('\n')}\n`);
+    console.log(`🏆 Progressione coach: ${progRows.length} discipline`);
+  }
+
   // 3) dashboard.md
   const gateRows = (L.gates || []).map((g) => {
     const pct = g.size ? Math.min(100, Math.round((g.done / g.size) * 100)) : 0;

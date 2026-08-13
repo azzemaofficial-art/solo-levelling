@@ -58,6 +58,7 @@ async function dispatch(req, res) {
   const meals = (await kvGet(`tg_meals:${chatId}`)) || [];
   const profile = (await kvGet(`tg_profile:${chatId}`)) || {};
   const webPrefs = (await kvGet(`web_prefs:${chatId}`)) || {};
+  const coachProgress = (await kvGet(`coach_progress:${chatId}`)) || {};
 
   const gates = GATE_IDS.map((g) => {
     const p = learn.prog?.[g] || { done: 0, correct: 0, total: 0 };
@@ -73,5 +74,6 @@ async function dispatch(req, res) {
     meals: Array.isArray(meals) ? meals : [],
     profile: profile && typeof profile === 'object' ? profile : {},
     webPrefs: webPrefs && typeof webPrefs === 'object' ? webPrefs : {},
+    coachProgress: coachProgress && typeof coachProgress === 'object' ? coachProgress : {},
   });
 }

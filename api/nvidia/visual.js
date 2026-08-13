@@ -2062,6 +2062,14 @@ async function kvSetRaw(key, value, ttl = 7776000) {
   } catch (_) {}
 }
 const num = (v) => (v == null || v === '' || Number.isNaN(Number(v)) ? null : Math.round(Number(v)));
+// SHADOW_BOT_CHAT_ID può essere una allow-list multi-utente ("123, 456"): il
+// chatId reale è quello che il client dichiara di sé; il fallback usa solo il
+// PRIMO ID (il proprietario), mai la stringa intera come chiave letterale.
+const resolveChatId = (claimed) => {
+  const own = String(claimed || '').trim().split(/[\s,]+/).filter(Boolean)[0];
+  if (own) return own;
+  return String(process.env.SHADOW_BOT_CHAT_ID || '').split(/[\s,]+/).filter(Boolean)[0] || '';
+};
 
 export default async function handler(req, res) {
   // Pipeline costosa (2 vision + brain): rate-limit più stretto del default.
@@ -2082,7 +2090,7 @@ export default async function handler(req, res) {
   // Il Visual Coach manda qui ogni verdetto + (opzionale) pollice su/giù dell'utente.
   // Si accumula in KV coach_samples:<chatId> come array JSON, letto dall'export/ponte.
   if (sample) {
-    const chatId = req.body?.chatId || process.env.SHADOW_BOT_CHAT_ID;
+    const chatId = resolveChatId(req.body?.chatId);
     if (!chatId) return res.status(400).json({ ok: false, error: 'chatId mancante' });
     // reset: azzera il dataset campioni (es. per togliere dati di test)
     if (sample.reset) {
@@ -2113,7 +2121,7 @@ export default async function handler(req, res) {
   // Il client manda: webPrefs:{ foodPrefs, recipeFeedback? } — recipeFeedback è UNA voce da
   // accodare (non l'intero array), così ogni 👍/👎 è una singola chiamata leggera.
   if (req.body?.webPrefs) {
-    const chatId = req.body?.chatId || process.env.SHADOW_BOT_CHAT_ID;
+    const chatId = resolveChatId(req.body?.chatId);
     if (!chatId) return res.status(400).json({ ok: false, error: 'chatId mancante' });
     const KEY = `web_prefs:${chatId}`;
     const cur = (await kvGetRaw(KEY)) || {};
@@ -2189,7 +2197,7 @@ export default async function handler(req, res) {
   // pagella strutturata, la persiste in KV coach_sessions:<chatId> (letta dal ponte Obsidian)
   // e la restituisce. Così il coach "ricorda" e migliora giorno dopo giorno.
   if (req.body?.sessionReport) {
-    const chatId = req.body?.chatId || process.env.SHADOW_BOT_CHAT_ID;
+    const chatId = resolveChatId(req.body?.chatId);
     const durationMin = Math.max(0, Math.min(600, parseInt(req.body.durationMin) || 0));
     const sampleCount = Math.max(0, Math.min(9999, parseInt(req.body.sampleCount) || 0));
     const verdicts = Array.isArray(req.body.verdicts) ? req.body.verdicts.filter(Boolean).map((v) => String(v).slice(0, 220)).slice(-24) : [];
@@ -2253,7 +2261,24 @@ export default async function handler(req, res) {
       pastArr.push(record);
       await kvSetRaw(SKEY, pastArr.slice(-180)); // ~6 mesi di sessioni giornaliere
     }
-    return res.status(200).json({ report: out, stored: Boolean(SKEY), sessions: pastArr.length });
+
+    // Progressione per disciplina: accumula XP/sessioni/best in coach_progress:<chatId>.
+    // Il client lo mostra come livello di competenza; il ponte Obsidian lo esporta.
+    let progress = null;
+    if (chatId) {
+      const PKEY = `coach_progress:${chatId}`;
+      const cur = (await kvGetRaw(PKEY)) || {};
+      const all = (cur && typeof cur === 'object' && !Array.isArray(cur)) ? cur : {};
+      const disc = all[mode] || { xp: 0, sessions: 0, best: 0 };
+      disc.xp = Math.min(100000, (Number(disc.xp) || 0) + out.xp);
+      disc.sessions = (Number(disc.sessions) || 0) + 1;
+      disc.best = Math.max(Number(disc.best) || 0, out.score);
+      disc.lastTs = new Date().toISOString();
+      all[mode] = disc;
+      await kvSetRaw(PKEY, all);
+      progress = all;
+    }
+    return res.status(200).json({ report: out, stored: Boolean(SKEY), sessions: pastArr.length, progress });
   }
 
   // ── GENERA CIRCUITO (piano drill su misura, nessuna immagine) ──────────────
@@ -2265,7 +2290,7 @@ export default async function handler(req, res) {
       const h = req.body.history.filter(Boolean).map((s) => String(s).slice(0, 200)).slice(-5);
       histBlock = `\n\nSTORICO/PROGRESSI RECENTI (adatta la difficoltà: insisti sulle debolezze ricorrenti, alza l'asticella su ciò che è stato superato):\n${h.map((x) => `- ${x}`).join('\n')}`;
     } else {
-      const chatId = req.body?.chatId || process.env.SHADOW_BOT_CHAT_ID;
+      const chatId = resolveChatId(req.body?.chatId);
       if (chatId) {
         const past = (await kvGetRaw(`coach_sessions:${chatId}`)) || [];
         const recent = (Array.isArray(past) ? past : []).slice(-4);

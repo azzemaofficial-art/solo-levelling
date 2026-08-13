@@ -790,6 +790,22 @@ const CURRICULUM_KEY = 'shadow_monarch_curriculum';
 const loadCurrProgress = () => { try { return JSON.parse(localStorage.getItem(CURRICULUM_KEY) || '{}'); } catch { return {}; } };
 const saveCurrProgress = (p) => { try { localStorage.setItem(CURRICULUM_KEY, JSON.stringify(p)); } catch {} };
 
+// ─── Progressione per disciplina (XP accumulato dalle pagelle) ───────────────
+// Fonte autorevole: KV coach_progress:<chatId> (visual.js sessionReport).
+// Copia locale per mostrare il livello anche offline/subito.
+const COACH_PROGRESS_KEY = 'shadow_monarch_coach_progress';
+const loadCoachProgress = () => { try { return JSON.parse(localStorage.getItem(COACH_PROGRESS_KEY) || '{}'); } catch { return {}; } };
+const saveCoachProgress = (p) => { try { localStorage.setItem(COACH_PROGRESS_KEY, JSON.stringify(p)); } catch {} };
+// 150 XP per livello di competenza (una sessione vale ~10-100 XP dalla pagella).
+const coachLevelOf = (xp) => Math.floor((Number(xp) || 0) / 150) + 1;
+// Grado/cintura dalla knowledge base: un grado ogni 600 XP.
+function coachRankOf(disciplineId, xp) {
+  const d = getDiscipline(disciplineId);
+  if (!d || !d.ranks?.length) return '';
+  const idx = Math.min(d.ranks.length - 1, Math.floor((Number(xp) || 0) / 600));
+  return d.ranks[idx];
+}
+
 // Blocco di contesto per i prompt AI: a che punto del percorso è l'allievo in
 // questa disciplina. Così il coach allena verso la prossima milestone invece
 // di dare feedback scollegati dal percorso.
@@ -2590,6 +2606,7 @@ function VisualCoach() {
   const [autoMode, setAutoMode] = useState(false);
   const [mode, setMode] = useState('muaythai');
   const [pastSessions, setPastSessions] = useState(() => loadSessions());
+  const [coachProgress, setCoachProgress] = useState(() => loadCoachProgress());
   const examRef = useRef(null);          // esame milestone in corso: {li, label, milestone, mode}
   const [examBanner, setExamBanner] = useState(null); // mostrato in setup quando arrivi dal curriculum
   // Deep-link dal Curriculum: sessione pre-configurata (argomento del percorso o esame milestone)
@@ -3667,17 +3684,24 @@ function VisualCoach() {
   const requestSessionReport = useCallback(async ({ durationMin, verdicts, sampleCount: sc, context, discipline }) => {
     setSessionReport({ loading: true });
     const exam = examRef.current && examRef.current.mode === discipline ? examRef.current : null;
+    let ownChatId = '';
+    try { ownChatId = window.localStorage.getItem('shadow_monarch_tg_chat_id') || ''; } catch {}
     try {
       const r = await fetch('/api/nvidia/visual', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           sessionReport: true, mode: discipline, durationMin, sampleCount: sc,
-          verdicts, context, level: guidedLevel,
+          verdicts, context, level: guidedLevel, chatId: ownChatId || undefined,
           exam: exam ? { milestone: exam.milestone, label: exam.label } : undefined,
         }),
       });
       const data = await r.json();
       if (r.ok && data.report) {
+        // Progressione per disciplina: KV è la fonte, copia locale per l'UI immediata.
+        if (data.progress && typeof data.progress === 'object') {
+          saveCoachProgress(data.progress);
+          setCoachProgress(data.progress);
+        }
         if (data.report.skills) pushSkillsHistory(discipline, data.report.skills); // trend competenze
         // Esame milestone: >=75 = PROMOSSO → salva il diploma e sblocca il grado
         let examOutcome = null;
@@ -4570,11 +4594,20 @@ function VisualCoach() {
         {(() => {
           const kd = getDiscipline(mode);
           if (!kd) return null;
+          const dp = coachProgress?.[mode] || null;
+          const xp = Number(dp?.xp) || 0;
           return (
             <div className="p-3 rounded-xl" style={{ background: 'rgba(180,120,30,0.07)', border: `1px solid ${C.amber.border}` }}>
-              <p className="text-[10px] font-black tracking-widest mb-1.5" style={{ color: C.amber.hex, fontFamily: 'Orbitron, sans-serif' }}>
-                {kd.emoji} LA VIA — {kd.name.toUpperCase()}
-              </p>
+              <div className="flex items-center justify-between mb-1.5">
+                <p className="text-[10px] font-black tracking-widest" style={{ color: C.amber.hex, fontFamily: 'Orbitron, sans-serif' }}>
+                  {kd.emoji} LA VIA — {kd.name.toUpperCase()}
+                </p>
+                {dp && (
+                  <p className="text-[9px] font-bold font-mono" style={{ color: '#fbbf24' }} title={`${dp.sessions || 0} sessioni · record ${dp.best || 0}/100`}>
+                    🏆 Lv {coachLevelOf(xp)} · {xp} XP{coachRankOf(mode, xp) ? ` · ${coachRankOf(mode, xp)}` : ''}
+                  </p>
+                )}
+              </div>
               <p className="text-[11px] leading-snug mb-1" style={{ color: '#d1d5db' }}>{kd.philosophy}</p>
               <p className="text-[10px] leading-snug mb-1" style={{ color: '#9ca3af' }}>🫁 Respiro: {kd.breathing.principle}</p>
               <p className="text-[10px] leading-snug" style={{ color: '#9ca3af' }}>🙏 {kd.etiquette[0]}</p>
