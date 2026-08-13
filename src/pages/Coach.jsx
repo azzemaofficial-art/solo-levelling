@@ -5,6 +5,7 @@ import { Eye, Lightbulb, Trophy, ScanSearch, Play, Pause, Target, FlipHorizontal
 import { BREATHING_PROTOCOLS } from '../../lib/breathingProtocols.js';
 import { getDiscipline } from '../../lib/martialKnowledge.js';
 import { MARKER_RE, canonicalMarker, normalizeCoachingText, extractCommand } from '../../lib/coachingText.js';
+import { applyXp } from '../utils/xpLogic';
 
 // ─── Quick prompts ─────────────────────────────────────────────────────────────
 const COACH_QUICK = [
@@ -2594,7 +2595,7 @@ function BreathingGuide({ protocol, onExit, voiceOn, enqueueSpeak }) {
   );
 }
 
-function VisualCoach() {
+function VisualCoach({ setPlayerStats }) {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const [step, setStep] = useState('setup');
@@ -3697,6 +3698,14 @@ function VisualCoach() {
       });
       const data = await r.json();
       if (r.ok && data.report) {
+        // L'XP della pagella entra anche nel personaggio (stesso modello XP
+        // sottrattivo di Boss/Quests/Training): allenarsi col coach fa salire il System.
+        if (setPlayerStats && data.report.xp > 0) {
+          setPlayerStats((prev) => {
+            const { level, exp } = applyXp(prev, data.report.xp);
+            return { ...prev, level, exp };
+          });
+        }
         // Progressione per disciplina: KV è la fonte, copia locale per l'UI immediata.
         if (data.progress && typeof data.progress === 'object') {
           saveCoachProgress(data.progress);
@@ -5494,7 +5503,7 @@ const TABS = [
   { id: 'visual',     label: 'Live',   icon: '📷', color: C.emerald },
 ];
 
-export default function Coach() {
+export default function Coach({ playerStats, setPlayerStats }) {
   const [tab, setTab] = useState(() => {
     try { return localStorage.getItem(PENDING_COACH_QUESTION_KEY) ? 'chat' : 'trainer'; } catch { return 'trainer'; }
   });
@@ -5551,7 +5560,7 @@ export default function Coach() {
             {tab === 'trainer'    && <PersonalTrainer />}
             {tab === 'curriculum' && <CurriculumCoach onGoLive={() => setTab('visual')} />}
             {tab === 'chat'       && <CoachChat />}
-            {tab === 'visual'     && <VisualCoach />}
+            {tab === 'visual'     && <VisualCoach setPlayerStats={setPlayerStats} />}
           </motion.div>
         </AnimatePresence>
       </div>

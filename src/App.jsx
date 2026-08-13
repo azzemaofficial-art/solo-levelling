@@ -1765,7 +1765,7 @@ useEffect(() => { localStorage.setItem('shadow_monarch_macros', JSON.stringify(m
             {activePage === 'help' && <Help createBackupPayload={createBackupPayload} importBackupPayload={importBackupPayload} resetAppData={resetAppData} playerStats={playerStats} onNavigate={handleTabChange} />}
             {activePage === 'french' && <French playerStats={playerStats} setPlayerStats={setPlayerStats} soundEnabled={soundEnabled} soundTheme={soundTheme} />}
             {activePage === 'polish' && <Polish playerStats={playerStats} setPlayerStats={setPlayerStats} soundEnabled={soundEnabled} soundTheme={soundTheme} />}
-            {activePage === 'coach' && <Coach />}
+            {activePage === 'coach' && <Coach playerStats={playerStats} setPlayerStats={setPlayerStats} />}
             {activePage === 'news' && (
               <News
                 playerStats={playerStats}
