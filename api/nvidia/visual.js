@@ -1076,6 +1076,40 @@ async function callVisionGroq(apiKey, imageBase64, mimeType, systemPrompt, userP
   }
 }
 
+// Google AI Studio (Gemini) — il free tier con la miglior visione gratuita.
+// OPZIONALE: si attiva solo con GEMINI_API_KEY; modello via GEMINI_VISION_MODEL.
+// Ritorna la stessa forma degli altri provider: data.choices[0].message.content.
+async function callVisionGemini(apiKey, model, imageBase64, mimeType, systemPrompt, userPrompt, maxTokens = 400) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 12000);
+  try {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: systemPrompt }] },
+          contents: [{ role: 'user', parts: [
+            { inlineData: { mimeType, data: imageBase64 } },
+            { text: userPrompt || 'Analizza questo frame.' },
+          ] }],
+          generationConfig: { maxOutputTokens: maxTokens, temperature: 0.4 },
+        }),
+        signal: controller.signal,
+      }
+    );
+    const data = await res.json();
+    const text = (data?.candidates?.[0]?.content?.parts || []).map((p) => p.text || '').join('');
+    return { ok: res.ok && !!text, status: res.status, data: { choices: [{ message: { content: text } }] } };
+  } catch (e) {
+    return { ok: false, status: 0, data: null, error: String(e?.message || e) };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+const geminiVision = () => ({ key: process.env.GEMINI_API_KEY || '', model: process.env.GEMINI_VISION_MODEL || 'gemini-2.5-flash' });
+
 const COSMOS_SYSTEM_PROMPT = `Sei un analista biomeccanico AI. Osservi un frame di allenamento/arti marziali.
 Analizza SOLO la fisica del movimento: postura, equilibrio, angoli articolari, centro di gravità, traiettorie.
 Rispondi in 1-2 frasi brevi, tecnico-precise. Nessun incoraggiamento, solo analisi fisica concreta.`;
@@ -2326,6 +2360,7 @@ export default async function handler(req, res) {
     const targetCombo = String(req.body.targetCombo || 'tecnica').slice(0, 80);
     const poseHint = req.body.poseHint || '';
     const JUDGE_SYSTEM = `Sei un giudice esperto di ${disciplineLabel}. Guardi UN frame di un atleta che ha appena eseguito una tecnica/combo chiamata.
+Se l'immagine contiene PIÙ PANNELLI affiancati (es. "1 — INIZIO", "2 — CENTRO", "3 — FINE"), sono momenti consecutivi della STESSA esecuzione: giudica l'intera sequenza, non un solo istante.
 Il tuo compito: stabilire se l'ha eseguita correttamente, in modo concreto e specifico basato su ciò che VEDI realmente.
 REGOLE: cita sempre la parte del corpo precisa. Niente consigli generici. Breve e diretto.
 FORMATO (esatto, NO markdown, NO emoji, 3 righe):
@@ -2334,7 +2369,14 @@ FEEDBACK: <1 frase — se buono/perfetto: la cosa migliore fatta. Se riprova: il
 PROSSIMO: <il prossimo combo da chiamare, specifico per la disciplina, DIVERSO dall'attuale, es. "cross-gancio-low kick">`;
     const userMsg = `L'atleta doveva eseguire: "${targetCombo}". ${poseHint ? `Dati scheletro: ${poseHint}.` : ''}\nGuarda il frame e giudica l'esecuzione.${strikeMasteryRubric(targetCombo)}`;
     let judgeResult = null;
-    if (_groqKey) {
+    const _gem = geminiVision();
+    if (_gem.key) {
+      try {
+        const g = await callVisionGemini(_gem.key, _gem.model, imageBase64, mimeType, JUDGE_SYSTEM, userMsg, 300);
+        if (g?.ok) judgeResult = g.data?.choices?.[0]?.message?.content?.trim() || '';
+      } catch (_) {}
+    }
+    if (!judgeResult && _groqKey) {
       try {
         const g = await callVisionGroq(_groqKey, imageBase64, mimeType, JUDGE_SYSTEM, userMsg);
         if (g?.ok) judgeResult = g.data?.choices?.[0]?.message?.content?.trim() || '';
@@ -2427,36 +2469,54 @@ PROSSIMO: <il prossimo combo da chiamare, specifico per la disciplina, DIVERSO d
     const poseLine = req.body?.poseHint ? `\nDATI SCHELETRO (angoli reali misurati, usali per essere preciso): ${req.body.poseHint}.` : '';
     const userObs = `Descrivi cosa vedi in questo frame.${poseLine} Se vedi un rischio di infortunio, inizia con "RISCHIO:".`;
     let observation = '';
-    if (groqKey) {
+    let obsProvider = 'observer-fast';
+    const gem = geminiVision();
+    if (gem.key) {
+      const g = await callVisionGemini(gem.key, gem.model, imageBase64, mimeType, techPrompt, userObs, 300);
+      if (g?.ok) { observation = g.data?.choices?.[0]?.message?.content?.trim() || ''; obsProvider = 'gemini-observer'; }
+    }
+    if (!observation && groqKey) {
       const g = await callVisionGroq(groqKey, imageBase64, mimeType, techPrompt, userObs);
       if (g?.ok) observation = g.data?.choices?.[0]?.message?.content?.trim() || '';
-    } else if (cosmosKey) {
+    }
+    if (!observation && cosmosKey) {
       const c = await callVisionCosmos(cosmosKey, cosmosModel, imageBase64, mimeType, `Descrivi postura, equilibrio e angoli articolari.${poseLine} Se sul frame vedi scheletro colorato/scie/testi disegnati sono misure reali del sistema: usale come verità. Se c'è rischio infortunio inizia con "RISCHIO:".`);
       if (c?.ok) observation = c.data?.choices?.[0]?.message?.content?.trim() || '';
     }
     const risk = /RISCHIO|infortun|rischio|pericol|cede sotto|collass|iperesten|sbilanc/i.test(observation);
     res.setHeader('X-Visual-Mode', mode);
-    return res.status(200).json({ observation, risk, provider: 'observer-fast', mode });
+    return res.status(200).json({ observation, risk, provider: obsProvider, mode });
   }
 
   // 1. I DUE COACH VISIVI in parallelo — entrambi OSSERVANO il frame reale
-  //    (Groq = tecnica, Cosmos = biomeccanica). Niente liste predefinite: descrivono
-  //    solo ciò che vedono, così il cervello produce un consiglio VERO non "da database".
+  //    (Gemini/Groq = tecnica, Cosmos = biomeccanica). Niente liste predefinite:
+  //    descrivono solo ciò che vedono, così il cervello produce un consiglio VERO.
   const techObserverPrompt = VISION_TECH_OBSERVER(disciplineLabel);
-  if (groqKey || cosmosKey) {
-    const [groqRes, cosmosRes] = await Promise.allSettled([
-      groqKey ? callVisionGroq(groqKey, imageBase64, mimeType, techObserverPrompt, 'Descrivi cosa vedi in questo frame.') : Promise.resolve({ ok: false }),
+  const gem = geminiVision();
+  if (gem.key || groqKey || cosmosKey) {
+    const [techRes, cosmosRes] = await Promise.allSettled([
+      gem.key
+        ? callVisionGemini(gem.key, gem.model, imageBase64, mimeType, techObserverPrompt, 'Descrivi cosa vedi in questo frame.', 300)
+        : (groqKey ? callVisionGroq(groqKey, imageBase64, mimeType, techObserverPrompt, 'Descrivi cosa vedi in questo frame.') : Promise.resolve({ ok: false })),
       cosmosKey ? callVisionCosmos(cosmosKey, cosmosModel, imageBase64, mimeType, 'Analizza postura, equilibrio e angoli articolari in questo frame. Se vedi scheletro colorato/scie/testi disegnati sono misure reali del sistema: usale come verità.') : Promise.resolve({ ok: false }),
     ]);
 
-    const groqText = groqRes.status === 'fulfilled' && groqRes.value?.ok
-      ? groqRes.value.data?.choices?.[0]?.message?.content?.trim()
+    let techText = techRes.status === 'fulfilled' && techRes.value?.ok
+      ? techRes.value.data?.choices?.[0]?.message?.content?.trim()
       : null;
+    let techProvider = gem.key ? 'gemini' : 'groq';
+    // Rivalsa: se Gemini non risponde, recupera l'osservazione tecnica da Groq
+    if (!techText && gem.key && groqKey) {
+      try {
+        const g = await callVisionGroq(groqKey, imageBase64, mimeType, techObserverPrompt, 'Descrivi cosa vedi in questo frame.');
+        if (g?.ok) { techText = g.data?.choices?.[0]?.message?.content?.trim() || null; techProvider = 'groq'; }
+      } catch (_) {}
+    }
     const cosmosText = cosmosRes.status === 'fulfilled' && cosmosRes.value?.ok
       ? cosmosRes.value.data?.choices?.[0]?.message?.content?.trim()
       : null;
 
-    if (groqText || cosmosText) {
+    if (techText || cosmosText) {
       // 2. CERVELLO GEMMA — fonde le due osservazioni con la conoscenza della disciplina
       // Estrae il blocco anti-ripetizione dal prompt (FEEDBACK RECENTI ...) se presente
       const antiRepeat = (prompt && /FEEDBACK RECENTI/i.test(prompt))
@@ -2466,7 +2526,7 @@ PROSSIMO: <il prossimo combo da chiamare, specifico per la disciplina, DIVERSO d
       const brain = await callBrainOrchestrator({
         isSparring: sparring,
         disciplineLabel,
-        techObs: groqText,
+        techObs: techText,
         biomechObs: cosmosText,
         antiRepeatContext: antiRepeat,
         disciplineMode: mode,
@@ -2479,9 +2539,9 @@ PROSSIMO: <il prossimo combo da chiamare, specifico per la disciplina, DIVERSO d
       }
 
       // Fallback: se il cervello non risponde, concatena le osservazioni grezze
-      let content = groqText || '';
+      let content = techText || '';
       if (cosmosText) content += (content ? '\n\n🔬 ' : '') + cosmosText;
-      const provider = groqText && cosmosText ? 'groq+cosmos' : (groqText ? 'groq' : 'cosmos');
+      const provider = techText && cosmosText ? `${techProvider}+cosmos` : (techText ? techProvider : 'cosmos');
       res.setHeader('X-Visual-Provider', provider);
       res.setHeader('X-Visual-Mode', mode);
       return res.status(200).json({ content, provider, mode });

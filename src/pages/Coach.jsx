@@ -3546,15 +3546,68 @@ function VisualCoach({ setPlayerStats }) {
     flushComboFocus(); // manda le eventuali voci accodate rimaste sotto soglia
   }, [flushComboFocus]);
 
+  // Fotogrammi chiave catturati durante il GO della combo → collage per il giudice
+  const comboFramesRef = useRef([]);
+  const comboShotTRef = useRef(0);
+  const comboCanvasRef = useRef(null);
+
+  // Compone N pannelli affiancati in una singola immagine (1 chiamata, N momenti)
+  const composeContactSheet = useCallback(async (urls, labels) => {
+    const imgs = await Promise.all(urls.map((u) => new Promise((ok, ko) => {
+      const img = new Image();
+      img.onload = () => ok(img);
+      img.onerror = ko;
+      img.src = u;
+    })));
+    if (!imgs.length) return null;
+    const pw = 384;
+    const ph = Math.round(imgs[0].height * (pw / (imgs[0].width || pw))) || 288;
+    const labelH = 28;
+    const c = document.createElement('canvas');
+    c.width = pw * imgs.length; c.height = ph + labelH;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#000'; ctx.fillRect(0, 0, c.width, c.height);
+    imgs.forEach((img, i) => {
+      ctx.drawImage(img, i * pw, labelH, pw, ph);
+      ctx.fillStyle = '#ffd24a';
+      ctx.font = 'bold 17px system-ui, sans-serif';
+      ctx.fillText(labels[i] || String(i + 1), i * pw + 8, 20);
+    });
+    return c.toDataURL('image/jpeg', 0.72).split(',')[1];
+  }, []);
+
   const runComboJudge = useCallback(async (combo) => {
     if (!videoRef.current || !canvasRef.current) return;
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
     const video = videoRef.current;
-    canvas.width = video.videoWidth || 640;
-    canvas.height = video.videoHeight || 480;
-    ctx.drawImage(video, 0, 0);
-    const imageBase64 = canvas.toDataURL('image/jpeg', 0.72).split(',')[1];
+    const pose = computePose();
+    const frames = comboFramesRef.current;
+    let imageBase64 = null;
+    // SCHEDA DI CONTATTO: inizio/centro + frame finale ANNOTATO (misure reali)
+    if (frames.length >= 2) {
+      const urls = [frames[0], frames[Math.floor(frames.length / 2)]];
+      const labels = ['1 — INIZIO', '2 — CENTRO'];
+      if (skeletonOn && lastLandmarksRef.current) {
+        urls.push('data:image/jpeg;base64,' + drawAnnotatedFrame(video, lastLandmarksRef.current, pose, trailRef.current, 448, 0.6));
+        labels.push('3 — FINE (misure reali)');
+      } else {
+        urls.push(frames[frames.length - 1]);
+        labels.push('3 — FINE');
+      }
+      try { imageBase64 = await composeContactSheet(urls, labels); } catch { imageBase64 = null; }
+    }
+    if (!imageBase64) {
+      // fallback: singolo frame (annotato se lo scheletro è attivo)
+      if (skeletonOn && lastLandmarksRef.current) {
+        imageBase64 = drawAnnotatedFrame(video, lastLandmarksRef.current, pose, trailRef.current, 512, 0.72);
+      } else {
+        canvas.width = video.videoWidth || 640;
+        canvas.height = video.videoHeight || 480;
+        ctx.drawImage(video, 0, 0);
+        imageBase64 = canvas.toDataURL('image/jpeg', 0.72).split(',')[1];
+      }
+    }
     try {
       const res = await fetch('/api/nvidia/visual', {
         method: 'POST',
@@ -3564,7 +3617,7 @@ function VisualCoach({ setPlayerStats }) {
       const data = await res.json();
       return data;
     } catch { return null; }
-  }, [mode]);
+  }, [mode, composeContactSheet, skeletonOn]);
 
   const currentComboRef = useRef('');
   const nextComboRoundRef = useRef(null);
@@ -3635,6 +3688,7 @@ function VisualCoach({ setPlayerStats }) {
     const go = () => {
       setComboPhase('go');
       comboPhaseRef.current = 'go';
+      comboFramesRef.current = [];  // nuova esecuzione → nuovi fotogrammi chiave
       enqueueSpeak('Via!', true);
       const execMs = Math.max(2400, nTech * 950);   // tempo d'esecuzione proporzionale ai colpi
       comboTimerRef.current = setTimeout(async () => {
@@ -3995,6 +4049,20 @@ function VisualCoach({ setPlayerStats }) {
                 const stanceW = L[27] && L[28] ? Math.abs(L[27].x - L[28].x) : null;
                 const guardDown = (L[15] && L[11] && L[15].y > L[11].y + 0.08) || (L[16] && L[12] && L[16].y > L[12].y + 0.08);
                 trendRef.current = [...trendRef.current, { t: nowK, stanceW, guardDown: guardDown ? 1 : 0 }].slice(-140);
+              }
+            }
+            // ── COMBO: fotogrammi chiave durante il GO → scheda di contatto ──
+            if (comboPhaseRef.current === 'go' && video.readyState >= 2) {
+              const nowC = performance.now();
+              if (nowC - comboShotTRef.current > 350) {
+                comboShotTRef.current = nowC;
+                const cw = 384;
+                const ch = Math.round((video.videoHeight || 480) * (cw / (video.videoWidth || 640)));
+                const kc = comboCanvasRef.current || (comboCanvasRef.current = document.createElement('canvas'));
+                kc.width = cw; kc.height = ch;
+                kc.getContext('2d').drawImage(video, 0, 0, cw, ch);
+                comboFramesRef.current.push(kc.toDataURL('image/jpeg', 0.5));
+                if (comboFramesRef.current.length > 14) comboFramesRef.current.shift();
               }
             }
             // ── INTENSITÀ: spostamento medio dei landmark del corpo → EMA 0-100 ──
