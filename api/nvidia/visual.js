@@ -1,6 +1,7 @@
 export const config = { maxDuration: 60 }; // pipeline 2 coach vision + cervello supera i 15s default
 import { guardApi } from '../../lib/apiGuard.js';
 import { maestroContext } from '../../lib/martialKnowledge.js';
+import { pickSecrets, secretOfTheDay, formatSecretsForPrompt } from '../../lib/coachSecrets.js';
 
 // NVIDIA NIM visual live coach — Llama Vision 90B primary, Groq fallback
 // Discipline: muaythai, boxing, kickboxing, bjj, wrestling, karate, mma, kravmaga, general, fitness
@@ -1869,7 +1870,7 @@ const BRAIN_PROVIDERS = [
   { key: () => process.env.MISTRAL_NVIDIA_API_KEY,  base: NVIDIA_BASE, model: 'mistralai/mistral-large-3-675b-instruct-2512', name: 'mistral-brain' },
 ];
 
-async function callBrainOrchestrator({ isSparring, disciplineLabel, techObs, biomechObs, antiRepeatContext, disciplineMode = '' }) {
+async function callBrainOrchestrator({ isSparring, disciplineLabel, techObs, biomechObs, antiRepeatContext, disciplineMode = '', secretsBlock = '' }) {
   if (!techObs && !biomechObs) return null;
   const system = isSparring ? BRAIN_SPARRING : BRAIN_SOLO;
   const obsBlock = [
@@ -1877,6 +1878,7 @@ async function callBrainOrchestrator({ isSparring, disciplineLabel, techObs, bio
     techObs ? `\nOSSERVATORE TECNICO:\n${techObs}` : '',
     biomechObs ? `\nOSSERVATORE BIOMECCANICO:\n${biomechObs}` : '',
     antiRepeatContext ? `\n${antiRepeatContext}` : '',
+    secretsBlock ? `\n${secretsBlock}` : '',
     errorsRubric(disciplineMode, disciplineLabel),
     maestroContext(disciplineMode),
     strikeMasteryRubric(`${techObs || ''} ${biomechObs || ''}`, true),
@@ -1989,7 +1991,7 @@ PROVA: <il prossimo COLPO o COMBO concreto da eseguire ORA, specifico per la dis
 PERCHÉ: <principio tecnico/biomeccanico in una frase — ometti se ovvio>
 Tono secco, professionale, esigente ma incoraggiante, in italiano. Dai SEMPRE sia il difetto sia ciò che va bene.`;
 
-async function callBrainVerdict({ disciplineLabel, observations, antiRepeatContext, disciplineMode = '', learner = null, pathContext = '' }) {
+async function callBrainVerdict({ disciplineLabel, observations, antiRepeatContext, disciplineMode = '', learner = null, pathContext = '', secretsBlock = '' }) {
   if (!observations || observations.length === 0) return null;
   const user = [
     `DISCIPLINA: ${disciplineLabel}`,
@@ -1998,6 +2000,7 @@ async function callBrainVerdict({ disciplineLabel, observations, antiRepeatConte
     antiRepeatContext ? `\n${antiRepeatContext}` : '',
     pathContext ? `\n${pathContext}` : '',
     learnerRubric(learner),
+    secretsBlock ? `\n${secretsBlock}` : '',
     errorsRubric(disciplineMode, disciplineLabel),
     strikeMasteryRubric(observations.join(' '), true),
     `\nTrova il pattern ricorrente e restituisci il comando finale nel formato richiesto.`,
@@ -2120,6 +2123,15 @@ export default async function handler(req, res) {
   const { imageBase64, mimeType = 'image/jpeg', prompt, mode = 'muaythai', observeOnly, observations, generatePlan, drillReview, drill, sample, learner } = req.body || {};
   const disciplineLabel = DISCIPLINE_LABELS[mode] || mode;
   const sparring = /sparring|partner|drill/.test(mode);
+
+  // ── SEGRETI DEL MAESTRO: retrieval deterministico (lib/coachSecrets) ──────
+  // 2-4 segreti pertinenti a ciò che si vede ORA, entro il grado dell'atleta.
+  const secretLevel = Math.max(1, Math.min(5, parseInt(req.body?.secretLevel) || 5));
+  const buildSecretsBlock = (errorText) => {
+    try {
+      return formatSecretsForPrompt(pickSecrets(mode, { n: 3, maxLevel: secretLevel, errorText: String(errorText || '').slice(0, 600) }));
+    } catch { return ''; }
+  };
 
   // ── CATTURA CAMPIONE COACH → alveare (nessuna immagine, solo dati) ─────────
   // Il Visual Coach manda qui ogni verdetto + (opzionale) pollice su/giù dell'utente.
@@ -2441,7 +2453,7 @@ PROSSIMO: <il prossimo combo da chiamare, specifico per la disciplina, DIVERSO d
       return (end === -1 ? rest : rest.slice(0, end)).slice(0, 900);
     };
     const pathContext = [extractBlock('PERCORSO ALLIEVO'), extractBlock('SESSIONE ATTUALE:')].filter(Boolean).join('\n');
-    const verdict = await callBrainVerdict({ disciplineLabel, observations, antiRepeatContext: antiRepeat, disciplineMode: mode, learner, pathContext });
+    const verdict = await callBrainVerdict({ disciplineLabel, observations, antiRepeatContext: antiRepeat, disciplineMode: mode, learner, pathContext, secretsBlock: buildSecretsBlock(observations.join(' ')) });
     if (verdict) {
       res.setHeader('X-Visual-Provider', verdict.brain);
       res.setHeader('X-Visual-Mode', mode);
@@ -2530,6 +2542,7 @@ PROSSIMO: <il prossimo combo da chiamare, specifico per la disciplina, DIVERSO d
         biomechObs: cosmosText,
         antiRepeatContext: antiRepeat,
         disciplineMode: mode,
+        secretsBlock: buildSecretsBlock(`${req.body?.poseHint || ''} ${techText || ''} ${cosmosText || ''}`),
       });
 
       if (brain) {
