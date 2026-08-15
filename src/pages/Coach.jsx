@@ -5,6 +5,7 @@ import { Eye, Lightbulb, Trophy, ScanSearch, Play, Pause, Target, FlipHorizontal
 import { BREATHING_PROTOCOLS } from '../../lib/breathingProtocols.js';
 import { getDiscipline } from '../../lib/martialKnowledge.js';
 import { analyzeKinematics, fatigueFromTrend } from '../../lib/kinematics.js';
+import { secretsFor, secretOfTheDay } from '../../lib/coachSecrets.js';
 import { MARKER_RE, canonicalMarker, normalizeCoachingText, extractCommand } from '../../lib/coachingText.js';
 import { buildCoachWorkout } from '../../lib/workouts.js';
 import { applyXp } from '../utils/xpLogic';
@@ -897,6 +898,15 @@ const disciplineRank = (disc) => {
   const idx = levelsDone >= curr.levels.length && examsDone >= curr.levels.length ? 5 : Math.min(levelsDone, 4);
   return { rank: RANK_LABELS[idx], levelsDone, examsDone };
 };
+// Grado → livello dei segreti rivelati (E=1 … A/S=5)
+const secretLevelOf = (rankLetter) => Math.min(5, Math.max(1, RANK_LABELS.indexOf(rankLetter) + 1));
+const secretLevelForMode = (mode) => {
+  const base = String(mode || '').replace(/^(sparring|drill|partner)_/, '');
+  const r = disciplineRank(base);
+  return r ? secretLevelOf(r.rank) : 5; // senza curriculum → nessuna restrizione
+};
+const SECRET_RANK_KEY = 'shadow_monarch_secret_rank_seen';
+const loadSeenRanks = () => { try { return JSON.parse(localStorage.getItem(SECRET_RANK_KEY) || '{}'); } catch { return {}; } };
 
 // ── Prossimo obiettivo nel percorso: primo argomento non completato ───────────
 const nextObjective = (disc) => {
@@ -1179,6 +1189,25 @@ function CurriculumCoach({ onGoLive }) {
   const reviews = useMemo(() => reviewTopics(disc), [disc, progress]);
   const rank = useMemo(() => disciplineRank(disc), [disc, progress, exams]);
 
+  // ── SEGRETI DEL MAESTRO: sblocco per grado + segreto del giorno ────────────
+  const secretLevel = rank ? secretLevelOf(rank.rank) : 1;
+  const discSecrets = useMemo(() => secretsFor(disc), [disc]);
+  const unlockedSecrets = discSecrets.filter((s) => s.livello <= secretLevel);
+  const todaySecret = useMemo(() => secretOfTheDay(disc), [disc]);
+  const [unlockModal, setUnlockModal] = useState(null);
+  useEffect(() => {
+    if (!rank) return;
+    const seen = loadSeenRanks();
+    const prev = seen[disc] || 'E';
+    if (RANK_LABELS.indexOf(rank.rank) > RANK_LABELS.indexOf(prev)) {
+      const fresh = discSecrets.filter((s) => s.livello === secretLevelOf(rank.rank));
+      if (fresh.length) setUnlockModal({ rank: rank.rank, secrets: fresh.slice(0, 5), total: fresh.length });
+    }
+    if (seen[disc] !== rank.rank) {
+      try { localStorage.setItem(SECRET_RANK_KEY, JSON.stringify({ ...seen, [disc]: rank.rank })); } catch {}
+    }
+  }, [disc, rank, discSecrets]);
+
   const toggleTopic = (li, ti) => {
     setProgress((prev) => {
       const dp = prev[disc] || {};
@@ -1327,6 +1356,66 @@ Rispondi in italiano, max 15 righe, tono da maestro pratico.`;
           </div>
         </div>
       </div>
+
+      {/* 🗝️ SEGRETI DEL MAESTRO — la conoscenza si sblocca col grado */}
+      {discSecrets.length > 0 && (() => {
+        const revealed = todaySecret && todaySecret.livello <= secretLevel;
+        const nextLocked = discSecrets.find((s) => s.livello > secretLevel);
+        return (
+          <div className="rounded-2xl p-4 space-y-2" style={{ background: 'linear-gradient(135deg, rgba(245,158,11,0.08), rgba(17,24,39,0.9))', border: `1px solid ${C.amber.border}` }}>
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs font-black tracking-widest" style={{ color: C.amber.hex, fontFamily: 'Orbitron, sans-serif' }}>🗝️ SEGRETO DEL GIORNO</p>
+              <span className="text-[10px] px-2 py-0.5 rounded-full font-bold whitespace-nowrap" style={{ background: 'rgba(55,65,81,0.4)', color: '#9ca3af' }}>
+                {unlockedSecrets.length}/{discSecrets.length} rivelati · grado {rank?.rank || 'E'}
+              </span>
+            </div>
+            {todaySecret && (revealed ? (
+              <p className="text-sm text-white leading-snug"><span style={{ color: C.amber.hex }}>[{todaySecret.categoria}{todaySecret.lore ? ' · tradizione' : ''}]</span> {todaySecret.text}</p>
+            ) : (
+              <div className="relative">
+                <p className="text-sm text-white leading-snug select-none" style={{ filter: 'blur(6px)', opacity: 0.55 }} aria-hidden>{todaySecret.text}</p>
+                <p className="absolute inset-0 flex items-center justify-center text-xs font-black px-2 text-center" style={{ color: C.amber.hex }}>
+                  🔒 Il Maestro lo rivelerà al grado {RANK_LABELS[Math.min(5, todaySecret.livello - 1)]}
+                </p>
+              </div>
+            ))}
+            {nextLocked && revealed && (
+              <p className="text-[10px]" style={{ color: '#6b7280' }}>
+                {discSecrets.filter((s) => s.livello === nextLocked.livello).length} segreti in attesa del grado {RANK_LABELS[Math.min(5, nextLocked.livello - 1)]}
+              </p>
+            )}
+          </div>
+        );
+      })()}
+
+      {/* 🗝️ CERIMONIA DI SBLOCCO — il Maestro rivela i segreti del nuovo grado */}
+      <AnimatePresence>
+        {unlockModal && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-6"
+            style={{ background: 'rgba(0,0,0,0.85)' }}
+            onClick={() => setUnlockModal(null)}>
+            <motion.div initial={{ scale: 0.85, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
+              className="max-w-md w-full rounded-2xl p-6 space-y-3"
+              style={{ background: 'linear-gradient(160deg, rgba(245,158,11,0.14), rgba(17,24,39,0.98))', border: `1px solid ${C.amber.border}`, boxShadow: `0 0 40px ${C.amber.glow}` }}
+              onClick={(e) => e.stopPropagation()}>
+              <p className="text-center text-3xl">🗝️</p>
+              <p className="text-center text-sm font-black tracking-widest" style={{ color: C.amber.hex, fontFamily: 'Orbitron, sans-serif' }}>SEGRETI SBLOCCATI — GRADO {unlockModal.rank}</p>
+              <p className="text-center text-xs" style={{ color: '#9ca3af' }}>
+                Il Maestro ti ritiene pronto. {unlockModal.total === 1 ? 'Un nuovo segreto' : `${unlockModal.total} nuovi segreti`} di {curriculum.name}{unlockModal.total > 5 ? ' — ecco i primi:' : ':'}
+              </p>
+              <div className="space-y-2">
+                {unlockModal.secrets.map((s) => (
+                  <div key={s.id} className="rounded-xl p-2.5" style={{ background: 'rgba(55,65,81,0.35)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                    <p className="text-xs text-white leading-snug">{s.text}</p>
+                  </div>
+                ))}
+              </div>
+              <button onClick={() => setUnlockModal(null)} className="w-full py-2.5 rounded-xl text-sm font-black" style={{ background: C.amber.hex, color: '#0b0b0f' }}>RICEVO L'INSEGNAMENTO</button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Selector */}
       <div className="flex flex-wrap gap-1.5">
@@ -4398,7 +4487,7 @@ function VisualCoach({ setPlayerStats }) {
     try {
       const res = await fetch('/api/nvidia/visual', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageBase64: base64, mimeType: 'image/jpeg', mode, prompt: buildPrompt(currentDisc?.prompt) }),
+        body: JSON.stringify({ imageBase64: base64, mimeType: 'image/jpeg', mode, prompt: buildPrompt(currentDisc?.prompt), secretLevel: secretLevelForMode(mode) }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Errore AI');
@@ -4546,6 +4635,7 @@ function VisualCoach({ setPlayerStats }) {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             mode, observations: observationsRef.current, prompt: buildPrompt(currentDisc?.prompt), poseHint,
+            secretLevel: secretLevelForMode(mode),
             // Il maestro sa CHI ha davanti: difetti storici da cacciare, cose già risolte, cosa gli ha già detto stasera.
             learner: buildLearnerProfile(pastSessionsRef.current, mode, insistedRef.current),
           }),
