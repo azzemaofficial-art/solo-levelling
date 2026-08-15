@@ -2789,6 +2789,45 @@ function VisualCoach({ setPlayerStats }) {
   const [mode, setMode] = useState('muaythai');
   const [pastSessions, setPastSessions] = useState(() => loadSessions());
   const [coachProgress, setCoachProgress] = useState(() => loadCoachProgress());
+  // ── MEMORIA DEL MAESTRO cross-device: idrata lo storico da KV (coach_sessions)
+  // una volta al mount, così errori ricorrenti e focus sopravvivono al cambio
+  // telefono/clear storage. Merge per (data+disciplina+titolo), ordinato per ts.
+  useEffect(() => {
+    let chatId = '';
+    try { chatId = window.localStorage.getItem('shadow_monarch_tg_chat_id') || ''; } catch {}
+    if (!chatId) return;
+    const toTs = (s) => s.ts || (s.date ? new Date(`${String(s.date).split('/').reverse().join('-')}T00:00:00`).toISOString() : '');
+    fetch('/api/nvidia/visual', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ memorySync: true, chatId }),
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        const kv = (data?.sessions || []).filter((s) => s && s.mode);
+        if (!kv.length) return;
+        setPastSessions((prev) => {
+          const local = (Array.isArray(prev) ? prev : []).map((s) => ({ ...s, ts: toTs(s) }));
+          const seen = new Set(local.map((s) => `${(s.ts || '').slice(0, 10)}|${s.mode}|${String(s.keyFeedback || '').slice(0, 40)}`));
+          const merged = [...local];
+          for (const s of kv) {
+            const dateIt = s.date ? new Date(`${s.date}T00:00:00`).toLocaleDateString('it-IT') : '';
+            const key = `${(s.ts || '').slice(0, 10)}|${s.mode}|${String(s.title || '').slice(0, 40)}`;
+            if (seen.has(key)) continue;
+            seen.add(key);
+            merged.push({
+              ts: s.ts || '', date: dateIt, mode: s.mode, score: s.score,
+              weaknesses: s.weaknesses || [], focusNext: s.focusNext || [],
+              keyFeedback: s.title || '',
+            });
+          }
+          merged.sort((a, b) => String(b.ts || '').localeCompare(String(a.ts || '')));
+          const next = merged.slice(0, 12);
+          saveSessions(next);
+          return next;
+        });
+      })
+      .catch(() => {});
+  }, []);
   const examRef = useRef(null);          // esame milestone in corso: {li, label, milestone, mode}
   const [examBanner, setExamBanner] = useState(null); // mostrato in setup quando arrivi dal curriculum
   // Deep-link dal Curriculum: sessione pre-configurata (argomento del percorso o esame milestone)

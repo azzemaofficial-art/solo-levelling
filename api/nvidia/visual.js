@@ -2164,6 +2164,27 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, stored: capped.length, sample: row });
   }
 
+  // ── MEMORIA DEL MAESTRO — il client idrata lo storico sessioni da KV ───────
+  // La pagella vive in coach_sessions:<chatId>; il web client la rilegge qui
+  // per costruire il profilo dell'atleta (errori ricorrenti, focus, livello).
+  if (req.body?.memorySync) {
+    const chatId = resolveChatId(req.body?.chatId);
+    if (!chatId) return res.status(400).json({ ok: false, error: 'chatId mancante' });
+    const past = (await kvGetRaw(`coach_sessions:${chatId}`)) || [];
+    const arr = Array.isArray(past) ? past : [];
+    return res.status(200).json({
+      ok: true,
+      sessions: arr.slice(-30).map((s) => ({
+        ts: s.ts || '', date: s.date || '', mode: s.mode || '',
+        score: typeof s.score === 'number' ? s.score : null,
+        title: String(s.title || '').slice(0, 120),
+        weaknesses: Array.isArray(s.weaknesses) ? s.weaknesses.slice(0, 3) : [],
+        strengths: Array.isArray(s.strengths) ? s.strengths.slice(0, 3) : [],
+        focusNext: Array.isArray(s.focusNext) ? s.focusNext.slice(0, 3) : [],
+      })),
+    });
+  }
+
   // ── PREFERENZE WEB (SystemHub/Recipe Forge) → KV web_prefs:<chatId>, letto dal ponte Obsidian ──
   // Il client manda: webPrefs:{ foodPrefs, recipeFeedback? } — recipeFeedback è UNA voce da
   // accodare (non l'intero array), così ogni 👍/👎 è una singola chiamata leggera.
