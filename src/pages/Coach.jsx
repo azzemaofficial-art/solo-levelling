@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Eye, Lightbulb, Trophy, ScanSearch, Play, Pause, Target, FlipHorizontal2, Volume2, VolumeX, Bone, X, Move, ThumbsUp, ThumbsDown } from 'lucide-react';
 import { BREATHING_PROTOCOLS } from '../../lib/breathingProtocols.js';
 import { getDiscipline } from '../../lib/martialKnowledge.js';
+import { analyzeKinematics, fatigueFromTrend } from '../../lib/kinematics.js';
 import { MARKER_RE, canonicalMarker, normalizeCoachingText, extractCommand } from '../../lib/coachingText.js';
 import { buildCoachWorkout } from '../../lib/workouts.js';
 import { applyXp } from '../utils/xpLogic';
@@ -1626,6 +1627,93 @@ function resolvePose(tech) {
   return 'stance';
 }
 
+// ── FRAME ANNOTATO PER L'AI ─────────────────────────────────────────────────
+// Sul frame spedito al modello disegniamo ciò che NOI abbiamo già misurato:
+// scheletro colorato (giunti ROSSI dove c'è un alert certo), scia del movimento
+// di polsi/caviglie e HUD con angoli e segnali. Il VLM così non misura più —
+// legge fatti già verificati e interpreta la scena. Stessa resa con modelli free.
+const ANNOT_CONN = [[11, 13], [13, 15], [12, 14], [14, 16], [11, 12], [11, 23], [12, 24], [23, 24], [23, 25], [25, 27], [24, 26], [26, 28]];
+const alertJoints = (alerts) => {
+  const red = new Set();
+  for (const a of alerts || []) {
+    const s = String(a).toLowerCase();
+    const dx = s.includes('dx');
+    if (s.includes('gomito')) (dx ? [12, 14, 16] : [11, 13, 15]).forEach((i) => red.add(i));
+    if (s.includes('guardia') || s.includes('mano')) (dx ? [12, 16] : [11, 15]).forEach((i) => red.add(i));
+    if (s.includes('ginocchio')) (dx ? [24, 26, 28] : [23, 25, 27]).forEach((i) => red.add(i));
+    if (s.includes('anca')) (dx ? [12, 24] : [11, 23]).forEach((i) => red.add(i));
+    if (s.includes('busto') || s.includes('schiena')) [11, 12, 23, 24].forEach((i) => red.add(i));
+  }
+  return red;
+};
+// Disegna il frame annotato e ritorna il base64 jpeg. `trail` = campioni
+// {t, lw, rw, la, ra} accumulati nel loop MediaPipe (coordinate normalizzate).
+function drawAnnotatedFrame(video, lm, pose, trail, maxDim = 512, quality = 0.68) {
+  const vw = video.videoWidth || 640, vh = video.videoHeight || 480;
+  const sc = Math.min(1, maxDim / vw);
+  const W = Math.round(vw * sc), H = Math.round(vh * sc);
+  const c = document.createElement('canvas');
+  c.width = W; c.height = H;
+  const ctx = c.getContext('2d');
+  ctx.drawImage(video, 0, 0, W, H);
+  const rawB64 = () => c.toDataURL('image/jpeg', quality).split(',')[1];
+  if (!lm || lm.length < 29) return rawB64();
+  const X = (p) => p.x * W, Y = (p) => p.y * H;
+  const vis = (i) => lm[i]?.visibility ?? 1;
+  // 1) Scia del movimento: archi a dissolvenza (il modello vede il gesto in una foto)
+  const drawTrail = (key, rgb) => {
+    const pts = (trail || []).map((s) => s[key]).filter(Boolean);
+    if (pts.length < 2) return;
+    for (let i = 1; i < pts.length; i++) {
+      const alpha = Math.round((i / pts.length) * 200);
+      ctx.strokeStyle = `rgba(${rgb},${alpha})`;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(X(pts[i - 1]), Y(pts[i - 1]));
+      ctx.lineTo(X(pts[i]), Y(pts[i]));
+      ctx.stroke();
+    }
+  };
+  drawTrail('lw', '255,196,0');   // polso sx
+  drawTrail('rw', '255,120,0');   // polso dx
+  drawTrail('la', '0,220,255');   // caviglia sx
+  drawTrail('ra', '0,140,255');   // caviglia dx
+  // 2) Scheletro: verde = ok, rosso = alert misurato dal sistema
+  const red = alertJoints(pose?.alerts);
+  ctx.lineWidth = 2;
+  for (const [a, b] of ANNOT_CONN) {
+    if (vis(a) < 0.35 || vis(b) < 0.35) continue;
+    ctx.strokeStyle = (red.has(a) || red.has(b)) ? 'rgba(255,60,60,0.95)' : 'rgba(0,255,136,0.85)';
+    ctx.beginPath(); ctx.moveTo(X(lm[a]), Y(lm[a])); ctx.lineTo(X(lm[b]), Y(lm[b])); ctx.stroke();
+  }
+  for (let i = 11; i <= 28; i++) {
+    const p = lm[i];
+    if (!p || vis(i) < 0.35) continue;
+    ctx.fillStyle = red.has(i) ? '#ff3c3c' : '#00ff88';
+    ctx.beginPath(); ctx.arc(X(p), Y(p), red.has(i) ? 5 : 3.5, 0, Math.PI * 2); ctx.fill();
+  }
+  // 3) HUD: i fatti certi, scritti grandi (il modello legge, non stima)
+  const hudLines = [];
+  if (pose?.hint) {
+    const seg = pose.hint.split(', ');
+    for (let i = 0; i < seg.length; i += 4) hudLines.push(seg.slice(i, i + 4).join(', '));
+  }
+  (pose?.alerts || []).slice(0, 4).forEach((a) => hudLines.push('⚠ ' + a));
+  if (hudLines.length) {
+    const fs = Math.max(13, Math.round(W / 32));
+    ctx.font = `bold ${fs}px system-ui, sans-serif`;
+    ctx.textBaseline = 'top';
+    hudLines.slice(0, 5).forEach((t, i) => {
+      const y = 6 + i * (fs + 5);
+      ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,0.85)';
+      ctx.strokeText(t, 6, y);
+      ctx.fillStyle = t.startsWith('⚠') ? '#ff6b6b' : '#ffffff';
+      ctx.fillText(t, 6, y);
+    });
+  }
+  return rawB64();
+}
+
 // ── SPECCHIO: confronta gli angoli REALI (MediaPipe) con quelli ideali della tecnica ──
 // Deterministico e istantaneo: nessuna AI. Giunti ok/off + correzioni concrete.
 const POSE_FAMILY = {
@@ -2710,6 +2798,11 @@ function VisualCoach({ setPlayerStats }) {
   const speakQueueRef = useRef([]);   // coda comandi da mostrare/leggere uno alla volta
   const presentingRef = useRef(false); // true mentre un comando è a schermo + in lettura
   const lastLandmarksRef = useRef(null); // ultimi landmark MediaPipe → angoli reali per l'AI
+  const trailRef = useRef([]);           // scia polsi/caviglie → disegnata sul frame annotato per l'AI
+  const kinHistRef = useRef([]);         // storia angolari (~3.5s) → velocità/rep-quality (lib/kinematics)
+  const trendRef = useRef([]);           // campioni lenti (stance/guardia ogni ~5s) → segnali fatica
+  const lastTrendTRef = useRef(0);
+  const lastFramingVoiceRef = useRef(0); // coaching vocale inquadratura (throttle 20s)
   // ── SPECCHIO (corpo vs ideale) — feedback deterministico dallo scheletro ──
   const [mirrorOn, setMirrorOn] = useState(false);
   const [mirrorTech, setMirrorTech] = useState('guard');   // tecnica da rispecchiare (manuale)
@@ -3655,7 +3748,9 @@ function VisualCoach({ setPlayerStats }) {
 
   const startCamera = async (facing = facingMode) => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: facing, width: 640, height: 480 } });
+      // 720p come ideal (non requisito): la posizione delle mani si legge molto
+      // meglio; i device deboli scendono da soli alla risoluzione che reggono.
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: facing, width: { ideal: 1280 }, height: { ideal: 720 } } });
       streamRef.current = stream;
       if (videoRef.current) { videoRef.current.srcObject = stream; videoRef.current.play(); }
       setStreaming(true);
@@ -3683,6 +3778,7 @@ function VisualCoach({ setPlayerStats }) {
   const startSession = async () => {
     sessionStartRef.current = Date.now();
     sessionVerdictsRef.current = [];      // nuova sessione → azzera i verdetti accumulati
+    kinHistRef.current = []; trendRef.current = []; lastTrendTRef.current = 0; // fatica misurata su QUESTA sessione
     unlockSpeech();                       // gesto utente: sblocca la voce per l'auto mode
     setScore({ a: 0, b: 0 }); setLastPoint(null);
     setStep('live'); setAnalysis(null);
@@ -3877,6 +3973,30 @@ function VisualCoach({ setPlayerStats }) {
             du.drawLandmarks(result.landmarks[0].filter((_, i) => i >= 11),
               { color: '#FF6B35', lineWidth: 1, radius: 4 });
             lastLandmarksRef.current = result.landmarks[0];   // per la precisione AI (angoli reali)
+            // ── TRAIL: scia di polsi/caviglie per il frame annotato dell'AI ──
+            {
+              const L = result.landmarks[0];
+              const T = trailRef.current;
+              T.push({ t: performance.now(), lw: [L[15].x, L[15].y], rw: [L[16].x, L[16].y], la: [L[27].x, L[27].y], ra: [L[28].x, L[28].y] });
+              while (T.length > 26) T.shift();
+              const cutoff = performance.now() - 900;
+              while (T.length && T[0].t < cutoff) T.shift();
+            }
+            // ── CINEMATICA: storia angoli (~3.5s) + trend fatica ogni ~5s ──
+            {
+              const L = result.landmarks[0];
+              const nowK = performance.now();
+              const K = kinHistRef.current;
+              K.push({ t: nowK, eL: jointAngle(L, 11, 13, 15), eR: jointAngle(L, 12, 14, 16), kL: jointAngle(L, 23, 25, 27), kR: jointAngle(L, 24, 26, 28) });
+              while (K.length > 220) K.shift();
+              while (K.length && nowK - K[0].t > 3500) K.shift();
+              if (nowK - lastTrendTRef.current > 5000) {
+                lastTrendTRef.current = nowK;
+                const stanceW = L[27] && L[28] ? Math.abs(L[27].x - L[28].x) : null;
+                const guardDown = (L[15] && L[11] && L[15].y > L[11].y + 0.08) || (L[16] && L[12] && L[16].y > L[12].y + 0.08);
+                trendRef.current = [...trendRef.current, { t: nowK, stanceW, guardDown: guardDown ? 1 : 0 }].slice(-140);
+              }
+            }
             // ── INTENSITÀ: spostamento medio dei landmark del corpo → EMA 0-100 ──
             {
               const curL = result.landmarks[0];
@@ -4196,9 +4316,16 @@ function VisualCoach({ setPlayerStats }) {
     analyzingRef.current = true;
     const canvas = canvasRef.current;
     const video = videoRef.current;
-    canvas.width = video.videoWidth || 640; canvas.height = video.videoHeight || 480;
-    canvas.getContext('2d').drawImage(video, 0, 0);
-    const base64 = canvas.toDataURL('image/jpeg', 0.72).split(',')[1];
+    // Frame annotato anche per l'analisi manuale (risoluzione più alta: 768px)
+    const pose = computePose();
+    let base64;
+    if (skeletonOn && lastLandmarksRef.current) {
+      base64 = drawAnnotatedFrame(video, lastLandmarksRef.current, pose, trailRef.current, 768, 0.72);
+    } else {
+      canvas.width = video.videoWidth || 640; canvas.height = video.videoHeight || 480;
+      canvas.getContext('2d').drawImage(video, 0, 0);
+      base64 = canvas.toDataURL('image/jpeg', 0.72).split(',')[1];
+    }
     setAnalyzing(true);
     try {
       const res = await fetch('/api/nvidia/visual', {
@@ -4283,20 +4410,52 @@ function VisualCoach({ setPlayerStats }) {
     analyzingRef.current = true;
     const canvas = canvasRef.current;
     const video = videoRef.current;
-    // Downscale a max 512px → upload più leggero e analisi più veloce (performance)
-    const vw = video.videoWidth || 640, vh = video.videoHeight || 480;
-    const sc = Math.min(1, 512 / vw);
-    canvas.width = Math.round(vw * sc); canvas.height = Math.round(vh * sc);
-    canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
-    const base64 = canvas.toDataURL('image/jpeg', 0.6).split(',')[1];
     const pose = computePose();
-    // GATE inquadratura: se il corpo è solo parziale, niente analisi imprecisa
-    if (skeletonOn && pose.quality === 'partial') {
-      setFramingHint('Inquadra tutto il corpo nel riquadro'); setTrackQuality('partial');
+    // FRAME ANNOTATO: se lo scheletro c'è, l'AI riceve il frame con scheletro
+    // colorato + scia del movimento + HUD degli angoli misurati. Altrimenti
+    // fallback al frame grezzo (downscale a max 512px per upload leggero).
+    let base64;
+    if (skeletonOn && lastLandmarksRef.current) {
+      base64 = drawAnnotatedFrame(video, lastLandmarksRef.current, pose, trailRef.current);
+    } else {
+      const vw = video.videoWidth || 640;
+      const sc = Math.min(1, 512 / vw);
+      canvas.width = Math.round((video.videoWidth || 640) * sc); canvas.height = Math.round((video.videoHeight || 480) * sc);
+      canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+      base64 = canvas.toDataURL('image/jpeg', 0.6).split(',')[1];
+    }
+    // GATE inquadratura: corpo parziale o assente → niente analisi imprecisa,
+    // e il maestro ti dice A VOCE come rimetterti in quadro (max una volta ogni 20s)
+    if (skeletonOn && (pose.quality === 'partial' || pose.quality === 'none')) {
+      const msg = pose.quality === 'none'
+        ? 'Non ti vedo: entra nell\'inquadratura, petto e gambe visibili.'
+        : 'Non ti vedo tutto: arretra di un passo, mi serve il corpo intero.';
+      setFramingHint(pose.quality === 'none' ? 'Entra nell\'inquadratura' : 'Inquadra tutto il corpo nel riquadro');
+      setTrackQuality(pose.quality);
+      const nowF = Date.now();
+      if (nowF - lastFramingVoiceRef.current > 20000) {
+        lastFramingVoiceRef.current = nowF;
+        enqueueSpeak(msg);
+      }
       analyzingRef.current = false; return;
     }
     setFramingHint(''); setTrackQuality(pose.quality);
-    const poseHint = pose.hint + (pose.alerts.length ? `. SEGNALI MISURATI (certi): ${pose.alerts.join('; ')}` : '');
+    // CINEMATICA: velocità/rep-quality dal buffer scheletro + segnali fatica
+    const kin = skeletonOn ? analyzeKinematics(kinHistRef.current) : null;
+    // QUOTA FREE: se non succede nulla (niente azione, intensità minima, nessun
+    // alert) la chiamata AI si salta — l'occhio osserva solo quando conta.
+    const calmMode = /yoga|stretch|breath|medita|mobilit|running/.test(mode);
+    if (kin && !kin.active && intensityRef.current < 3 && !pose.alerts.length && !calmMode) {
+      analyzingRef.current = false; return;
+    }
+    const JOINT_LABEL = { eL: 'gomito sx', eR: 'gomito dx', kL: 'ginocchio sx', kR: 'ginocchio dx' };
+    let poseHint = pose.hint + (pose.alerts.length ? `. SEGNALI MISURATI (certi): ${pose.alerts.join('; ')}` : '');
+    if (kin && (kin.peakDeg > 0 || kin.strikes.tot > 0)) {
+      poseHint += `. CINEMATICA MISURATA: picco ${kin.peakDeg}°/s${kin.peakJoint ? ` (${JOINT_LABEL[kin.peakJoint] || kin.peakJoint})` : ''}`;
+      if (kin.strikes.tot > 0) poseHint += `; colpi ${kin.strikes.tot}: ${kin.strikes.esplosivi} esplosivi, ${kin.strikes.lenti} lenti al ritorno`;
+    }
+    const fat = skeletonOn ? fatigueFromTrend(trendRef.current) : null;
+    if (fat?.fatigued) poseHint += `. SEGNALE FATICA (misurato): ${fat.reasons.join('; ')}`;
     setAnalyzing(true);
     try {
       // 1) OSSERVAZIONE silenziosa (osservatori, niente cervello, niente voce)

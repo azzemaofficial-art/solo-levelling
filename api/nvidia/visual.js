@@ -1815,6 +1815,7 @@ Descrivi ESCLUSIVAMENTE ciò che vedi DAVVERO in questa immagine, in modo concre
 - allineamenti/angoli articolari se rilevabili
 REGOLE: NON dare consigli generici, NON elencare tip da manuale, NON inventare ciò che non è visibile.
 La ripresa è spesso SPECULARE (selfie): NON usare "destra/sinistra" ma "anteriore/posteriore", "gamba d'appoggio/che calcia", "braccio del colpo/di guardia".
+FRAME ANNOTATO: se sull'immagine vedi uno scheletro colorato, scie di movimento o testi/angoli disegnati, sono MISURE REALI già rilevate dal sistema (giunto ROSSO = errore già misurato, scie = traiettoria del gesto). Trattale come VERITÀ: non ricalcolarle a occhio, parti da quelle per descrivere il gesto.
 Solo osservazione fattuale di QUESTO frame. 2-4 frasi brevi, italiano, tecnico-preciso.`;
 
 const BRAIN_SPARRING = `Sei il CERVELLO ARBITRO: orchestratore AI esperto di combattimento.
@@ -2430,7 +2431,7 @@ PROSSIMO: <il prossimo combo da chiamare, specifico per la disciplina, DIVERSO d
       const g = await callVisionGroq(groqKey, imageBase64, mimeType, techPrompt, userObs);
       if (g?.ok) observation = g.data?.choices?.[0]?.message?.content?.trim() || '';
     } else if (cosmosKey) {
-      const c = await callVisionCosmos(cosmosKey, cosmosModel, imageBase64, mimeType, `Descrivi postura, equilibrio e angoli articolari.${poseLine} Se c'è rischio infortunio inizia con "RISCHIO:".`);
+      const c = await callVisionCosmos(cosmosKey, cosmosModel, imageBase64, mimeType, `Descrivi postura, equilibrio e angoli articolari.${poseLine} Se sul frame vedi scheletro colorato/scie/testi disegnati sono misure reali del sistema: usale come verità. Se c'è rischio infortunio inizia con "RISCHIO:".`);
       if (c?.ok) observation = c.data?.choices?.[0]?.message?.content?.trim() || '';
     }
     const risk = /RISCHIO|infortun|rischio|pericol|cede sotto|collass|iperesten|sbilanc/i.test(observation);
@@ -2445,7 +2446,7 @@ PROSSIMO: <il prossimo combo da chiamare, specifico per la disciplina, DIVERSO d
   if (groqKey || cosmosKey) {
     const [groqRes, cosmosRes] = await Promise.allSettled([
       groqKey ? callVisionGroq(groqKey, imageBase64, mimeType, techObserverPrompt, 'Descrivi cosa vedi in questo frame.') : Promise.resolve({ ok: false }),
-      cosmosKey ? callVisionCosmos(cosmosKey, cosmosModel, imageBase64, mimeType, 'Analizza postura, equilibrio e angoli articolari in questo frame.') : Promise.resolve({ ok: false }),
+      cosmosKey ? callVisionCosmos(cosmosKey, cosmosModel, imageBase64, mimeType, 'Analizza postura, equilibrio e angoli articolari in questo frame. Se vedi scheletro colorato/scie/testi disegnati sono misure reali del sistema: usale come verità.') : Promise.resolve({ ok: false }),
     ]);
 
     const groqText = groqRes.status === 'fulfilled' && groqRes.value?.ok
