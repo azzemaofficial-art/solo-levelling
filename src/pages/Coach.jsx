@@ -4,7 +4,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Eye, Lightbulb, Trophy, ScanSearch, Play, Pause, Target, FlipHorizontal2, Volume2, VolumeX, Bone, X, Move, ThumbsUp, ThumbsDown } from 'lucide-react';
 import { BREATHING_PROTOCOLS } from '../../lib/breathingProtocols.js';
 import { getDiscipline } from '../../lib/martialKnowledge.js';
-import { analyzeKinematics, fatigueFromTrend } from '../../lib/kinematics.js';
+import { analyzeKinematics, fatigueFromTrend, detectKicks, kickLevelFromMatch } from '../../lib/kinematics.js';
+import { playEpicDing, playComboHit } from '../utils/sfx';
 import { secretsFor, secretOfTheDay } from '../../lib/coachSecrets.js';
 import { MARKER_RE, canonicalMarker, normalizeCoachingText, extractCommand } from '../../lib/coachingText.js';
 import { buildCoachWorkout } from '../../lib/workouts.js';
@@ -2884,6 +2885,11 @@ function VisualCoach({ setPlayerStats }) {
   const reactTimerRef = useRef(null);
   const reactOnRef = useRef(false);
   const timerPhaseRef = useRef('idle');
+  // ── CONTATORE CALCI DA MATCH (camera, da 3+ round) ──
+  const matchKicksRef = useRef({ tot: 0, sx: 0, dx: 0, peaks: [] });
+  const kickStateRef = useRef({ lastKickT: { kL: -1e9, kR: -1e9 } });
+  const matchCtxRef = useRef({ active: false, rounds: 0 }); // specchiato: l'effetto rAF non si ricrea
+  const [kickReport, setKickReport] = useState(null);
   const [intensity, setIntensity] = useState(0);          // intensità movimento 0-100 (EMA)
   const intensityRef = useRef(0);
   const prevLmRef = useRef(null);
@@ -3923,6 +3929,24 @@ function VisualCoach({ setPlayerStats }) {
   const timer = useRoundTimer({ rounds, roundDuration, restDuration: 60 });
   const currentDisc = ALL_DISCIPLINES.find((d) => d.id === mode) || ALL_DISCIPLINES[0];
   const isPartnerMode = isSparring(mode);
+  useEffect(() => { matchCtxRef.current = { active: roundsOn || isPartnerMode, rounds }; }, [roundsOn, isPartnerMode, rounds]);
+  // Fine match → referto livello calcio (cinematico + suono); inizio → azzera
+  useEffect(() => {
+    if (timer.phase === 'round' && timer.currentRound === 1) {
+      matchKicksRef.current = { tot: 0, sx: 0, dx: 0, peaks: [] };
+      kickStateRef.current = { lastKickT: { kL: -1e9, kR: -1e9 } };
+      setKickReport(null);
+    }
+    if (timer.phase === 'finished') {
+      const M = matchKicksRef.current;
+      if (matchCtxRef.current.active && matchCtxRef.current.rounds >= 3 && M.tot > 0) {
+        const avgPeak = Math.round(M.peaks.reduce((a, b) => a + b, 0) / M.peaks.length);
+        const level = kickLevelFromMatch({ tot: M.tot, avgPeak });
+        setKickReport({ tot: M.tot, sx: M.sx, dx: M.dx, avgPeak, level });
+        if (level >= 60) playEpicDing({ enabled: true }); else playComboHit({ enabled: true, power: 0.8 });
+      }
+    }
+  }, [timer.phase, timer.currentRound]);
 
   const handleScore = useCallback((who, delta) => {
     setScore((s) => ({ ...s, [who]: Math.max(0, s[who] + delta) }));
@@ -4177,6 +4201,22 @@ function VisualCoach({ setPlayerStats }) {
                 const stanceW = L[27] && L[28] ? Math.abs(L[27].x - L[28].x) : null;
                 const guardDown = (L[15] && L[11] && L[15].y > L[11].y + 0.08) || (L[16] && L[12] && L[16].y > L[12].y + 0.08);
                 trendRef.current = [...trendRef.current, { t: nowK, stanceW, guardDown: guardDown ? 1 : 0 }].slice(-140);
+              }
+            }
+            // ── MATCH: conteggio calci dalla camera (attivo da 3+ round) ──
+            {
+              const mc = matchCtxRef.current;
+              if (mc.active && mc.rounds >= 3 && timerPhaseRef.current === 'round') {
+                const K = kinHistRef.current;
+                if (K.length >= 2) {
+                  const hits = detectKicks(K[K.length - 2], K[K.length - 1], kickStateRef.current);
+                  const M = matchKicksRef.current;
+                  for (const h of hits) {
+                    M.tot += 1;
+                    if (h.side === 'kL') M.sx += 1; else M.dx += 1;
+                    M.peaks.push(h.vel);
+                  }
+                }
               }
             }
             // ── COMBO: fotogrammi chiave durante il GO → scheda di contatto ──
@@ -5276,6 +5316,33 @@ function VisualCoach({ setPlayerStats }) {
             </motion.div>
           )}
           {isPartnerMode && <ScoreTracker score={score} onScore={handleScore} lastPoint={lastPoint} />}
+          {/* 🦵 REFERTO LIVELLO CALCIO — a fine match, dalla camera */}
+          {kickReport && (
+            <motion.div initial={{ opacity: 0, scale: 0.92, y: -6 }} animate={{ opacity: 1, scale: 1, y: 0 }}
+              transition={{ type: 'spring', stiffness: 260, damping: 20 }}
+              className="p-3 rounded-2xl space-y-2"
+              style={{ background: 'rgba(127,29,29,0.5)', border: `1px solid ${C.red.border}`, backdropFilter: 'blur(8px)' }}>
+              <p className="text-[10px] font-black tracking-widest" style={{ color: '#fbbf24', fontFamily: 'Orbitron, sans-serif' }}>
+                🦵 LIVELLO CALCIO — REFERTO MATCH
+              </p>
+              <div className="flex items-center gap-3">
+                <p className="text-3xl font-black leading-none" style={{ color: '#fff', textShadow: '0 0 16px rgba(251,191,36,0.7)', fontFamily: 'Orbitron, sans-serif' }}>
+                  {kickReport.level}
+                </p>
+                <div className="flex-1">
+                  <div className="h-2 rounded-full overflow-hidden" style={{ background: 'rgba(55,65,81,0.6)' }}>
+                    <motion.div className="h-full rounded-full"
+                      initial={{ width: 0 }} animate={{ width: `${kickReport.level}%` }}
+                      transition={{ duration: 0.9, ease: [0.2, 0.8, 0.3, 1] }}
+                      style={{ background: 'linear-gradient(90deg, #fbbf24, #fff)', boxShadow: '0 0 10px rgba(251,191,36,0.6)' }} />
+                  </div>
+                  <p className="text-[10px] mt-1" style={{ color: '#fca5a5' }}>
+                    {kickReport.tot} calci ({kickReport.sx} sx / {kickReport.dx} dx) · picco medio {kickReport.avgPeak}°/s
+                  </p>
+                </div>
+              </div>
+            </motion.div>
+          )}
         </div>
       )}
 

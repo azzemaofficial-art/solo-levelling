@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { analyzeKinematics, fatigueFromTrend } from '../lib/kinematics.js';
+import { analyzeKinematics, fatigueFromTrend, detectKicks, kickLevelFromMatch } from '../lib/kinematics.js';
 
 // Campionatore sintetico: un campione ogni `step` ms a partire da t0.
 const samples = (vals, step = 33, t0 = 0) => vals.map((eR, i) => ({ t: t0 + i * step, eL: 100, eR, kL: 165, kR: 165 }));
@@ -84,4 +84,37 @@ test('fatigueFromTrend: sessione stabile → nessuna fatica', () => {
 test('fatigueFromTrend: pochi campioni → non si esprime', () => {
   const f = fatigueFromTrend([{ t: 0, stanceW: 0.4, guardDown: 0.1 }]);
   assert.equal(f.fatigued, false);
+});
+
+test('detectKicks: estensione esplosiva del ginocchio = calcio contato', () => {
+  const state = {};
+  const prev = { t: 0, kL: 110, kR: 165, eL: 100, eR: 100 };
+  const cur = { t: 33, kL: 160, kR: 165, eL: 100, eR: 100 }; // ~1515°/s
+  const hits = detectKicks(prev, cur, state);
+  assert.equal(hits.length, 1);
+  assert.equal(hits[0].side, 'kL');
+  assert.ok(hits[0].vel > 500);
+});
+
+test('detectKicks: refrattario anti doppio conteggio, ginocchia indipendenti', () => {
+  const state = {};
+  const base = { kL: 110, kR: 110, eL: 100, eR: 100 };
+  assert.equal(detectKicks({ ...base, t: 0 }, { ...base, kL: 160, kR: 160, t: 33 }, state).length, 2); // entrambe le gambe
+  assert.equal(detectKicks({ ...base, kL: 110, kR: 160, t: 33 }, { ...base, kL: 160, kR: 160, t: 66 }, state).length, 0); // dentro il refrattario
+  assert.equal(detectKicks({ ...base, kL: 110, kR: 110, t: 800 }, { ...base, kL: 160, kR: 110, t: 833 }, state).length, 1); // dopo il refrattario
+});
+
+test('detectKicks: movimento lento non conta', () => {
+  const state = {};
+  const hits = detectKicks({ t: 0, kL: 150, kR: 150 }, { t: 33, kL: 160, kR: 158 }, state);
+  assert.equal(hits.length, 0);
+});
+
+test('kickLevelFromMatch: zero calci = zero; volume+velocità crescono fino a 100', () => {
+  assert.equal(kickLevelFromMatch({ tot: 0, avgPeak: 900 }), 0);
+  const low = kickLevelFromMatch({ tot: 5, avgPeak: 500 });
+  const mid = kickLevelFromMatch({ tot: 15, avgPeak: 700 });
+  const high = kickLevelFromMatch({ tot: 40, avgPeak: 1200 });
+  assert.ok(low > 0 && low < mid && mid < high);
+  assert.equal(high, 100); // cap
 });
