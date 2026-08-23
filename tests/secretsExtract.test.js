@@ -39,7 +39,7 @@ test('ogni JSON ha secrets non vuoti con i campi obbligatori', () => {
         assert.ok(typeof t === 'string' && t.length > 0, `${file}: tag vuoto`);
         assert.equal(t, t.toLowerCase(), `${file}: tag '${t}' non minuscolo`);
       }
-      assert.equal(s.errore, '', `${file}: errore deve essere '' per ora`);
+      assert.equal(typeof s.errore, 'string', `${file}: errore deve essere una stringa (il segno visivo che attiva il segreto)`);
     }
   }
 });
