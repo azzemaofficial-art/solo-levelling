@@ -7,6 +7,7 @@ import { getDiscipline } from '../../lib/martialKnowledge.js';
 import { analyzeKinematics, fatigueFromTrend, detectKicks, kickLevelFromMatch } from '../../lib/kinematics.js';
 import { masteryFromXp } from '../../lib/mastery.js';
 import { playEpicDing, playComboHit } from '../utils/sfx';
+import ComboFx from '../components/ComboFx';
 import { secretsFor, secretOfTheDay } from '../../lib/coachSecrets.js';
 import { MARKER_RE, canonicalMarker, normalizeCoachingText, extractCommand } from '../../lib/coachingText.js';
 import { buildCoachWorkout } from '../../lib/workouts.js';
@@ -3015,6 +3016,7 @@ function VisualCoach({ setPlayerStats }) {
   const [currentCombo, setCurrentCombo] = useState('');
   const [comboCountdown, setComboCountdown] = useState(3);
   const [comboResult, setComboResult] = useState(null); // {grade, feedback, nextCombo}
+  const [comboFx, setComboFx] = useState(null);         // cinematico SUPER COMBO/COMBO
   const [comboScore, setComboScore] = useState({ perfect: 0, good: 0, redo: 0 });
   const comboPhaseRef = useRef('idle');
   const comboTimerRef = useRef(null);
@@ -3860,6 +3862,8 @@ function VisualCoach({ setPlayerStats }) {
         const grade = result?.grade || 'good';
         setComboResult({ grade, feedback: result?.feedback || '', nextCombo: result?.nextCombo || '' });
         setComboScore((prev) => ({ ...prev, [grade]: (prev[grade] || 0) + 1 }));
+        // Cinematico: PERFETTO → SUPER COMBO (gong+flash), BUONO → COMBO
+        if (grade === 'perfect' || grade === 'good') setComboFx({ t: Date.now(), grade, combo });
         // Log locale focus→voto: alimenta pickCombo per proporre più spesso ciò che ti riesce bene
         // (stile "più ti piace/riesce, più te ne mostro simili"), mai un vincolo, solo un peso.
         try {
@@ -5610,6 +5614,8 @@ function VisualCoach({ setPlayerStats }) {
                     <p className="text-[10px]" style={{ color: 'rgba(254,215,170,0.8)' }}>Il coach valuta…</p>
                   </div>
                 )}
+                {/* 🎬 CINEMATICO COMBO/SUPER COMBO — fullscreen */}
+                <ComboFx fx={comboFx} onDone={() => setComboFx(null)} />
                 {/* RESULT */}
                 {comboPhase === 'result' && comboResult && (
                   <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-2 py-1 relative">
