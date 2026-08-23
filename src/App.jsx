@@ -12,6 +12,7 @@ import { fetchTelegramLogs } from './utils/personalAgentSync';
 import NeuralIntro from './components/NeuralIntro';
 import TouchSparks from './components/TouchSparks';
 import LevelUpOverlay from './components/LevelUpOverlay';
+import MealBurst from './components/MealBurst';
 
 const SystemHub = lazy(() => import('./pages/SystemHub'));
 const Calendar = lazy(() => import('./pages/Calendar'));
@@ -74,6 +75,7 @@ function App() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [quickMealSlot, setQuickMealSlot] = useState('lunch');
+  const [mealFx, setMealFx] = useState(null); // burst cinematico cibo/acqua
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [commandQuery, setCommandQuery] = useState('');
   const [tapPulseTick, setTapPulseTick] = useState(0);
@@ -1046,6 +1048,23 @@ useEffect(() => { localStorage.setItem('shadow_monarch_macros', JSON.stringify(m
     if (mode === 'workout') {
       setPlayerStats((prev) => ({ ...prev, lastWorkoutDate: todayKey }));
     }
+    // Burst cinematico: cibo/acqua con pennellata + barra che sale col suono
+    if (mode === 'meal' || mode === 'protein' || mode === 'water') {
+      const isWater = mode === 'water';
+      const before = Number(isWater ? (todayLog.waterMl || 0) : (todayLog.consumed || 0));
+      const delta = isWater ? 350 : mode === 'meal' ? 480 : 170;
+      const cap = isWater ? 2500 : 2600;
+      const after = before + delta;
+      setMealFx({
+        t: Date.now(), kind: mode, delta,
+        unit: isWater ? ' ml' : ' kcal',
+        before: isWater ? `${before}ml` : `${before}`,
+        after: isWater ? `${after}ml` : `${after}`,
+        fromPct: Math.min(1, before / cap),
+        toPct: Math.min(1, after / cap),
+        slot: quickMealSlot,
+      });
+    }
     setQuickAddOpen(false);
     triggerFxBurst('success');
     setTapPulseTick(Date.now());
@@ -1991,6 +2010,8 @@ useEffect(() => { localStorage.setItem('shadow_monarch_macros', JSON.stringify(m
           </motion.div>
         ) : null}
       </AnimatePresence>
+
+      <MealBurst fx={mealFx} onDone={() => setMealFx(null)} soundEnabled={soundEnabled} soundTheme={soundTheme} />
 
       {/* BARRA NAVIGAZIONE — 4 tab principali */}
       <nav
