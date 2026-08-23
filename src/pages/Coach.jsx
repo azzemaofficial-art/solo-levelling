@@ -5,6 +5,7 @@ import { Eye, Lightbulb, Trophy, ScanSearch, Play, Pause, Target, FlipHorizontal
 import { BREATHING_PROTOCOLS } from '../../lib/breathingProtocols.js';
 import { getDiscipline } from '../../lib/martialKnowledge.js';
 import { analyzeKinematics, fatigueFromTrend, detectKicks, kickLevelFromMatch } from '../../lib/kinematics.js';
+import { masteryFromXp } from '../../lib/mastery.js';
 import { playEpicDing, playComboHit } from '../utils/sfx';
 import { secretsFor, secretOfTheDay } from '../../lib/coachSecrets.js';
 import { MARKER_RE, canonicalMarker, normalizeCoachingText, extractCommand } from '../../lib/coachingText.js';
@@ -803,7 +804,10 @@ const saveCurrProgress = (p) => { try { localStorage.setItem(CURRICULUM_KEY, JSO
 // Copia locale per mostrare il livello anche offline/subito.
 const COACH_PROGRESS_KEY = 'shadow_monarch_coach_progress';
 const loadCoachProgress = () => { try { return JSON.parse(localStorage.getItem(COACH_PROGRESS_KEY) || '{}'); } catch { return {}; } };
-const saveCoachProgress = (p) => { try { localStorage.setItem(COACH_PROGRESS_KEY, JSON.stringify(p)); } catch {} };
+const saveCoachProgress = (p) => {
+  try { localStorage.setItem(COACH_PROGRESS_KEY, JSON.stringify(p)); } catch {}
+  try { window.dispatchEvent(new Event('coach-progress-updated')); } catch {}
+};
 // 150 XP per livello di competenza (una sessione vale ~10-100 XP dalla pagella).
 const coachLevelOf = (xp) => Math.floor((Number(xp) || 0) / 150) + 1;
 // Grado/cintura dalla knowledge base: un grado ogni 600 XP.
@@ -1195,6 +1199,14 @@ function CurriculumCoach({ onGoLive }) {
   const discSecrets = useMemo(() => secretsFor(disc), [disc]);
   const unlockedSecrets = discSecrets.filter((s) => s.livello <= secretLevel);
   const todaySecret = useMemo(() => secretOfTheDay(disc), [disc]);
+  // ⚔ Maestria della disciplina (0-100, curva lentissima) — dall'XP coach
+  const [discMastery, setDiscMastery] = useState(0);
+  useEffect(() => {
+    const update = () => setDiscMastery(masteryFromXp(loadCoachProgress()[disc]?.xp));
+    update();
+    window.addEventListener('coach-progress-updated', update);
+    return () => window.removeEventListener('coach-progress-updated', update);
+  }, [disc]);
   const [unlockModal, setUnlockModal] = useState(null);
   useEffect(() => {
     if (!rank) return;
@@ -1356,6 +1368,20 @@ Rispondi in italiano, max 15 righe, tono da maestro pratico.`;
               layout transition={{ duration: 0.6 }} />
           </div>
         </div>
+      </div>
+
+      {/* ⚔ MAESTRIA DELLA DISCIPLINA — sale solo con tanta pratica */}
+      <div className="rounded-2xl px-4 py-2.5 flex items-center gap-3" style={{ background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.2)' }}>
+        <p className="text-[8px] font-black tracking-[0.18em] whitespace-nowrap" style={{ color: '#fbbf24', fontFamily: 'Orbitron, sans-serif' }}>⚔ MAESTRIA</p>
+        <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(55,65,81,0.5)' }}>
+          <motion.div className="h-full rounded-full"
+            animate={{ width: `${Math.max(1.5, discMastery)}%` }}
+            transition={{ duration: 0.7, ease: [0.2, 0.8, 0.3, 1] }}
+            style={{ background: 'linear-gradient(90deg, #b45309, #fbbf24, #fff)', boxShadow: '0 0 8px rgba(251,191,36,0.6)' }} />
+        </div>
+        <p className="text-[10px] font-black whitespace-nowrap" style={{ color: '#fff', fontFamily: 'Orbitron, sans-serif' }}>
+          {discMastery}<span style={{ color: '#6b7280' }}>/100</span>
+        </p>
       </div>
 
       {/* 🗝️ SEGRETI DEL MAESTRO — la conoscenza si sblocca col grado */}

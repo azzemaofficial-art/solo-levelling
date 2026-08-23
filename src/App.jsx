@@ -13,6 +13,7 @@ import NeuralIntro from './components/NeuralIntro';
 import TouchSparks from './components/TouchSparks';
 import LevelUpOverlay from './components/LevelUpOverlay';
 import MealBurst from './components/MealBurst';
+import GlobalMasteryBar from './components/GlobalMasteryBar';
 
 const SystemHub = lazy(() => import('./pages/SystemHub'));
 const Calendar = lazy(() => import('./pages/Calendar'));
@@ -2012,6 +2013,9 @@ useEffect(() => { localStorage.setItem('shadow_monarch_macros', JSON.stringify(m
       </AnimatePresence>
 
       <MealBurst fx={mealFx} onDone={() => setMealFx(null)} soundEnabled={soundEnabled} soundTheme={soundTheme} />
+
+      {/* ⚔ Maestria globale 0-100 — fissa sopra la nav */}
+      <GlobalMasteryBar />
 
       {/* BARRA NAVIGAZIONE — 4 tab principali */}
       <nav
