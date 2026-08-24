@@ -217,7 +217,7 @@ function App() {
     return [createEmptyLog(today)];
   });
   // Specchio per letture sincrone dentro callback a dipendenze stabili (applyTgImport)
-  const systemLogsRef = useRef([]);
+  const systemLogsRef = React.useRef([]);
   useEffect(() => { systemLogsRef.current = systemLogs; }, [systemLogs]);
 
   // ── Telegram → Solo Levelling sync ───────────────────────────────────────────
