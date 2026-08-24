@@ -102,7 +102,7 @@ export default function MealBurst({ fx, onDone, soundEnabled = true, soundTheme 
               transition={{ delay: 0.12, type: 'spring', stiffness: 300, damping: 18 }}
               className="text-sm font-black tracking-widest z-10"
               style={{ color: k.color, textShadow: `0 0 14px ${k.glow}`, fontFamily: 'Orbitron, sans-serif' }}>
-              +{fx.delta}{fx.unit || ' kcal'} · {k.label}
+              +{fx.delta}{fx.unit || ' kcal'} · {fx.name || k.label}
             </motion.p>
 
             {/* Barra che sale */}

@@ -216,6 +216,9 @@ function App() {
     const today = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit' });
     return [createEmptyLog(today)];
   });
+  // Specchio per letture sincrone dentro callback a dipendenze stabili (applyTgImport)
+  const systemLogsRef = useRef([]);
+  useEffect(() => { systemLogsRef.current = systemLogs; }, [systemLogs]);
 
   // ── Telegram → Solo Levelling sync ───────────────────────────────────────────
   // Fetch personal_logs from the main project API (Supabase) and merge into
@@ -439,6 +442,22 @@ useEffect(() => { localStorage.setItem('shadow_monarch_macros', JSON.stringify(m
       if (idx >= 0) { next[idx] = updated; } else { next.push(updated); }
       return next;
     });
+    // Burst cinematic anche per i pasti che arrivano da Telegram (si vede
+    // all'apertura dell'app, quando la coda claim-import viene consumata)
+    if (payload.type === 'meal' && Number(payload.kcal) > 0) {
+      const keyFx = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit' });
+      const todayFx = (systemLogsRef.current || []).find((l) => l.date === keyFx);
+      const before = Number(todayFx?.consumed || 0);
+      const delta = Number(payload.kcal);
+      const after = before + delta;
+      setMealFx({
+        t: Date.now(), kind: 'meal', delta, unit: ' kcal',
+        name: String(payload.name || '').slice(0, 28),
+        before: `${before}`, after: `${after}`,
+        fromPct: Math.min(1, before / 2600), toPct: Math.min(1, after / 2600),
+        slot: payload.slot || 'pranzo',
+      });
+    }
     // Per le misurazioni aggiorna anche playerStats
     if (payload.type === 'measurement') {
       setPlayerStats?.((prev) => ({
