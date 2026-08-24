@@ -42,6 +42,10 @@ const prefersReducedMotion = () =>
 export default function ComboFx({ fx, onDone }) {
   const playedRef = useRef(0);
   const waveRef = useRef(null);
+  // onDone inline cambia identità a ogni render: via ref, altrimenti il cleanup
+  // cancella il timeout di chiusura e il cinematico resta incollato allo schermo
+  const onDoneRef = useRef(onDone);
+  useEffect(() => { onDoneRef.current = onDone; });
 
   useEffect(() => {
     if (!fx || fx.t === playedRef.current) return undefined;
@@ -64,9 +68,9 @@ export default function ComboFx({ fx, onDone }) {
         { scale: 0, opacity: fx.grade === 'perfect' ? 0.95 : 0.6 },
         { scale: fx.grade === 'perfect' ? 8 : 5, opacity: 0, duration: 0.75, ease: 'power2.out' });
     }
-    const id = setTimeout(() => onDone?.(), 1500);
+    const id = setTimeout(() => onDoneRef.current?.(), 1500);
     return () => clearTimeout(id);
-  }, [fx, onDone]);
+  }, [fx]);
 
   const particles = useMemo(() => Array.from({ length: 18 }, (_, i) => {
     const angle = (i / 18) * Math.PI * 2 + ((fx?.t || 0) % 7) * 0.13;

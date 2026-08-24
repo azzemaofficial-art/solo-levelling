@@ -8,7 +8,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import gsap from 'gsap';
 import { playSfx, playEatCrunch, playBarRise, playSample } from '../utils/sfx';
-import FoodFigure3D from './FoodFigure3D';
+import FoodFigure from './FoodFigure';
 
 const KIND = {
   meal: { emoji: '🍜', label: 'PASTO', color: '#fbbf24', glow: 'rgba(251,191,36,0.5)' },
@@ -22,6 +22,10 @@ const prefersReducedMotion = () =>
 export default function MealBurst({ fx, onDone, soundEnabled = true, soundTheme = 'solo' }) {
   const playedRef = useRef(0);
   const stageRef = useRef(null);
+  // onDone arriva inline (identità nuova a ogni render): se finisse nelle deps,
+  // il cleanup cancellerebbe il timeout di chiusura e il burst resterebbe incollato.
+  const onDoneRef = useRef(onDone);
+  useEffect(() => { onDoneRef.current = onDone; });
 
   useEffect(() => {
     if (!fx || fx.t === playedRef.current) return undefined;
@@ -36,15 +40,15 @@ export default function MealBurst({ fx, onDone, soundEnabled = true, soundTheme 
       }
       setTimeout(() => playBarRise({ enabled: true, from: fx.fromPct, to: fx.toPct }), 180);
     }
-    // Ingresso GSAP: la scena 3D sbuca con overshoot
+    // Ingresso GSAP: la figura sbuca con overshoot
     if (stageRef.current && !prefersReducedMotion()) {
       gsap.fromTo(stageRef.current,
         { scale: 0.4, y: 46, opacity: 0, rotate: -6 },
         { scale: 1, y: 0, opacity: 1, rotate: 0, duration: 0.6, ease: 'back.out(1.7)' });
     }
-    const id = setTimeout(() => onDone?.(), 2100);
+    const id = setTimeout(() => onDoneRef.current?.(), 2100);
     return () => clearTimeout(id);
-  }, [fx, soundEnabled, soundTheme, onDone]);
+  }, [fx, soundEnabled, soundTheme]);
 
   const particles = useMemo(() => Array.from({ length: 14 }, (_, i) => {
     const angle = (i / 14) * Math.PI * 2 + (fx?.t || 0) % 1;
@@ -76,12 +80,18 @@ export default function MealBurst({ fx, onDone, soundEnabled = true, soundTheme 
               </svg>
             )}
 
-            {/* Figura del cibo: 3D procedurale (emoji solo con reduced-motion) */}
-            <div ref={stageRef} className="relative z-10" style={{ width: 190, height: 190, filter: `drop-shadow(0 0 22px ${k.glow})` }}>
+            {/* Figura del cibo: SVG disegnato e animato (emoji solo con reduced-motion) */}
+            <div ref={stageRef} className="relative z-10" style={{ width: 200, height: 200, filter: `drop-shadow(0 0 22px ${k.glow})` }}>
+              {!reduced && (
+                <motion.div className="absolute inset-0 rounded-full"
+                  animate={{ opacity: [0.4, 0.85, 0.4], scale: [1, 1.13, 1] }}
+                  transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
+                  style={{ background: `radial-gradient(circle, ${k.glow} 0%, transparent 62%)` }} />
+              )}
               {reduced ? (
                 <div className="w-full h-full flex items-center justify-center text-6xl">{k.emoji}</div>
               ) : (
-                <FoodFigure3D kind={fx.kind} />
+                <FoodFigure kind={fx.kind} />
               )}
             </div>
 
