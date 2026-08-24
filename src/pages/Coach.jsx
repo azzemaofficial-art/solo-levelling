@@ -6,7 +6,7 @@ import { BREATHING_PROTOCOLS } from '../../lib/breathingProtocols.js';
 import { getDiscipline } from '../../lib/martialKnowledge.js';
 import { analyzeKinematics, fatigueFromTrend, detectKicks, kickLevelFromMatch } from '../../lib/kinematics.js';
 import { masteryFromXp } from '../../lib/mastery.js';
-import { playEpicDing, playComboHit } from '../utils/sfx';
+import { playEpicDing, playComboHit, playSample } from '../utils/sfx';
 import ComboFx from '../components/ComboFx';
 import { secretsFor, secretOfTheDay } from '../../lib/coachSecrets.js';
 import { MARKER_RE, canonicalMarker, normalizeCoachingText, extractCommand } from '../../lib/coachingText.js';
@@ -1215,7 +1215,10 @@ function CurriculumCoach({ onGoLive }) {
     const prev = seen[disc] || 'E';
     if (RANK_LABELS.indexOf(rank.rank) > RANK_LABELS.indexOf(prev)) {
       const fresh = discSecrets.filter((s) => s.livello === secretLevelOf(rank.rank));
-      if (fresh.length) setUnlockModal({ rank: rank.rank, secrets: fresh.slice(0, 5), total: fresh.length });
+      if (fresh.length) {
+        setUnlockModal({ rank: rank.rank, secrets: fresh.slice(0, 5), total: fresh.length });
+        playSample('unlock', { volume: 0.5 });
+      }
     }
     if (seen[disc] !== rank.rank) {
       try { localStorage.setItem(SECRET_RANK_KEY, JSON.stringify({ ...seen, [disc]: rank.rank })); } catch {}

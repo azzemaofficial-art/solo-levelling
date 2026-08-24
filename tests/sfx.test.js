@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { playSfx, playMonsterGrowl, playEatCrunch, playBarRise, playEpicDing, playGong, playComboHit } from '../src/utils/sfx.js';
+import { playSfx, playMonsterGrowl, playEatCrunch, playBarRise, playEpicDing, playGong, playComboHit, playSample } from '../src/utils/sfx.js';
 
 // In Node non c'è window/AudioContext: ogni funzione deve essere un no-op sicuro.
 test('tutti i suoni sono no-op sicuri senza AudioContext (SSR)', () => {
@@ -21,4 +21,9 @@ test('enabled=false non fa nulla (e non rompe)', () => {
   assert.doesNotThrow(() => playSfx('success', false));
   assert.doesNotThrow(() => playEatCrunch({ enabled: false }));
   assert.doesNotThrow(() => playGong({ enabled: false }));
+});
+
+test('playSample senza AudioContext/fetch è un no-op che ritorna false', () => {
+  assert.equal(playSample('eat'), false);
+  assert.equal(playSample('hit', { enabled: false }), false);
 });

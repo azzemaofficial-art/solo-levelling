@@ -307,3 +307,43 @@ export const playComboHit = ({ enabled = true, power = 1 } = {}) => {
   click.connect(hp); hp.connect(cg); cg.connect(ctx.destination);
   click.start(now, Math.random() * 0.5, 0.05);
 };
+
+// ── CAMPIONI REALI — public/sounds/*.mp3 (Mixkit, licenza libera) ───────────
+// Primo avvio: fetch+decode asincrono e fallback sintetico; dal secondo in poi
+// il campione è in cache. Ritorna true se ha suonato il campione.
+const sampleCache = new Map();
+export const playSample = (name, { enabled = true, volume = 0.5, rate = 1 } = {}) => {
+  if (!enabled) return false;
+  const ctx = getContext();
+  if (!ctx) return false;
+  const url = `/sounds/${name}.mp3`;
+  const cached = sampleCache.get(url);
+  if (cached === 'loading') return false;
+  if (cached) {
+    const src = ctx.createBufferSource();
+    src.buffer = cached;
+    src.playbackRate.value = rate;
+    const g = ctx.createGain();
+    g.gain.value = volume;
+    src.connect(g); g.connect(ctx.destination);
+    src.start(0);
+    return true;
+  }
+  sampleCache.set(url, 'loading');
+  fetch(url)
+    .then((r) => (r.ok ? r.arrayBuffer() : null))
+    .then((ab) => (ab ? ctx.decodeAudioData(ab) : null))
+    .then((buf) => {
+      if (!buf) { sampleCache.delete(url); return; }
+      sampleCache.set(url, buf);
+      const src = ctx.createBufferSource();
+      src.buffer = buf;
+      src.playbackRate.value = rate;
+      const g = ctx.createGain();
+      g.gain.value = volume;
+      src.connect(g); g.connect(ctx.destination);
+      src.start(0);
+    })
+    .catch(() => sampleCache.delete(url));
+  return false;
+};
