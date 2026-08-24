@@ -1,12 +1,14 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Burst cinematico quando si aggiunge cibo/acqua: pennellata d'inchiostro,
-// particelle oro, barra che sale col suono. Stile Solo Leveling + cinema
-// orientale — tutto procedurale (framer-motion + SVG), zero asset.
+// Burst cinematico quando si aggiunge cibo/acqua: figura 3D del piatto che
+// appare (ciotola + riso + vapore / goccia), pennellata d'inchiostro,
+// particelle oro, barra che sale col suono. Zero asset: tutto procedurale.
 // fx: { t, kind: meal|protein|water, delta, unit, before, after, fromPct, toPct, slot }
 // ─────────────────────────────────────────────────────────────────────────────
 import { useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { playSfx, playEatCrunch, playBarRise } from '../utils/sfx';
+import gsap from 'gsap';
+import { playSfx, playEatCrunch, playBarRise, playSample } from '../utils/sfx';
+import FoodFigure3D from './FoodFigure3D';
 
 const KIND = {
   meal: { emoji: '🍜', label: 'PASTO', color: '#fbbf24', glow: 'rgba(251,191,36,0.5)' },
@@ -19,20 +21,28 @@ const prefersReducedMotion = () =>
 
 export default function MealBurst({ fx, onDone, soundEnabled = true, soundTheme = 'solo' }) {
   const playedRef = useRef(0);
+  const stageRef = useRef(null);
 
   useEffect(() => {
     if (!fx || fx.t === playedRef.current) return undefined;
     playedRef.current = fx.t;
     if (soundEnabled) {
+      // Campioni reali (Mixkit) con fallback sintetico
       if (fx.kind === 'water') {
-        playSfx('bar', true, soundTheme);
+        if (!playSample('water', { volume: 0.55 })) playSfx('bar', true, soundTheme);
       } else {
-        playEatCrunch({ enabled: true });
+        if (!playSample('eat', { volume: 0.55 })) playEatCrunch({ enabled: true });
         playSfx('eat', true, soundTheme);
       }
       setTimeout(() => playBarRise({ enabled: true, from: fx.fromPct, to: fx.toPct }), 180);
     }
-    const id = setTimeout(() => onDone?.(), 1750);
+    // Ingresso GSAP: la scena 3D sbuca con overshoot
+    if (stageRef.current && !prefersReducedMotion()) {
+      gsap.fromTo(stageRef.current,
+        { scale: 0.4, y: 46, opacity: 0, rotate: -6 },
+        { scale: 1, y: 0, opacity: 1, rotate: 0, duration: 0.6, ease: 'back.out(1.7)' });
+    }
+    const id = setTimeout(() => onDone?.(), 2100);
     return () => clearTimeout(id);
   }, [fx, soundEnabled, soundTheme, onDone]);
 
@@ -66,15 +76,14 @@ export default function MealBurst({ fx, onDone, soundEnabled = true, soundTheme 
               </svg>
             )}
 
-            {/* Cibo che arriva */}
-            <motion.div
-              initial={reduced ? { opacity: 1 } : { scale: 0, y: -70, rotate: -24 }}
-              animate={{ scale: 1, y: 0, rotate: 0, opacity: 1 }}
-              transition={{ type: 'spring', stiffness: 420, damping: 16 }}
-              className="text-6xl relative z-10"
-              style={{ filter: `drop-shadow(0 0 18px ${k.glow})` }}>
-              {k.emoji}
-            </motion.div>
+            {/* Figura del cibo: 3D procedurale (emoji solo con reduced-motion) */}
+            <div ref={stageRef} className="relative z-10" style={{ width: 190, height: 190, filter: `drop-shadow(0 0 22px ${k.glow})` }}>
+              {reduced ? (
+                <div className="w-full h-full flex items-center justify-center text-6xl">{k.emoji}</div>
+              ) : (
+                <FoodFigure3D kind={fx.kind} />
+              )}
+            </div>
 
             {/* Particelle oro */}
             {!reduced && particles.map((p, i) => (

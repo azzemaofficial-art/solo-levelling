@@ -5,7 +5,28 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { playGong, playComboHit, playEpicDing } from '../utils/sfx';
+import gsap from 'gsap';
+import Particles, { ParticlesProvider } from '@tsparticles/react';
+import { loadSlim } from '@tsparticles/slim';
+import { playGong, playComboHit, playEpicDing, playSample } from '../utils/sfx';
+
+// Callback stabile a livello modulo (richiesto da ParticlesProvider v4)
+const initParticlesEngine = async (engine) => { await loadSlim(engine); };
+
+// Pioggia di scintille oro ambiente (tsParticles, MIT) — solo durante il cinematico
+const GOLD_OPTIONS = {
+  fpsLimit: 60,
+  fullScreen: { enable: false },
+  detectRetina: true,
+  particles: {
+    number: { value: 40 },
+    color: { value: ['#ffd24a', '#fff7cc', '#ffffff'] },
+    shape: { type: 'circle' },
+    opacity: { value: { min: 0.1, max: 0.85 }, animation: { enable: true, speed: 2, sync: false } },
+    size: { value: { min: 1, max: 2.6 } },
+    move: { enable: true, speed: { min: 10, max: 26 }, direction: 'top', random: true, straight: false, outModes: { default: 'out' } },
+  },
+};
 
 const CFG = {
   perfect: { label: 'SUPER COMBO', sub: 'PERFETTO', color: '#fbbf24', glow: 'rgba(251,191,36,0.85)' },
@@ -20,17 +41,28 @@ const prefersReducedMotion = () =>
 
 export default function ComboFx({ fx, onDone }) {
   const playedRef = useRef(0);
+  const waveRef = useRef(null);
 
   useEffect(() => {
     if (!fx || fx.t === playedRef.current) return undefined;
     playedRef.current = fx.t;
     if (soundOn()) {
+      // Campioni reali (Mixkit) con fallback sintetico
       if (fx.grade === 'perfect') {
-        playGong({ power: 1.2 });
-        setTimeout(() => playEpicDing({ enabled: true }), 220);
-      } else {
+        playSample('whoosh', { volume: 0.4 });
+        if (!playSample('levelup', { volume: 0.55 })) {
+          playGong({ power: 1.2 });
+          setTimeout(() => playEpicDing({ enabled: true }), 220);
+        }
+      } else if (!playSample('hit', { volume: 0.6 })) {
         playComboHit({ power: 1 });
       }
+    }
+    // Onda d'urto GSAP dal punto d'impatto
+    if (waveRef.current && !prefersReducedMotion()) {
+      gsap.fromTo(waveRef.current,
+        { scale: 0, opacity: fx.grade === 'perfect' ? 0.95 : 0.6 },
+        { scale: fx.grade === 'perfect' ? 8 : 5, opacity: 0, duration: 0.75, ease: 'power2.out' });
     }
     const id = setTimeout(() => onDone?.(), 1500);
     return () => clearTimeout(id);
@@ -58,6 +90,20 @@ export default function ComboFx({ fx, onDone }) {
             <motion.div className="absolute inset-0 bg-white"
               initial={{ opacity: 0.85 }} animate={{ opacity: 0 }}
               transition={{ duration: 0.35, ease: 'easeOut' }} />
+          )}
+
+          {/* Scintille oro ambiente (tsParticles) */}
+          {!reduced && (
+            <ParticlesProvider init={initParticlesEngine}>
+              <Particles options={GOLD_OPTIONS} className="absolute inset-0" />
+            </ParticlesProvider>
+          )}
+
+          {/* Onda d'urto GSAP dal centro */}
+          {!reduced && (
+            <div ref={waveRef}
+              className="absolute inset-0 m-auto w-28 h-28 rounded-full pointer-events-none"
+              style={{ border: `2px solid ${c.color}`, boxShadow: `0 0 34px ${c.glow}`, opacity: 0 }} />
           )}
 
           {/* Screen shake sul contenuto */}
