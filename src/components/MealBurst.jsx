@@ -11,10 +11,16 @@ import { playSfx, playEatCrunch, playBarRise, playSample } from '../utils/sfx';
 import FoodFigure from './FoodFigure';
 
 const KIND = {
-  meal: { emoji: '🍜', label: 'PASTO', color: '#fbbf24', glow: 'rgba(251,191,36,0.5)' },
+  meal: { emoji: '🍜', label: 'PASTO', color: '#fbbf24', glow: 'rgba(251,191,36,0.5)', img: '/images/ramen-eating.gif' },
   protein: { emoji: '🍗', label: 'PROTEINE', color: '#34d399', glow: 'rgba(52,211,153,0.5)' },
   water: { emoji: '💧', label: 'ACQUA', color: '#38bdf8', glow: 'rgba(56,189,248,0.5)' },
 };
+
+// Preload del gif: il primo burst non deve aspettare il download
+if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
+  const preloadImg = new Image();
+  preloadImg.src = KIND.meal.img;
+}
 
 const prefersReducedMotion = () =>
   typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
@@ -38,7 +44,8 @@ export default function MealBurst({ fx, onDone, soundEnabled = true, soundTheme 
         if (!playSample('eat', { volume: 0.55 })) playEatCrunch({ enabled: true });
         playSfx('eat', true, soundTheme);
       }
-      setTimeout(() => playBarRise({ enabled: true, from: fx.fromPct, to: fx.toPct }), 180);
+      // Suono della barra sincronizzato con l'animazione della barra (0.22s)
+      setTimeout(() => playBarRise({ enabled: true, from: fx.fromPct, to: fx.toPct }), 220);
     }
     // Ingresso GSAP: la figura sbuca con overshoot
     if (stageRef.current && !prefersReducedMotion()) {
@@ -46,7 +53,7 @@ export default function MealBurst({ fx, onDone, soundEnabled = true, soundTheme 
         { scale: 0.4, y: 46, opacity: 0, rotate: -6 },
         { scale: 1, y: 0, opacity: 1, rotate: 0, duration: 0.6, ease: 'back.out(1.7)' });
     }
-    const id = setTimeout(() => onDoneRef.current?.(), 2100);
+    const id = setTimeout(() => onDoneRef.current?.(), 2400);
     return () => clearTimeout(id);
   }, [fx, soundEnabled, soundTheme]);
 
@@ -80,7 +87,22 @@ export default function MealBurst({ fx, onDone, soundEnabled = true, soundTheme 
               </svg>
             )}
 
-            {/* Figura del cibo: SVG disegnato e animato (emoji solo con reduced-motion) */}
+            {/* Nome del cibo mangiato — NEON, visibile per poco tempo */}
+            {fx.name && !reduced && (
+              <motion.p
+                initial={{ opacity: 0, scale: 1.7, filter: 'blur(8px)' }}
+                animate={{ opacity: [0, 1, 1, 0], scale: 1, filter: 'blur(0px)' }}
+                transition={{ duration: 2.1, times: [0, 0.15, 0.78, 1], ease: 'easeOut' }}
+                className="text-base font-black uppercase tracking-[0.22em] z-10 text-center px-3 -mb-1"
+                style={{
+                  color: '#fff', fontFamily: 'Orbitron, sans-serif',
+                  textShadow: `0 0 5px ${k.color}, 0 0 16px ${k.color}, 0 0 36px ${k.glow}`,
+                }}>
+                {fx.name}
+              </motion.p>
+            )}
+
+            {/* Figura del cibo: gif del pasto / SVG animato / emoji se reduced-motion */}
             <div ref={stageRef} className="relative z-10" style={{ width: 200, height: 200, filter: `drop-shadow(0 0 22px ${k.glow})` }}>
               {!reduced && (
                 <motion.div className="absolute inset-0 rounded-full"
@@ -90,6 +112,10 @@ export default function MealBurst({ fx, onDone, soundEnabled = true, soundTheme 
               )}
               {reduced ? (
                 <div className="w-full h-full flex items-center justify-center text-6xl">{k.emoji}</div>
+              ) : k.img ? (
+                <img src={k.img} alt="" draggable="false"
+                  className="w-full h-full object-cover rounded-3xl relative z-10"
+                  style={{ border: `2px solid ${k.color}`, boxShadow: `0 0 28px ${k.glow}` }} />
               ) : (
                 <FoodFigure kind={fx.kind} />
               )}
@@ -105,14 +131,17 @@ export default function MealBurst({ fx, onDone, soundEnabled = true, soundTheme 
                 transition={{ duration: 0.7, delay: p.d, ease: 'easeOut' }} />
             ))}
 
-            {/* Chip del delta */}
+            {/* Calorie — NEON, visibili per poco tempo */}
             <motion.p
-              initial={{ opacity: 0, y: 10, scale: 0.8 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              transition={{ delay: 0.12, type: 'spring', stiffness: 300, damping: 18 }}
-              className="text-sm font-black tracking-widest z-10"
-              style={{ color: k.color, textShadow: `0 0 14px ${k.glow}`, fontFamily: 'Orbitron, sans-serif' }}>
-              +{fx.delta}{fx.unit || ' kcal'} · {fx.name || k.label}
+              initial={{ opacity: 0, y: 12, scale: 0.7 }}
+              animate={{ opacity: [0, 1, 1, 0], y: 0, scale: [0.7, 1.12, 1, 0.95] }}
+              transition={{ duration: 2.15, times: [0, 0.12, 0.75, 1], ease: 'easeOut' }}
+              className="text-lg font-black tracking-widest z-10"
+              style={{
+                color: '#fff', fontFamily: 'Orbitron, sans-serif',
+                textShadow: `0 0 6px ${k.color}, 0 0 18px ${k.color}, 0 0 34px ${k.glow}`,
+              }}>
+              +{fx.delta}{fx.unit || ' kcal'}{fx.name ? '' : ` · ${k.label}`}
             </motion.p>
 
             {/* Barra che sale */}
@@ -125,7 +154,7 @@ export default function MealBurst({ fx, onDone, soundEnabled = true, soundTheme 
                 <motion.div className="h-full rounded-full"
                   initial={{ width: `${(fx.fromPct || 0) * 100}%` }}
                   animate={{ width: `${(fx.toPct || 0) * 100}%` }}
-                  transition={{ duration: 0.7, delay: 0.18, ease: [0.2, 0.8, 0.3, 1] }}
+                  transition={{ duration: 0.7, delay: 0.22, ease: [0.2, 0.8, 0.3, 1] }}
                   style={{ background: `linear-gradient(90deg, ${k.color}, #fff)`, boxShadow: `0 0 12px ${k.glow}` }} />
               </div>
             </div>

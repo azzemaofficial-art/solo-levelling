@@ -1075,9 +1075,11 @@ useEffect(() => { localStorage.setItem('shadow_monarch_macros', JSON.stringify(m
       const delta = isWater ? 350 : mode === 'meal' ? 480 : 170;
       const cap = isWater ? 2500 : 2600;
       const after = before + delta;
+      const slotName = { breakfast: 'Colazione', lunch: 'Pranzo', dinner: 'Cena', snack: 'Spuntino' }[quickMealSlot] || '';
       setMealFx({
         t: Date.now(), kind: mode, delta,
         unit: isWater ? ' ml' : ' kcal',
+        name: isWater ? 'Acqua' : slotName,
         before: isWater ? `${before}ml` : `${before}`,
         after: isWater ? `${after}ml` : `${after}`,
         fromPct: Math.min(1, before / cap),
