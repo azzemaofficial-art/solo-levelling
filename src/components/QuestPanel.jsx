@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { dailyQuest, questXp } from '../../lib/quests.js';
 import { masteryFromXp } from '../../lib/mastery.js';
 import { playSfx, playEpicDing, playSample, playGong } from '../utils/sfx';
+import { speakSystem } from '../utils/systemVoice';
 
 const META_KEY = 'shadow_monarch_quest_meta';        // { lastClaim, streak }
 const CLAIM_KEY = 'shadow_monarch_quest_claim';      // { date, checks, claimed }
@@ -69,6 +70,7 @@ export default function QuestPanel() {
       setPenalty(true);
       playGong({ power: 0.7 });
       playSfx('warning', true, 'solo');
+      speakSystem('Missione fallita. Penalità applicata. Il Sistema non dimentica.');
     }
   }, [today, meta.lastClaim, meta.streak]);
 
@@ -100,6 +102,7 @@ export default function QuestPanel() {
     setXpBurst({ xp, streak, t: Date.now() });
     if (!playSample('levelup', { volume: 0.5 })) playEpicDing({ enabled: true });
     playSfx('streak', true, 'solo');
+    speakSystem(`Quest completata. Ricompensa: ${xp} punti esperienza. Serie di ${streak} giorni.`);
   };
 
   const dismissPenalty = () => {

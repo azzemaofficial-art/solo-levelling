@@ -7,6 +7,7 @@ import { getDiscipline } from '../../lib/martialKnowledge.js';
 import { analyzeKinematics, fatigueFromTrend, detectKicks, kickLevelFromMatch } from '../../lib/kinematics.js';
 import { masteryFromXp } from '../../lib/mastery.js';
 import { playEpicDing, playComboHit, playSample } from '../utils/sfx';
+import { speakSystem } from '../utils/systemVoice';
 import ComboFx from '../components/ComboFx';
 import QuestPanel from '../components/QuestPanel';
 import SystemHud from '../components/SystemHud';
@@ -1218,6 +1219,7 @@ function CurriculumCoach({ onGoLive }) {
     saveArmy(next);
     setArmy(next);
     setShadowRise({ t: Date.now(), disc: CURRICULUM[d].name, rank: r.rank });
+    setTimeout(() => speakSystem('Ombra estratta. Alzati e combatti per me.'), 1400);
   }, []);
   // ⚔ Maestria della disciplina (0-100, curva lentissima) — dall'XP coach
   const [discMastery, setDiscMastery] = useState(0);
@@ -1235,6 +1237,7 @@ function CurriculumCoach({ onGoLive }) {
     if (RANK_LABELS.indexOf(rank.rank) > RANK_LABELS.indexOf(prev)) {
       // Prima il RISVEGLIO, poi i segreti sbloccati
       setAwakening({ t: Date.now(), rank: rank.rank, disc: curriculum.name });
+      speakSystem(`Risveglio registrato. Grado ${rank.rank} raggiunto in ${curriculum.name}.`);
       // Grado A/S → il Sistema estrae l'ombra della disciplina
       if (RANK_LABELS.indexOf(rank.rank) >= 4 && !loadArmy()[disc]) extractShadow(disc);
       const fresh = discSecrets.filter((s) => s.livello === secretLevelOf(rank.rank));
