@@ -9,6 +9,7 @@ import { masteryFromXp } from '../../lib/mastery.js';
 import { playEpicDing, playComboHit, playSample } from '../utils/sfx';
 import ComboFx from '../components/ComboFx';
 import QuestPanel from '../components/QuestPanel';
+import SystemHud from '../components/SystemHud';
 import { secretsFor, secretOfTheDay } from '../../lib/coachSecrets.js';
 import { MARKER_RE, canonicalMarker, normalizeCoachingText, extractCommand } from '../../lib/coachingText.js';
 import { buildCoachWorkout } from '../../lib/workouts.js';
@@ -5224,6 +5225,14 @@ function VisualCoach({ setPlayerStats }) {
   }
 
   // ── Live — camera overlay (video a tutto schermo + comandi sovrapposti) ──────
+  // Snapshot per l'HUD olografico: legge i ref, nessun re-render del Coach
+  const hudSnapshot = useCallback(() => ({
+    elapsedSec: sessionStartRef.current ? Math.floor((Date.now() - sessionStartRef.current) / 1000) : 0,
+    intensity: Math.round(intensityRef.current),
+    kicks: matchKicksRef.current.tot,
+    matchOn: matchCtxRef.current.active && matchCtxRef.current.rounds >= 3 && timerPhaseRef.current === 'round',
+  }), []);
+
   // Pattern app-fotocamera: video in absolute inset-0 come sfondo, tutti i
   // comandi in absolute ancorati top/bottom.
   // PORTAL su document.body: indispensabile perché un ancestor con transform
@@ -5236,6 +5245,9 @@ function VisualCoach({ setPlayerStats }) {
       <video ref={videoRef} className="absolute inset-0 w-full h-full" style={{ objectFit: 'cover', transform: facingMode === 'user' ? 'scaleX(-1)' : 'none' }} playsInline muted />
       <canvas ref={canvasRef} className="hidden" />
       <canvas ref={overlayRef} className="absolute pointer-events-none" style={{ opacity: skeletonOn ? 1 : 0, transform: facingMode === 'user' ? 'scaleX(-1)' : 'none' }} />
+
+      {/* ⌈ HUD OLOGRAFICO DEL SISTEMA ⌋ — finestre fluttuanti sul video */}
+      <SystemHud active={streaming && skeletonOn} getSnapshot={hudSnapshot} />
 
       {/* TOP BAR — sovrapposta in alto */}
       <div className="absolute top-0 inset-x-0 z-20 flex items-center gap-2.5 px-3 pb-3"
