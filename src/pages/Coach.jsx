@@ -8,6 +8,7 @@ import { analyzeKinematics, fatigueFromTrend, detectKicks, kickLevelFromMatch } 
 import { masteryFromXp } from '../../lib/mastery.js';
 import { playEpicDing, playComboHit, playSample } from '../utils/sfx';
 import ComboFx from '../components/ComboFx';
+import QuestPanel from '../components/QuestPanel';
 import { secretsFor, secretOfTheDay } from '../../lib/coachSecrets.js';
 import { MARKER_RE, canonicalMarker, normalizeCoachingText, extractCommand } from '../../lib/coachingText.js';
 import { buildCoachWorkout } from '../../lib/workouts.js';
@@ -1373,6 +1374,9 @@ Rispondi in italiano, max 15 righe, tono da maestro pratico.`;
           </div>
         </div>
       </div>
+
+      {/* ⌈ DAILY QUEST DEL SISTEMA ⌋ — la missione del giorno */}
+      <QuestPanel />
 
       {/* ⚔ MAESTRIA DELLA DISCIPLINA — sale solo con tanta pratica */}
       <div className="rounded-2xl px-4 py-2.5 flex items-center gap-3" style={{ background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.2)' }}>
