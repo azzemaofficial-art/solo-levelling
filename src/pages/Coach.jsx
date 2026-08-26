@@ -10,6 +10,7 @@ import { playEpicDing, playComboHit, playSample } from '../utils/sfx';
 import ComboFx from '../components/ComboFx';
 import QuestPanel from '../components/QuestPanel';
 import SystemHud from '../components/SystemHud';
+import AwakeningFx from '../components/AwakeningFx';
 import { secretsFor, secretOfTheDay } from '../../lib/coachSecrets.js';
 import { MARKER_RE, canonicalMarker, normalizeCoachingText, extractCommand } from '../../lib/coachingText.js';
 import { buildCoachWorkout } from '../../lib/workouts.js';
@@ -1202,6 +1203,7 @@ function CurriculumCoach({ onGoLive }) {
   const discSecrets = useMemo(() => secretsFor(disc), [disc]);
   const unlockedSecrets = discSecrets.filter((s) => s.livello <= secretLevel);
   const todaySecret = useMemo(() => secretOfTheDay(disc), [disc]);
+  const [awakening, setAwakening] = useState(null); // cinematica RISVEGLIO al cambio grado
   // ⚔ Maestria della disciplina (0-100, curva lentissima) — dall'XP coach
   const [discMastery, setDiscMastery] = useState(0);
   useEffect(() => {
@@ -1216,6 +1218,8 @@ function CurriculumCoach({ onGoLive }) {
     const seen = loadSeenRanks();
     const prev = seen[disc] || 'E';
     if (RANK_LABELS.indexOf(rank.rank) > RANK_LABELS.indexOf(prev)) {
+      // Prima il RISVEGLIO, poi i segreti sbloccati
+      setAwakening({ t: Date.now(), rank: rank.rank, disc: curriculum.name });
       const fresh = discSecrets.filter((s) => s.livello === secretLevelOf(rank.rank));
       if (fresh.length) {
         setUnlockModal({ rank: rank.rank, secrets: fresh.slice(0, 5), total: fresh.length });
@@ -1378,6 +1382,9 @@ Rispondi in italiano, max 15 righe, tono da maestro pratico.`;
 
       {/* ⌈ DAILY QUEST DEL SISTEMA ⌋ — la missione del giorno */}
       <QuestPanel />
+
+      {/* ⚡ CINEMATICA RISVEGLIO — al passaggio di grado */}
+      <AwakeningFx fx={awakening} onDone={() => setAwakening(null)} />
 
       {/* ⚔ MAESTRIA DELLA DISCIPLINA — sale solo con tanta pratica */}
       <div className="rounded-2xl px-4 py-2.5 flex items-center gap-3" style={{ background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.2)' }}>
