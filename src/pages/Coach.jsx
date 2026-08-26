@@ -11,6 +11,7 @@ import ComboFx from '../components/ComboFx';
 import QuestPanel from '../components/QuestPanel';
 import SystemHud from '../components/SystemHud';
 import AwakeningFx from '../components/AwakeningFx';
+import { ShadowSoldier, ShadowRiseFx } from '../components/ShadowArmy';
 import { secretsFor, secretOfTheDay } from '../../lib/coachSecrets.js';
 import { MARKER_RE, canonicalMarker, normalizeCoachingText, extractCommand } from '../../lib/coachingText.js';
 import { buildCoachWorkout } from '../../lib/workouts.js';
@@ -916,6 +917,9 @@ const secretLevelForMode = (mode) => {
 };
 const SECRET_RANK_KEY = 'shadow_monarch_secret_rank_seen';
 const loadSeenRanks = () => { try { return JSON.parse(localStorage.getItem(SECRET_RANK_KEY) || '{}'); } catch { return {}; } };
+const ARMY_KEY = 'shadow_monarch_army';
+const loadArmy = () => { try { return JSON.parse(localStorage.getItem(ARMY_KEY) || '{}'); } catch { return {}; } };
+const saveArmy = (a) => { try { localStorage.setItem(ARMY_KEY, JSON.stringify(a)); } catch {} };
 
 // ── Prossimo obiettivo nel percorso: primo argomento non completato ───────────
 const nextObjective = (disc) => {
@@ -1204,6 +1208,17 @@ function CurriculumCoach({ onGoLive }) {
   const unlockedSecrets = discSecrets.filter((s) => s.livello <= secretLevel);
   const todaySecret = useMemo(() => secretOfTheDay(disc), [disc]);
   const [awakening, setAwakening] = useState(null); // cinematica RISVEGLIO al cambio grado
+  const [army, setArmy] = useState(loadArmy);        // 🗡️ armata delle ombre
+  const [shadowRise, setShadowRise] = useState(null);
+  const extractShadow = useCallback((d) => {
+    const r = disciplineRank(d);
+    const cur = loadArmy();
+    if (!r || RANK_LABELS.indexOf(r.rank) < 4 || cur[d]) return;
+    const next = { ...cur, [d]: { rank: r.rank, extractedAt: Date.now() } };
+    saveArmy(next);
+    setArmy(next);
+    setShadowRise({ t: Date.now(), disc: CURRICULUM[d].name, rank: r.rank });
+  }, []);
   // ⚔ Maestria della disciplina (0-100, curva lentissima) — dall'XP coach
   const [discMastery, setDiscMastery] = useState(0);
   useEffect(() => {
@@ -1220,6 +1235,8 @@ function CurriculumCoach({ onGoLive }) {
     if (RANK_LABELS.indexOf(rank.rank) > RANK_LABELS.indexOf(prev)) {
       // Prima il RISVEGLIO, poi i segreti sbloccati
       setAwakening({ t: Date.now(), rank: rank.rank, disc: curriculum.name });
+      // Grado A/S → il Sistema estrae l'ombra della disciplina
+      if (RANK_LABELS.indexOf(rank.rank) >= 4 && !loadArmy()[disc]) extractShadow(disc);
       const fresh = discSecrets.filter((s) => s.livello === secretLevelOf(rank.rank));
       if (fresh.length) {
         setUnlockModal({ rank: rank.rank, secrets: fresh.slice(0, 5), total: fresh.length });
@@ -1385,6 +1402,8 @@ Rispondi in italiano, max 15 righe, tono da maestro pratico.`;
 
       {/* ⚡ CINEMATICA RISVEGLIO — al passaggio di grado */}
       <AwakeningFx fx={awakening} onDone={() => setAwakening(null)} />
+      {/* 🗡️ CINEMATICA ESTRAZIONE OMBRA */}
+      <ShadowRiseFx fx={shadowRise} onDone={() => setShadowRise(null)} />
 
       {/* ⚔ MAESTRIA DELLA DISCIPLINA — sale solo con tanta pratica */}
       <div className="rounded-2xl px-4 py-2.5 flex items-center gap-3" style={{ background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.2)' }}>
@@ -1459,6 +1478,40 @@ Rispondi in italiano, max 15 righe, tono da maestro pratico.`;
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* 🗡️ ARMATA DELLE OMBRE — ogni grado A/S estrae un soldato */}
+      <div className="rounded-2xl p-4 space-y-2" style={{ background: 'linear-gradient(160deg, rgba(76,29,149,0.14), rgba(17,24,39,0.9))', border: '1px solid rgba(167,139,250,0.3)', boxShadow: '0 0 22px rgba(139,92,246,0.12)' }}>
+        <div className="flex items-center justify-between">
+          <p className="text-xs font-black tracking-widest" style={{ color: '#c4b5fd', fontFamily: 'Orbitron, sans-serif' }}>🗡️ ARMATA DELLE OMBRE</p>
+          <span className="text-[10px] px-2 py-0.5 rounded-full font-bold" style={{ background: 'rgba(139,92,246,0.15)', color: '#a78bfa', border: '1px solid rgba(167,139,250,0.35)' }}>
+            {Object.keys(army).filter((d) => CURRICULUM[d]).length}/{Object.keys(CURRICULUM).length}
+          </span>
+        </div>
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          {Object.keys(CURRICULUM).map((d) => {
+            const r = disciplineRank(d);
+            const extracted = !!army[d];
+            const eligible = r && RANK_LABELS.indexOf(r.rank) >= 4;
+            return (
+              <button key={d} onClick={() => extractShadow(d)} disabled={!eligible || extracted}
+                className="flex flex-col items-center gap-1 shrink-0 rounded-xl p-2"
+                style={{
+                  minWidth: 76, cursor: eligible && !extracted ? 'pointer' : 'default',
+                  background: extracted ? 'rgba(139,92,246,0.12)' : 'rgba(30,41,59,0.4)',
+                  border: `1px solid ${extracted ? 'rgba(167,139,250,0.55)' : eligible ? 'rgba(251,191,36,0.5)' : 'rgba(148,163,184,0.12)'}`,
+                }}>
+                <ShadowSoldier extracted={extracted} size={40} glow={extracted} />
+                <p className="text-[8px] font-black tracking-wider leading-none" style={{ color: extracted ? '#c4b5fd' : '#64748b' }}>
+                  {CURRICULUM[d].name.split(' ')[0].toUpperCase()}
+                </p>
+                <p className="text-[7px] leading-none" style={{ color: eligible && !extracted ? '#fbbf24' : '#475569' }}>
+                  {extracted ? `GRADO ${army[d].rank}` : eligible ? 'ESTRAI!' : 'GRADO A'}
+                </p>
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
       {/* Selector */}
       <div className="flex flex-wrap gap-1.5">
