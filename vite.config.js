@@ -28,6 +28,13 @@ export default defineConfig(({ mode }) => {
     plugins: [react()],
     server: { proxy },
     build: {
+      // Di default Vite mette in <link rel="modulepreload"> anche i chunk usati
+      // SOLO da pagine lazy() come Boss (3D) — quindi ogni apertura del sito
+      // scaricava ~850KB di Three.js mai usati subito. Li togliamo dal preload:
+      // restano lazy per davvero, caricati solo quando l'utente apre quella pagina.
+      modulePreload: {
+        resolveDependencies: (filename, deps) => deps.filter((d) => !/three-(core|fiber|drei)/.test(d)),
+      },
       rollupOptions: {
         output: {
           manualChunks(id) {
