@@ -14,3 +14,11 @@ server/data/*.json
 
 # Copie-duplicato create da iCloud durante l'editing (il vero file è senza suffisso)
 api/telegram/webhook 2.js
+
+# Sorgenti del popup ramen (frame PNG, sprite sheet): restano in locale,
+# in produzione servono solo i due encode con alpha (.mp4 HEVC / .webm VP9).
+public/ramen_popup_v4/frame_*.png
+public/ramen_popup_v4/ramen_popup_sheet_rgba.png
+public/ramen_popup_v4/ramen_popup_source.png
+public/ramen_popup_v4/ramen_popup_transparent.gif
+public/ramen_popup_v4/ramen_popup_transparent.webm

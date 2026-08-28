@@ -10,17 +10,21 @@ import gsap from 'gsap';
 import { playSfx, playEatCrunch, playBarRise, playSample } from '../utils/sfx';
 import FoodFigure from './FoodFigure';
 
+// Popup del ramen con sfondo TRASPARENTE: due encode dello stesso video perché
+// nessun formato con alpha è supportato ovunque —
+//   • HEVC-alpha in MP4  → Safari / iPhone (l'unico che iOS accetta)
+//   • VP9-alpha in WebM  → Chrome / Firefox / Android
+// Il browser prende la prima <source> che sa riprodurre.
+const RAMEN_MP4 = '/ramen_popup_v4/ramen_popup_alpha.mp4';
+const RAMEN_WEBM = '/ramen_popup_v4/ramen_popup_alpha.webm';
+// Durata reale della clip (16 frame a 7fps): il burst resta a schermo almeno tanto.
+const RAMEN_MS = 2300;
+
 const KIND = {
-  meal: { emoji: '🍜', label: 'PASTO', color: '#fbbf24', glow: 'rgba(251,191,36,0.5)', img: '/images/ramen-eating.gif' },
+  meal: { emoji: '🍜', label: 'PASTO', color: '#fbbf24', glow: 'rgba(251,191,36,0.5)', video: true },
   protein: { emoji: '🍗', label: 'PROTEINE', color: '#34d399', glow: 'rgba(52,211,153,0.5)' },
   water: { emoji: '💧', label: 'ACQUA', color: '#38bdf8', glow: 'rgba(56,189,248,0.5)' },
 };
-
-// Preload del gif: il primo burst non deve aspettare il download
-if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
-  const preloadImg = new Image();
-  preloadImg.src = KIND.meal.img;
-}
 
 const prefersReducedMotion = () =>
   typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
@@ -53,7 +57,10 @@ export default function MealBurst({ fx, onDone, soundEnabled = true, soundTheme 
         { scale: 0.4, y: 46, opacity: 0, rotate: -6 },
         { scale: 1, y: 0, opacity: 1, rotate: 0, duration: 0.6, ease: 'back.out(1.7)' });
     }
-    const id = setTimeout(() => onDoneRef.current?.(), 2400);
+    // Il pasto mostra la clip del ramen: resta finché la clip non è finita
+    // (+ mezzo secondo per leggere kcal/nome) invece di sparire a metà.
+    const hold = fx.kind === 'meal' ? RAMEN_MS + 500 : 2400;
+    const id = setTimeout(() => onDoneRef.current?.(), hold);
     return () => clearTimeout(id);
   }, [fx, soundEnabled, soundTheme]);
 
@@ -112,10 +119,20 @@ export default function MealBurst({ fx, onDone, soundEnabled = true, soundTheme 
               )}
               {reduced ? (
                 <div className="w-full h-full flex items-center justify-center text-6xl">{k.emoji}</div>
-              ) : k.img ? (
-                <img src={k.img} alt="" draggable="false"
-                  className="w-full h-full object-cover rounded-3xl relative z-10"
-                  style={{ border: `2px solid ${k.color}`, boxShadow: `0 0 28px ${k.glow}` }} />
+              ) : k.video ? (
+                // Nessun bordo/sfondo: il video ha l'alpha, deve sembrare ritagliato
+                // sullo schermo. muted+playsInline sono obbligatori per l'autoplay su iOS.
+                <video
+                  key={fx.t}
+                  autoPlay muted playsInline
+                  preload="auto"
+                  aria-hidden="true"
+                  className="w-full h-full object-contain relative z-10"
+                  style={{ filter: `drop-shadow(0 0 18px ${k.glow})` }}
+                >
+                  <source src={RAMEN_MP4} type="video/mp4; codecs=hvc1" />
+                  <source src={RAMEN_WEBM} type="video/webm" />
+                </video>
               ) : (
                 <FoodFigure kind={fx.kind} />
               )}
