@@ -491,7 +491,12 @@ useEffect(() => { localStorage.setItem('shadow_monarch_macros', JSON.stringify(m
   // 1. Recupera import pendenti dal server (funziona da qualsiasi browser, bypassa WebView isolation)
   //    Coda completa: applica TUTTI gli import accodati (più messaggi Telegram non si perdono).
   //    Re-poll al focus/visibilità: il sito si aggiorna senza refresh manuale.
+  //    ATTESA INTRO: NeuralIntro sta a z-999 per 4.8s, il MealBurst a z-97 e si
+  //    autochiude dopo 2.8s → partendo subito il burst finiva dietro l'intro e
+  //    spariva senza essere visto, ma la coda veniva svuotata lo stesso (pasto
+  //    perso). Aspettiamo la fine dell'intro prima di consumare la coda.
   useEffect(() => {
+    if (showIntro) return undefined;
     // Il chat_id da cui importare è legato al BROWSER (localStorage), non fisso.
     // Nota iOS: "Aggiungi a Home" ignora l'URL corrente e riapre sempre lo
     // start_url del manifest (senza ?tg=), e l'icona ha memoria isolata da Safari.
@@ -528,7 +533,7 @@ useEffect(() => { localStorage.setItem('shadow_monarch_macros', JSON.stringify(m
       window.removeEventListener('focus', onFocus);
       document.removeEventListener('visibilitychange', onVisible);
     };
-  }, [applyTgImport]);
+  }, [applyTgImport, showIntro]);
 
   // 2. Fallback: legge ?tg_import= dall'URL (per desktop o link diretti)
   useEffect(() => {
