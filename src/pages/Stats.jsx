@@ -355,6 +355,15 @@ const Stats = ({ systemLogs, dailyGoal = 2400, hydrationGoal = 2800, macroGoals 
       { name: 'Fats', value: Math.round((f / total) * 100) }
     ];
   }, [periodStats.avgProtein, periodStats.avgCarbs, periodStats.avgFats]);
+  const protocolMode = playerStats?.objective === 'bulk' ? 'bulk' : 'cut';
+  const protocolAccent = protocolMode === 'cut' ? '#b8f34a' : '#ff9b54';
+  const weightSeries = useMemo(() => recent7.map((log, index) => ({
+    day: log?.date || `D${index + 1}`,
+    weight: toNumber(log?.weight, 0)
+  })).filter((entry) => entry.weight > 0), [recent7]);
+  const latestWeight = weightSeries.length ? weightSeries[weightSeries.length - 1].weight : toNumber(playerStats?.currentWeightKg, 0);
+  const firstWeight = weightSeries.length ? weightSeries[0].weight : latestWeight;
+  const weightDelta = latestWeight && firstWeight ? Number((latestWeight - firstWeight).toFixed(1)) : 0;
 
   const calendarData = useMemo(() => {
     const year = monthCursor.getFullYear();
@@ -402,6 +411,14 @@ const Stats = ({ systemLogs, dailyGoal = 2400, hydrationGoal = 2800, macroGoals 
         <p className="text-gray-500 text-[10px] tracking-[0.3em] font-bold system-font mb-1 uppercase">Hunt Logs</p>
         <h1 className="text-4xl font-black italic tracking-tighter text-white">STATISTICS</h1>
       </div>
+
+      <motion.section initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mb-6 rounded-2xl border p-4" style={{ borderColor: `${protocolAccent}55`, background: `linear-gradient(145deg, ${protocolMode === 'cut' ? 'rgba(184,243,74,0.09)' : 'rgba(255,155,84,0.09)'}, rgba(0,0,0,0.35))` }}>
+        <div className="mb-3 flex items-center justify-between"><div><p className="text-[9px] uppercase tracking-[0.3em] font-bold" style={{ color: protocolAccent }}>Protocol snapshot</p><p className="mt-1 text-sm font-black uppercase text-white">{protocolMode} · trend 7 giorni</p></div><p className="text-xl font-black" style={{ color: protocolAccent }}>{latestWeight || '--'}<span className="ml-1 text-[9px]">kg</span></p></div>
+        <div className="h-20 w-full">
+          {weightSeries.length > 1 ? <ResponsiveContainer width="100%" height="100%"><LineChart data={weightSeries}><Line type="monotone" dataKey="weight" stroke={protocolAccent} strokeWidth={2.5} dot={false} isAnimationActive={false} /><XAxis dataKey="day" hide /><Tooltip contentStyle={customTooltipStyle} formatter={(value) => [`${value} kg`, 'Peso']} /></LineChart></ResponsiveContainer> : <div className="flex h-full items-center justify-center rounded-xl border border-dashed border-white/10 text-[9px] uppercase tracking-widest text-gray-500">Servono almeno 2 pesate per il trend</div>}
+        </div>
+        <div className="mt-3 grid grid-cols-4 gap-1.5 text-center"><div className="rounded-lg border border-white/10 bg-white/[0.03] py-1.5"><p className="text-[8px] text-gray-500">Δ peso</p><p className="text-[11px] font-black" style={{ color: weightDelta <= 0 && protocolMode === 'cut' ? protocolAccent : '#fff' }}>{weightDelta > 0 ? '+' : ''}{weightDelta || '--'} kg</p></div><div className="rounded-lg border border-white/10 bg-white/[0.03] py-1.5"><p className="text-[8px] text-gray-500">Kcal</p><p className="text-[11px] font-black text-white">{periodStats.kcalAdherencePct}%</p></div><div className="rounded-lg border border-white/10 bg-white/[0.03] py-1.5"><p className="text-[8px] text-gray-500">Prot</p><p className="text-[11px] font-black text-white">{periodStats.proteinAdherencePct}%</p></div><div className="rounded-lg border border-white/10 bg-white/[0.03] py-1.5"><p className="text-[8px] text-gray-500">Fibra</p><p className="text-[11px] font-black text-white">{periodStats.avgFiber}g</p></div></div>
+      </motion.section>
 
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mb-6 rounded-sm border border-fuchsia-300/30 bg-black/40 p-4">
         <div className="flex items-center justify-between mb-3">

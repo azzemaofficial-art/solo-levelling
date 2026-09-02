@@ -1289,6 +1289,97 @@ const SystemHub = ({ systemLogs, setSystemLogs, dailyGoal, setDailyGoal, hydrati
     : '';
   const calorieDecisionLog = playerStats.calorieDecisionLog || [];
   const showAdvanced = !systemCompactMode;
+  // ── Performance block: Cut/Bulk controller ────────────────────────────────
+  // The block is intentionally local and lightweight: it gives the user one
+  // clear decision surface without disturbing the existing nutrition engine.
+  const [bodyMode, setBodyMode] = useState(() => {
+    try { return localStorage.getItem('shadow_monarch_body_mode') || (playerStats?.objective === 'bulk' ? 'bulk' : 'cut'); } catch { return 'cut'; }
+  });
+  const [modeFx, setModeFx] = useState(null);
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('preview') !== 'protocol-shift') return undefined;
+    setModeFx('bulk');
+    const timer = window.setTimeout(() => setModeFx(null), 4600);
+    return () => window.clearTimeout(timer);
+  }, []);
+  const [bodyWeight, setBodyWeight] = useState(() => Number(playerStats?.currentWeightKg || todayData?.weight || 87));
+  const bodyTarget = bodyMode === 'cut' ? 83 : 90;
+  const bodyStart = bodyMode === 'cut' ? 87 : 83;
+  const bodyProgress = Math.max(0, Math.min(100, bodyMode === 'cut'
+    ? ((bodyStart - Number(bodyWeight || bodyStart)) / (bodyStart - bodyTarget)) * 100
+    : ((Number(bodyWeight || bodyStart) - bodyStart) / (bodyTarget - bodyStart)) * 100));
+  const weekPlan = [
+    { day: 'Lun', full: 'Lunedì', label: 'Pesi A', type: 'strength', duration: '40 min', intensity: 'ALTA', kcal: 2700 },
+    { day: 'Mar', full: 'Martedì', label: 'Tom Holland + addome', type: 'conditioning', duration: '25–30 min', intensity: 'MOLTO ALTA', kcal: 2700 },
+    { day: 'Mer', full: 'Mercoledì', label: 'Mobilità + recupero', type: 'recovery', duration: '20–30 min', intensity: 'BASSA', kcal: 2550 },
+    { day: 'Gio', full: 'Giovedì', label: 'Pesi B', type: 'strength', duration: '40 min', intensity: 'ALTA', kcal: 2700 },
+    { day: 'Ven', full: 'Venerdì', label: 'MMA', type: 'mma', duration: '60–90 min', intensity: 'ALTA', kcal: 3050 },
+    { day: 'Sab', full: 'Sabato', label: 'Tom Holland + addome', type: 'conditioning', duration: '25–30 min', intensity: 'MOLTO ALTA', kcal: 2700 },
+    { day: 'Dom', full: 'Domenica', label: 'Riposo completo', type: 'rest', duration: '—', intensity: '—', kcal: 1900 }
+  ];
+  const todayPlan = weekPlan[(new Date().getDay() + 6) % 7];
+  const loggedWorkoutToday = Number(todayData?.workoutBurn ?? todayData?.burned ?? 0) >= 180 || Number(todayData?.strength || 0) > 0 || playerStats?.lastWorkoutDate === today;
+  const [workoutFx, setWorkoutFx] = useState(false);
+  const previousWorkoutLoggedRef = useRef(loggedWorkoutToday);
+  useEffect(() => {
+    if (!previousWorkoutLoggedRef.current && loggedWorkoutToday) {
+      setWorkoutFx(true);
+      const timer = setTimeout(() => setWorkoutFx(false), 2200);
+      return () => clearTimeout(timer);
+    }
+    previousWorkoutLoggedRef.current = loggedWorkoutToday;
+    return undefined;
+  }, [loggedWorkoutToday]);
+  const modeKcal = bodyMode === 'cut' ? todayPlan.kcal : todayPlan.kcal + 300;
+  const modeMacroGoals = useMemo(() => {
+    const protein = bodyMode === 'cut' ? 190 : 165;
+    const fats = bodyMode === 'cut' ? 70 : 80;
+    const fiber = bodyMode === 'cut' ? 30 : 35;
+    const carbs = Math.max(80, Math.round((modeKcal - (protein * 4) - (fats * 9)) / 4));
+    return { protein, carbs, fats, fiber };
+  }, [bodyMode, modeKcal]);
+  const modeColor = bodyMode === 'cut' ? '#b8f34a' : '#ff9b54';
+  const modeSoft = bodyMode === 'cut' ? 'rgba(184,243,74,0.13)' : 'rgba(255,155,84,0.13)';
+  useEffect(() => {
+    const current = macroGoals || {};
+    const aligned = ['protein', 'carbs', 'fats', 'fiber'].every((key) => Number(current[key] || 0) === Number(modeMacroGoals[key] || 0));
+    if (!aligned) setMacroGoals((prev) => ({ ...prev, ...modeMacroGoals }));
+  }, [bodyMode, modeMacroGoals, macroGoals, setMacroGoals]);
+  const setBodyModeAndPersist = (next) => {
+    setModeFx(next);
+    window.setTimeout(() => setModeFx(null), 4600);
+    setBodyMode(next);
+    try { localStorage.setItem('shadow_monarch_body_mode', next); } catch {}
+    setPlayerStats((prev) => ({ ...prev, objective: next, currentWeightKg: Number(bodyWeight || bodyStart) }));
+    const nextKcal = next === 'cut' ? todayPlan.kcal : todayPlan.kcal + 300;
+    const nextProtein = next === 'cut' ? 190 : 165;
+    const nextFats = next === 'cut' ? 70 : 80;
+    const nextMacros = { protein: nextProtein, fats: nextFats, fiber: next === 'cut' ? 30 : 35, carbs: Math.max(80, Math.round((nextKcal - (nextProtein * 4) - (nextFats * 9)) / 4)) };
+    setMacroGoals((prev) => ({ ...prev, ...nextMacros }));
+    setDailyGoal(nextKcal);
+  };
+  const weekRows = systemLogs.slice(-7);
+  const weekTrainingDays = weekRows.filter((log) => Number(log?.workoutBurn ?? log?.burned ?? 0) >= 180 || Number(log?.strength || 0) > 0).length;
+  const weekNutritionDays = weekRows.filter((log) => {
+    const consumed = Number(log?.consumed || 0);
+    const goal = Number(getCalorieTargetForLog(log) || dailyGoal || 2400);
+    return consumed >= goal * 0.8 && consumed <= goal * 1.15 && Number(log?.protein || 0) >= Number(modeMacroGoals.protein) * 0.8;
+  }).length;
+  const weekHydrationDays = weekRows.filter((log) => Number(log?.waterMl || 0) >= Number(hydrationGoal || 2800) * 0.8).length;
+  const tgSyncLabel = tgSyncStatus?.ts ? `Sync ${new Date(tgSyncStatus.ts).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}` : 'In attesa di sync';
+  const registerPlanWorkout = () => {
+    const burn = todayPlan.type === 'mma' ? 720 : todayPlan.type === 'conditioning' ? 360 : todayPlan.type === 'strength' ? 300 : 180;
+    setSystemLogs((prev) => {
+      const next = [...prev];
+      const index = next.findIndex((log) => log.date === today);
+      const base = index >= 0 ? next[index] : createEmptyLog(today);
+      const updated = { ...base, workoutBurn: Math.max(Number(base.workoutBurn || 0), burn), burned: Math.max(Number(base.burned || 0), burn), workoutNote: `${todayPlan.label} · Piano settimanale` };
+      if (index >= 0) next[index] = updated; else next.push(updated);
+      return next;
+    });
+    setPlayerStats((prev) => ({ ...prev, lastWorkoutDate: today }));
+    emitUiToast({ message: 'Sessione registrata · creatina 5g pronta dopo il workout', tone: 'success' });
+  };
   const mealToday = {
     breakfast: Number(quickLogData.mealBreakfastKcal || 0),
     lunch: Number(quickLogData.mealLunchKcal || 0),
@@ -5508,11 +5599,142 @@ ${lowReliabilityMode ? 'Modalita alta prudenza: riduci le stime incerte del 8-12
   }
 
   return (
-    <div className="system-hub-shell p-6 pt-10 pb-24 min-h-full bg-void-black relative overflow-hidden">
+    <div className={`system-hub-shell body-mode-${bodyMode} p-6 pt-10 pb-24 min-h-full bg-void-black relative overflow-hidden`}>
+      <AnimatePresence>
+        {modeFx && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className={`mode-shift-overlay mode-shift-${modeFx} fixed inset-0 z-[65] flex items-center justify-center pointer-events-none`}
+            aria-live="polite"
+          >
+            <div className="mode-shift-machine" aria-label={`Cambio modalità ${modeFx}`}>
+              <motion.svg
+                className="mode-shift-gear"
+                viewBox="0 0 520 520"
+                role="img"
+                aria-label="Ingranaggio CUT BULK"
+                initial={{ rotate: 0 }}
+                animate={{ rotate: modeFx === 'bulk' ? -1080 : 1080 }}
+                transition={{ duration: 3, ease: [0.12, 0.8, 0.22, 1] }}
+              >
+                <g className="mode-shift-teeth">
+                  {Array.from({ length: 16 }, (_, index) => <rect key={index} x="254" y="16" width="12" height="42" rx="2" transform={`rotate(${index * 22.5} 260 260)`} />)}
+                </g>
+                <circle className="mode-shift-track" cx="260" cy="260" r="194" />
+                <circle className="mode-shift-track mode-shift-track-inner" cx="260" cy="260" r="144" />
+                <path className="mode-shift-spiral" d="M260 260c0-38 31-69 69-69 57 0 103 46 103 103 0 95-77 172-172 172-133 0-240-107-240-240C20 81 101 0 206 0" />
+                <path className="mode-shift-spiral mode-shift-spiral-alt" d="M260 260c0 38-31 69-69 69-57 0-103-46-103-103 0-95 77-172 172-172 133 0 240 107 240 240 0 145-117 262-262 262" />
+                <text className="mode-shift-label mode-shift-label-cut" x="86" y="272">CUT</text>
+                <text className="mode-shift-label mode-shift-label-bulk" x="358" y="272">BULK</text>
+                <circle className="mode-shift-core" cx="260" cy="260" r="34" />
+                <circle className="mode-shift-core-dot" cx="260" cy="260" r="6" />
+              </motion.svg>
+              <div className="mode-shift-copy text-center">
+                <p className="text-[9px] font-black uppercase tracking-[0.45em] text-white/60">PROTOCOL SHIFT</p>
+                <p className="mt-2 text-3xl font-black uppercase tracking-tight text-white">{modeFx.toUpperCase()} ACTIVATED</p>
+              </div>
+            </div>
+          </motion.div>
+        )}
+        {workoutFx && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="workout-clear-overlay fixed inset-0 z-[70] flex items-center justify-center pointer-events-none"
+            aria-live="polite"
+          >
+            <div className="workout-clear-ring" />
+            <div className="workout-clear-copy text-center">
+              <p className="text-[9px] font-black uppercase tracking-[0.42em] text-white/70">QUEST CLEAR</p>
+              <p className="mt-2 text-2xl font-black uppercase tracking-tight text-white">Allenamento registrato</p>
+              <p className="mt-2 text-[10px] font-bold uppercase tracking-[0.2em]" style={{ color: modeColor }}>Creatina 5 g · post-workout</p>
+            </div>
+            <span className="workout-spark workout-spark-a" /><span className="workout-spark workout-spark-b" /><span className="workout-spark workout-spark-c" /><span className="workout-spark workout-spark-d" />
+          </motion.div>
+        )}
+      </AnimatePresence>
       <div className="mb-8">
         <p className="text-[10px] tracking-[0.38em] font-bold system-font mb-1 uppercase" style={{ color: 'rgba(124,58,237,0.9)', letterSpacing: '0.36em' }}>⚡ System Core</p>
         <h1 className="epic-title text-4xl font-black italic tracking-tight">COMMAND CENTER</h1>
       </div>
+
+      {/* ── Body mode: the user's cut/bulk mission control ── */}
+      <motion.section
+        key={bodyMode}
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="mb-6 relative overflow-hidden rounded-2xl p-4"
+        style={{ background: `linear-gradient(145deg, ${modeSoft}, rgba(7,10,17,0.97) 62%)`, border: `1px solid ${modeColor}55`, boxShadow: `0 16px 36px ${modeColor}10` }}
+      >
+        <div className="absolute -right-12 -top-12 h-36 w-36 rounded-full blur-3xl pointer-events-none" style={{ background: `${modeColor}20` }} />
+        <div className="relative z-10">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-[9px] uppercase tracking-[0.32em] font-bold" style={{ color: modeColor }}>◈ BODY PROTOCOL</p>
+              <h2 className="mt-1 text-2xl font-black uppercase tracking-tight text-white">{bodyMode === 'cut' ? 'Cut mission' : 'Bulk mission'}</h2>
+              <p className="mt-1 text-[10px] text-gray-400">{bodyMode === 'cut' ? '87 kg → 83 kg · deficit controllato' : 'Costruisci massa · surplus progressivo'}</p>
+            </div>
+            <div className="flex shrink-0 items-start gap-2">
+              <img src="/body-core.png" alt="Core energetico" className="h-14 w-14 object-contain" style={{ filter: bodyMode === 'cut' ? 'sepia(1) saturate(3) hue-rotate(35deg)' : 'sepia(1) saturate(4) hue-rotate(320deg)', opacity: 0.92 }} />
+              <button
+                onClick={() => setBodyModeAndPersist(bodyMode === 'cut' ? 'bulk' : 'cut')}
+                aria-label="Cambia modalità cut bulk"
+                className="rounded-full border px-2.5 py-1.5 text-[9px] font-black uppercase tracking-widest transition active:scale-95"
+                style={{ color: modeColor, borderColor: `${modeColor}77`, background: `${modeColor}14` }}
+              >
+                {bodyMode === 'cut' ? 'CUT  /  BULK' : 'BULK  /  CUT'}
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-4 flex items-end justify-between">
+            <div>
+              <p className="text-[8px] uppercase tracking-widest text-gray-500">Peso attuale</p>
+              <div className="mt-1 flex items-baseline gap-1">
+                <input
+                  aria-label="Peso attuale"
+                  type="number" step="0.1" value={bodyWeight}
+                  onChange={(event) => { const value = Number(event.target.value); setBodyWeight(value); setPlayerStats((prev) => ({ ...prev, currentWeightKg: value })); }}
+                  className="w-20 bg-transparent text-3xl font-black text-white outline-none border-b border-white/15 focus:border-white/50"
+                />
+                <span className="text-xs font-bold" style={{ color: modeColor }}>kg</span>
+              </div>
+            </div>
+            <div className="text-right">
+              <p className="text-[8px] uppercase tracking-widest text-gray-500">Obiettivo</p>
+              <p className="mt-1 text-2xl font-black" style={{ color: modeColor }}>{bodyTarget}<span className="ml-1 text-xs">kg</span></p>
+            </div>
+          </div>
+          <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/10">
+            <motion.div className="h-full rounded-full" animate={{ width: `${bodyProgress}%` }} style={{ background: modeColor, boxShadow: `0 0 14px ${modeColor}` }} />
+          </div>
+          <div className="mt-1 flex justify-between text-[8px] uppercase tracking-widest text-gray-500"><span>{bodyMode === 'cut' ? `${Math.max(0, (bodyStart - Number(bodyWeight || bodyStart)).toFixed(1))} kg persi` : 'Progressione'}</span><span>{Math.round(bodyProgress)}%</span></div>
+
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            <div className="rounded-xl border border-white/10 bg-black/25 p-2.5"><p className="text-[8px] uppercase tracking-widest text-gray-500">Target oggi</p><p className="mt-1 text-lg font-black text-white">{modeKcal.toLocaleString('it-IT')} <span className="text-[9px] text-gray-500">kcal</span></p><p className="text-[8px]" style={{ color: modeColor }}>{todayPlan.full} · {todayPlan.label}</p></div>
+            <div className="rounded-xl border border-white/10 bg-black/25 p-2.5"><p className="text-[8px] uppercase tracking-widest text-gray-500">Recovery cue</p><p className="mt-1 text-[11px] font-bold text-white">{loggedWorkoutToday ? 'Creatina 5g' : todayPlan.type === 'rest' ? 'Cena · creatina 5g' : 'Allenamento da fare'}</p><p className="text-[8px] text-gray-500">{loggedWorkoutToday ? 'post-workout + pasto' : 'segna il piano quando hai finito'}</p></div>
+          </div>
+          <div className="mt-2 rounded-xl border border-white/10 bg-black/25 p-2.5">
+            <div className="flex items-center justify-between mb-2"><p className="text-[8px] uppercase tracking-widest text-gray-500">Macro alignment · {bodyMode.toUpperCase()}</p><span className="text-[8px] font-bold" style={{ color: modeColor }}>AUTO</span></div>
+            <div className="grid grid-cols-4 gap-1.5 text-center">
+              {[['P', modeMacroGoals.protein, 'g'], ['C', modeMacroGoals.carbs, 'g'], ['F', modeMacroGoals.fats, 'g'], ['Fib', modeMacroGoals.fiber, 'g']].map(([label, value, unit]) => <div key={label} className="rounded-lg border border-white/10 bg-white/[0.03] py-1.5"><p className="text-[8px] text-gray-500">{label}</p><p className="text-[11px] font-black text-white">{value}<span className="ml-0.5 text-[7px] text-gray-500">{unit}</span></p></div>)}
+            </div>
+            <p className="mt-2 text-[8px] leading-relaxed text-gray-500">Proteine alte per preservare massa nel cut · carboidrati calcolati sul training · fibre aumentate nel bulk.</p>
+          </div>
+          <div className="mt-2 grid grid-cols-3 gap-1.5">
+            {[['Train', weekTrainingDays, 6], ['Fuel', weekNutritionDays, 7], ['H₂O', weekHydrationDays, 7]].map(([label, value, target]) => <div key={label} className="rounded-lg border border-white/10 bg-white/[0.025] px-2 py-1.5"><div className="flex items-center justify-between"><p className="text-[7px] uppercase tracking-widest text-gray-500">{label}</p><p className="text-[9px] font-black text-white">{value}/{target}</p></div><div className="mt-1 h-1 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full" style={{ width: `${Math.min(100, (value / target) * 100)}%`, background: modeColor }} /></div></div>)}
+          </div>
+          <div className="mt-2 flex items-center justify-between rounded-lg border border-white/10 bg-white/[0.025] px-2.5 py-2"><div><p className="text-[8px] uppercase tracking-widest text-gray-500">Telegram link</p><p className="mt-0.5 text-[9px] font-bold text-white">Scrivi <span style={{ color: modeColor }}>fatto</span> al bot per registrare</p></div><span className="text-[8px] font-bold" style={{ color: tgSyncStatus?.ok === false ? '#fb7185' : modeColor }}>{tgSyncLabel}</span></div>
+          <button onClick={registerPlanWorkout} disabled={loggedWorkoutToday} className="mt-3 w-full rounded-xl border py-2.5 text-[10px] font-black uppercase tracking-[0.18em] transition active:scale-[0.98] disabled:opacity-50" style={{ color: modeColor, borderColor: `${modeColor}66`, background: loggedWorkoutToday ? 'rgba(255,255,255,0.04)' : `${modeColor}18` }}>{loggedWorkoutToday ? '✓ Sessione registrata' : todayPlan.type === 'rest' || todayPlan.type === 'recovery' ? 'Segna allenamento extra' : `Segna ${todayPlan.label} completato`}</button>
+          {(todayPlan.type === 'rest' || todayPlan.type === 'recovery') && <p className="mt-2 text-center text-[8px] text-gray-500">Recupero programmato · se ti sei allenato comunque, registralo qui.</p>}
+        </div>
+      </motion.section>
+
+      <section className="mb-6">
+        <div className="mb-2 flex items-center justify-between"><p className="text-[9px] uppercase tracking-[0.32em] font-bold text-gray-400">Weekly loadout</p><p className="text-[8px] uppercase tracking-widest" style={{ color: modeColor }}>7 giorni · {bodyMode.toUpperCase()}</p></div>
+        <div className="grid grid-cols-7 gap-1.5">
+          {weekPlan.map((plan, index) => { const isToday = index === (new Date().getDay() + 6) % 7; return <div key={plan.day} className="min-w-0 rounded-xl border p-2 text-center" style={{ borderColor: isToday ? `${modeColor}88` : 'rgba(255,255,255,0.08)', background: isToday ? `${modeColor}12` : 'rgba(255,255,255,0.025)' }}><p className="text-[8px] font-black" style={{ color: isToday ? modeColor : '#6b7280' }}>{plan.day}</p><p className="mt-2 truncate text-[8px] font-bold text-white">{plan.label.replace(' + addome', '')}</p><p className="mt-1 text-[7px] text-gray-500">{plan.duration}</p><div className="mx-auto mt-2 h-1 w-1 rounded-full" style={{ background: plan.type === 'rest' ? '#6b7280' : plan.type === 'recovery' ? '#58d6b1' : plan.type === 'mma' ? '#ff6b6b' : modeColor }} /></div>; })}
+        </div>
+      </section>
 
       <motion.div
         initial={{ opacity: 0, y: 10 }}
@@ -6309,7 +6531,6 @@ ${lowReliabilityMode ? 'Modalita alta prudenza: riduci le stime incerte del 8-12
           {[
             { label: '🌐 Globale (default)', value: aiModelGlobal, set: (v) => { setAiModelGlobal(v); setGlobalModel(v); } },
             { label: '🍽️ Analisi pasto', value: aiModelMeal, set: (v) => { setAiModelMeal(v); setTaskOverride('meal', v); } },
-            { label: '👨‍🍳 Ricetta', value: aiModelRecipe, set: (v) => { setAiModelRecipe(v); setTaskOverride('recipe', v); } },
             { label: '🧠 Analisi profilo', value: aiModelProfile, set: (v) => { setAiModelProfile(v); setTaskOverride('profile', v); } },
           ].map((row) => (
             <div key={row.label} className="flex items-center justify-between gap-2">
@@ -6389,7 +6610,7 @@ ${lowReliabilityMode ? 'Modalita alta prudenza: riduci le stime incerte del 8-12
         )}
       </motion.div>
 
-      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.0289 }} className="mb-6 rounded-2xl overflow-hidden relative" style={{ background: 'linear-gradient(145deg, rgba(10,6,22,0.97), rgba(20,8,36,0.93))', border: '1px solid rgba(167,139,250,0.22)', boxShadow: '0 8px 32px rgba(124,58,237,0.1), inset 0 1px 0 rgba(255,255,255,0.04)' }}>
+      <motion.div style={{ display: 'none' }} aria-hidden="true"><div className="mb-6 rounded-2xl overflow-hidden relative" style={{ background: 'linear-gradient(145deg, rgba(10,6,22,0.97), rgba(20,8,36,0.93))', border: '1px solid rgba(167,139,250,0.22)', boxShadow: '0 8px 32px rgba(124,58,237,0.1), inset 0 1px 0 rgba(255,255,255,0.04)' }}>
         <div className="pointer-events-none absolute -top-8 -right-8 h-32 w-32 rounded-full blur-3xl" style={{ background: 'rgba(124,58,237,0.16)' }} />
         <div className="p-4 relative z-10">
           <div className="flex items-center justify-between mb-3">
@@ -6776,7 +6997,7 @@ ${lowReliabilityMode ? 'Modalita alta prudenza: riduci le stime incerte del 8-12
             </div>
           )}
         </div>
-      </motion.div>
+        </div></motion.div>
 
       {/* ── 📜 CALENDARIO DEL DESTINO — overlay fullscreen a portal, griglia di carte mystery ── */}
       {forgeBatch && createPortal(
