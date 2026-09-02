@@ -4,7 +4,7 @@
 // particelle oro, barra che sale col suono. Zero asset: tutto procedurale.
 // fx: { t, kind: meal|protein|water, delta, unit, before, after, fromPct, toPct, slot }
 // ─────────────────────────────────────────────────────────────────────────────
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import gsap from 'gsap';
 import { playSfx, playEatCrunch, playBarRise, playSample } from '../utils/sfx';
@@ -38,6 +38,7 @@ const prefersReducedMotion = () =>
 export default function MealBurst({ fx, onDone, soundEnabled = true, soundTheme = 'solo' }) {
   const playedRef = useRef(0);
   const stageRef = useRef(null);
+  const [imgFailed, setImgFailed] = useState(false);
   // onDone arriva inline (identità nuova a ogni render): se finisse nelle deps,
   // il cleanup cancellerebbe il timeout di chiusura e il burst resterebbe incollato.
   const onDoneRef = useRef(onDone);
@@ -46,6 +47,7 @@ export default function MealBurst({ fx, onDone, soundEnabled = true, soundTheme 
   useEffect(() => {
     if (!fx || fx.t === playedRef.current) return undefined;
     playedRef.current = fx.t;
+    setImgFailed(false);
     if (soundEnabled) {
       // Campioni reali (Mixkit) con fallback sintetico
       if (fx.kind === 'water') {
@@ -70,6 +72,10 @@ export default function MealBurst({ fx, onDone, soundEnabled = true, soundTheme 
     return () => clearTimeout(id);
   }, [fx, soundEnabled, soundTheme]);
 
+  // Se la gif non carica (rete/offline), la ciotola SVG disegnata fa da backup:
+  // l'animazione non resta MAI vuota.
+  const showGif = k.img && !imgFailed;
+
   const particles = useMemo(() => Array.from({ length: 14 }, (_, i) => {
     const angle = (i / 14) * Math.PI * 2 + (fx?.t || 0) % 1;
     const dist = 68 + ((i * 37) % 42);
@@ -84,7 +90,7 @@ export default function MealBurst({ fx, onDone, soundEnabled = true, soundTheme 
       {fx ? (
         <motion.div key={fx.t}
           initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[97] flex items-center justify-center pointer-events-none">
+          className="fixed inset-0 z-[140] flex items-center justify-center pointer-events-none">
           <div className="relative flex flex-col items-center gap-3">
             {/* Pennellata d'inchiostro dietro il cibo */}
             {!reduced && (
@@ -125,9 +131,10 @@ export default function MealBurst({ fx, onDone, soundEnabled = true, soundTheme 
               )}
               {reduced ? (
                 <div className="w-full h-full flex items-center justify-center text-6xl">{k.emoji}</div>
-              ) : k.img ? (
+              ) : showGif ? (
                 // Nessun bordo/sfondo: il gif ha l'alpha, deve sembrare ritagliato sullo schermo.
                 <img key={fx.t} src={k.img} alt="" draggable="false"
+                  onError={() => setImgFailed(true)}
                   className="w-full h-full object-contain relative z-10"
                   style={{ filter: `drop-shadow(0 0 18px ${k.glow})` }} />
               ) : (
