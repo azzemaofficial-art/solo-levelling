@@ -140,12 +140,19 @@ async function callAI(messages, fast = false) {
     ? PROVIDERS.filter((p) => p.fast)
     : PROVIDERS;
 
+  // La funzione ha 30s in tutto (vercel.json). Con 28s di timeout PER provider,
+  // se il primo (Groq) rallenta anche solo una volta la funzione muore prima di
+  // poter anche solo TENTARE il fallback — la catena di riserva era decorativa.
+  // 8s è comunque abbondante (Groq/NVIDIA rispondono di norma in 0.1-2s) e lascia
+  // budget reale per provare 2-3 provider diversi entro i 30s totali.
+  const deadline = Date.now() + 26000; // margine per KV/invio dopo l'ultimo tentativo
   for (const provider of providers) {
     const apiKey = provider.key();
     if (!apiKey) continue;
+    if (Date.now() >= deadline) break;
     try {
       const ctrl = new AbortController();
-      const t = setTimeout(() => ctrl.abort(), 28000);
+      const t = setTimeout(() => ctrl.abort(), 8000);
       const res = await fetch(`${provider.baseUrl || NVIDIA_BASE}/chat/completions`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
@@ -1271,8 +1278,10 @@ Consiglia SOLO integratori presenti nei PRINCIPI scientifici. Ricorda: gli integ
       for (const p of providers) {
         const k = p.key();
         if (!k) continue;
+        // 2 provider × 20s poteva superare da solo i 30s totali della funzione,
+        // senza lasciare spazio al fallback (stesso bug di callAI, vedi sopra).
         const ctrl = new AbortController();
-        const t = setTimeout(() => ctrl.abort(), 20000);
+        const t = setTimeout(() => ctrl.abort(), 10000);
         try {
           const r = await fetch(`${p.baseUrl}/chat/completions`, {
             method: 'POST',
