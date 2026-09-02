@@ -29,8 +29,8 @@ Rispondi sempre in italiano. Sii preciso e tecnico come un coach professionista.
 NON ripetere i feedback originali per intero — analizza i pattern, non elencare.`;
 
 const PROVIDERS = [
-  { name: 'groq-70b',       key: () => process.env.GROQ_API_KEY,                   model: 'llama-3.3-70b-versatile',                       base: GROQ_BASE },
-  { name: 'groq-8b',        key: () => process.env.GROQ_API_KEY,                   model: 'llama-3.1-8b-instant',                          base: GROQ_BASE },
+  { name: 'groq-70b',       key: () => process.env.GROQ_API_KEY,                   model: 'openai/gpt-oss-120b',                       base: GROQ_BASE },
+  { name: 'groq-8b',        key: () => process.env.GROQ_API_KEY,                   model: 'openai/gpt-oss-20b',                          base: GROQ_BASE },
   { name: 'kimi-k2',    key: () => process.env.KIMI_NVIDIA_API_KEY,             model: process.env.KIMI_NVIDIA_MODEL || 'moonshotai/kimi-k2.6',              base: NVIDIA_BASE },
   { name: 'llama-3.1-70b', key: () => process.env.LLAMA_NVIDIA_API_KEY,        model: 'meta/llama-3.1-70b-instruct',                                        base: NVIDIA_BASE },
   { name: 'phi4-mini',      key: () => process.env.PHI_NVIDIA_API_KEY,             model: 'microsoft/phi-4-mini-instruct',                 base: NVIDIA_BASE },

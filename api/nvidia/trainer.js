@@ -31,8 +31,8 @@ Quando l'utente chiede il piano calorico, chiedi (o usa quelli forniti):
 - Sport praticato (es. arti marziali, palestra, ecc.)`;
 
 const PROVIDERS = [
-  { name: 'groq-70b',        key: () => process.env.GROQ_API_KEY,                   base: GROQ_BASE,   model: () => 'llama-3.3-70b-versatile' },
-  { name: 'groq-8b',         key: () => process.env.GROQ_API_KEY,                   base: GROQ_BASE,   model: () => 'llama-3.1-8b-instant' },
+  { name: 'groq-70b',        key: () => process.env.GROQ_API_KEY,                   base: GROQ_BASE,   model: () => 'openai/gpt-oss-120b' },
+  { name: 'groq-8b',         key: () => process.env.GROQ_API_KEY,                   base: GROQ_BASE,   model: () => 'openai/gpt-oss-20b' },
   { name: 'kimi-k2',     key: () => process.env.KIMI_NVIDIA_API_KEY,            base: NVIDIA_BASE, model: () => process.env.KIMI_NVIDIA_MODEL || 'moonshotai/kimi-k2.6' },
   { name: 'llama-3.1-70b',   key: () => process.env.LLAMA_NVIDIA_API_KEY,          base: NVIDIA_BASE, model: () => 'meta/llama-3.1-70b-instruct' },
   { name: 'phi4-mini',       key: () => process.env.PHI_NVIDIA_API_KEY,             base: NVIDIA_BASE, model: () => 'microsoft/phi-4-mini-instruct' },

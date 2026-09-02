@@ -172,7 +172,7 @@ Regole obbligatorie: esattamente 8 vocaboli e 9 esercizi; almeno 3 type e almeno
     const data = await requestSystemAI({
       // Llama 3.3 70B è rapido e stabile per il francese; il proxy prova poi
       // Agnes/GPT-OSS/NVIDIA se Groq è in rate-limit o senza chiave.
-      model: getModelFor('french') || 'groq:llama-3.3-70b-versatile',
+      model: getModelFor('french') || 'groq:openai/gpt-oss-120b',
       temperature: 0.35,
       max_tokens: compact ? 1600 : 2200,
       maxRetries: 0,

@@ -47,8 +47,8 @@ async function logMeal(chatId, entry) {
 
 // Provider chain — Groq primo per i fast (no reasoning, JSON pulito), 550B per task lenti
 const PROVIDERS = [
-  { key: () => process.env.GROQ_API_KEY,                  model: 'llama-3.3-70b-versatile',                      fast: true,  baseUrl: GROQ_BASE },
-  { key: () => process.env.GROQ_API_KEY,                  model: 'llama-3.1-8b-instant',                         fast: true,  baseUrl: GROQ_BASE },
+  { key: () => process.env.GROQ_API_KEY,                  model: 'openai/gpt-oss-120b',                      fast: true,  baseUrl: GROQ_BASE },
+  { key: () => process.env.GROQ_API_KEY,                  model: 'openai/gpt-oss-20b',                         fast: true,  baseUrl: GROQ_BASE },
   { key: () => process.env.KIMI_NVIDIA_API_KEY,           model: process.env.KIMI_NVIDIA_MODEL || 'moonshotai/kimi-k2.6',             fast: true,  baseUrl: NVIDIA_BASE },
   { key: () => process.env.LLAMA_NVIDIA_API_KEY,          model: 'meta/llama-3.1-70b-instruct',                  fast: true,  baseUrl: NVIDIA_BASE },
   { key: () => process.env.PHI_NVIDIA_API_KEY,            model: 'microsoft/phi-4-mini-instruct',                fast: true,  baseUrl: NVIDIA_BASE },
@@ -1271,7 +1271,7 @@ Consiglia SOLO integratori presenti nei PRINCIPI scientifici. Ricorda: gli integ
         `Sessioni oggi: pasti ${day.meals || 0}, workout ${day.workouts || 0}.`,
       ].join(' ');
       const providers = [
-        { key: () => process.env.GROQ_API_KEY, model: 'llama-3.3-70b-versatile', baseUrl: GROQ_BASE },
+        { key: () => process.env.GROQ_API_KEY, model: 'openai/gpt-oss-120b', baseUrl: GROQ_BASE },
         { key: () => process.env.KIMI_NVIDIA_API_KEY, model: process.env.KIMI_NVIDIA_MODEL || 'moonshotai/kimi-k2.6', baseUrl: NVIDIA_BASE },
       ];
       let aiReply = '';

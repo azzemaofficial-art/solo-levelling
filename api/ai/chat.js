@@ -55,9 +55,7 @@ const FALLBACK = [
   // reasoning e torna content vuoto (usabile solo con reasoning_effort:"none").
   'agnes:agnes-2.0-flash',
   'groq:openai/gpt-oss-120b',
-  'groq:llama-3.3-70b-versatile',
   'groq:openai/gpt-oss-20b',
-  'groq:llama-3.1-8b-instant',
   // Ultima risorsa fuori-Groq: se Groq è interamente in 429, NIM risponde comunque
   // (lento ma verificato 200) — meglio una risposta in 20s che nessuna.
   'nvidia:nvidia/nemotron-3-ultra-550b-a55b',

@@ -24,7 +24,7 @@ const NVIDIA_MODEL_KEY = {
 const NVIDIA_KEY_DEFAULT = () => firstKey('NVIDIA_API_KEY', 'LLAMA_NVIDIA_API_KEY', 'KIMI_NVIDIA_API_KEY');
 
 // Groq fallback chain (sempre disponibili)
-const GROQ_FALLBACK = ['groq:llama-3.3-70b-versatile', 'groq:llama-3.1-8b-instant'];
+const GROQ_FALLBACK = ['groq:openai/gpt-oss-120b', 'groq:openai/gpt-oss-20b'];
 
 const unique = (items) => {
   const out = []; const seen = new Set();

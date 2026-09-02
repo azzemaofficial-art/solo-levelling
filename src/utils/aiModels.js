@@ -8,11 +8,13 @@
 // Prefisso groq:/nvidia: → ogni modello NVIDIA usa la chiave mappata in chat.js.
 // Verificati live il 2026-07-22 (probe su /api/ai/chat con campo `tried`):
 // rimossi Llama 4 Scout, Kimi K2.6 NIM e Mistral Large 3 → 404/no-key su provider.
+// Aggiornamento 2026-09-02: Groq ha tolto TUTTA la famiglia Llama 3.x dal
+// catalogo (llama-3.3-70b-versatile e llama-3.1-8b-instant → model_not_found,
+// verificato in diretta). Sostituiti ovunque con openai/gpt-oss-120b/20b.
 export const AI_MODELS = [
   { id: '', label: 'Automatico (fallback)' },
   { id: 'agnes:agnes-2.0-flash', label: 'Agnes 2.0 Flash — contesto enorme, JSON pulito (~10s)' },
   { id: 'groq:openai/gpt-oss-120b', label: 'Groq GPT-OSS 120B — qualità alta, mai in coda' },
-  { id: 'groq:llama-3.3-70b-versatile', label: 'Groq Llama 3.3 70B — veloce, JSON pulito' },
   { id: 'groq:openai/gpt-oss-20b', label: 'Groq GPT-OSS 20B — fulmineo' },
   { id: 'nvidia:nvidia/nemotron-3-ultra-550b-a55b', label: 'NVIDIA Nemotron Ultra 550B — il più potente' },
   { id: 'nvidia:mistralai/mistral-nemotron', label: 'NVIDIA Mistral NeMo — macro precisi, veloce (13-17s)' },
@@ -22,8 +24,8 @@ export const AI_MODELS = [
 const TASK_DEFAULT = {
   meal: 'agnes:agnes-2.0-flash',          // Agnes 2.0: stime realistiche, JSON pulito
   recipe: 'agnes:agnes-2.0-flash',        // Agnes 2.0: ricette JSON solide, contesto ampio
-  french: 'groq:llama-3.3-70b-versatile', // lezioni brevi, rapide e con buona resa linguistica
-  polish: 'groq:llama-3.3-70b-versatile', // stessa scelta: rapido e stabile anche sul polacco
+  french: 'groq:openai/gpt-oss-120b', // lezioni brevi, rapide e con buona resa linguistica
+  polish: 'groq:openai/gpt-oss-120b', // stessa scelta: rapido e stabile anche sul polacco
   profile: '',                            // usa sempre /api/nvidia/coach direttamente
 };
 // NB: se AGNES_API_KEY non è impostata su Vercel, il proxy salta Agnes e usa la catena di
