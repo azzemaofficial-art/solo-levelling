@@ -72,10 +72,6 @@ export default function MealBurst({ fx, onDone, soundEnabled = true, soundTheme 
     return () => clearTimeout(id);
   }, [fx, soundEnabled, soundTheme]);
 
-  // Se la gif non carica (rete/offline), la ciotola SVG disegnata fa da backup:
-  // l'animazione non resta MAI vuota.
-  const showGif = k.img && !imgFailed;
-
   const particles = useMemo(() => Array.from({ length: 14 }, (_, i) => {
     const angle = (i / 14) * Math.PI * 2 + (fx?.t || 0) % 1;
     const dist = 68 + ((i * 37) % 42);
@@ -83,6 +79,9 @@ export default function MealBurst({ fx, onDone, soundEnabled = true, soundTheme 
   }), [fx?.t]);
 
   const k = KIND[fx?.kind] || KIND.meal;
+  // Se la gif non carica (rete/offline), la ciotola SVG disegnata fa da backup:
+  // l'animazione non resta MAI vuota. (dopo la dichiarazione di k!)
+  const showGif = k.img && !imgFailed;
   const reduced = prefersReducedMotion();
 
   return (
