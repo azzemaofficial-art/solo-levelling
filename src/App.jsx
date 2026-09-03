@@ -24,7 +24,6 @@ const Training = lazy(() => import('./pages/Training'));
 const Recovery = lazy(() => import('./pages/Recovery'));
 const Help = lazy(() => import('./pages/Help'));
 const Coach = lazy(() => import('./pages/Coach'));
-const News = lazy(() => import('./pages/News'));
 const French = lazy(() => import('./pages/French'));
 const Polish = lazy(() => import('./pages/Polish'));
 runStorageMigrations();
@@ -85,7 +84,7 @@ function App() {
   const [tgBindPrompt, setTgBindPrompt] = useState(false);
   const [tgBindCustom, setTgBindCustom] = useState('');
   const { fxPulseKey, fxBurstKey, surgeKey, comboProgress, triggerFxBurst } = useFxCombo();
-  const pagesOrder = ['system', 'systemplus', 'training', 'recovery', 'quests', 'boss', 'calendar', 'stats', 'help', 'coach', 'news'];
+  const pagesOrder = ['system', 'systemplus', 'training', 'recovery', 'quests', 'boss', 'calendar', 'stats', 'help', 'coach'];
   const [soundEnabled, setSoundEnabled] = useState(() => {
     const saved = localStorage.getItem('shadow_monarch_sound');
     return saved ? saved === '1' : true;
@@ -1595,9 +1594,6 @@ useEffect(() => { localStorage.setItem('shadow_monarch_macros', JSON.stringify(m
               <button onClick={() => handleTabChange('help')} className="text-[10px] px-2 py-3 border border-cyan-300/40 text-cyan-200 uppercase tracking-widest flex items-center gap-1.5">
                 <span>❓</span> Help
               </button>
-              <button onClick={() => { handleTabChange('news'); setMenuOpen(false); }} className="text-[10px] px-2 py-3 border border-sky-300/40 text-sky-200 uppercase tracking-widest flex items-center gap-1.5">
-                <span>🔬</span> News
-              </button>
               <button onClick={() => { handleTabChange('french'); setMenuOpen(false); }} className="text-[10px] px-2 py-3 border border-blue-300/40 text-blue-200 uppercase tracking-widest flex items-center gap-1.5">
                 <span>🇫🇷</span> Français
               </button>
@@ -1738,7 +1734,6 @@ useEffect(() => { localStorage.setItem('shadow_monarch_macros', JSON.stringify(m
                 crownAnthemEnabled={crownAnthemEnabled}
                 coachMode={coachMode}
                 systemCompactMode={true}
-                onOpenNews={() => handleTabChange('news')}
               />
             )}
             {activePage === 'systemplus' && (
@@ -1761,7 +1756,6 @@ useEffect(() => { localStorage.setItem('shadow_monarch_macros', JSON.stringify(m
                 crownAnthemEnabled={crownAnthemEnabled}
                 coachMode={false}
                 systemCompactMode={false}
-                onOpenNews={() => handleTabChange('news')}
               />
             )}
             {activePage === 'training' && (
@@ -1807,21 +1801,11 @@ useEffect(() => { localStorage.setItem('shadow_monarch_macros', JSON.stringify(m
                 playerStats={playerStats}
               />
             )}
-            {activePage === 'stats' && <Stats systemLogs={systemLogs} dailyGoal={dailyGoal} hydrationGoal={hydrationGoal} macroGoals={macroGoals} playerStats={playerStats} />}
+            {activePage === 'stats' && <Stats systemLogs={systemLogs} dailyGoal={dailyGoal} hydrationGoal={hydrationGoal} macroGoals={macroGoals} playerStats={playerStats} setPlayerStats={setPlayerStats} soundEnabled={soundEnabled} soundTheme={soundTheme} />}
             {activePage === 'help' && <Help createBackupPayload={createBackupPayload} importBackupPayload={importBackupPayload} resetAppData={resetAppData} playerStats={playerStats} onNavigate={handleTabChange} />}
             {activePage === 'french' && <French playerStats={playerStats} setPlayerStats={setPlayerStats} soundEnabled={soundEnabled} soundTheme={soundTheme} />}
             {activePage === 'polish' && <Polish playerStats={playerStats} setPlayerStats={setPlayerStats} soundEnabled={soundEnabled} soundTheme={soundTheme} />}
             {activePage === 'coach' && <Coach playerStats={playerStats} setPlayerStats={setPlayerStats} />}
-            {activePage === 'news' && (
-              <News
-                playerStats={playerStats}
-                onAskCoach={(question) => {
-                  try { localStorage.setItem('shadow_monarch_pending_coach_question', question); } catch {}
-                  handleTabChange('coach');
-                }}
-                onToast={(message) => emitUiToast({ message, tone: 'success', durationMs: 2600 })}
-              />
-            )}
             </motion.div>
           </AnimatePresence>
         </Suspense>

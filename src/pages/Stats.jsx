@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { AreaChart, Area, LineChart, Line, XAxis, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell } from 'recharts';
+import BodyCompositionPanel from '../components/BodyCompositionPanel';
 
 const WEEKDAY_SHORT = ['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom'];
 const MONTH_LABEL_IT = ['Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno', 'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre'];
@@ -21,7 +22,7 @@ const isWorkoutDay = (log) => toNumber(log?.burned, 0) >= 180 || toNumber(log?.s
 const safePct = (num, den) => (den > 0 ? Math.round((num / den) * 100) : 0);
 const estimateNeatScore = (steps) => Math.max(0, Math.round((toNumber(steps, 0) / 10000) * 100));
 
-const Stats = ({ systemLogs, dailyGoal = 2400, hydrationGoal = 2800, macroGoals = { protein: 190 }, playerStats = {} }) => {
+const Stats = ({ systemLogs, dailyGoal = 2400, hydrationGoal = 2800, macroGoals = { protein: 190 }, playerStats = {}, setPlayerStats, soundEnabled = true, soundTheme = 'solo' }) => {
   const [timeframe, setTimeframe] = useState('daily'); // daily, weekly, monthly
   const [periodDays, setPeriodDays] = useState(90);
   const [monthCursor, setMonthCursor] = useState(() => {
@@ -410,6 +411,17 @@ const Stats = ({ systemLogs, dailyGoal = 2400, hydrationGoal = 2800, macroGoals 
       <div className="mb-8">
         <p className="text-gray-500 text-[10px] tracking-[0.3em] font-bold system-font mb-1 uppercase">Hunt Logs</p>
         <h1 className="text-4xl font-black italic tracking-tighter text-white">STATISTICS</h1>
+      </div>
+
+      {/* ⚖ Body Composition — trends metriche + goal (spostato qui dal System) */}
+      <div className="mb-8">
+        <BodyCompositionPanel
+          systemLogs={systemLogs}
+          playerStats={playerStats}
+          setPlayerStats={setPlayerStats}
+          soundEnabled={soundEnabled}
+          soundTheme={soundTheme}
+        />
       </div>
 
       <motion.section initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mb-6 rounded-2xl border p-4" style={{ borderColor: `${protocolAccent}55`, background: `linear-gradient(145deg, ${protocolMode === 'cut' ? 'rgba(184,243,74,0.09)' : 'rgba(255,155,84,0.09)'}, rgba(0,0,0,0.35))` }}>
