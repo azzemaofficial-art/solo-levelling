@@ -6,9 +6,10 @@
 import { motion, AnimatePresence } from 'framer-motion';
 
 const MODES = [
+  { id: 'punch', label: 'PUGNI', icon: '🥊' },
+  { id: 'kicks', label: 'CALCI', icon: '🥋' },
   { id: 'squat', label: 'SQUAT', icon: '🦵' },
   { id: 'push', label: 'PIEGAMENTI', icon: '💪' },
-  { id: 'kicks', label: 'CALCI', icon: '🥋' },
 ];
 
 export default function RepCoach({ mode, count, onSelect, onStop }) {

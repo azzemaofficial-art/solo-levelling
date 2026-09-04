@@ -1604,6 +1604,41 @@ Rispondi in italiano, max 15 righe, tono da maestro pratico.`;
         </div>
       )}
 
+      {/* 🎯 PARTI DA ZERO — la prima sessione passo-passo per chi inizia */}
+      {totalDone === 0 && (
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+          className="rounded-2xl p-4 space-y-2.5"
+          style={{ background: 'linear-gradient(160deg, rgba(251,191,36,0.1), rgba(17,24,39,0.94))', border: '1px solid rgba(251,191,36,0.4)', boxShadow: '0 0 24px rgba(251,191,36,0.12)' }}>
+          <p className="text-xs font-black tracking-widest" style={{ color: '#fbbf24', fontFamily: 'Orbitron, sans-serif' }}>
+            🎯 PARTI DA ZERO — {curriculum.name.toUpperCase()}
+          </p>
+          <div className="space-y-1.5">
+            {[
+              `Prima mossa: impara "${objective?.topic || curriculum.levels[0].topics[0]}" — il maestro ti guarda dalla camera e ti corregge`,
+              'Scalda il corpo col Conta Voce: 3 serie di pugni e squat',
+              'Chiudi con 2 minuti di shadow lento: solo tecnica, zero fretta',
+            ].map((step, i) => (
+              <p key={i} className="text-[11px] leading-snug flex gap-2" style={{ color: '#e5e7eb' }}>
+                <span className="font-black shrink-0" style={{ color: '#fbbf24' }}>{i + 1}.</span>{step}
+              </p>
+            ))}
+          </div>
+          {(() => {
+            const s0 = (typeof secretsFor === 'function' ? secretsFor(disc) : [])[0];
+            return s0 ? (
+              <p className="text-[10px] leading-snug rounded-xl p-2" style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)', color: '#fde68a' }}>
+                🗝 Primo segreto del maestro: {s0.text}
+              </p>
+            ) : null;
+          })()}
+          <button onClick={() => trainLive(`Prima sessione da zero in ${curriculum.name}: insegna "${objective?.topic || curriculum.levels[0].topics[0]}" con drill semplici, guarda la camera e correggi tutto.`)}
+            className="w-full py-2.5 rounded-xl text-xs font-black tracking-widest"
+            style={{ background: 'linear-gradient(90deg, #fbbf24, #f59e0b)', color: '#1c1204', fontFamily: 'Orbitron, sans-serif', boxShadow: '0 0 16px rgba(251,191,36,0.4)' }}>
+            ▶ INIZIA LA PRIMA SESSIONE
+          </button>
+        </motion.div>
+      )}
+
       {/* Levels */}
       <div className="space-y-2">
         {curriculum.levels.map((level, li) => {
@@ -2999,7 +3034,7 @@ function VisualCoach({ setPlayerStats }) {
     repBadStreakRef.current = 0;
     setRepMode(m);
     setVcCount(0);
-    const label = m === 'squat' ? 'squat' : m === 'push' ? 'piegamenti' : 'calci';
+    const label = { squat: 'squat', push: 'piegamenti', kicks: 'calci', punch: 'pugni' }[m] || 'ripetizioni';
     enqueueSpeak(`Serie di ${label}. Parti quando vuoi, conto io.`, true);
   }, [enqueueSpeak]);
 
@@ -4370,7 +4405,7 @@ function VisualCoach({ setPlayerStats }) {
                   const nowV = performance.now();
                   if (rr.bad && repBadStreakRef.current >= 2) {
                     repBadStreakRef.current = 0;
-                    enqueueSpeak(repModeRef.current === 'squat' ? 'Scendi di più.' : repModeRef.current === 'push' ? 'Scendi col petto.' : 'Calcio più esplosivo.', true);
+                    enqueueSpeak(repModeRef.current === 'squat' ? 'Scendi di più.' : repModeRef.current === 'push' ? 'Scendi col petto.' : repModeRef.current === 'punch' ? 'Colpisci più esplosivo e torna in guardia.' : 'Calcio più esplosivo.', true);
                   } else if (rr.count <= 3 || rr.count % 5 === 0) {
                     lastRepVoiceRef.current = nowV;
                     enqueueSpeak(rr.count % 5 === 0 ? `${rr.count}!` : String(rr.count), true);

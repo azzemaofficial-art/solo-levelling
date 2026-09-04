@@ -78,6 +78,19 @@ test('kicks: estensioni esplosive del ginocchio = calci', () => {
   assert.ok(peak > 500);
 });
 
+test('punch: estensioni esplosive del gomito = pugni', () => {
+  const c = createRepCounter('punch');
+  const seq = [
+    { t: 0, eL: 100, eR: 100 },
+    { t: 33, eL: 155, eR: 100 },   // jab sx ~1666°/s
+    { t: 400, eL: 100, eR: 100 },
+    { t: 433, eL: 100, eR: 160 },  // cross dx (fuori refrattario 320ms)
+  ];
+  let counted = 0;
+  for (const s of seq) if (c.push(s).counted) counted += 1;
+  assert.equal(counted, 2);
+});
+
 test('reset azzera il contatore', () => {
   const c = createRepCounter('squat');
   for (const s of cycle(0, 90)) c.push(s);
@@ -87,6 +100,7 @@ test('reset azzera il contatore', () => {
 });
 
 test('preset esposti per la UI', () => {
-  assert.ok(REP_PRESETS.squat && REP_PRESETS.push && REP_PRESETS.kicks);
+  assert.ok(REP_PRESETS.squat && REP_PRESETS.push && REP_PRESETS.kicks && REP_PRESETS.punch);
   assert.equal(REP_PRESETS.squat.label, 'Squat');
+  assert.equal(REP_PRESETS.punch.label, 'Pugni');
 });
