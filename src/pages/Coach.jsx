@@ -2987,7 +2987,7 @@ function VisualCoach({ setPlayerStats }) {
   const timerPhaseRef = useRef('idle');
   // ── COACH VOCALE MANI-LIBERE (conta ripetizioni ad alta voce) ──
   const [repMode, setRepMode] = useState(null);           // 'squat'|'push'|'kicks'|null
-  const [repCount, setRepCount] = useState(0);
+  const [vcCount, setVcCount] = useState(0);              // contatore vocale (repCount è del guided)
   const repCounterRef = useRef(null);
   const repModeRef = useRef(null);                        // specchio per il loop rAF
   const repBadStreakRef = useRef(0);
@@ -2998,7 +2998,7 @@ function VisualCoach({ setPlayerStats }) {
     repModeRef.current = m;
     repBadStreakRef.current = 0;
     setRepMode(m);
-    setRepCount(0);
+    setVcCount(0);
     const label = m === 'squat' ? 'squat' : m === 'push' ? 'piegamenti' : 'calci';
     enqueueSpeak(`Serie di ${label}. Parti quando vuoi, conto io.`, true);
   }, [enqueueSpeak]);
@@ -3019,7 +3019,7 @@ function VisualCoach({ setPlayerStats }) {
         saveCoachProgress(p);
       } catch {}
     }
-    setRepCount(0);
+    setVcCount(0);
   }, [enqueueSpeak, mode]);
 
   // ── CONTATORE CALCI DA MATCH (camera, da 3+ round) ──
@@ -4365,7 +4365,7 @@ function VisualCoach({ setPlayerStats }) {
               if (K.length >= 1) {
                 const rr = repCounterRef.current.push(K[K.length - 1]);
                 if (rr.counted) {
-                  setRepCount(rr.count);
+                  setVcCount(rr.count);
                   repBadStreakRef.current = rr.bad ? repBadStreakRef.current + 1 : 0;
                   const nowV = performance.now();
                   if (rr.bad && repBadStreakRef.current >= 2) {
@@ -5568,7 +5568,7 @@ function VisualCoach({ setPlayerStats }) {
         {/* 🎙 COACH VOCALE MANI-LIBERE — conta le ripetizioni ad alta voce */}
         {streaming && skeletonOn && (
           <div className="flex justify-center mt-2 pointer-events-none">
-            <RepCoach mode={repMode} count={repCount} onSelect={startReps} onStop={stopReps} />
+            <RepCoach mode={repMode} count={vcCount} onSelect={startReps} onStop={stopReps} />
           </div>
         )}
 
