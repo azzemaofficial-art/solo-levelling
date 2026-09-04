@@ -6,6 +6,7 @@ import { BREATHING_PROTOCOLS } from '../../lib/breathingProtocols.js';
 import { getDiscipline } from '../../lib/martialKnowledge.js';
 import { analyzeKinematics, fatigueFromTrend, detectKicks, kickLevelFromMatch } from '../../lib/kinematics.js';
 import { createRepCounter } from '../../lib/repCounter.js';
+import { techniquesByCat, CAT_LABEL } from '../../lib/techniques.js';
 import RepCoach from '../components/RepCoach';
 import { masteryFromXp } from '../../lib/mastery.js';
 import { playEpicDing, playComboHit, playSample } from '../utils/sfx';
@@ -1189,12 +1190,13 @@ function SkillRadar({ skills, size = 170 }) {
 function CurriculumCoach({ onGoLive }) {
   const [disc, setDisc] = useState('muaythai');
   const [expandedLevel, setExpandedLevel] = useState(0);
+  const [openTech, setOpenTech] = useState(null); // libreria tecniche: tecnica espansa
   const [progress, setProgress] = useState(() => loadCurrProgress());
   const [loadingTopic, setLoadingTopic] = useState(null);
   const [topicLesson, setTopicLesson] = useState(null);
   const [exams, setExams] = useState(() => loadExams());
   const [weekPlan, setWeekPlan] = useState(null);      // {content} | {loading:true}
-  useEffect(() => { setExams(loadExams()); }, [disc]); // gli esami li scrive la sessione live
+  useEffect(() => { setExams(loadExams()); setOpenTech(null); }, [disc]); // gli esami li scrive la sessione live
 
   const curriculum = CURRICULUM[disc];
   const discProgress = progress[disc] || {};
@@ -1483,6 +1485,66 @@ Rispondi in italiano, max 15 righe, tono da maestro pratico.`;
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* 📖 LIBRERIA TECNICHE — posizioni/prese/combo/proiezioni, sblocco per grado */}
+      {Object.keys(techniquesByCat(disc)).length > 0 && (() => {
+        const byCat = techniquesByCat(disc);
+        const all = Object.values(byCat).flat();
+        const unlockedCount = all.filter((t) => t.lvl <= secretLevel).length;
+        return (
+          <div className="rounded-2xl p-4 space-y-3" style={{ background: 'linear-gradient(160deg, rgba(14,116,144,0.1), rgba(17,24,39,0.92))', border: '1px solid rgba(56,189,248,0.3)' }}>
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-black tracking-widest" style={{ color: '#7dd3fc', fontFamily: 'Orbitron, sans-serif' }}>📖 TECNICHE</p>
+              <span className="text-[10px] px-2 py-0.5 rounded-full font-bold" style={{ background: 'rgba(56,189,248,0.12)', color: '#7dd3fc', border: '1px solid rgba(56,189,248,0.3)' }}>
+                {unlockedCount}/{all.length} · grado {rank?.rank || 'E'}
+              </span>
+            </div>
+            {Object.entries(byCat).map(([cat, list]) => (
+              <div key={cat}>
+                <p className="text-[9px] font-black tracking-[0.2em] mb-1.5" style={{ color: '#64748b' }}>{CAT_LABEL[cat]}</p>
+                <div className="space-y-1.5">
+                  {list.map((t) => {
+                    const unlocked = t.lvl <= secretLevel;
+                    const open = openTech === t.id;
+                    return (
+                      <div key={t.id} className="rounded-xl overflow-hidden" style={{ background: 'rgba(30,41,59,0.45)', border: `1px solid ${unlocked ? 'rgba(56,189,248,0.25)' : 'rgba(148,163,184,0.12)'}` }}>
+                        <button onClick={() => unlocked && setOpenTech(open ? null : t.id)}
+                          className="w-full flex items-center justify-between gap-2 px-3 py-2 text-left"
+                          style={{ cursor: unlocked ? 'pointer' : 'default' }}>
+                          <span className="text-[11px] font-bold truncate" style={{ color: unlocked ? '#e2e8f0' : '#475569', filter: unlocked ? 'none' : 'blur(3px)' }}>{t.name}</span>
+                          <span className="text-[9px] font-black whitespace-nowrap shrink-0" style={{ color: unlocked ? '#7dd3fc' : '#475569' }}>
+                            {unlocked ? (open ? '▲' : '▼') : `🔒 ${RANK_LABELS[t.lvl - 1]}`}
+                          </span>
+                        </button>
+                        {open && unlocked && (
+                          <div className="px-3 pb-3 space-y-1.5">
+                            {t.steps.map((s, i) => (
+                              <p key={i} className="text-[10px] leading-snug flex gap-1.5" style={{ color: '#cbd5e1' }}>
+                                <span className="shrink-0 font-black" style={{ color: '#7dd3fc' }}>{i + 1}.</span>{s}
+                              </p>
+                            ))}
+                            <p className="text-[9px] font-black tracking-widest pt-1" style={{ color: '#f87171' }}>⚠ ERRORI DA EVITARE</p>
+                            {t.errori.map((e, i) => (
+                              <p key={i} className="text-[10px] leading-snug flex gap-1.5" style={{ color: '#fca5a5' }}>
+                                <span className="shrink-0">✗</span>{e}
+                              </p>
+                            ))}
+                            <button onClick={() => trainLive(`Insegna la tecnica "${t.name}" (${CAT_LABEL[cat].replace(/^[^ ]+ /, '')}): guida questi step — ${t.steps.join(' / ')} — e correggimi dalla camera mentre la eseguo.`)}
+                              className="w-full mt-1 py-2 rounded-lg text-[10px] font-black tracking-widest"
+                              style={{ background: 'linear-gradient(90deg, #38bdf8, #0ea5e9)', color: '#04121c', fontFamily: 'Orbitron, sans-serif' }}>
+                              ▶ ALLENA ORA
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        );
+      })()}
 
       {/* 🗡️ ARMATA DELLE OMBRE — ogni grado A/S estrae un soldato */}
       <div className="rounded-2xl p-4 space-y-2" style={{ background: 'linear-gradient(160deg, rgba(76,29,149,0.14), rgba(17,24,39,0.9))', border: '1px solid rgba(167,139,250,0.3)', boxShadow: '0 0 22px rgba(139,92,246,0.12)' }}>
