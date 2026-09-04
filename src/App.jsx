@@ -408,7 +408,22 @@ useEffect(() => { localStorage.setItem('shadow_monarch_macros', JSON.stringify(m
       }
       return;
     }
-    const key = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit' });
+    // ↩️ UNDO_MEAL — "annulla" su Telegram: sottrae il pasto dal giorno indicato
+    if (payload.type === 'undo_meal') {
+      const undoKey = payload.date || new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit' });
+      setSystemLogs((prev) => prev.map((l) => (l.date === undoKey ? {
+        ...l,
+        consumed: Math.max(0, Number(l.consumed || 0) - Number(payload.kcal || 0)),
+        protein: Math.max(0, Number(l.protein || 0) - Number(payload.protein || 0)),
+        carbs: Math.max(0, Number(l.carbs || 0) - Number(payload.carbs || 0)),
+        fatMacros: Math.max(0, Number(l.fatMacros || 0) - Number(payload.fat || 0)),
+      } : l)));
+      emitUiToast({ message: `↩️ Pasto annullato${payload.name ? `: ${payload.name}` : ''} (da Telegram)`, tone: 'info', durationMs: 3200 });
+      return;
+    }
+    const todayDdMm = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit' });
+    // ⏪ "ieri ..." da Telegram porta payload.date (dd/mm): il pasto va in quel giorno
+    const key = payload.date || todayDdMm;
     setSystemLogs((prev) => {
       const idx = prev.findIndex((l) => l.date === key);
       const base = idx >= 0 ? prev[idx] : { date: key, consumed: 0, protein: 0, carbs: 0, fatMacros: 0, workoutBurn: 0, burned: 0, waterMl: 0 };
@@ -442,8 +457,9 @@ useEffect(() => { localStorage.setItem('shadow_monarch_macros', JSON.stringify(m
       return next;
     });
     // Burst cinematic anche per i pasti che arrivano da Telegram (si vede
-    // all'apertura dell'app, quando la coda claim-import viene consumata)
-    if (payload.type === 'meal' && Number(payload.kcal) > 0) {
+    // all'apertura dell'app, quando la coda claim-import viene consumata).
+    // Solo per i pasti di OGGI: i pasti di ieri aggiornano lo storico senza burst.
+    if (payload.type === 'meal' && Number(payload.kcal) > 0 && (!payload.date || payload.date === todayDdMm)) {
       const keyFx = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit' });
       const todayFx = (systemLogsRef.current || []).find((l) => l.date === keyFx);
       const before = Number(todayFx?.consumed || 0);

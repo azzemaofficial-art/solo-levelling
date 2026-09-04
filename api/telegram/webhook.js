@@ -45,6 +45,73 @@ async function logMeal(chatId, entry) {
   await kvSet(k, arr.slice(-300), 7776000); // ultimi 300 pasti, TTL 90 giorni
 }
 
+// Data nel formato del sito (dd/mm) e ISO, con offset giorni (ieri = -1), fuso Rome
+const appDayFmt = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Rome', day: '2-digit', month: '2-digit' });
+const isoDayFmt = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Rome', year: 'numeric', month: '2-digit', day: '2-digit' });
+const appDayStr = (offsetDays = 0) => appDayFmt.format(new Date(Date.now() + offsetDays * 86400000));
+const isoDayStr = (offsetDays = 0) => isoDayFmt.format(new Date(Date.now() + offsetDays * 86400000));
+const isoToDdMm = (iso) => {
+  const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? `${m[3]}/${m[2]}` : appDayStr(0);
+};
+
+// Sottrae un pasto dai totali del giorno corrente (per l'annullo)
+async function subDailyMeal(chatId, m) {
+  const k = todayKey(chatId);
+  const cur = (await kvGet(k)) || { kcal: 0, protein: 0, carbs: 0, fat: 0, burn: 0, meals: 0, workouts: 0 };
+  const next = {
+    kcal: Math.max(0, cur.kcal - (m.kcal || 0)),
+    protein: Math.max(0, cur.protein - (m.protein || 0)),
+    carbs: Math.max(0, cur.carbs - (m.carbs || 0)),
+    fat: Math.max(0, cur.fat - (m.fat || 0)),
+    burn: cur.burn,
+    meals: Math.max(0, cur.meals - 1),
+    workouts: cur.workouts,
+  };
+  await kvSet(k, next, 172800);
+  return next;
+}
+
+// ↩️ ANNULLA: toglie l'ultimo pasto. Se è ancora in coda lo elimina e basta;
+// se il sito l'ha già consumato, pusha un evento undo_meal perché lo sottragga anche là.
+async function undoLastMeal(botToken, chatId) {
+  const qk = `tg_queue:${chatId}`;
+  const queueRaw = (await kvGet(qk)) || [];
+  const q = Array.isArray(queueRaw) ? queueRaw : [];
+  const lastIdx = q.map((it) => it?.type).lastIndexOf('meal');
+  if (lastIdx >= 0) {
+    const meal = q[lastIdx];
+    q.splice(lastIdx, 1);
+    await kvSet(qk, q, 604800);
+    const mk = `tg_meals:${chatId}`;
+    const mealsRaw = (await kvGet(mk)) || [];
+    const meals = Array.isArray(mealsRaw) ? mealsRaw : [];
+    const mIdx = meals.map((e) => e?.ts).lastIndexOf(meal.ts);
+    if (mIdx >= 0) { meals.splice(mIdx, 1); await kvSet(mk, meals.slice(-300), 7776000); }
+    if (!meal.date || meal.date === appDayStr(0)) await subDailyMeal(chatId, meal);
+    await sendTelegramMessage(botToken, chatId, `↩️ <b>${meal.name || 'Pasto'}</b> annullato (~${meal.kcal || 0} kcal). Non è più contato.`);
+    return;
+  }
+  // Non in coda → probabilmente già applicato dal sito: evento di annullamento
+  const mk = `tg_meals:${chatId}`;
+  const mealsRaw = (await kvGet(mk)) || [];
+  const meals = Array.isArray(mealsRaw) ? mealsRaw : [];
+  const last = meals[meals.length - 1];
+  if (!last) {
+    await sendTelegramMessage(botToken, chatId, '🤷 Non trovo un pasto recente da annullare.');
+    return;
+  }
+  meals.pop();
+  await kvSet(mk, meals.slice(-300), 7776000);
+  if (!last.date || last.date === isoDayStr(0)) await subDailyMeal(chatId, last);
+  await kvPush(qk, {
+    type: 'undo_meal', ts: Date.now(),
+    kcal: last.kcal || 0, protein: last.protein || 0, carbs: last.carbs || 0, fat: last.fat || 0,
+    name: last.name || '', slot: last.slot || '', date: isoToDdMm(last.date),
+  });
+  await sendTelegramMessage(botToken, chatId, `↩️ <b>${last.name || 'Ultimo pasto'}</b> annullato (~${last.kcal || 0} kcal).\n🔄 Verrà rimosso anche sul sito alla prossima apertura.`);
+}
+
 // Provider chain — Groq primo per i fast (no reasoning, JSON pulito), 550B per task lenti
 const PROVIDERS = [
   { key: () => process.env.GROQ_API_KEY,                  model: 'openai/gpt-oss-120b',                      fast: true,  baseUrl: GROQ_BASE },
@@ -640,18 +707,22 @@ function computeBurn(activities, weightKg) {
 // ─── Flusso pasto condiviso (testo / voce / foto) ───
 const SLOT_EMOJI = { colazione: '🌅', pranzo: '🍽️', cena: '🌙', merenda: '🍎' };
 
-async function processMeal(botToken, chatId, parsed) {
+async function processMeal(botToken, chatId, parsed, dayOffset = 0) {
   const slot = parsed.slot || 'pranzo';
   const name = parsed.name || 'Pasto';
   const m = await computeMeal(parsed.items);
+  const appDate = appDayStr(dayOffset);   // dd/mm — formato del sito
+  const isoDate = isoDayStr(dayOffset);   // yyyy-mm-dd — formato tg_meals
 
   await kvPush(`tg_queue:${chatId}`, {
     type: 'meal', ts: Date.now(),
     kcal: m.kcal, protein: m.protein, carbs: m.carbs, fat: m.fat, name, slot,
+    ...(dayOffset ? { date: appDate } : {}),
   });
-  const day = await addDaily(chatId, m);
+  // I totali del /oggi si muovono solo per i pasti di oggi
+  const day = dayOffset === 0 ? await addDaily(chatId, m) : null;
   await logMeal(chatId, {
-    ts: Date.now(), date: romeDayStr(),
+    ts: Date.now(), date: isoDate,
     slot, name, kcal: m.kcal, protein: m.protein, carbs: m.carbs, fat: m.fat,
   });
 
@@ -660,7 +731,11 @@ async function processMeal(botToken, chatId, parsed) {
   reply += '━━━━━━━━━━━\n';
   reply += `📊 <b>~${m.kcal} kcal</b> · P ${m.protein}g · C ${m.carbs}g · G ${m.fat}g`;
   if (parsed.tip) reply += `\n💡 ${parsed.tip}`;
-  reply += `\n\n📅 Oggi: <b>${day.kcal} kcal</b>${day.burn ? ` · 🔥 ${day.burn} bruciate` : ''} (netto ${day.kcal - day.burn})`;
+  if (day) {
+    reply += `\n\n📅 Oggi: <b>${day.kcal} kcal</b>${day.burn ? ` · 🔥 ${day.burn} bruciate` : ''} (netto ${day.kcal - day.burn})`;
+  } else {
+    reply += `\n\n📅 Aggiunto a <b>IERI</b> (${appDate}).`;
+  }
   reply += '\n🔄 <i>Apri il sito per i dati aggiornati.</i>';
   await sendTelegramMessage(botToken, chatId, reply);
 }
@@ -1124,12 +1199,31 @@ Consiglia SOLO integratori presenti nei PRINCIPI scientifici. Ricorda: gli integ
   // Normalizza i comandi: "/scienza@NomeBot" → "/scienza" (il menu/gruppi aggiungono @bot)
   if (text.startsWith('/')) text = text.replace(/^(\/[A-Za-z_]+)@\w+/, '$1').trim();
 
+  // ↩️ ANNULLA — "annulla" cancella l'ultimo pasto inserito (coda + sito)
+  if (/^(annulla|undo|annullare|cancella ultimo)[\s!.]*$/i.test(text.trim())) {
+    await undoLastMeal(botToken, incomingChatId);
+    return res.status(200).json({ ok: true });
+  }
+
+  // ⏪ IERI — "ieri ..." registra il pasto nel giorno precedente
+  let dayOffset = 0;
+  if (/^ieri\b/i.test(text.trim())) {
+    dayOffset = -1;
+    text = text.replace(/^ieri\b[\s:,\-]*/i, '').trim();
+    if (!text) {
+      await sendTelegramMessage(botToken, incomingChatId, '⏪ Dimmi cosa hai mangiato ieri, es: <i>ieri cena: pollo 200g e riso 100g</i>');
+      return res.status(200).json({ ok: true });
+    }
+  }
+
   // Comandi speciali
   if (text === '/start' || text === '/help') {
     await sendTelegramMessage(botToken, incomingChatId,
       '⚡ <b>Shadow Monarch Bot</b>\n\n' +
       'Dimmi cosa hai mangiato o che allenamento hai fatto — anche con 🎤 <b>vocale</b> o 📷 <b>foto del piatto</b>:\n\n' +
       '🍽️ <b>Pasto</b> — "Cena: pollo 200g, riso 100g cotto, insalata"\n' +
+      '⏪ <b>Ieri</b> — "ieri cena: ..." registra il pasto nel giorno prima\n' +
+      '↩️ <b>Annulla</b> — scrivi "annulla" per togliere l\'ultimo pasto (anche dal sito)\n' +
       '🏋️ <b>Workout</b> — "45 min corsa + 30 min pesi"\n' +
       '📷 <b>Foto piatto</b> — manda la foto del piatto, stimo io gli alimenti\n' +
       '🏷️ <b>Etichetta</b> — foto della tabella nutrizionale con didascalia "etichetta" (macro precisi dal confezionato; aggiungi i grammi es. "etichetta 50g")\n' +
@@ -1365,7 +1459,7 @@ Consiglia SOLO integratori presenti nei PRINCIPI scientifici. Ricorda: gli integ
 
   // ── PASTO: macro calcolati su database reale ──
   if (parsed && parsed.type === 'meal') {
-    await processMeal(botToken, incomingChatId, parsed);
+    await processMeal(botToken, incomingChatId, parsed, dayOffset);
     return res.status(200).json({ ok: true });
   }
 
