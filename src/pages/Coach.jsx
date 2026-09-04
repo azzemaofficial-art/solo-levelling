@@ -5,6 +5,8 @@ import { Eye, Lightbulb, Trophy, ScanSearch, Play, Pause, Target, FlipHorizontal
 import { BREATHING_PROTOCOLS } from '../../lib/breathingProtocols.js';
 import { getDiscipline } from '../../lib/martialKnowledge.js';
 import { analyzeKinematics, fatigueFromTrend, detectKicks, kickLevelFromMatch } from '../../lib/kinematics.js';
+import { createRepCounter } from '../../lib/repCounter.js';
+import RepCoach from '../components/RepCoach';
 import { masteryFromXp } from '../../lib/mastery.js';
 import { playEpicDing, playComboHit, playSample } from '../utils/sfx';
 import { speakSystem } from '../utils/systemVoice';
@@ -2983,6 +2985,43 @@ function VisualCoach({ setPlayerStats }) {
   const reactTimerRef = useRef(null);
   const reactOnRef = useRef(false);
   const timerPhaseRef = useRef('idle');
+  // ── COACH VOCALE MANI-LIBERE (conta ripetizioni ad alta voce) ──
+  const [repMode, setRepMode] = useState(null);           // 'squat'|'push'|'kicks'|null
+  const [repCount, setRepCount] = useState(0);
+  const repCounterRef = useRef(null);
+  const repModeRef = useRef(null);                        // specchio per il loop rAF
+  const repBadStreakRef = useRef(0);
+  const lastRepVoiceRef = useRef(0);
+
+  const startReps = useCallback((m) => {
+    repCounterRef.current = createRepCounter(m);
+    repModeRef.current = m;
+    repBadStreakRef.current = 0;
+    setRepMode(m);
+    setRepCount(0);
+    const label = m === 'squat' ? 'squat' : m === 'push' ? 'piegamenti' : 'calci';
+    enqueueSpeak(`Serie di ${label}. Parti quando vuoi, conto io.`, true);
+  }, [enqueueSpeak]);
+
+  const stopReps = useCallback(() => {
+    const n = repCounterRef.current?.count || 0;
+    repCounterRef.current = null;
+    repModeRef.current = null;
+    setRepMode(null);
+    if (n > 0) {
+      enqueueSpeak(`Serie finita: ${n} ripetizioni.`, true);
+      playEpicDing({ enabled: true });
+      // XP alla disciplina attiva → barre maestria si aggiornano da sole
+      try {
+        const p = loadCoachProgress();
+        const cur = p[mode] || {};
+        p[mode] = { ...cur, xp: (cur.xp || 0) + Math.min(60, 8 + n * 2) };
+        saveCoachProgress(p);
+      } catch {}
+    }
+    setRepCount(0);
+  }, [enqueueSpeak, mode]);
+
   // ── CONTATORE CALCI DA MATCH (camera, da 3+ round) ──
   const matchKicksRef = useRef({ tot: 0, sx: 0, dx: 0, peaks: [] });
   const kickStateRef = useRef({ lastKickT: { kL: -1e9, kR: -1e9 } });
@@ -4320,6 +4359,28 @@ function VisualCoach({ setPlayerStats }) {
                 }
               }
             }
+            // ── COACH VOCALE: conteggio ripetizioni live (squat/piegamenti/calci) ──
+            if (repCounterRef.current) {
+              const K = kinHistRef.current;
+              if (K.length >= 1) {
+                const rr = repCounterRef.current.push(K[K.length - 1]);
+                if (rr.counted) {
+                  setRepCount(rr.count);
+                  repBadStreakRef.current = rr.bad ? repBadStreakRef.current + 1 : 0;
+                  const nowV = performance.now();
+                  if (rr.bad && repBadStreakRef.current >= 2) {
+                    repBadStreakRef.current = 0;
+                    enqueueSpeak(repModeRef.current === 'squat' ? 'Scendi di più.' : repModeRef.current === 'push' ? 'Scendi col petto.' : 'Calcio più esplosivo.', true);
+                  } else if (rr.count <= 3 || rr.count % 5 === 0) {
+                    lastRepVoiceRef.current = nowV;
+                    enqueueSpeak(rr.count % 5 === 0 ? `${rr.count}!` : String(rr.count), true);
+                  } else if (nowV - lastRepVoiceRef.current > 1400) {
+                    lastRepVoiceRef.current = nowV;
+                    enqueueSpeak(String(rr.count), true);
+                  }
+                }
+              }
+            }
             // ── COMBO: fotogrammi chiave durante il GO → scheda di contatto ──
             if (comboPhaseRef.current === 'go' && video.readyState >= 2) {
               const nowC = performance.now();
@@ -5503,6 +5564,13 @@ function VisualCoach({ setPlayerStats }) {
       {/* BLOCCO INFERIORE — feedback + comandi, ancorato in basso (sempre visibile) */}
       <div className="absolute bottom-0 inset-x-0 z-30 flex flex-col"
         style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.95) 65%, rgba(0,0,0,0.55) 88%, transparent)', paddingBottom: 'max(16px, env(safe-area-inset-bottom))' }}>
+
+        {/* 🎙 COACH VOCALE MANI-LIBERE — conta le ripetizioni ad alta voce */}
+        {streaming && skeletonOn && (
+          <div className="flex justify-center mt-2 pointer-events-none">
+            <RepCoach mode={repMode} count={repCount} onSelect={startReps} onStop={stopReps} />
+          </div>
+        )}
 
         {/* CARD GUIDATA — circuito drill su misura */}
         {guidedOn && (
