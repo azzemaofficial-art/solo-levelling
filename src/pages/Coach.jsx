@@ -7,6 +7,7 @@ import { getDiscipline } from '../../lib/martialKnowledge.js';
 import { analyzeKinematics, fatigueFromTrend, detectKicks, kickLevelFromMatch } from '../../lib/kinematics.js';
 import { createRepCounter } from '../../lib/repCounter.js';
 import { techniquesByCat, CAT_LABEL } from '../../lib/techniques.js';
+import { fighterLevel, pillarLevels, evalUnlock, lvlToFl, levelTitle } from '../../lib/progression.js';
 import RepCoach from '../components/RepCoach';
 import ShadowSparring from '../components/ShadowSparring';
 import { masteryFromXp } from '../../lib/mastery.js';
@@ -816,8 +817,38 @@ const COACH_PROGRESS_KEY = 'shadow_monarch_coach_progress';
 const loadCoachProgress = () => { try { return JSON.parse(localStorage.getItem(COACH_PROGRESS_KEY) || '{}'); } catch { return {}; } };
 const saveCoachProgress = (p) => {
   try { localStorage.setItem(COACH_PROGRESS_KEY, JSON.stringify(p)); } catch {}
-  try { window.dispatchEvent(new Event('coach-progress-updated')); } catch {}
+  try { window.dispatchEvent(new Event('coach-progress-updated')); } catch {} };
+
+// ── LA SCALATA: persistenza giorni di allenamento + miglior Fight IQ ──
+const TRAIN_DAYS_KEY = 'shadow_monarch_training_days';
+const loadTrainDays = () => { try { return JSON.parse(localStorage.getItem(TRAIN_DAYS_KEY) || '[]'); } catch { return []; } };
+const markTrainDay = () => {
+  try {
+    const today = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    const days = loadTrainDays();
+    if (!days.includes(today)) localStorage.setItem(TRAIN_DAYS_KEY, JSON.stringify([...days, today].slice(-1200)));
+  } catch {}
 };
+const FIGHT_META_KEY = 'shadow_monarch_fight_meta';
+const loadFightMeta = () => { try { return JSON.parse(localStorage.getItem(FIGHT_META_KEY) || '{}'); } catch { return {}; } };
+const saveFightIq = (iq) => {
+  try {
+    const meta = loadFightMeta();
+    const best = Math.max(Number(meta.bestIq) || 0, Number(iq) || 0);
+    localStorage.setItem(FIGHT_META_KEY, JSON.stringify({ ...meta, bestIq: best, lastIq: iq, rounds: (meta.rounds || 0) + 1 }));
+  } catch {}
+};
+// Profilo del combattente: esperienza + costanza + combattimento → livello 1-100
+function buildFighterProfile() {
+  const prog = loadCoachProgress();
+  const xp = Object.values(prog).reduce((a, d) => a + Math.max(0, Number(d?.xp) || 0), 0);
+  const days = loadTrainDays().length;
+  const scores = loadSessions().map((s) => Number(s?.score)).filter((v) => v > 0);
+  const avgScore = scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0;
+  const fightIq = Math.max(0, Number(loadFightMeta().bestIq) || 0);
+  const profile = { xp, days, fightIq, avgScore };
+  return { ...profile, level: fighterLevel(profile), pillars: pillarLevels(profile) };
+}
 // 150 XP per livello di competenza (una sessione vale ~10-100 XP dalla pagella).
 const coachLevelOf = (xp) => Math.floor((Number(xp) || 0) / 150) + 1;
 // Grado/cintura dalla knowledge base: un grado ogni 600 XP.
@@ -1487,17 +1518,56 @@ Rispondi in italiano, max 15 righe, tono da maestro pratico.`;
         )}
       </AnimatePresence>
 
-      {/* 📖 LIBRERIA TECNICHE — posizioni/prese/combo/proiezioni, sblocco per grado */}
+      {/* ⛰ LA SCALATA — livello combattente 1-100 dai tre pilastri */}
+      {(() => {
+        const fp = buildFighterProfile();
+        const tt = levelTitle(fp.level);
+        const PillarBar = ({ icon, label, val, sub }) => (
+          <div className="rounded-xl p-2.5 space-y-1.5" style={{ background: 'rgba(15,23,42,0.6)', border: '1px solid rgba(251,191,36,0.15)' }}>
+            <div className="flex items-center justify-between">
+              <p className="text-[9px] font-black tracking-wider" style={{ color: '#fbbf24' }}>{icon} {label}</p>
+              <p className="text-[9px] font-bold" style={{ color: '#94a3b8' }}>{sub}</p>
+            </div>
+            <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(51,65,85,0.6)' }}>
+              <div className="h-full rounded-full" style={{ width: `${Math.max(2, val)}%`, background: 'linear-gradient(90deg,#b45309,#fbbf24)', transition: 'width 0.6s ease' }} />
+            </div>
+          </div>
+        );
+        return (
+          <div className="rounded-2xl p-4 space-y-3" style={{ background: 'linear-gradient(160deg, rgba(120,53,15,0.25), rgba(17,24,39,0.94))', border: '1px solid rgba(251,191,36,0.4)', boxShadow: '0 0 26px rgba(251,191,36,0.12)' }}>
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-black tracking-widest" style={{ color: '#fbbf24', fontFamily: 'Orbitron, sans-serif' }}>⛰ LA SCALATA</p>
+              <p className="text-sm font-black" style={{ color: '#fff', fontFamily: 'Orbitron, sans-serif' }}>{fp.level}<span style={{ color: '#78716c' }}>/100</span></p>
+            </div>
+            <div>
+              <p className="text-base font-black tracking-wide" style={{ color: '#fde68a', fontFamily: 'Orbitron, sans-serif' }}>{tt.title}</p>
+              <p className="text-[10px]" style={{ color: '#a8a29e' }}>{tt.sub}</p>
+            </div>
+            <div className="h-2 rounded-full overflow-hidden" style={{ background: 'rgba(51,65,85,0.6)', border: '1px solid rgba(251,191,36,0.2)' }}>
+              <motion.div className="h-full rounded-full" animate={{ width: `${Math.max(1, fp.level)}%` }} transition={{ duration: 0.8, ease: [0.2, 0.8, 0.3, 1] }}
+                style={{ background: 'linear-gradient(90deg,#b45309,#fbbf24,#fde68a)', boxShadow: '0 0 10px rgba(251,191,36,0.6)' }} />
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <PillarBar icon="🎖" label="ESPERIENZA" val={fp.pillars.esper} sub={`${fp.xp} XP`} />
+              <PillarBar icon="⏳" label="COSTANZA" val={fp.pillars.costanza} sub={`${fp.days} giorni`} />
+              <PillarBar icon="🥊" label="COMBATTI" val={fp.pillars.combat} sub={`IQ ${fp.fightIq} · ${fp.avgScore}`} />
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* 📖 LIBRERIA TECNICHE — posizioni/prese/combo/proiezioni, sblocco per LA SCALATA */}
       {Object.keys(techniquesByCat(disc)).length > 0 && (() => {
         const byCat = techniquesByCat(disc);
         const all = Object.values(byCat).flat();
-        const unlockedCount = all.filter((t) => t.lvl <= secretLevel).length;
+        const fProfile = buildFighterProfile();
+        const unlockedCount = all.filter((t) => evalUnlock(t, fProfile).unlocked).length;
         return (
           <div className="rounded-2xl p-4 space-y-3" style={{ background: 'linear-gradient(160deg, rgba(14,116,144,0.1), rgba(17,24,39,0.92))', border: '1px solid rgba(56,189,248,0.3)' }}>
             <div className="flex items-center justify-between">
               <p className="text-xs font-black tracking-widest" style={{ color: '#7dd3fc', fontFamily: 'Orbitron, sans-serif' }}>📖 TECNICHE</p>
               <span className="text-[10px] px-2 py-0.5 rounded-full font-bold" style={{ background: 'rgba(56,189,248,0.12)', color: '#7dd3fc', border: '1px solid rgba(56,189,248,0.3)' }}>
-                {unlockedCount}/{all.length} · grado {rank?.rank || 'E'}
+                {unlockedCount}/{all.length} · LIV {fProfile.level}
               </span>
             </div>
             {Object.entries(byCat).map(([cat, list]) => (
@@ -1505,16 +1575,29 @@ Rispondi in italiano, max 15 righe, tono da maestro pratico.`;
                 <p className="text-[9px] font-black tracking-[0.2em] mb-1.5" style={{ color: '#64748b' }}>{CAT_LABEL[cat]}</p>
                 <div className="space-y-1.5">
                   {list.map((t) => {
-                    const unlocked = t.lvl <= secretLevel;
+                    const u = evalUnlock(t, fProfile);
+                    const unlocked = u.unlocked;
                     const open = openTech === t.id;
+                    const reqFl = t.fl ?? lvlToFl(t.lvl);
+                    const missingBits = [];
+                    if (!unlocked) {
+                      if (u.missing.level > 0) missingBits.push(`LIV ${reqFl}`);
+                      if (u.missing.days > 0) missingBits.push(`${u.missing.days} giorni`);
+                      if (u.missing.iq > 0) missingBits.push(`IQ ${u.missing.iq}`);
+                    }
                     return (
                       <div key={t.id} className="rounded-xl overflow-hidden" style={{ background: 'rgba(30,41,59,0.45)', border: `1px solid ${unlocked ? 'rgba(56,189,248,0.25)' : 'rgba(148,163,184,0.12)'}` }}>
                         <button onClick={() => unlocked && setOpenTech(open ? null : t.id)}
                           className="w-full flex items-center justify-between gap-2 px-3 py-2 text-left"
                           style={{ cursor: unlocked ? 'pointer' : 'default' }}>
-                          <span className="text-[11px] font-bold truncate" style={{ color: unlocked ? '#e2e8f0' : '#475569', filter: unlocked ? 'none' : 'blur(3px)' }}>{t.name}</span>
+                          <span className="min-w-0">
+                            <span className="block text-[11px] font-bold truncate" style={{ color: unlocked ? '#e2e8f0' : '#475569', filter: unlocked ? 'none' : 'blur(3px)' }}>{t.name}</span>
+                            {!unlocked && missingBits.length > 0 && (
+                              <span className="block text-[8px] font-bold" style={{ color: '#78716c' }}>🔒 manca: {missingBits.join(' · ')}</span>
+                            )}
+                          </span>
                           <span className="text-[9px] font-black whitespace-nowrap shrink-0" style={{ color: unlocked ? '#7dd3fc' : '#475569' }}>
-                            {unlocked ? (open ? '▲' : '▼') : `🔒 ${RANK_LABELS[t.lvl - 1]}`}
+                            {unlocked ? (open ? '▲' : '▼') : `🔒 ${reqFl}`}
                           </span>
                         </button>
                         {open && unlocked && (
@@ -3129,6 +3212,7 @@ function VisualCoach({ setPlayerStats }) {
       p[mode] = { ...cur, xp: (cur.xp || 0) + Math.min(100, iq) };
       saveCoachProgress(p);
     } catch {}
+    saveFightIq(iq); // il miglior Fight IQ alimenta LA SCALATA
     speakSystem(`Round di shadow sparring completato. Fight IQ ${iq}.`);
   }, [mode]);
 
@@ -4317,6 +4401,7 @@ function VisualCoach({ setPlayerStats }) {
             score: rep.score, weaknesses: rep.weaknesses, focusNext: rep.focusNext,
           }, ...loadSessions()].slice(0, 10);
           saveSessions(enriched); setPastSessions(enriched);
+          markTrainDay(); // LA SCALATA: oggi conta come giorno di allenamento
         } catch (_) {}
       } else {
         setSessionReport(null);
