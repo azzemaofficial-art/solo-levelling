@@ -8,6 +8,7 @@ import { analyzeKinematics, fatigueFromTrend, detectKicks, kickLevelFromMatch } 
 import { createRepCounter } from '../../lib/repCounter.js';
 import { techniquesByCat, CAT_LABEL } from '../../lib/techniques.js';
 import RepCoach from '../components/RepCoach';
+import ShadowSparring from '../components/ShadowSparring';
 import { masteryFromXp } from '../../lib/mastery.js';
 import { playEpicDing, playComboHit, playSample } from '../utils/sfx';
 import { speakSystem } from '../utils/systemVoice';
@@ -3119,6 +3120,18 @@ function VisualCoach({ setPlayerStats }) {
     setVcCount(0);
   }, [enqueueSpeak, mode]);
 
+  // ── SHADOW SPARRING — il coach diventa l'avversario ──
+  const [shadowOn, setShadowOn] = useState(false);
+  const handleShadowComplete = useCallback((iq) => {
+    try {
+      const p = loadCoachProgress();
+      const cur = p[mode] || {};
+      p[mode] = { ...cur, xp: (cur.xp || 0) + Math.min(100, iq) };
+      saveCoachProgress(p);
+    } catch {}
+    speakSystem(`Round di shadow sparring completato. Fight IQ ${iq}.`);
+  }, [mode]);
+
   // ── CONTATORE CALCI DA MATCH (camera, da 3+ round) ──
   const matchKicksRef = useRef({ tot: 0, sx: 0, dx: 0, peaks: [] });
   const kickStateRef = useRef({ lastKickT: { kL: -1e9, kR: -1e9 } });
@@ -5658,13 +5671,27 @@ function VisualCoach({ setPlayerStats }) {
         )}
       </AnimatePresence>
 
+      {/* 🥊 SHADOW SPARRING — il coach diventa l'avversario */}
+      <ShadowSparring
+        active={shadowOn && streaming}
+        onExit={() => setShadowOn(false)}
+        readState={() => ({ kin: kinHistRef.current, lm: lastLandmarksRef.current })}
+        speak={enqueueSpeak}
+        onComplete={handleShadowComplete}
+      />
+
       {/* BLOCCO INFERIORE — feedback + comandi, ancorato in basso (sempre visibile) */}
       <div className="absolute bottom-0 inset-x-0 z-30 flex flex-col"
         style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.95) 65%, rgba(0,0,0,0.55) 88%, transparent)', paddingBottom: 'max(16px, env(safe-area-inset-bottom))' }}>
 
-        {/* 🎙 COACH VOCALE MANI-LIBERE — conta le ripetizioni ad alta voce */}
+        {/* 🎙 COACH VOCALE + 🥊 SHADOW SPARRING */}
         {streaming && skeletonOn && (
-          <div className="flex justify-center mt-2 pointer-events-none">
+          <div className="flex justify-center items-end gap-2 mt-2 pointer-events-none">
+            <button onClick={() => setShadowOn(true)}
+              className="pointer-events-auto px-3 py-2.5 rounded-xl text-[9px] font-black tracking-widest whitespace-nowrap"
+              style={{ background: 'rgba(127,29,29,0.75)', border: '1px solid rgba(239,68,68,0.6)', color: '#fecaca', fontFamily: 'Orbitron, sans-serif', backdropFilter: 'blur(6px)', boxShadow: '0 0 14px rgba(239,68,68,0.25)' }}>
+              🥊 SPARRING
+            </button>
             <RepCoach mode={repMode} count={vcCount} onSelect={startReps} onStop={stopReps} />
           </div>
         )}
