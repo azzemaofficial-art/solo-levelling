@@ -3,7 +3,7 @@
 
 import { GATES, GATE_IDS, nextQuestion, gradeAnswer, startBoss, bossQuestion, gradeBoss, progressLine, progressCard, initLearn, normalize as normLearn, gateButtons, levelOf, loadGen, baseCount, existingStems, safeHtml, studyLabel, difficultyForLevel } from '../../lib/learn.js';
 import { NUTRITION_PRINCIPLES, knowledgePromptFor } from '../../lib/knowledgeBase.js';
-import { kvGet, kvSet, kvPush, KvError } from '../../lib/kv.js';
+import { kvGet, kvSet, kvPush, kvListRange, kvListReplace, KvError } from '../../lib/kv.js';
 import { safeEqual } from '../../lib/secrets.js';
 import { FR_ALL_UNITS, frUnitByIndex } from '../../lib/frenchCurriculum.js';
 import { PL_ALL_UNITS, plUnitByIndex } from '../../lib/polishCurriculum.js';
@@ -75,14 +75,15 @@ async function subDailyMeal(chatId, m) {
 // ↩️ ANNULLA: toglie l'ultimo pasto. Se è ancora in coda lo elimina e basta;
 // se il sito l'ha già consumato, pusha un evento undo_meal perché lo sottragga anche là.
 async function undoLastMeal(botToken, chatId) {
+  // tg_queue è una LISTA Redis (RPUSH, vedi kvPush): kvGet/kvSet fanno GET/SET
+  // e danno WRONGTYPE su una lista — va letta/riscritta con kvListRange/Replace.
   const qk = `tg_queue:${chatId}`;
-  const queueRaw = (await kvGet(qk)) || [];
-  const q = Array.isArray(queueRaw) ? queueRaw : [];
+  const q = await kvListRange(qk);
   const lastIdx = q.map((it) => it?.type).lastIndexOf('meal');
   if (lastIdx >= 0) {
     const meal = q[lastIdx];
     q.splice(lastIdx, 1);
-    await kvSet(qk, q, 604800);
+    await kvListReplace(qk, q, 604800);
     const mk = `tg_meals:${chatId}`;
     const mealsRaw = (await kvGet(mk)) || [];
     const meals = Array.isArray(mealsRaw) ? mealsRaw : [];
