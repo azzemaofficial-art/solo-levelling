@@ -3061,6 +3061,13 @@ function BreathingGuide({ protocol, onExit, voiceOn, enqueueSpeak }) {
 function VisualCoach({ setPlayerStats }) {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
+  // Ref per enqueueSpeak (dichiarata molto più sotto, ~riga 4130): alcuni callback
+  // qui sopra (startReps/stopReps) la usano prima di quel punto — mettere
+  // enqueueSpeak nella loro dependency array darebbe "Cannot access before
+  // initialization" (TDZ), perché le dependency array si valutano subito a ogni
+  // render, in ordine, indipendentemente da dove il JSX la chiamerebbe davvero.
+  // Stesso pattern già usato in questo file per speakNextRef.
+  const enqueueSpeakRef = useRef(() => {});
   const [step, setStep] = useState('setup');
   const [sessionContext, setSessionContext] = useState('');
   const [streaming, setStreaming] = useState(false);
@@ -3181,8 +3188,8 @@ function VisualCoach({ setPlayerStats }) {
     setRepMode(m);
     setVcCount(0);
     const label = { squat: 'squat', push: 'piegamenti', kicks: 'calci', punch: 'pugni' }[m] || 'ripetizioni';
-    enqueueSpeak(`Serie di ${label}. Parti quando vuoi, conto io.`, true);
-  }, [enqueueSpeak]);
+    enqueueSpeakRef.current(`Serie di ${label}. Parti quando vuoi, conto io.`, true);
+  }, []);
 
   const stopReps = useCallback(() => {
     const n = repCounterRef.current?.count || 0;
@@ -3190,7 +3197,7 @@ function VisualCoach({ setPlayerStats }) {
     repModeRef.current = null;
     setRepMode(null);
     if (n > 0) {
-      enqueueSpeak(`Serie finita: ${n} ripetizioni.`, true);
+      enqueueSpeakRef.current(`Serie finita: ${n} ripetizioni.`, true);
       playEpicDing({ enabled: true });
       // XP alla disciplina attiva → barre maestria si aggiornano da sole
       try {
@@ -3201,7 +3208,7 @@ function VisualCoach({ setPlayerStats }) {
       } catch {}
     }
     setVcCount(0);
-  }, [enqueueSpeak, mode]);
+  }, [mode]);
 
   // ── SHADOW SPARRING — il coach diventa l'avversario ──
   const [shadowOn, setShadowOn] = useState(false);
@@ -4136,6 +4143,7 @@ function VisualCoach({ setPlayerStats }) {
     if (speakQueueRef.current.length > 2) speakQueueRef.current = speakQueueRef.current.slice(-2);
     speakNext();
   }, [speakNext]);
+  enqueueSpeakRef.current = enqueueSpeak;
 
   const nextComboRound = useCallback((suggestedCombo) => {
     if (!comboPhaseRef.current || comboPhaseRef.current === 'idle') return;
