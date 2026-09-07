@@ -5267,6 +5267,18 @@ function VisualCoach({ setPlayerStats }) {
 
   useEffect(() => () => { streamRef.current?.getTracks().forEach((t) => t.stop()); }, []);
 
+  // Snapshot per l'HUD olografico: legge i ref, nessun re-render del Coach.
+  // DEVE stare prima del return anticipato di 'setup' qui sotto: un hook
+  // dichiarato dopo un return condizionale viene chiamato solo in alcuni
+  // render (qui sì/no a seconda di step) → "Rendered fewer hooks than
+  // expected" (React #310), crash totale al primo cambio di step.
+  const hudSnapshot = useCallback(() => ({
+    elapsedSec: sessionStartRef.current ? Math.floor((Date.now() - sessionStartRef.current) / 1000) : 0,
+    intensity: Math.round(intensityRef.current),
+    kicks: matchKicksRef.current.tot,
+    matchOn: matchCtxRef.current.active && matchCtxRef.current.rounds >= 3 && timerPhaseRef.current === 'round',
+  }), []);
+
   // ── Setup ──────────────────────────────────────────────────────────────────
   if (step === 'setup') {
     return (
@@ -5552,13 +5564,6 @@ function VisualCoach({ setPlayerStats }) {
   }
 
   // ── Live — camera overlay (video a tutto schermo + comandi sovrapposti) ──────
-  // Snapshot per l'HUD olografico: legge i ref, nessun re-render del Coach
-  const hudSnapshot = useCallback(() => ({
-    elapsedSec: sessionStartRef.current ? Math.floor((Date.now() - sessionStartRef.current) / 1000) : 0,
-    intensity: Math.round(intensityRef.current),
-    kicks: matchKicksRef.current.tot,
-    matchOn: matchCtxRef.current.active && matchCtxRef.current.rounds >= 3 && timerPhaseRef.current === 'round',
-  }), []);
 
   // Pattern app-fotocamera: video in absolute inset-0 come sfondo, tutti i
   // comandi in absolute ancorati top/bottom.
