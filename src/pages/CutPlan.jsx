@@ -22,6 +22,13 @@ const getLocalDateKey = () => {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 };
 const round1 = (value) => Math.round(value * 10) / 10;
+// Diagnostica effetti (draghi/animazioni) per capire da remoto perché un telefono non li mostra.
+const clientInfo = () => {
+  const read = (key) => { try { return localStorage.getItem(key) || 'auto'; } catch { return '?'; } };
+  let reducedMotion = null;
+  try { reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch { /* vecchi browser */ }
+  return { reducedMotion, fxMode: read('shadow_monarch_fx_mode'), dragons: read('shadow_monarch_dragons'), ua: String(navigator.userAgent || '').slice(0, 180) };
+};
 const isRestDay = (session) => session.duration === '—';
 const toNumber = (value) => Number(String(value).replace(',', '.'));
 const emptyProfileForm = (p) => ({
@@ -75,7 +82,7 @@ export default function CutPlan({ view = 'today', onNavigate, systemLogs = [], o
     const timer = setTimeout(() => {
       fetch('/api/telegram/remind', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chat_id: chatId, creatineDate: saved.creatineDate || null, sessionDoneDate, lastWeighDate, kcalTargets: kcalTargetsKey.split(',').map(Number) }),
+        body: JSON.stringify({ chat_id: chatId, creatineDate: saved.creatineDate || null, sessionDoneDate, lastWeighDate, kcalTargets: kcalTargetsKey.split(',').map(Number), client: clientInfo() }),
       }).catch(() => { /* offline: si riallinea al prossimo cambio */ });
     }, 1500);
     return () => clearTimeout(timer);

@@ -1,7 +1,7 @@
 /* ── Draghi (DragonSky.jsx) ──────────────────────────────────────────────────
    Solo transform/opacity. Il volo usa px e min(100vw, 430px): niente unità cqw,
    che i Safari più vecchi ignorano (il drago restava invisibile). */
-.dragon-sky{--sky-w:min(100vw,430px);position:absolute;inset:0;z-index:5;overflow:hidden;pointer-events:none}
+.dragon-sky{position:absolute;inset:0;z-index:5;overflow:hidden;pointer-events:none}
 .dragon{display:block;width:100%;height:auto;overflow:visible}
 
 /* Battito d'ali: le due ali ruotano attorno alla spalla, sfasate; il corpo ondeggia */
@@ -27,11 +27,11 @@
   0%{transform:translateX(-260px) rotate(-6deg);opacity:0}
   3%{opacity:.95}
   33%{opacity:.95}
-  37%{transform:translateX(calc(var(--sky-w) + 40px)) rotate(4deg);opacity:0}
-  100%{transform:translateX(calc(var(--sky-w) + 40px));opacity:0}
+  37%{transform:translateX(470px) rotate(4deg);opacity:0}
+  100%{transform:translateX(470px);opacity:0}
 }
 @keyframes dragon-cross-rtl{
-  0%{transform:translateX(calc(var(--sky-w) + 20px)) rotate(5deg);opacity:0}
+  0%{transform:translateX(450px) rotate(5deg);opacity:0}
   3%{opacity:.7}
   24%{opacity:.7}
   27%{transform:translateX(-130px) rotate(-3deg);opacity:0}
@@ -52,5 +52,18 @@
 .dragon-lane-mid .dragon-flight-a{top:41%}
 .dragon-lane-mid .dragon-flight-b{top:12%}
 
-.cut-fx-lite .dragon-sky,.cut-fx-lite .dragon-swoop{display:none}
-@media (prefers-reduced-motion:reduce){.dragon-sky,.dragon-swoop{display:none}}
+.cut-fx-lite:not(.dragons-forced) .dragon-sky,.cut-fx-lite:not(.dragons-forced) .dragon-swoop{display:none}
+@media (prefers-reduced-motion:reduce){:not(.dragons-forced)>.dragon-sky,:not(.dragons-forced)>.dragon-swoop{display:none}}
+
+/* "Sempre" (menu → Draghi): l'utente li vuole anche con Riduci movimento. La regola
+   globale azzera tutte le durate con !important: qui le ridichiariamo, più specifiche. */
+.cut-fx-lite.dragons-forced .dragon-sky,.cut-fx-lite.dragons-forced .dragon-swoop{display:block}
+@media (prefers-reduced-motion:reduce){
+  .dragons-forced .dragon-flight-a{animation-duration:30s!important;animation-iteration-count:infinite!important}
+  .dragons-forced .dragon-flight-b{animation-duration:44s!important;animation-iteration-count:infinite!important}
+  .dragons-forced .dragon-arc{animation-duration:12s!important;animation-iteration-count:infinite!important}
+  .dragons-forced .dragon-wing,.dragons-forced .dragon-body{animation-duration:.9s!important;animation-iteration-count:infinite!important}
+  .dragons-forced .dragon-tail{animation-duration:1.8s!important;animation-iteration-count:infinite!important}
+  .dragons-forced .dragon-swoop{animation-duration:2.4s!important}
+  .dragons-forced .dragon-swoop .dragon-wing,.dragons-forced .dragon-swoop .dragon-body{animation-duration:.45s!important;animation-iteration-count:infinite!important}
+}

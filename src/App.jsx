@@ -670,6 +670,18 @@ useEffect(() => { localStorage.setItem('shadow_monarch_macros', JSON.stringify(m
   // telefoni (quella serve agli effetti pesanti del System). Si spengono solo con
   // FX lite scelto a mano o con "riduci movimento" di sistema.
   const cutFxLite = fxMode === 'lite' || prefersReducedMotion;
+  // Draghi: 'auto' segue le regole sopra; 'on' li mostra anche con Riduci movimento / FX lite
+  // (scelta esplicita dell'utente, vince sul sistema); 'off' li spegne.
+  const [dragonMode, setDragonMode] = useState(() => {
+    try { const saved = localStorage.getItem('shadow_monarch_dragons'); return ['auto', 'on', 'off'].includes(saved) ? saved : 'auto'; } catch { return 'auto'; }
+  });
+  useEffect(() => { try { localStorage.setItem('shadow_monarch_dragons', dragonMode); } catch { /* storage bloccato */ } }, [dragonMode]);
+  const dragonsEnabled = dragonMode === 'on' || (dragonMode === 'auto' && !cutFxLite);
+  const dragonStatus = dragonsEnabled
+    ? (dragonMode === 'on' ? 'Attivi (forzati)' : 'Attivi')
+    : dragonMode === 'off' ? 'Spenti da te'
+      : prefersReducedMotion ? 'Spenti: sull’iPhone è attivo “Riduci movimento”'
+        : 'Spenti: FX MODE è su LITE';
   const checkAiConnection = async () => {
     setAiStatus('checking');
     setAiStatusDetail('');
@@ -1437,7 +1449,7 @@ useEffect(() => { localStorage.setItem('shadow_monarch_macros', JSON.stringify(m
 
   return (
     <div
-      className={`app-shell-fs gameframe-shell premium-shell system-scanlines neon-cinema theme-${activePage} ${['cut', 'food', 'program', 'mma', 'progress'].includes(activePage) ? 'cut-app-shell' : ''} ${shouldReduceFx ? 'fx-lite' : ''} ${cutFxLite ? 'cut-fx-lite' : ''} max-w-[390px] mx-auto bg-void-black relative shadow-2xl overflow-hidden border-x border-white/5 flex flex-col`}>
+      className={`app-shell-fs gameframe-shell premium-shell system-scanlines neon-cinema theme-${activePage} ${['cut', 'food', 'program', 'mma', 'progress'].includes(activePage) ? 'cut-app-shell' : ''} ${shouldReduceFx ? 'fx-lite' : ''} ${cutFxLite ? 'cut-fx-lite' : ''} ${dragonMode === 'on' ? 'dragons-forced' : ''} max-w-[390px] mx-auto bg-void-black relative shadow-2xl overflow-hidden border-x border-white/5 flex flex-col`}>
       {showIntro && activePage === 'system' && <NeuralIntro onDone={() => setShowIntro(false)} />}
       {tgBindPrompt ? (
         <div className="fixed inset-0 z-[999] bg-black/95 backdrop-blur-sm p-5 flex flex-col items-center justify-center gap-4 text-center">
@@ -1501,7 +1513,7 @@ useEffect(() => { localStorage.setItem('shadow_monarch_macros', JSON.stringify(m
         <div className="absolute inset-0 starfield"></div>
       </div>}
       {/* in home il drago vola nella fascia vuota tra frase e numeri, non sopra i titoli */}
-      <DragonSky enabled={!cutFxLite} lane={activePage === 'cut' ? 'mid' : 'top'} />
+      <DragonSky enabled={dragonsEnabled} lane={activePage === 'cut' ? 'mid' : 'top'} />
       <div className="absolute right-2 z-[90] flex items-center gap-1" style={{ top: 'calc(0.5rem + env(safe-area-inset-top))' }}>
         <button
           onClick={() => { setMenuOpen((prev) => !prev); triggerFxBurst('light'); }}
@@ -1607,6 +1619,14 @@ useEffect(() => { localStorage.setItem('shadow_monarch_macros', JSON.stringify(m
                 X
               </button>
             </div>
+            <p className="text-[9px] uppercase tracking-widest text-gray-400 mb-2">🐉 Draghi</p>
+            <p className={`text-[11px] mb-2 ${dragonsEnabled ? 'text-emerald-200' : 'text-amber-200'}`}>{dragonStatus}</p>
+            <div className="grid grid-cols-3 gap-2 mb-2">
+              {[['auto', 'Auto'], ['on', 'Sempre'], ['off', 'Off']].map(([mode, label]) => (
+                <button key={mode} onClick={() => setDragonMode(mode)} aria-pressed={dragonMode === mode} className={`text-[10px] px-2 py-2 border uppercase tracking-widest ${dragonMode === mode ? 'border-fuchsia-300/70 text-fuchsia-100 bg-fuchsia-400/10' : 'border-white/15 text-gray-300'}`}>{label}</button>
+              ))}
+            </div>
+            <button onClick={() => { setMenuOpen(false); setTimeout(summonDragon, 350); }} disabled={!dragonsEnabled} className="w-full mb-4 text-[10px] px-2 py-3 border border-violet-300/50 text-violet-100 uppercase tracking-widest disabled:opacity-40">Evoca il drago ora</button>
             <p className="text-[9px] uppercase tracking-widest text-gray-400 mb-2">Quick Actions</p>
             <div className="grid grid-cols-1 gap-2 mb-4">
               <button onClick={quickAddWater} className="text-[10px] px-2 py-2 border border-cyan-300/50 text-cyan-200 uppercase tracking-widest">+400 ml acqua</button>
