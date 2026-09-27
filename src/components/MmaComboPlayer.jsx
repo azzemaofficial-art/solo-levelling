@@ -4,6 +4,7 @@ import { ArrowLeft, Check, Pause, Play, SkipBack, SkipForward, Volume2, VolumeX 
 import MmaFigure, { useSkeletonPlayer } from './MmaFigure';
 import { MOVES, comboKeys } from '../data/mmaMoves';
 import { LEVELS } from '../data/mmaCombos';
+import { localDateKey, logWorkout, readTrainingLog, unlogWorkout } from '../utils/trainingLog';
 
 const ORDINAL = ['Primo', 'Secondo', 'Terzo', 'Quarto', 'Quinto', 'Sesto'];
 const SPEEDS = [[0.35, 'Lento'], [0.6, 'Medio'], [1, 'Reale']];
@@ -58,6 +59,12 @@ export default function MmaComboPlayer({ combo, learned, onLearned, onClose }) {
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
 
+  const logEntry = { date: localDateKey(), kind: 'mma', title: `Combo ${combo.name}` };
+  const [doneToday, setDoneToday] = useState(() => readTrainingLog().some((e) => e.date === logEntry.date && e.title === logEntry.title));
+  const toggleDone = () => {
+    if (doneToday) unlogWorkout(logEntry); else logWorkout({ ...logEntry, minutes: 10 });
+    setDoneToday(!doneToday);
+  };
   const current = mode === 'learn' ? script[Math.min(segment, script.length - 1)] : null;
   useEffect(() => {
     if (mode !== 'learn' || finished || !playing) return;
@@ -120,6 +127,7 @@ export default function MmaComboPlayer({ combo, learned, onLearned, onClose }) {
     </div>
     {mode === 'loop' && <div className="mma-combo-speeds">{SPEEDS.map(([value, label]) => <button key={value} className={loopSpeed === value ? 'active' : ''} onClick={() => setLoopSpeed(value)}>{label}</button>)}</div>}
 
+    <button className={`mma-combo-done ${doneToday ? 'done' : ''}`} onClick={toggleDone}>{doneToday ? <><Check size={18} /> Allenamento segnato oggi</> : <>✅ Fatto: segna l’allenamento</>}</button>
     <div className="mma-combo-foot">
       <button onClick={() => setStance((s) => (s === 'orthodox' ? 'southpaw' : 'orthodox'))}>{stance === 'orthodox' ? 'Guardia destra' : 'Guardia mancina'} · cambia</button>
       <button className={`mma-combo-learned ${learned ? 'done' : ''}`} onClick={onLearned}>{learned ? <><Check size={16} /> Imparata</> : 'Segna come imparata'}</button>

@@ -3,6 +3,7 @@ import { ArrowRight, Camera, Check, ChevronDown, Focus, Volume2 } from 'lucide-r
 import ProtocolIcon from './ProtocolIcon';
 import { mmaLessons, mmaRoundPlans, mmaStages } from '../data/mmaPath';
 import { readMmaStore } from '../../lib/mmaCoachStorage';
+import { durationMinutes, localDateKey, logWorkout, unlogWorkout } from '../utils/trainingLog';
 import '../styles/mma-pro.css';
 const MmaProCoach = lazy(() => import('./MmaProCoach'));
 const MmaComboLibrary = lazy(() => import('./MmaComboLibrary'));
@@ -35,6 +36,8 @@ export default function MmaAcademy({ onNavigate }) {
     const next = { ...done, [lesson.id]: !done[lesson.id] };
     setDone(next);
     persist({ done: next });
+    const entry = { date: localDateKey(), kind: 'mma', title: `Lezione MMA · ${lesson.title}` };
+    if (next[lesson.id]) logWorkout({ ...entry, minutes: durationMinutes(lesson.duration) }); else unlogWorkout(entry);
   };
   const openLive = () => setStudioOpen(true);
   const openFullCurriculum = () => {

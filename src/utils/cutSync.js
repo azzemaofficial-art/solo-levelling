@@ -1,6 +1,8 @@
 // Azioni del Protocollo Cut arrivate da Telegram (bottoni 💊/✅ dei promemoria,
 // lib/cutReminders.js) e ritirate dall'app tramite la coda tg_queue.
 // Stesse chiavi XP della pagina: un premio già preso in app non si ripaga.
+import { trainingDays } from '../data/cutPlan.js';
+import { durationMinutes, kindForSession, logWorkout } from './trainingLog.js';
 export const CUT_PLAN_KEY = 'shadow_monarch_cut_plan_v1';
 export const CUT_SYNC_EVENT = 'shadow_cut_sync';
 export const CUT_XP = { session: 40, creatine: 10, measure: 15 };
@@ -24,6 +26,8 @@ export function applyCutRemote(payload, grantXp) {
     const slot = `${Number(saved.trainingWeek) || 0}-${mondayIndex(date)}`;
     saved.completed = { ...(saved.completed || {}), [slot]: true };
     xpKey = `session-${slot}`; amount = CUT_XP.session; label = 'Allenamento (da Telegram)';
+    const session = trainingDays[mondayIndex(date)];
+    logWorkout({ date, kind: kindForSession(session.type), title: session.short, minutes: durationMinutes(session.duration), source: 'telegram' });
   } else {
     return;
   }
