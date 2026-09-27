@@ -14,7 +14,7 @@ export const summonDragon = () => {
 const DRAGON_SRC = '/dragons/astral.webp';
 
 export function Dragon({ className = '' }) {
-  return <img className={`dragon ${className}`} src={DRAGON_SRC} alt="" width="351" height="331" decoding="async" draggable="false" />;
+  return <img className={`dragon ${className}`} src={DRAGON_SRC} alt="" width="305" height="289" decoding="async" draggable="false" />;
 }
 
 export default function DragonSky({ enabled = true, lane = 'top' }) {

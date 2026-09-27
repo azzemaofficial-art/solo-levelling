@@ -43,15 +43,19 @@ d=mathutils.Vector(view).normalized(); co.location=d*4
 co.rotation_euler=(mathutils.Vector((0,0,0.02))-co.location).to_track_quat('-Z','Y').to_euler()
 for f in range(frames):
     if only and f not in only: continue
-    ph=2*math.pi*f/frames
-    ang=math.radians(34)*math.sin(ph) + math.radians(6)       # su/giù attorno a un leggero "su"
-    fold=math.radians(10)*max(0,-math.sin(ph))                  # in basso le punte si chiudono un po'
+    t=f/frames
+    # colpo in giù più rapido (40% del ciclo) e risalita più lenta, come un volatile vero;
+    # la fase è continua e ciclica, quindi il loop non ha scatti
+    warp=t+0.08*math.sin(2*math.pi*t)
+    ph=2*math.pi*warp
+    ang=math.radians(32)*math.cos(ph) + math.radians(6)       # 0 = ali in alto, 0.5 = ali in basso
+    fold=math.radians(9)*max(0,-math.cos(ph))**1.5              # in basso le punte si chiudono un po'
     a=ang*wgt + fold*wgt**2
     dy=np.abs(y)-hinge_y; dz=z-hinge_z
     c,s=np.cos(a),np.sin(a)
     ny=hinge_y+dy*c - dz*s; nz=hinge_z+dy*s + dz*c
     new=np.c_[x, side*ny, nz]
     # il corpo sale un filo quando le ali spingono giù
-    new[:,2]+= 0.012*math.sin(ph+math.pi)
+    new[:,2]-= 0.010*math.cos(ph)   # il corpo si alza quando le ali spingono giù (cos=-1)
     me.vertices.foreach_set('co',new.ravel()); me.update()
     sc.render.filepath=f'{out}{f:02d}.png'; bpy.ops.render.render(write_still=True)

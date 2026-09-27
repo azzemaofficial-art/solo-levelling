@@ -8,37 +8,38 @@
 .dragon{user-select:none;-webkit-user-drag:none}
 
 /* Voli di sfondo: attraversano in ~12 s e poi restano invisibili fino al giro dopo */
-.dragon-flight{position:absolute;left:0;opacity:0;will-change:transform,opacity}
+.dragon-flight{position:absolute;left:0;opacity:0;will-change:transform,opacity;backface-visibility:hidden}
 /* alone morbido dietro la sagoma: un gradiente che si muove col drago, niente filter (Safari mobile scattava) */
-.dragon-flight:before{content:'';position:absolute;inset:-30% -15%;border-radius:50%;background:radial-gradient(closest-side,#b8a4ff55,#ff8fd826 55%,transparent);pointer-events:none}
+.dragon-flight:before,.dragon-swoop:before{content:'';position:absolute;inset:-30% -15%;border-radius:50%;background:radial-gradient(closest-side,#b8a4ff55,#ff8fd826 55%,transparent);pointer-events:none}
 .dragon-flight-a{top:6%;width:min(46vw,190px);animation:dragon-cross-ltr 30s linear 1.5s infinite}
 .dragon-flight-b{top:30%;width:min(26vw,104px);animation:dragon-cross-rtl 44s linear 17s infinite}
 .dragon-flight-b .dragon{transform:scaleX(-1);opacity:.8}
-.dragon-arc{animation:dragon-arc 12s ease-in-out infinite}
+/* ondeggiare continuo: si ferma solo agli estremi, come un vero su-e-giù (niente tappe intermedie) */
+.dragon-arc{animation:dragon-arc 3.6s ease-in-out infinite alternate}
 @keyframes dragon-cross-ltr{
-  0%{transform:translateX(-260px) rotate(-6deg);opacity:0}
+  0%{transform:translate3d(-260px,0,0) rotate(-6deg);opacity:0}
   3%{opacity:.95}
   33%{opacity:.95}
-  37%{transform:translateX(470px) rotate(4deg);opacity:0}
-  100%{transform:translateX(470px);opacity:0}
+  37%{transform:translate3d(470px,0,0) rotate(4deg);opacity:0}
+  100%{transform:translate3d(470px,0,0);opacity:0}
 }
 @keyframes dragon-cross-rtl{
-  0%{transform:translateX(450px) rotate(5deg);opacity:0}
+  0%{transform:translate3d(450px,0,0) rotate(5deg);opacity:0}
   3%{opacity:.7}
   24%{opacity:.7}
-  27%{transform:translateX(-130px) rotate(-3deg);opacity:0}
-  100%{transform:translateX(-130px);opacity:0}
+  27%{transform:translate3d(-130px,0,0) rotate(-3deg);opacity:0}
+  100%{transform:translate3d(-130px,0,0);opacity:0}
 }
-@keyframes dragon-arc{0%,100%{transform:translateY(0)}25%{transform:translateY(-26px)}60%{transform:translateY(18px)}}
+@keyframes dragon-arc{from{transform:translate3d(0,-14px,0)}to{transform:translate3d(0,14px,0)}}
 
 /* Picchiata in primo piano (evento): grande, veloce, sopra i contenuti ma sotto la nav */
-.dragon-swoop{position:absolute;z-index:45;top:18%;left:0;width:min(80vw,330px);pointer-events:none;filter:drop-shadow(0 0 22px #ff8fd899);animation:dragon-swoop 2.4s cubic-bezier(.45,0,.2,1) both}
+.dragon-swoop{position:absolute;z-index:45;top:18%;left:0;width:min(80vw,330px);pointer-events:none;will-change:transform,opacity;animation:dragon-swoop 2.4s cubic-bezier(.35,.05,.45,.95) both}
 @keyframes dragon-swoop{
-  0%{transform:translate(-340px,180px) rotate(-18deg) scale(.7);opacity:0}
-  15%{opacity:1}
-  55%{transform:translate(60px,-10px) rotate(-4deg) scale(1.05);opacity:1}
-  100%{transform:translate(520px,-240px) rotate(-22deg) scale(.6);opacity:0}
+  from{transform:translate3d(-340px,170px,0) rotate(-16deg)}
+  to{transform:translate3d(500px,-230px,0) rotate(-20deg)}
 }
+.dragon-swoop .dragon-arc{animation:dragon-swoop-fx 2.4s linear both}
+@keyframes dragon-swoop-fx{0%{opacity:0;transform:scale(.75)}15%{opacity:1}50%{transform:scale(1.05)}85%{opacity:1}100%{opacity:0;transform:scale(.7)}}
 
 .dragon-lane-mid .dragon-flight-a{top:37%}
 .dragon-lane-mid .dragon-flight-b{top:12%}
@@ -52,6 +53,7 @@
 @media (prefers-reduced-motion:reduce){
   .dragons-forced .dragon-flight-a{animation-duration:30s!important;animation-iteration-count:infinite!important}
   .dragons-forced .dragon-flight-b{animation-duration:44s!important;animation-iteration-count:infinite!important}
-  .dragons-forced .dragon-arc{animation-duration:12s!important;animation-iteration-count:infinite!important}
+  .dragons-forced .dragon-arc{animation-duration:3.6s!important;animation-iteration-count:infinite!important}
+  .dragons-forced .dragon-swoop .dragon-arc{animation-duration:2.4s!important;animation-iteration-count:1!important}
   .dragons-forced .dragon-swoop{animation-duration:2.4s!important}
 }
