@@ -2,9 +2,12 @@ import React, { useEffect, useState } from 'react';
 import { ArrowRight, BookOpen, Check, ChevronLeft, ChevronRight, PlayCircle, Plus, RotateCcw, Utensils } from 'lucide-react';
 import ProtocolIcon from '../components/ProtocolIcon';
 import { dayNames, evidence, mealWeeks, nutritionRules, phases, recipes, trainingDays } from '../data/cutPlan';
+import { recipeFor } from '../data/mealRecipes';
+import { videosFor } from '../data/exerciseVideos';
 import { dayTargetFor, formatKg, useCutProfile } from '../utils/cutProfile';
 import { CUT_PLAN_KEY, CUT_SYNC_EVENT, CUT_XP } from '../utils/cutSync';
 import MmaAcademy from '../components/MmaAcademy';
+import { summonDragon } from '../components/DragonSky';
 import CountUp from '../components/CountUp';
 import WeightTrend from '../components/WeightTrend';
 import '../styles/cut-plan.css';
@@ -45,6 +48,13 @@ export default function CutPlan({ view = 'today', onNavigate, systemLogs = [], o
   const [load, setLoad] = useState('');
   const [selectedRecipe, setSelectedRecipe] = useState(null);
   const [videoOpen, setVideoOpen] = useState(false);
+  const [exerciseVideo, setExerciseVideo] = useState(null); // { name, index }
+  useEffect(() => {
+    if (!selectedRecipe) return undefined;
+    const onKey = (event) => { if (event.key === 'Escape') setSelectedRecipe(null); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [selectedRecipe]);
   const [videoId, setVideoId] = useState('1763945815001');
   useEffect(() => { localStorage.setItem(KEY, JSON.stringify({ ...saved, week, trainingWeek })); }, [saved, week, trainingWeek]);
   // Promemoria Telegram serali (lib/cutReminders.js via remind): il server riceve solo
@@ -72,6 +82,17 @@ export default function CutPlan({ view = 'today', onNavigate, systemLogs = [], o
   }, [saved.creatineDate, sessionDoneDate, lastWeighDate, kcalTargetsKey]);
   const today = getMondayIndex();
   const selectedMeal = mealWeeks[week][day];
+  const mealSlots = Object.entries({ Colazione: selectedMeal.breakfast, Pranzo: selectedMeal.lunch, Spuntino: selectedMeal.snack, Cena: selectedMeal.dinner });
+  const planTotals = mealSlots.reduce((sum, [, meal]) => {
+    const recipe = recipeFor(meal);
+    return { kcal: sum.kcal + (recipe?.kcal || 0), protein: sum.protein + (recipe?.protein || 0) };
+  }, { kcal: 0, protein: 0 });
+  const isFootballDay = trainingDays[day].type === 'football';
+  const openMeal = (label, meal) => {
+    const recipe = recipeFor(meal);
+    if (!recipe) return;
+    setSelectedRecipe({ ...recipe, image: selectedMeal.images[label], tag: `${label} • ${recipe.time}` });
+  };
   const todayTraining = trainingDays[today];
   const currentPhase = phases[trainingWeek < 2 ? 0 : trainingWeek < 4 ? 1 : trainingWeek < 8 ? 2 : 3];
   const completed = saved.completed || {};
@@ -142,7 +163,7 @@ export default function CutPlan({ view = 'today', onNavigate, systemLogs = [], o
     {view === 'today' && <>
       <section className="cut-hero">
         <div className="cut-hero-copy"><span className="cut-kicker">IL TUO PERCORSO • 12 SETTIMANE</span><h1>Il prossimo<br /><em>livello.</em></h1><p>{profile ? `Da ${formatKg(profile.startWeightKg)} kg verso ${formatKg(profile.targetWeightKg)} kg. ` : ''}Forza, velocità e continuità. Una giornata alla volta.</p></div>
-        <img src="/avatar8.png" alt="Guerriero in stile anime" className="cut-hero-art" />
+        <button type="button" className="cut-hero-summon" onClick={summonDragon} aria-label="Evoca il drago"><img src="/avatar8.png" alt="" className="cut-hero-art" /></button>
         <div className="cut-hero-line" />
       </section>
       <section className="cut-status">
@@ -168,8 +189,11 @@ export default function CutPlan({ view = 'today', onNavigate, systemLogs = [], o
       <section className="cut-page-head"><span className="cut-kicker">28 GIORNI • 4 SETTIMANE</span><h1>Mangia bene.<br /><em>Con gusto.</em></h1><p>Un piano vario che include già McDonald’s, pasta con carne di cavallo, pizza e ricette fit porn. Ripeti la rotazione nei tre mesi cambiando verdure, frutta e fonti proteiche equivalenti.</p></section>
       <div className="cut-week-picker"><button aria-label="Settimana precedente" onClick={() => setWeek((n) => Math.max(0, n - 1))}><ChevronLeft size={20} /></button><span>SETTIMANA <strong>{week + 1}</strong> / 4</span><button aria-label="Settimana successiva" onClick={() => setWeek((n) => Math.min(3, n + 1))}><ChevronRight size={20} /></button></div>
       <div className="cut-day-strip">{dayNames.map((name, index) => <button key={name} className={day === index ? 'active' : ''} onClick={() => setDay(index)}>{name.slice(0, 3)}</button>)}</div>
-      <section className="cut-meal-head"><span>{selectedMeal.day}</span><strong>≈ {dayTargetFor(profile, day).toLocaleString('it-IT')} kcal</strong></section>
-      {Object.entries({ Colazione: selectedMeal.breakfast, Pranzo: selectedMeal.lunch, Spuntino: selectedMeal.snack, Cena: selectedMeal.dinner }).map(([label, meal], index) => <div className={`cut-meal cut-meal-${index}`} key={label}><img className="cut-meal-image" src={selectedMeal.images[label]} alt={meal.split(':')[0]} loading="lazy" /><div className="cut-meal-copy"><span>0{index + 1} / {label}</span><p>{meal}</p></div></div>)}
+      <section className="cut-meal-head"><span>{selectedMeal.day}</span><strong>obiettivo ≈ {dayTargetFor(profile, day).toLocaleString('it-IT')} kcal</strong></section>
+      <div className="cut-plan-totals"><span><small>NEL PIANO</small><b>≈ {planTotals.kcal.toLocaleString('it-IT')} kcal</b></span><span className={planTotals.protein < 140 ? 'low' : ''}><small>PROTEINE</small><b>≈ {planTotals.protein} g</b></span></div>
+      {planTotals.protein < 140 && <p className="cut-note">Proteine un po’ basse oggi: aggiungi uno yogurt greco (170 g ≈ +17 g) o 100 g di fiocchi di latte (+12 g).</p>}
+      {isFootballDay && <p className="cut-note">Giorno di calcio: 1–2 ore prima aggiungi uno spuntino con carboidrati, es. banana + 2 fette di pane con miele (≈ 300 kcal). Così arrivi vicino all’obiettivo e giochi con energia.</p>}
+      {mealSlots.map(([label, meal], index) => { const recipe = recipeFor(meal); return <button type="button" className={`cut-meal cut-meal-${index}`} key={label} onClick={() => openMeal(label, meal)} aria-label={`Ricetta: ${recipe?.title || label}`}><img className="cut-meal-image" src={selectedMeal.images[label]} alt="" loading="lazy" /><div className="cut-meal-copy"><span>0{index + 1} / {label}</span><p>{meal}</p>{recipe && <em className="cut-meal-macros">≈ {recipe.kcal} kcal · {recipe.protein} g proteine · <b>Ricetta</b></em>}</div><ArrowRight size={16} className="cut-meal-go" /></button>; })}
       {selectedMeal.note && <p className="cut-note">{selectedMeal.note}</p>}
       <p className="cut-fine">Le calorie del giorno sono una stima. Quantità e prodotti reali possono cambiare molto il totale: usa il diario per calibrare le porzioni.</p>
       <button className="cut-primary" onClick={() => onNavigate('system')}>Registra ciò che hai mangiato <ArrowRight size={17} /></button>
@@ -185,7 +209,13 @@ export default function CutPlan({ view = 'today', onNavigate, systemLogs = [], o
       <div className="cut-phase-list">{phases.map((phase) => <details key={phase.weeks} open={phase.weeks === '1–2'}><summary><span>SETTIMANE {phase.weeks}</span><b>{phase.name}</b></summary><p>{phase.detail}</p></details>)}</div>
       <div className="cut-day-strip">{dayNames.map((name, index) => <button key={name} className={day === index ? 'active' : ''} onClick={() => setDay(index)}>{name.slice(0, 3)}</button>)}</div>
       <section className={`cut-feature cut-${trainingDays[day].type}`}><div className="cut-feature-icon">{sessionIcon(trainingDays[day].type)}</div><div>{trainingDays[day].duration !== '—' && <small>{trainingDays[day].duration}</small>}<h2>{trainingDays[day].short}</h2><p>{trainingDays[day].detail}</p></div></section>
-      {trainingDays[day].exercises && <><button className={`cut-toggle ${light ? 'active' : ''}`} onClick={() => setLight((n) => !n)}>{light ? 'Versione leggera attiva' : 'Sono stanco: versione leggera'} <RotateCcw size={15} /></button><div className="cut-exercises">{(light ? trainingDays[day].exercises.filter((_, index) => index < 3) : trainingDays[day].exercises).map(([name, prescription], index) => <div className="cut-exercise" key={name}><span>{String(index + 1).padStart(2, '0')}</span><div><b>{name}</b><small>{light && index > 0 ? '1–2 serie facili' : trainingWeek < 2 ? prescription.replace(/^3 ×/, '2 ×').replace(/^4–6 rip\./, '3–4 rip. al 70–80%') : prescription}</small></div></div>)}</div><p className="cut-fine">Riposa 60–90 s tra le serie; 90–120 s per le accelerazioni. Ferma la serie quando la tecnica peggiora.</p></>}
+      {trainingDays[day].exercises && <><button className={`cut-toggle ${light ? 'active' : ''}`} onClick={() => setLight((n) => !n)}>{light ? 'Versione leggera attiva' : 'Sono stanco: versione leggera'} <RotateCcw size={15} /></button><div className="cut-exercises">{(light ? trainingDays[day].exercises.filter((_, index) => index < 3) : trainingDays[day].exercises).map(([name, prescription], index) => <div className={`cut-exercise ${exerciseVideo?.name === name ? 'open' : ''}`} key={name}><span>{String(index + 1).padStart(2, '0')}</span><div className="cut-exercise-main"><b>{name}</b><small>{light && index > 0 ? '1–2 serie facili' : trainingWeek < 2 ? prescription.replace(/^3 ×/, '2 ×').replace(/^4–6 rip\./, '3–4 rip. al 70–80%') : prescription}</small>
+        {exerciseVideo?.name === name && (() => { const videos = videosFor(name); const current = videos[exerciseVideo.index] || videos[0]; return <div className="cut-exercise-video">
+          {videos.length > 1 && <div className="cut-video-tabs">{videos.map((video, videoIndex) => <button type="button" key={video.id} className={videoIndex === exerciseVideo.index ? 'active' : ''} onClick={() => setExerciseVideo({ name, index: videoIndex })}>{video.label}</button>)}</div>}
+          <iframe key={current.id} className="cut-video-frame" title={`Video tecnica: ${name}`} src={`https://www.youtube-nocookie.com/embed/${current.id}?rel=0&modestbranding=1&playsinline=1`} allow="accelerometer; encrypted-media; gyroscope; picture-in-picture; fullscreen" allowFullScreen loading="lazy" />
+          <small className="cut-video-credit">Video di {current.channel} · YouTube, in inglese</small>
+        </div>; })()}
+      </div>{videosFor(name).length > 0 && <button type="button" className="cut-exercise-play" aria-expanded={exerciseVideo?.name === name} aria-label={`${exerciseVideo?.name === name ? 'Chiudi' : 'Guarda'} il video: ${name}`} onClick={() => setExerciseVideo((prev) => (prev?.name === name ? null : { name, index: 0 }))}><PlayCircle size={22} /></button>}</div>)}</div><p className="cut-fine">Riposa 60–90 s tra le serie; 90–120 s per le accelerazioni. Ferma la serie quando la tecnica peggiora.</p></>}
       {isRestDay(trainingDays[day]) ? <p className="cut-note">Giorno di riposo: niente da segnare. Il recupero fa parte del piano.</p> : <button className={`cut-primary ${completed[`${trainingWeek}-${day}`] ? 'done' : ''}`} onClick={() => completeSession(day)}>{completed[`${trainingWeek}-${day}`] ? <Check size={18} /> : <Plus size={18} />}{completed[`${trainingWeek}-${day}`] ? 'Sessione completata' : <>Segna come completata <span className="cut-xp">+{XP.session} XP</span></>}</button>}
       <section className="cut-section"><div className="cut-section-title"><span>VIDEO TECNICA</span><PlayCircle size={18} /></div><button className="cut-video" onClick={() => setVideoOpen((n) => !n)}><img src="/avatar7.png" alt="" /><span><PlayCircle size={28} /><b>{videoOpen ? 'Nascondi video' : 'Guarda le dimostrazioni'}</b><small>Riscaldamento, squat, trazioni • NHS</small></span></button>{videoOpen && <div className="cut-video-links"><div className="cut-video-tabs">{[['1763945815001', 'Warm-up'], ['1763919389001', 'Squat'], ['1763919425001', 'Trazioni']].map(([id, label]) => <button key={id} className={videoId === id ? 'active' : ''} onClick={() => setVideoId(id)}>{label}</button>)}</div><iframe key={videoId} className="cut-video-frame" title="Dimostrazione tecnica NHS" src={`https://players.brightcove.net/79855382001/EkC1XU82e_default/index.html?videoId=${videoId}`} allow="encrypted-media; fullscreen; picture-in-picture" allowFullScreen loading="lazy" /><a href="https://www.nhs.uk/live-well/exercise/strength-and-flex-exercise-plan-how-to-videos/" target="_blank" rel="noreferrer">Altri video NHS <ArrowRight size={15} /></a></div>}</section>
       <button className="cut-secondary" onClick={() => onNavigate('training')}>Apri il vecchio laboratorio allenamento <ArrowRight size={16} /></button>
@@ -210,6 +240,6 @@ export default function CutPlan({ view = 'today', onNavigate, systemLogs = [], o
       <section className="cut-section"><div className="cut-section-title"><span>CHECK OGNI 4 SETTIMANE</span></div><p className="cut-rule">Segna anche quante trazioni e piegamenti consecutivi riesci a fare e i carichi usati. Se forza, energia o prestazioni calano troppo, alleggerisci l’allenamento e rivedi l’apporto energetico.</p><p className="cut-rule">Le stime di massa grassa della bilancia OKOK servono solo come riferimento: peso medio, girovita e prestazioni sono più utili per questo percorso.</p></section>
       <section className="cut-section"><div className="cut-section-title"><span>FONTI DEL PROTOCOLLO</span></div>{evidence.map((source) => <a className="cut-source" href={source.url} key={source.url} target="_blank" rel="noreferrer">{source.label}<ArrowRight size={15} /></a>)}</section>
     </>}
-    {selectedRecipe && <div className="cut-modal-backdrop" onClick={() => setSelectedRecipe(null)}><div className="cut-modal" onClick={(e) => e.stopPropagation()}><button className="cut-close" onClick={() => setSelectedRecipe(null)}>Chiudi</button><img src={selectedRecipe.image} alt="" /><small>{selectedRecipe.tag}</small><h2>{selectedRecipe.title}</h2><h3>Ingredienti</h3><p>{selectedRecipe.ingredients}</p><h3>Preparazione</h3><p>{selectedRecipe.steps}</p></div></div>}
+    {selectedRecipe && <div className="cut-modal-backdrop" onClick={() => setSelectedRecipe(null)}><div className="cut-modal" role="dialog" aria-modal="true" aria-labelledby="cut-recipe-title" onClick={(e) => e.stopPropagation()}><button className="cut-close" onClick={() => setSelectedRecipe(null)}>Chiudi</button><img src={selectedRecipe.image} alt="" /><small>{selectedRecipe.tag}</small><h2 id="cut-recipe-title">{selectedRecipe.title}</h2>{selectedRecipe.kcal && <div className="cut-macro-chips"><span>≈ {selectedRecipe.kcal} kcal</span><span>{selectedRecipe.protein} g proteine</span></div>}<h3>Ingredienti</h3>{Array.isArray(selectedRecipe.ingredients) ? <ul className="cut-ingredients">{selectedRecipe.ingredients.map((item) => <li key={item}>{item}</li>)}</ul> : <p>{selectedRecipe.ingredients}</p>}<h3>Preparazione</h3>{Array.isArray(selectedRecipe.steps) ? <ol className="cut-steps">{selectedRecipe.steps.map((step) => <li key={step}>{step}</li>)}</ol> : <p>{selectedRecipe.steps}</p>}{selectedRecipe.kcal && <p className="cut-fine">Valori stimati sulle quantità indicate: condimenti e marche li cambiano. Registra nel diario quello che mangi davvero.</p>}</div></div>}
   </main>;
 }

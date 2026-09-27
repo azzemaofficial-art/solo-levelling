@@ -439,3 +439,41 @@
 @keyframes cut-fade-in{to{opacity:1}}
 @keyframes cut-dash{to{stroke-dashoffset:-24}}
 @media (prefers-reduced-motion:reduce){.cut-trend-line{stroke-dashoffset:0}.cut-trend-area,.cut-trend-dot{opacity:1}}
+
+/* Tocca il guerriero → il drago passa in picchiata */
+.cut-page .cut-hero .cut-hero-summon{position:absolute;display:block;inset:0 0 0 auto;z-index:1;width:45%;padding:0;border:0;background:none;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.cut-hero-summon .cut-hero-art{pointer-events:none}
+.cut-hero-summon:active .cut-hero-art{filter:grayscale(0) saturate(1.4) drop-shadow(0 0 34px color-mix(in srgb,var(--accent-2) 70%,transparent)) drop-shadow(0 20px 30px #000)}
+
+/* ── Pasti con ricetta ── */
+.cut-page button.cut-meal{width:100%;margin:0;padding:14px 0;border:0;border-top:1px solid #ffffff1c;border-radius:0;background:none;color:inherit;font:inherit;text-align:left;cursor:pointer}
+.cut-meal-macros{display:block;margin-top:6px;color:var(--t3);font-size:11px;font-style:normal}
+.cut-meal-macros b{color:var(--lime);font-weight:700}
+.cut-meal-go{flex:none;color:var(--t3);transition:transform .2s ease,color .2s ease}
+.cut-meal:hover .cut-meal-go{color:var(--lime);transform:translateX(3px)}
+.cut-plan-totals{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 0 12px}
+.cut-plan-totals span{display:flex;flex-direction:column;gap:3px;padding:10px 12px;border-radius:4px;background:linear-gradient(120deg,color-mix(in srgb,var(--lime) 14%,var(--surface)),var(--surface))}
+.cut-plan-totals small{color:var(--t3);font:700 9px/normal var(--font-label);letter-spacing:.12em}
+.cut-plan-totals b{font:700 17px/normal var(--font-display);letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.cut-plan-totals .low b{color:#ffb4a8}
+.cut-macro-chips{display:flex;gap:6px;margin:-8px 0 14px}
+.cut-macro-chips span{padding:5px 9px;border-radius:20px;background:color-mix(in srgb,var(--lime) 18%,transparent);color:#fff;font:700 11px/normal var(--font-label);letter-spacing:.04em}
+.cut-ingredients,.cut-steps{margin:0 0 14px;padding-left:20px;color:#e2e3f3;font-size:13px;line-height:1.6}
+.cut-ingredients li::marker{color:var(--lime)}
+.cut-steps li{padding-left:4px;margin-bottom:8px}
+.cut-steps li::marker{color:var(--lime);font-weight:700}
+
+/* ── Video per esercizio ── */
+.cut-exercise{align-items:flex-start}
+.cut-exercise .cut-exercise-main{flex:1;min-width:0}
+.cut-exercise-play{flex:none;display:grid;place-items:center;width:40px;height:40px;margin-top:-4px;border:1px solid color-mix(in srgb,var(--lime) 40%,transparent);border-radius:50%;background:color-mix(in srgb,var(--lime) 12%,transparent);color:var(--lime);cursor:pointer}
+.cut-exercise-play:hover{background:color-mix(in srgb,var(--lime) 24%,transparent)}
+.cut-exercise.open .cut-exercise-play{background:var(--grad);color:#11131f;border-color:transparent}
+.cut-page .cut-exercise .cut-exercise-video{display:grid;gap:6px;margin-top:10px;animation:cut-enter .35s cubic-bezier(.16,1,.3,1) both}
+.cut-exercise-video .cut-video-frame{border-radius:6px;box-shadow:0 10px 30px #0008}
+.cut-video-credit{color:var(--t4)!important;font-size:10px!important}
+.cut-ingredients{list-style:disc}
+.cut-steps{list-style:decimal}
+.cut-page .cut-exercise .cut-video-tabs{display:grid;grid-template-columns:repeat(auto-fit,minmax(0,1fr));gap:4px}
+/* la nav dell'app resta sopra il foglio ricetta: spazio perché l'ultima riga si legga */
+.cut-modal{padding-bottom:calc(110px + env(safe-area-inset-bottom))}

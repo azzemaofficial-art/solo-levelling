@@ -1,7 +1,7 @@
 /* ── Draghi (DragonSky.jsx) ──────────────────────────────────────────────────
-   Solo transform/opacity. Il volo usa unità cqw (larghezza del guscio app) così
-   attraversa esattamente lo schermo a qualsiasi larghezza. */
-.dragon-sky{position:absolute;inset:0;z-index:5;overflow:hidden;pointer-events:none;container-type:inline-size}
+   Solo transform/opacity. Il volo usa px e min(100vw, 430px): niente unità cqw,
+   che i Safari più vecchi ignorano (il drago restava invisibile). */
+.dragon-sky{--sky-w:min(100vw,430px);position:absolute;inset:0;z-index:5;overflow:hidden;pointer-events:none}
 .dragon{display:block;width:100%;height:auto;overflow:visible}
 
 /* Battito d'ali: le due ali ruotano attorno alla spalla, sfasate; il corpo ondeggia */
@@ -16,24 +16,24 @@
 
 /* Voli di sfondo: attraversano in ~12 s e poi restano invisibili fino al giro dopo */
 .dragon-flight{position:absolute;left:0;opacity:0;will-change:transform,opacity}
-.dragon-flight-a{top:9%;width:150px;filter:drop-shadow(0 0 14px #b8a4ff88);animation:dragon-cross-ltr 42s linear 6s infinite}
-.dragon-flight-b{top:24%;width:84px;filter:blur(1.2px) drop-shadow(0 0 10px #ff8fd866);animation:dragon-cross-rtl 58s linear 27s infinite}
+.dragon-flight-a{top:8%;width:160px;filter:drop-shadow(0 0 16px #b8a4ffaa);animation:dragon-cross-ltr 30s linear 1.5s infinite}
+.dragon-flight-b{top:22%;width:90px;filter:blur(1px) drop-shadow(0 0 10px #ff8fd888);animation:dragon-cross-rtl 44s linear 17s infinite}
 .dragon-flight-b .dragon{transform:scaleX(-1)}
 .dragon-flight-b .dragon-wing,.dragon-flight-b .dragon-body{animation-duration:1.15s}
 .dragon-arc{animation:dragon-arc 12s ease-in-out infinite}
 @keyframes dragon-cross-ltr{
-  0%{transform:translateX(-45cqw) rotate(-6deg);opacity:0}
-  2%{opacity:.5}
-  26%{opacity:.5}
-  29%{transform:translateX(125cqw) rotate(4deg);opacity:0}
-  100%{transform:translateX(125cqw);opacity:0}
+  0%{transform:translateX(-200px) rotate(-6deg);opacity:0}
+  3%{opacity:.7}
+  33%{opacity:.7}
+  37%{transform:translateX(calc(var(--sky-w) + 40px)) rotate(4deg);opacity:0}
+  100%{transform:translateX(calc(var(--sky-w) + 40px));opacity:0}
 }
 @keyframes dragon-cross-rtl{
-  0%{transform:translateX(120cqw) rotate(5deg);opacity:0}
-  2%{opacity:.35}
-  19%{opacity:.35}
-  21%{transform:translateX(-35cqw) rotate(-3deg);opacity:0}
-  100%{transform:translateX(-35cqw);opacity:0}
+  0%{transform:translateX(calc(var(--sky-w) + 20px)) rotate(5deg);opacity:0}
+  3%{opacity:.45}
+  24%{opacity:.45}
+  27%{transform:translateX(-130px) rotate(-3deg);opacity:0}
+  100%{transform:translateX(-130px);opacity:0}
 }
 @keyframes dragon-arc{0%,100%{transform:translateY(0)}25%{transform:translateY(-26px)}60%{transform:translateY(18px)}}
 
