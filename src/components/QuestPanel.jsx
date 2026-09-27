@@ -135,7 +135,7 @@ export default function QuestPanel() {
           transition={{ duration: 3.4, repeat: Infinity, ease: 'linear' }} />
 
         <div className="flex items-center justify-between">
-          <p className="text-[10px] font-black tracking-[0.3em]" style={{ color: '#7dd3fc', fontFamily: 'Orbitron, sans-serif' }}>
+          <p className="text-[10px] font-black tracking-[0.3em]" style={{ color: '#7dd3fc', fontFamily: 'Syne, sans-serif' }}>
             ⌈ DAILY QUEST ⌋
           </p>
           {meta.streak > 0 && (
@@ -189,14 +189,14 @@ export default function QuestPanel() {
           {state.claimed ? (
             <motion.p initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
               className="text-[11px] font-black tracking-widest whitespace-nowrap"
-              style={{ color: '#4ade80', fontFamily: 'Orbitron, sans-serif', textShadow: '0 0 12px rgba(74,222,128,0.6)' }}>
+              style={{ color: '#4ade80', fontFamily: 'Syne, sans-serif', textShadow: '0 0 12px rgba(74,222,128,0.6)' }}>
               ✓ QUEST COMPLETATA
             </motion.p>
           ) : (
             <motion.button onClick={claimQuest} disabled={!allDone} whileTap={allDone ? { scale: 0.94 } : {}}
               className="px-4 py-2 rounded-xl text-[11px] font-black tracking-widest whitespace-nowrap"
               style={{
-                fontFamily: 'Orbitron, sans-serif',
+                fontFamily: 'Syne, sans-serif',
                 background: allDone ? 'linear-gradient(90deg, #fbbf24, #f59e0b)' : 'rgba(51,65,85,0.5)',
                 color: allDone ? '#1c1204' : '#64748b',
                 boxShadow: allDone ? '0 0 18px rgba(251,191,36,0.55)' : 'none',
@@ -214,7 +214,7 @@ export default function QuestPanel() {
               className="text-center pt-1">
               <motion.p animate={{ scale: [1, 1.15, 1] }} transition={{ duration: 0.5 }}
                 className="text-sm font-black"
-                style={{ color: '#fbbf24', fontFamily: 'Orbitron, sans-serif', textShadow: '0 0 16px rgba(251,191,36,0.7)' }}>
+                style={{ color: '#fbbf24', fontFamily: 'Syne, sans-serif', textShadow: '0 0 16px rgba(251,191,36,0.7)' }}>
                 +{xpBurst.xp} XP
               </motion.p>
             </motion.div>
@@ -234,8 +234,8 @@ export default function QuestPanel() {
               className="relative max-w-sm w-full rounded-2xl p-6 space-y-3 text-center"
               style={{ background: 'linear-gradient(165deg, rgba(50,8,8,0.96), rgba(25,4,4,0.96))', border: '1px solid rgba(239,68,68,0.6)', boxShadow: '0 0 44px rgba(239,68,68,0.35)' }}>
               <Corners color="rgba(239,68,68,0.9)" />
-              <p className="text-[11px] font-black tracking-[0.35em]" style={{ color: '#f87171', fontFamily: 'Orbitron, sans-serif' }}>⚠ PENALTY ⚠</p>
-              <p className="text-2xl font-black" style={{ color: '#fecaca', fontFamily: 'Orbitron, sans-serif', textShadow: '0 0 18px rgba(239,68,68,0.8)' }}>
+              <p className="text-[11px] font-black tracking-[0.35em]" style={{ color: '#f87171', fontFamily: 'Syne, sans-serif' }}>⚠ PENALTY ⚠</p>
+              <p className="text-2xl font-black" style={{ color: '#fecaca', fontFamily: 'Syne, sans-serif', textShadow: '0 0 18px rgba(239,68,68,0.8)' }}>
                 QUEST FALLITA
               </p>
               <p className="text-xs leading-relaxed" style={{ color: '#fca5a5' }}>
@@ -244,7 +244,7 @@ export default function QuestPanel() {
                 <span style={{ color: '#f87171' }}>Il Sistema non dimentica.</span>
               </p>
               <button onClick={dismissPenalty} className="w-full py-2.5 rounded-xl text-xs font-black tracking-widest"
-                style={{ background: 'rgba(239,68,68,0.9)', color: '#1c0505', fontFamily: 'Orbitron, sans-serif' }}>
+                style={{ background: 'rgba(239,68,68,0.9)', color: '#1c0505', fontFamily: 'Syne, sans-serif' }}>
                 ACCETTO LA PENITENZA
               </button>
             </motion.div>

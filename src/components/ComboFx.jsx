@@ -157,7 +157,7 @@ export default function ComboFx({ fx, onDone }) {
               transition={{ type: 'spring', stiffness: 380, damping: 17 }}
               className={`relative z-10 font-black text-center leading-none ${superFx ? 'text-5xl' : 'text-4xl'}`}
               style={{
-                fontFamily: 'Orbitron, sans-serif',
+                fontFamily: 'Syne, sans-serif',
                 color: '#fff',
                 textShadow: `0 0 22px ${c.glow}, 0 0 60px ${c.glow}, 0 3px 10px rgba(0,0,0,0.9)`,
                 WebkitTextStroke: `1px ${c.color}`,

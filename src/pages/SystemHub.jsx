@@ -10,7 +10,14 @@ import { computeReadinessOutcome, computeSleepCoach, computeWeightTrendGuard, co
 import { applyXp } from '../utils/xpLogic';
 import { emitShadowFxBurst } from '../utils/fxEvents';
 import { emitUiToast } from '../utils/uiEvents';
-import { knowledgePrompt, knowledgePromptFor } from '../../lib/knowledgeBase.js';
+
+// La knowledge base (~420KB) serve solo quando parte una richiesta AI: la
+// scarichiamo al primo uso invece che insieme alla pagina.
+let knowledgeModule = null;
+const loadKnowledgePrompt = async (query, budget) => {
+  knowledgeModule ||= await import('../../lib/knowledgeBase.js');
+  return knowledgeModule.knowledgePromptFor(query, budget);
+};
 const QUICK_PROTOCOLS = [
   { id: 'nutrition', title: 'Nutrition Lock', desc: 'Chiudi proteine + kcal target', color: 'text-cyan-200 border-cyan-300/30 bg-cyan-500/10' },
   { id: 'hydration', title: 'Hydration Shield', desc: 'Acqua costante durante il giorno', color: 'text-emerald-200 border-emerald-300/30 bg-emerald-500/10' },
@@ -2133,7 +2140,7 @@ const SystemHub = ({ systemLogs, setSystemLogs, dailyGoal, setDailyGoal, hydrati
     setIsShadowChatLoading(true);
     const profileCtx = `Profilo Shadow Hunter: obiettivo=${playerStats.objective || 'recomp'}, livello=${playerStats.level || 1}, streak=${streak}. Oggi: kcal=${Math.round(Number(todayData.consumed || 0))}/${Math.round(effectiveDailyGoal || dailyGoal || 0)}, prot=${Math.round(Number(todayData.protein || 0))}g, burn=${Math.round(Number(todayData.workoutBurn ?? todayData.burned ?? 0))}kcal, h2o=${Math.round(Number(todayData.waterMl || 0))}ml. Integratori consigliati: ${dailySupplementCore?.map((s) => s.name).join(', ') || '--'}.`;
     const isHeavy = text.length > 80 || /piano|analisi|completo|settimana|ottimizza|spiega|confronta|perché|strategia|programma/i.test(text);
-    const systemPrompt = `Sei Nemotron${isHeavy ? ' 550B' : ''}, il coach AI del Shadow Hunter System. Sei un esperto di fitness, nutrizione, arti marziali e performance atletica. Rispondi in italiano, sii diretto e tecnico. ${isHeavy ? 'Puoi rispondere in modo approfondito.' : 'Massimo 150 parole per risposta.'} ${profileCtx}${knowledgePromptFor(text)}`;
+    const systemPrompt = `Sei Nemotron${isHeavy ? ' 550B' : ''}, il coach AI del Shadow Hunter System. Sei un esperto di fitness, nutrizione, arti marziali e performance atletica. Rispondi in italiano, sii diretto e tecnico. ${isHeavy ? 'Puoi rispondere in modo approfondito.' : 'Massimo 150 parole per risposta.'} ${profileCtx}${await loadKnowledgePrompt(text)}`;
     try {
       const res = await fetch('/api/nvidia/coach', {
         method: 'POST',
@@ -2884,7 +2891,7 @@ Struttura la risposta in sezioni chiare con questi titoli:
 ⚠️ CRITICITÀ — i 2-3 problemi più importanti, con il perché
 🎯 PIANO D'AZIONE — 4-5 azioni specifiche e misurabili per le prossime settimane
 🔮 PROIEZIONE — dove porta la traiettoria attuale e cosa cambiare
-Italiano, diretto, esigente. Niente markdown pesante, usa i titoli con emoji come sopra.${knowledgePromptFor(ctx)}`,
+Italiano, diretto, esigente. Niente markdown pesante, usa i titoli con emoji come sopra.${await loadKnowledgePrompt(ctx)}`,
         }),
         signal: AbortSignal.timeout(45000),
       });
@@ -2976,7 +2983,7 @@ Struttura così:
 🧪 OPZIONALI/SPERIMENTALI (evidenza debole) — segnala l'incertezza
 ⚠️ NOTA: gli integratori vengono DOPO sonno, dieta e allenamento; consulta un medico per condizioni/farmaci.
 VINCOLO ASSOLUTO: se sono indicate allergie o un regime alimentare, NON consigliare MAI integratori che li violano (priorità su tutto il resto).
-Italiano, conciso, niente markdown pesante. Dosi concrete (anche per ${pesoKg}kg quando rilevante).${knowledgePromptFor(suppQuery, 3200)}`,
+Italiano, conciso, niente markdown pesante. Dosi concrete (anche per ${pesoKg}kg quando rilevante).${await loadKnowledgePrompt(suppQuery, 3200)}`,
         }),
         signal: AbortSignal.timeout(45000),
       });
@@ -3107,7 +3114,7 @@ ${deltaKg ? `- Obiettivo peso: ${pesoTarget}kg (${Number(deltaKg) > 0 ? '-' : '+
     const collected = [];
     try {
       const { profileCtx, prefsCtx, mealMoment } = computeRecipeContext();
-      const science = knowledgePromptFor(`${prompt || mealMoment} nutrizione proteine sazietà energia`, 1800);
+      const science = await loadKnowledgePrompt(`${prompt || mealMoment} nutrizione proteine sazietà energia`, 1800);
       // Modello scelto per le ricette: override utente → globale → default (Agnes 2.0).
       // Senza AGNES_API_KEY il proxy salta Agnes e usa la catena di fallback (Groq/NVIDIA).
       const recipeModel = getModelFor('recipe');
@@ -3312,7 +3319,7 @@ Rispondi SOLO con un array JSON valido di ESATTAMENTE ${chunkSize} ricett${chunk
     // micronutrienti — non solo "belle da vedere".
     // NB: il 2° parametro è un BUDGET IN CARATTERI (non un conteggio di principi):
     // con 12 la scienza usciva vuota e le ricette ignoravano la knowledge base.
-    const science = knowledgePromptFor(`${mealType} nutrizione proteine sazietà energia ${prefsCtx}`, 1800);
+    const science = await loadKnowledgePrompt(`${mealType} nutrizione proteine sazietà energia ${prefsCtx}`, 1800);
     const cards = [];
     // Lotti da 8 (non 12): Mistral NeMo — ora il modello di default per la qualità — premette
     // spesso testo/ragionamento prima del JSON, quindi con lotti grandi solo ~7 oggetti interi
@@ -3427,7 +3434,7 @@ Rispondi SOLO con un array JSON valido di esattamente ${chunkSize} oggetti, in q
     setForgeBatch((prev) => prev ? { ...prev, cards: prev.cards.map((c) => c.id === cardId ? { ...c, loadingFull: true } : c) } : prev);
     try {
       const { profileCtx, prefsCtx } = computeRecipeContext();
-      const science = knowledgePromptFor(`${forgeBatch.mealType} ${card.title} nutrizione proteine`, 1200);
+      const science = await loadKnowledgePrompt(`${forgeBatch.mealType} ${card.title} nutrizione proteine`, 1200);
       const systemPrompt = `Sei uno chef nutrizionale d'élite specializzato in FITPORN. Devi completare una ricetta il cui titolo, tagline e macro sono GIÀ decisi: crea ingredienti e procedimento coerenti con quei valori, senza cambiarli.
 VINCOLO ASSOLUTO DI SICUREZZA: rispetta sempre le eventuali allergie indicate.
 La nota finale ("notes") deve contenere UN hack nutrizionale concreto e fondato sulla scienza qui sotto (timing, assorbimento, sazietà), non un consiglio generico.${science}
@@ -5753,22 +5760,22 @@ ${lowReliabilityMode ? 'Modalita alta prudenza: riduci le stime incerte del 8-12
         <div className="pointer-events-none absolute top-0 right-0 w-full h-px" style={{ background: 'linear-gradient(90deg, transparent, rgba(0,242,255,0.4), transparent)' }} />
         <div className="relative z-10">
           <p className="text-[9px] uppercase tracking-[0.42em] font-bold" style={{ color: '#00f2ff', letterSpacing: '0.4em' }}>◈ Shadow Protocol Online</p>
-          <h2 className="mt-1 text-2xl font-black uppercase text-white tracking-wide" style={{ fontFamily: 'Russo One, sans-serif' }}>Hunter Dashboard</h2>
+          <h2 className="mt-1 text-2xl font-black uppercase text-white tracking-wide" style={{ fontFamily: 'Syne, sans-serif' }}>Hunter Dashboard</h2>
           <p className="mt-2 text-xs text-gray-400">
             Stato realtime: energia, calorie engine e progressione evolutiva.
           </p>
           <div className="mt-4 grid grid-cols-3 gap-2">
             <div className="hero-stat-box">
               <p className="text-[9px] uppercase tracking-widest mb-1" style={{ color: '#67e8f9' }}>System Power</p>
-              <p className="text-xl font-black" style={{ color: '#cffafe', fontFamily: 'Russo One, sans-serif' }}>{systemPowerScore}</p>
+              <p className="text-xl font-black" style={{ color: '#cffafe', fontFamily: 'Syne, sans-serif' }}>{systemPowerScore}</p>
             </div>
             <div className="hero-stat-box">
               <p className="text-[9px] uppercase tracking-widest mb-1" style={{ color: '#d8b4fe' }}>Force Bonus</p>
-              <p className="text-xl font-black" style={{ color: '#f0e6ff', fontFamily: 'Russo One, sans-serif' }}>+{systemForceBonus}</p>
+              <p className="text-xl font-black" style={{ color: '#f0e6ff', fontFamily: 'Syne, sans-serif' }}>+{systemForceBonus}</p>
             </div>
             <div className="hero-stat-box">
               <p className="text-[9px] uppercase tracking-widest mb-1" style={{ color: '#6ee7b7' }}>Hydration</p>
-              <p className="text-xl font-black" style={{ color: '#d1fae5', fontFamily: 'Russo One, sans-serif' }}>{Math.round(hydrationPct)}%</p>
+              <p className="text-xl font-black" style={{ color: '#d1fae5', fontFamily: 'Syne, sans-serif' }}>{Math.round(hydrationPct)}%</p>
             </div>
           </div>
         </div>
@@ -5832,12 +5839,12 @@ ${lowReliabilityMode ? 'Modalita alta prudenza: riduci le stime incerte del 8-12
               {/* Header */}
               <div className="flex items-center justify-between mb-5">
                 <div>
-                  <p className="text-[8px] uppercase font-bold mb-1" style={{ color: '#00f2ff', fontFamily: 'Orbitron, sans-serif', letterSpacing: '0.45em' }}>◈ Profilo Fisico</p>
+                  <p className="text-[8px] uppercase font-bold mb-1" style={{ color: '#00f2ff', fontFamily: 'Syne, sans-serif', letterSpacing: '0.45em' }}>◈ Profilo Fisico</p>
                   <p className="text-[10px] text-gray-400 tracking-wider">Biometria · {metrics.filter(m => m.value !== '--').length}/{metrics.length} metriche attive</p>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" style={{ boxShadow: '0 0 8px #4ade80', animation: 'pulse-glow 2s ease-in-out infinite' }} />
-                  <span className="text-[8px] uppercase tracking-widest" style={{ color: '#4ade80', fontFamily: 'Orbitron, sans-serif' }}>Live</span>
+                  <span className="text-[8px] uppercase tracking-widest" style={{ color: '#4ade80', fontFamily: 'Syne, sans-serif' }}>Live</span>
                 </div>
               </div>
 
@@ -5869,9 +5876,9 @@ ${lowReliabilityMode ? 'Modalita alta prudenza: riduci le stime incerte del 8-12
                       <div className="pointer-events-none absolute top-0 left-0 right-0 h-px" style={{ background: `linear-gradient(90deg, transparent, ${color}60, transparent)` }} />
                     )}
                     <div className="p-2.5">
-                      <p className="text-[7px] uppercase tracking-widest mb-1.5" style={{ color: 'rgba(156,163,175,0.7)', fontFamily: 'Orbitron, sans-serif' }}>{label}</p>
+                      <p className="text-[7px] uppercase tracking-widest mb-1.5" style={{ color: 'rgba(156,163,175,0.7)', fontFamily: 'Syne, sans-serif' }}>{label}</p>
                       <div className="flex items-baseline gap-1">
-                        <p className="text-lg font-black leading-none" style={{ color: value !== '--' ? color : 'rgba(107,114,128,0.6)', fontFamily: 'Russo One, sans-serif', filter: value !== '--' ? `drop-shadow(0 0 6px ${color}66)` : 'none' }}>
+                        <p className="text-lg font-black leading-none" style={{ color: value !== '--' ? color : 'rgba(107,114,128,0.6)', fontFamily: 'Syne, sans-serif', filter: value !== '--' ? `drop-shadow(0 0 6px ${color}66)` : 'none' }}>
                           {value}
                         </p>
                         {unit && value !== '--' && (
@@ -5879,7 +5886,7 @@ ${lowReliabilityMode ? 'Modalita alta prudenza: riduci le stime incerte del 8-12
                         )}
                       </div>
                       {sub && (
-                        <p className="text-[8px] mt-1 leading-none" style={{ color: color + 'bb', fontFamily: 'Chakra Petch, sans-serif' }}>{sub}</p>
+                        <p className="text-[8px] mt-1 leading-none" style={{ color: color + 'bb', fontFamily: 'Manrope, sans-serif' }}>{sub}</p>
                       )}
                     </div>
                   </motion.div>
@@ -5887,7 +5894,7 @@ ${lowReliabilityMode ? 'Modalita alta prudenza: riduci le stime incerte del 8-12
               </motion.div>
 
               {/* Bottom hint */}
-              <p className="text-[8px] text-center mt-4 tracking-widest" style={{ color: 'rgba(0,242,255,0.3)', fontFamily: 'Orbitron, sans-serif' }}>
+              <p className="text-[8px] text-center mt-4 tracking-widest" style={{ color: 'rgba(0,242,255,0.3)', fontFamily: 'Syne, sans-serif' }}>
                 INVIA DATI VIA TELEGRAM · AGGIORNAMENTO REAL-TIME
               </p>
             </div>
@@ -6118,7 +6125,7 @@ ${lowReliabilityMode ? 'Modalita alta prudenza: riduci le stime incerte del 8-12
         <div className="flex items-center justify-between mb-3">
           <div>
             <p className="text-[9px] uppercase tracking-[0.36em] font-bold" style={{ color: 'rgba(52,211,153,0.9)' }}>◈ AI Personale</p>
-            <p className="text-sm font-black text-white" style={{ fontFamily: 'Russo One, sans-serif' }}>Shadow Insights</p>
+            <p className="text-sm font-black text-white" style={{ fontFamily: 'Syne, sans-serif' }}>Shadow Insights</p>
           </div>
           <button onClick={() => generateShadowInsights(true)} disabled={isLoadingInsights}
             className="text-[8px] px-2 py-1 border border-white/15 text-gray-500 uppercase tracking-widest hover:border-emerald-300/40 hover:text-emerald-300 transition-colors disabled:opacity-30">
@@ -6339,7 +6346,7 @@ ${lowReliabilityMode ? 'Modalita alta prudenza: riduci le stime incerte del 8-12
             <div className="flex items-start justify-between gap-3 mb-4">
               <div>
                 <p className="text-[10px] uppercase tracking-[0.4em] font-bold" style={{ color: '#fcd34d' }}>◈ Destino Sigillato</p>
-                <p className="text-lg font-black text-white" style={{ fontFamily: 'Russo One, sans-serif' }}>
+                <p className="text-lg font-black text-white" style={{ fontFamily: 'Syne, sans-serif' }}>
                   📜 Calendario delle {FORGE_MEAL_LABELS[forgeBatch.mealType] || 'ricette'}
                 </p>
                 <p className="text-[10px] text-gray-400 mt-0.5">
@@ -6368,7 +6375,7 @@ ${lowReliabilityMode ? 'Modalita alta prudenza: riduci le stime incerte del 8-12
                     <button onClick={() => setCartOpen((v) => !v)} className="w-full flex items-center gap-2.5 p-3">
                       <motion.span className="text-xl" animate={{ rotate: cartOpen ? [0, -12, 8, 0] : 0 }} transition={{ duration: 0.5 }}>🛒</motion.span>
                       <div className="flex-1 text-left">
-                        <p className="text-[11px] font-black text-white leading-tight" style={{ fontFamily: 'Russo One, sans-serif' }}>Carrello della spesa</p>
+                        <p className="text-[11px] font-black text-white leading-tight" style={{ fontFamily: 'Syne, sans-serif' }}>Carrello della spesa</p>
                         <p className="text-[8px] text-amber-200/80">{checkedCount}/{forgeCart.length} presi · dalle ricette aperte</p>
                       </div>
                       {/* Badge conteggio: pop-in quando entra un nuovo ingrediente */}
@@ -6495,7 +6502,7 @@ ${lowReliabilityMode ? 'Modalita alta prudenza: riduci le stime incerte del 8-12
                       <div className="absolute inset-0 rounded-2xl flex flex-col p-2.5"
                         style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)', background: 'linear-gradient(160deg, rgba(124,58,237,0.22), rgba(15,8,28,0.96))', border: '1px solid rgba(167,139,250,0.35)', boxShadow: '0 0 18px rgba(124,58,237,0.18)' }}>
                         <span className="text-2xl leading-none">{card.emoji}</span>
-                        <p className="text-[11px] font-black text-white leading-tight mt-1 line-clamp-2" style={{ fontFamily: 'Russo One, sans-serif' }}>{card.title}</p>
+                        <p className="text-[11px] font-black text-white leading-tight mt-1 line-clamp-2" style={{ fontFamily: 'Syne, sans-serif' }}>{card.title}</p>
                         <p className="text-[8px] text-violet-200 italic mt-0.5 leading-snug line-clamp-2 flex-1">"{card.tagline}"</p>
                         <div className="grid grid-cols-4 gap-0.5 my-1.5 text-center">
                           <div><p className="text-[9px] font-black" style={{ color: '#f97316' }}>{card.kcal}</p><p className="text-[6px] text-gray-500">KCAL</p></div>
@@ -6537,7 +6544,7 @@ ${lowReliabilityMode ? 'Modalita alta prudenza: riduci le stime incerte del 8-12
                 <div className="flex items-start gap-2 pr-6">
                   <span className="text-3xl leading-none">{card.emoji}</span>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-black text-white leading-tight" style={{ fontFamily: 'Russo One, sans-serif' }}>{card.title}</p>
+                    <p className="text-sm font-black text-white leading-tight" style={{ fontFamily: 'Syne, sans-serif' }}>{card.title}</p>
                     {card.tagline && <p className="text-[10px] text-violet-200 mt-0.5 italic leading-snug">"{card.tagline}"</p>}
                   </div>
                   <div className="px-1.5 py-0.5 rounded text-[8px] font-bold flex-shrink-0" style={{ background: 'rgba(167,139,250,0.2)', color: '#c4b5fd' }}>FIT {card.full.fitScore}/10</div>

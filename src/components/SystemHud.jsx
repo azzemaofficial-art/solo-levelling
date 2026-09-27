@@ -68,7 +68,7 @@ export default function SystemHud({ active, getSnapshot }) {
           className="absolute rounded-xl px-2.5 py-2 space-y-1"
           style={{ ...winStyle, top: 64, left: 10, maxWidth: 168 }}>
           <Corners />
-          <p className="text-[8px] font-black tracking-[0.25em]" style={{ color: '#7dd3fc', fontFamily: 'Orbitron, sans-serif' }}>
+          <p className="text-[8px] font-black tracking-[0.25em]" style={{ color: '#7dd3fc', fontFamily: 'Syne, sans-serif' }}>
             ⌈ QUEST {questState.claimed ? '✓' : ''}
           </p>
           <div className="flex items-center gap-1.5">
@@ -89,10 +89,10 @@ export default function SystemHud({ active, getSnapshot }) {
         className="absolute rounded-xl px-2.5 py-2 space-y-1"
         style={{ ...winStyle, top: 64, right: 10, width: 118 }}>
         <Corners />
-        <p className="text-[8px] font-black tracking-[0.25em]" style={{ color: '#7dd3fc', fontFamily: 'Orbitron, sans-serif' }}>
+        <p className="text-[8px] font-black tracking-[0.25em]" style={{ color: '#7dd3fc', fontFamily: 'Syne, sans-serif' }}>
           ⌈ LIVE
         </p>
-        <p className="text-sm font-black leading-none" style={{ color: '#e2e8f0', fontFamily: 'Orbitron, sans-serif' }}>
+        <p className="text-sm font-black leading-none" style={{ color: '#e2e8f0', fontFamily: 'Syne, sans-serif' }}>
           {fmtTime(Math.max(0, snap.elapsedSec || 0))}
         </p>
         <div className="h-1 rounded-full overflow-hidden" style={{ background: 'rgba(51,65,85,0.6)' }}>
@@ -114,10 +114,10 @@ export default function SystemHud({ active, getSnapshot }) {
             className="absolute rounded-xl px-3 py-2 text-center"
             style={{ ...winStyle, bottom: 132, left: 10, borderColor: 'rgba(251,191,36,0.45)' }}>
             <Corners color="rgba(251,191,36,0.85)" />
-            <p className="text-[8px] font-black tracking-[0.25em]" style={{ color: '#fbbf24', fontFamily: 'Orbitron, sans-serif' }}>🦵 CALCI</p>
+            <p className="text-[8px] font-black tracking-[0.25em]" style={{ color: '#fbbf24', fontFamily: 'Syne, sans-serif' }}>🦵 CALCI</p>
             <motion.p key={snap.kicks} initial={{ scale: 1.5 }} animate={{ scale: 1 }}
               className="text-xl font-black leading-none"
-              style={{ color: '#fff', fontFamily: 'Orbitron, sans-serif', textShadow: '0 0 14px rgba(251,191,36,0.7)' }}>
+              style={{ color: '#fff', fontFamily: 'Syne, sans-serif', textShadow: '0 0 14px rgba(251,191,36,0.7)' }}>
               {snap.kicks || 0}
             </motion.p>
           </motion.div>
@@ -130,7 +130,7 @@ export default function SystemHud({ active, getSnapshot }) {
         transition={{ opacity: { duration: 2.6, repeat: Infinity } }}
         className="absolute left-1/2 -translate-x-1/2 rounded-full px-3 py-1"
         style={{ bottom: 96, background: 'rgba(6,10,20,0.6)', border: '1px solid rgba(56,189,248,0.25)' }}>
-        <p className="text-[8px] font-bold tracking-[0.3em] whitespace-nowrap" style={{ color: '#7dd3fc', fontFamily: 'Orbitron, sans-serif' }}>
+        <p className="text-[8px] font-bold tracking-[0.3em] whitespace-nowrap" style={{ color: '#7dd3fc', fontFamily: 'Syne, sans-serif' }}>
           [SYSTEM] ANALISI ATTIVA
         </p>
       </motion.div>

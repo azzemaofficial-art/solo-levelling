@@ -1,6 +1,6 @@
 import React, { Suspense, lazy, useMemo, useState, useEffect, useCallback } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Zap, Swords, BrainCircuit, Activity } from 'lucide-react';
+import ProtocolIcon from './components/ProtocolIcon';
 import { playSfx } from './utils/sfx';
 import { formatAiErrorDetail, requestSystemAI, subscribeAiStatus } from './utils/aiClient';
 import { runStorageMigrations } from './utils/storageMigrations';
@@ -26,6 +26,7 @@ const Help = lazy(() => import('./pages/Help'));
 const Coach = lazy(() => import('./pages/Coach'));
 const French = lazy(() => import('./pages/French'));
 const Polish = lazy(() => import('./pages/Polish'));
+const CutPlan = lazy(() => import('./pages/CutPlan'));
 runStorageMigrations();
 const isWorkoutLog = (log) => Number(log?.workoutBurn ?? log?.burned ?? 0) >= 180 || Number(log?.strength || 0) > 0;
 const getIsoWeekKey = (value = new Date()) => {
@@ -64,11 +65,11 @@ function App() {
       return fallback;
     }
   };
-  const [activePage, setActivePage] = useState('system');
+  const [activePage, setActivePage] = useState('cut');
+  const pageScrollRef = React.useRef(null);
+  useEffect(() => { if (pageScrollRef.current) pageScrollRef.current.scrollTop = 0; }, [activePage]);
   const [lastPageIndex, setLastPageIndex] = useState(0);
-  const [showIntro, setShowIntro] = useState(() => {
-    try { if (sessionStorage.getItem('sm_intro_seen')) return false; sessionStorage.setItem('sm_intro_seen', '1'); return true; } catch { return false; }
-  });
+  const [showIntro, setShowIntro] = useState(false);
   const [levelUpTo, setLevelUpTo] = useState(null);
   const prevLevelRef = React.useRef(null);
   const [pageIntroFx, setPageIntroFx] = useState(null);
@@ -84,7 +85,7 @@ function App() {
   const [tgBindPrompt, setTgBindPrompt] = useState(false);
   const [tgBindCustom, setTgBindCustom] = useState('');
   const { fxPulseKey, fxBurstKey, surgeKey, comboProgress, triggerFxBurst } = useFxCombo();
-  const pagesOrder = ['system', 'systemplus', 'training', 'recovery', 'quests', 'boss', 'calendar', 'stats', 'help', 'coach'];
+  const pagesOrder = ['cut', 'food', 'program', 'mma', 'progress', 'system', 'systemplus', 'training', 'recovery', 'quests', 'boss', 'calendar', 'stats', 'help', 'coach'];
   const [soundEnabled, setSoundEnabled] = useState(() => {
     const saved = localStorage.getItem('shadow_monarch_sound');
     return saved ? saved === '1' : true;
@@ -1412,8 +1413,8 @@ useEffect(() => { localStorage.setItem('shadow_monarch_macros', JSON.stringify(m
 
   return (
     <div
-      className={`app-shell-fs gameframe-shell premium-shell system-scanlines neon-cinema theme-${activePage} ${shouldReduceFx ? 'fx-lite' : ''} max-w-[390px] mx-auto bg-void-black relative shadow-2xl overflow-hidden border-x border-white/5 flex flex-col`}>
-      {showIntro && <NeuralIntro onDone={() => setShowIntro(false)} />}
+      className={`app-shell-fs gameframe-shell premium-shell system-scanlines neon-cinema theme-${activePage} ${['cut', 'food', 'program', 'mma', 'progress'].includes(activePage) ? 'cut-app-shell' : ''} ${shouldReduceFx ? 'fx-lite' : ''} max-w-[390px] mx-auto bg-void-black relative shadow-2xl overflow-hidden border-x border-white/5 flex flex-col`}>
+      {showIntro && activePage === 'system' && <NeuralIntro onDone={() => setShowIntro(false)} />}
       {tgBindPrompt ? (
         <div className="fixed inset-0 z-[999] bg-black/95 backdrop-blur-sm p-5 flex flex-col items-center justify-center gap-4 text-center">
           <p className="text-[10px] uppercase tracking-[0.3em] text-cyan-300">Chi sei?</p>
@@ -1463,7 +1464,7 @@ useEffect(() => { localStorage.setItem('shadow_monarch_macros', JSON.stringify(m
       <AnimatePresence>
         {levelUpTo != null && <LevelUpOverlay key="levelup" level={levelUpTo} onDone={() => setLevelUpTo(null)} />}
       </AnimatePresence>
-      <div className="pointer-events-none absolute inset-0 cinematic-backdrop">
+      {!['cut', 'food', 'program', 'mma', 'progress'].includes(activePage) && <div className="pointer-events-none absolute inset-0 cinematic-backdrop">
         <div className="absolute inset-0 aurora-layer"></div>
         <div className="absolute inset-0 hud-grid"></div>
         <div className="absolute -top-24 -left-20 h-56 w-56 rounded-full bg-system-blue/15 blur-3xl drift-slow"></div>
@@ -1474,7 +1475,7 @@ useEffect(() => { localStorage.setItem('shadow_monarch_macros', JSON.stringify(m
         <img src="/avatar6.png" alt="" className="anime-float absolute left-1/2 bottom-24 w-20 -translate-x-1/2 opacity-14 grayscale" />
         <img src="/boss4.png" alt="" className="anime-float-reverse absolute right-10 bottom-40 w-24 opacity-12 grayscale" />
         <div className="absolute inset-0 starfield"></div>
-      </div>
+      </div>}
       <div className="absolute top-2 right-2 z-[90] flex items-center gap-1">
         <button
           onClick={() => { setMenuOpen((prev) => !prev); triggerFxBurst('light'); }}
@@ -1484,7 +1485,7 @@ useEffect(() => { localStorage.setItem('shadow_monarch_macros', JSON.stringify(m
           {menuOpen ? 'CLOSE' : 'MENU'}
         </button>
       </div>
-      <div className="absolute top-2 left-2 z-[80] flex items-center gap-1">
+      {!['cut', 'food', 'program', 'mma', 'progress', 'coach'].includes(activePage) && <div className="absolute top-2 left-2 z-[80] flex items-center gap-1">
         <div role="status" aria-live="polite" className={`text-[10px] px-2 py-1 border backdrop-blur-md ${
           aiStatus === 'online'
             ? 'border-emerald-300 text-emerald-300 bg-emerald-500/10'
@@ -1506,13 +1507,13 @@ useEffect(() => { localStorage.setItem('shadow_monarch_macros', JSON.stringify(m
             AI BUSY {aiInflightCount}
           </div>
         ) : null}
-      </div>
-      {aiStatus === 'offline' && aiStatusDetail ? (
+      </div>}
+      {aiStatus === 'offline' && aiStatusDetail && !['cut', 'food', 'program', 'mma', 'progress', 'coach'].includes(activePage) ? (
         <div className="absolute top-10 left-2 z-[80] max-w-[220px] text-[9px] px-2 py-1 border border-rose-300/30 text-rose-200 bg-black/45 backdrop-blur-md">
           {aiStatusDetail}
         </div>
       ) : null}
-      {contextualReminder ? (
+      {contextualReminder && !['cut', 'food', 'program', 'mma', 'progress', 'coach'].includes(activePage) ? (
         <div className="absolute top-10 right-2 z-[80] max-w-[230px] border border-amber-300/40 bg-black/70 p-2 backdrop-blur-md">
           <p className="text-[9px] uppercase tracking-widest text-amber-200">{contextualReminder.title}</p>
           <p className="text-[10px] text-amber-100 mt-1">{contextualReminder.text}</p>
@@ -1571,7 +1572,7 @@ useEffect(() => { localStorage.setItem('shadow_monarch_macros', JSON.stringify(m
         <div className="absolute inset-0 z-[92] flex justify-end bg-black/45 backdrop-blur-[1px]" onClick={() => setMenuOpen(false)}>
           <div className="menu-drawer-premium w-[78%] h-full border-l border-cyan-300/35 bg-[#070b14]/95 p-4 overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="mb-3 flex items-center justify-between">
-              <p className="text-[10px] uppercase tracking-[0.28em] text-cyan-200">Hamburger Menu</p>
+              <p className="text-[10px] uppercase tracking-[0.28em] text-cyan-200">Esplora</p>
               <button
                 onClick={() => setMenuOpen(false)}
                 aria-label="Chiudi pannello menu"
@@ -1589,6 +1590,8 @@ useEffect(() => { localStorage.setItem('shadow_monarch_macros', JSON.stringify(m
 
             <p className="text-[9px] uppercase tracking-widest text-gray-400 mb-2">Altre sezioni</p>
             <div className="grid grid-cols-2 gap-2 mb-4">
+              <button onClick={() => handleTabChange('system')} className="text-[10px] px-2 py-3 border border-lime-300/40 text-lime-200 uppercase tracking-widest">Diario cibo</button>
+              <button onClick={() => handleTabChange('training')} className="text-[10px] px-2 py-3 border border-lime-300/40 text-lime-200 uppercase tracking-widest">Training lab</button>
               <button onClick={() => { handleTabChange('coach'); setMenuOpen(false); }} className="text-[10px] px-2 py-3 border border-blue-300/40 text-blue-200 uppercase tracking-widest flex items-center gap-1.5">
                 <span>🧠</span> Coach AI
               </button>
@@ -1656,7 +1659,7 @@ useEffect(() => { localStorage.setItem('shadow_monarch_macros', JSON.stringify(m
           </div>
         </div>
       ) : null}
-      {!onboardingState.done ? (
+      {!onboardingState.done && activePage === 'systemplus' ? (
         <div className="absolute inset-0 z-[95] flex items-end bg-black/70 p-3">
           <div className="w-full rounded-sm border border-cyan-300/40 bg-black/90 p-4">
             <p className="text-[9px] uppercase tracking-[0.25em] text-cyan-200">Onboarding</p>
@@ -1719,7 +1722,7 @@ useEffect(() => { localStorage.setItem('shadow_monarch_macros', JSON.stringify(m
       ) : null}
       
       {/* Pagine (Passiamo tutte le memorie come prop) */}
-      <div className="flex-1 overflow-y-auto no-scrollbar relative z-10">
+      <div ref={pageScrollRef} className="flex-1 overflow-y-auto no-scrollbar relative z-10">
         <Suspense fallback={<div className="p-6 text-xs text-cyan-200 uppercase tracking-widest">Loading System Module...</div>}>
           <AnimatePresence mode="wait" initial={false}>
             <motion.div
@@ -1730,6 +1733,7 @@ useEffect(() => { localStorage.setItem('shadow_monarch_macros', JSON.stringify(m
               transition={shouldReduceFx ? { duration: 0.14, ease: 'linear' } : { duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
               className={`min-h-full page-shell page-shell-${activePage}`}
             >
+            {['cut', 'food', 'program', 'mma', 'progress'].includes(activePage) && <CutPlan view={activePage === 'cut' ? 'today' : activePage} onNavigate={handleTabChange} systemLogs={systemLogs} />}
             {activePage === 'system' && (
               <SystemHub
                 systemLogs={systemLogs}
@@ -1821,7 +1825,7 @@ useEffect(() => { localStorage.setItem('shadow_monarch_macros', JSON.stringify(m
             {activePage === 'help' && <Help createBackupPayload={createBackupPayload} importBackupPayload={importBackupPayload} resetAppData={resetAppData} playerStats={playerStats} onNavigate={handleTabChange} />}
             {activePage === 'french' && <French playerStats={playerStats} setPlayerStats={setPlayerStats} soundEnabled={soundEnabled} soundTheme={soundTheme} />}
             {activePage === 'polish' && <Polish playerStats={playerStats} setPlayerStats={setPlayerStats} soundEnabled={soundEnabled} soundTheme={soundTheme} />}
-            {activePage === 'coach' && <Coach playerStats={playerStats} setPlayerStats={setPlayerStats} />}
+            {activePage === 'coach' && <Coach playerStats={playerStats} setPlayerStats={setPlayerStats} aiStatus={aiStatus} />}
             </motion.div>
           </AnimatePresence>
         </Suspense>
@@ -1844,15 +1848,15 @@ useEffect(() => { localStorage.setItem('shadow_monarch_macros', JSON.stringify(m
           </div>
         </>
       ) : null}
-      <div className="pointer-events-none absolute top-11 left-1/2 z-[82] -translate-x-1/2 rounded-full border border-fuchsia-300/40 bg-black/55 px-3 py-1 backdrop-blur-md">
+      {!['cut', 'food', 'program', 'mma', 'progress'].includes(activePage) && <div className="pointer-events-none absolute top-11 left-1/2 z-[82] -translate-x-1/2 rounded-full border border-fuchsia-300/40 bg-black/55 px-3 py-1 backdrop-blur-md">
         <p className="text-[9px] uppercase tracking-[0.22em] text-fuchsia-200">Combo {comboProgress.count}/3</p>
-      </div>
-      <div key={`surge-${surgeKey}`} className={`pointer-events-none absolute inset-0 z-[84] shadow-surge ${!shouldReduceFx && surgeKey > 0 ? 'shadow-surge-active' : ''}`}>
+      </div>}
+      {!['cut', 'food', 'program', 'mma', 'progress'].includes(activePage) && <div key={`surge-${surgeKey}`} className={`pointer-events-none absolute inset-0 z-[84] shadow-surge ${!shouldReduceFx && surgeKey > 0 ? 'shadow-surge-active' : ''}`}>
         <div className="shadow-surge-center">
           <p className="text-[11px] uppercase tracking-[0.34em] text-fuchsia-200">Shadow Surge</p>
           <p className="text-[10px] uppercase tracking-widest text-cyan-200 mt-1">3 azioni utili consecutive</p>
         </div>
-      </div>
+      </div>}
       <AnimatePresence>
         {pageIntroFx && !shouldReduceFx ? (
           <motion.div
@@ -1999,14 +2003,14 @@ useEffect(() => { localStorage.setItem('shadow_monarch_macros', JSON.stringify(m
           />
         ) : null}
       </AnimatePresence>
-      <button
+      {!['cut', 'food', 'program', 'mma', 'progress'].includes(activePage) && <button
         aria-label="Apri Quick Add"
         onClick={() => setQuickAddOpen((v) => !v)}
         className="quick-add-fab fixed right-14 z-[97] flex h-9 w-9 items-center justify-center border border-fuchsia-300/55 bg-black/88 text-lg font-black text-fuchsia-200 backdrop-blur-md hover:bg-fuchsia-300 hover:text-black shadow-[0_0_18px_rgba(217,70,239,0.28)]"
         style={{ top: 'calc(0.5rem + env(safe-area-inset-top))' }}
       >
         +
-      </button>
+      </button>}
       <AnimatePresence>
         {quickAddOpen ? (
           <motion.div
@@ -2041,23 +2045,24 @@ useEffect(() => { localStorage.setItem('shadow_monarch_macros', JSON.stringify(m
       <MealBurst fx={mealFx} onDone={() => setMealFx(null)} soundEnabled={soundEnabled} soundTheme={soundTheme} />
 
       {/* ⚔ Maestria globale 0-100 — fissa sopra la nav */}
-      <GlobalMasteryBar />
+      {!['cut', 'food', 'program', 'mma', 'progress', 'coach'].includes(activePage) && <GlobalMasteryBar />}
 
-      {/* BARRA NAVIGAZIONE — 4 tab principali */}
+      {/* Barra delle cinque sezioni principali */}
       <nav
         style={{ height: 'calc(5rem + env(safe-area-inset-bottom))', paddingBottom: 'env(safe-area-inset-bottom)' }}
         className="game-nav premium-nav w-full max-w-[390px] h-20 bg-black/95 backdrop-blur-xl border-t border-white/[0.06] flex justify-around items-center z-50 shrink-0 relative">
         {[
-          { id: 'system',   label: 'System', Icon: Zap,          hex: '#38bdf8', glow: 'rgba(56,189,248,0.6)'   },
-          { id: 'training', label: 'Train',  Icon: Swords,       hex: '#f87171', glow: 'rgba(248,113,113,0.6)'  },
-          { id: 'coach',    label: 'Coach',  Icon: BrainCircuit, hex: '#818cf8', glow: 'rgba(129,140,248,0.6)'  },
-          { id: 'stats',    label: 'Stats',  Icon: Activity,     hex: '#a78bfa', glow: 'rgba(167,139,250,0.6)'  },
-        ].map(({ id, label, Icon, hex, glow }) => {
+          { id: 'cut', label: 'Oggi', hex: '#b8a4ff', glow: 'rgba(184,164,255,0.38)' },
+          { id: 'food', label: 'Pasti', hex: '#ffac91', glow: 'rgba(255,172,145,0.35)' },
+          { id: 'program', label: 'Training', hex: '#ffd184', glow: 'rgba(255,209,132,0.35)' },
+          { id: 'mma', label: 'MMA', hex: '#6de2d3', glow: 'rgba(109,226,211,0.38)' },
+          { id: 'progress', label: 'Progressi', hex: '#8fb9ff', glow: 'rgba(143,185,255,0.35)' },
+        ].map(({ id, label, hex, glow }) => {
           const active = activePage === id;
           return (
             <motion.button key={id} aria-label={`Apri pagina ${label}`} onClick={() => handleTabChange(id)}
               className="relative flex flex-col items-center gap-1.5 px-5 py-2"
-              whileTap={{ scale: 0.76 }}
+              whileTap={{ scale: 0.94 }}
               transition={{ type: 'spring', stiffness: 700, damping: 30 }}>
 
               {/* sliding background pill — layoutId shared across all tabs */}
@@ -2091,19 +2096,19 @@ useEffect(() => { localStorage.setItem('shadow_monarch_macros', JSON.stringify(m
 
               {/* icon */}
               <motion.div
-                animate={{ scale: active ? 1.22 : 1, y: active ? -2 : 0 }}
+                animate={{ scale: active ? 1.08 : 1, y: active ? -1 : 0 }}
                 transition={{ type: 'spring', stiffness: 550, damping: 22 }}
                 style={{
-                  color: active ? hex : 'rgba(255,255,255,0.2)',
+                  color: active ? hex : 'rgba(206,222,205,0.68)',
                   filter: active ? `drop-shadow(0 0 9px ${glow})` : 'none',
                 }}>
-                <Icon size={22} strokeWidth={active ? 2.2 : 1.4} />
+                <ProtocolIcon name={id} size={27} />
               </motion.div>
 
               {/* label */}
               <motion.span
                 className="text-[9px] font-bold tracking-widest uppercase system-font relative z-10"
-                animate={{ color: active ? hex : 'rgba(255,255,255,0.2)' }}
+                animate={{ color: active ? hex : 'rgba(206,222,205,0.68)' }}
                 transition={{ duration: 0.18 }}
                 style={{ letterSpacing: '0.12em' }}>
                 {label}

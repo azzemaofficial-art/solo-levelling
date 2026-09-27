@@ -22,23 +22,30 @@ import { secretsFor, secretOfTheDay } from '../../lib/coachSecrets.js';
 import { MARKER_RE, canonicalMarker, normalizeCoachingText, extractCommand } from '../../lib/coachingText.js';
 import { buildCoachWorkout } from '../../lib/workouts.js';
 import { applyXp } from '../utils/xpLogic';
+import '../styles/mma-studio.css';
+import { describeProfile, readCutProfile } from '../utils/cutProfile';
 
 // ─── Quick prompts ─────────────────────────────────────────────────────────────
+// {PROFILE} viene sostituito col profilo Cut di chi usa questo telefono.
+const personalizePrompts = (prompts) => {
+  const summary = describeProfile(readCutProfile());
+  return prompts.map((prompt) => ({ ...prompt, text: prompt.text.replace('{PROFILE}', summary) }));
+};
 const COACH_QUICK = [
   { label: '🗺️ Piano della settimana', text: 'Guarda il mio percorso e dimmi cosa allenare questa settimana per avvicinarmi alla prossima milestone: giorni, drill e obiettivi misurabili.' },
   { label: '🛡️ Difesa personale da 0', text: 'Voglio diventare fortissimo nella difesa personale partendo da zero. Costruiscimi il percorso: cosa imparare per primo, quante sessioni a settimana e come misurare i progressi.' },
   { label: '🥊 Sblocca la milestone', text: 'Analizza a che punto sono nel curriculum e dammi un drill specifico per superare la milestone del mio livello attuale.' },
-  { label: '📊 Macro per atleta', text: 'Come calcolo i macronutrienti ideali per un atleta di arti marziali? Peso 75kg, altezza 178cm, alleno 4x settimana.' },
+  { label: '📊 Macro per il cut', text: '{PROFILE} Allenamento: calcio lunedì e giovedì e due sedute di forza. Aiutami a calibrare le porzioni sulle misure e sulla prestazione.' },
   { label: '🥋 Conditioning marziale', text: 'Crea un piano di conditioning per un praticante di arti marziali, 3 sessioni/settimana: esplosività, grip, collo, core.' },
   { label: '😴 Recupero e sonno', text: 'Come ottimizzare il recupero muscolare e il sonno per massimizzare i guadagni?' },
 ];
 
 const TRAINER_QUICK = [
-  { label: '🔥 Piano calorico', text: 'Calcolami il fabbisogno calorico giornaliero e i macro ideali. Peso 75kg, 178cm, 25 anni, maschio, allenamento 4x/settimana, obiettivo massa muscolare.' },
-  { label: '🥗 Piano pasti 7gg', text: 'Crea un piano pasti completo per 7 giorni, ~2800 kcal/giorno, alto contenuto proteico (160g+), con ricette e macro per ogni pasto.' },
+  { label: '🔥 Piano calorico', text: '{PROFILE} Allenamento: calcio lunedì e giovedì, forza due giorni; cut graduale. Stima un punto di partenza e spiegami come adattarlo alla media del peso, al girovita e all’energia.' },
+  { label: '🥗 Piano pasti 7gg', text: 'Adatta una settimana del mio piano alimentare al cut. Mantieni McDonald’s mercoledì sera, pasta bianca e carne di cavallo sabato pranzo, pizza domenica sera e ricette fit porn negli altri pasti.' },
   { label: '💪 Scheda arti marziali', text: 'Crea una scheda di allenamento per migliorare forza esplosiva, mobilità e resistenza specifica per le arti marziali (3-4x settimana).' },
   { label: '🥊 Migliori esercizi', text: 'Quali sono i 10 esercizi più efficaci per un praticante di arti marziali che vuole migliorare potenza, velocità e resistenza?' },
-  { label: '💊 Stack integratori', text: 'Costruisci uno stack di integratori evidence-based per un atleta di arti marziali: cosa prendere, quando, quanto.' },
+  { label: '💊 Creatina', text: 'Spiegami in modo pratico cosa sappiamo sulla creatina monoidrato per allenamento di forza e sprint, dose quotidiana tipica, possibili effetti sul peso e quando parlarne con un professionista.' },
   { label: '🍳 Ricetta post-workout', text: 'Dammi 3 ricette post-allenamento veloci, almeno 40g di proteine, con macro precisi.' },
 ];
 
@@ -290,13 +297,13 @@ const CURRICULUM = {
 
 // ─── Colori palette ────────────────────────────────────────────────────────────
 const C = {
-  emerald: { hex: '#10b981', glow: 'rgba(16,185,129,0.4)', bg: 'rgba(6,78,59,0.15)',  border: 'rgba(16,185,129,0.25)' },
-  blue:    { hex: '#3b82f6', glow: 'rgba(59,130,246,0.4)', bg: 'rgba(30,58,138,0.15)', border: 'rgba(59,130,246,0.25)' },
-  orange:  { hex: '#f97316', glow: 'rgba(249,115,22,0.4)', bg: 'rgba(124,45,18,0.15)', border: 'rgba(249,115,22,0.25)' },
+  emerald: { hex: '#6de2d3', glow: 'rgba(109,226,211,0.36)', bg: 'rgba(18,88,85,0.18)', border: 'rgba(109,226,211,0.34)' },
+  blue:    { hex: '#8fb9ff', glow: 'rgba(143,185,255,0.38)', bg: 'rgba(56,74,124,0.18)', border: 'rgba(143,185,255,0.32)' },
+  orange:  { hex: '#ffac91', glow: 'rgba(255,172,145,0.38)', bg: 'rgba(120,64,53,0.18)', border: 'rgba(255,172,145,0.32)' },
   rose:    { hex: '#f43f5e', glow: 'rgba(244,63,94,0.4)',  bg: 'rgba(136,19,55,0.15)', border: 'rgba(244,63,94,0.25)'  },
-  amber:   { hex: '#f59e0b', glow: 'rgba(245,158,11,0.4)', bg: 'rgba(120,53,15,0.15)', border: 'rgba(245,158,11,0.25)' },
+  amber:   { hex: '#ffd184', glow: 'rgba(255,209,132,0.38)', bg: 'rgba(115,79,36,0.18)', border: 'rgba(255,209,132,0.32)' },
   red:     { hex: '#ef4444', glow: 'rgba(239,68,68,0.5)',  bg: 'rgba(127,29,29,0.2)',  border: 'rgba(239,68,68,0.3)'  },
-  violet:  { hex: '#8b5cf6', glow: 'rgba(139,92,246,0.4)', bg: 'rgba(76,29,149,0.15)', border: 'rgba(139,92,246,0.25)' },
+  violet:  { hex: '#b8a4ff', glow: 'rgba(184,164,255,0.38)', bg: 'rgba(71,59,125,0.18)', border: 'rgba(184,164,255,0.32)' },
 };
 
 // ─── SVG Ring (progress circle) ───────────────────────────────────────────────
@@ -716,11 +723,11 @@ function CoachChat() {
             <div className="h-px w-full" style={{ background: 'linear-gradient(90deg, transparent, #3b82f6 40%, #6366f1 70%, transparent)', animation: 'frame-glow-shift 4s linear infinite', backgroundSize: '200% 100%' }} />
             <div className="relative px-4 py-3.5 overflow-hidden">
               <div className="absolute -right-4 -top-4 w-20 h-20 rounded-full pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(59,130,246,0.12) 0%, transparent 70%)' }} />
-              <p className="text-xs font-black tracking-widest" style={{ color: C.blue.hex, fontFamily: 'Orbitron, sans-serif' }}>💬 AI COACH CHAT</p>
+              <p className="text-xs font-black tracking-widest" style={{ color: C.blue.hex, fontFamily: 'Syne, sans-serif' }}>💬 AI COACH CHAT</p>
               <p className="text-xs mt-0.5" style={{ color: '#6b7280' }}>Arti Marziali · Percorso · Nutrizione · Recovery</p>
             </div>
           </div>
-          <QuickGrid prompts={COACH_QUICK} onSend={sendWithContext} accentColor="blue" />
+          <QuickGrid prompts={personalizePrompts(COACH_QUICK)} onSend={sendWithContext} accentColor="blue" />
         </>
       )}
       <div className="space-y-3 min-h-[120px]">
@@ -767,12 +774,12 @@ function PersonalTrainer() {
             <div className="h-px w-full" style={{ background: 'linear-gradient(90deg, transparent, #f59e0b 40%, #f97316 70%, transparent)', animation: 'frame-glow-shift 4s linear infinite', backgroundSize: '200% 100%' }} />
             <div className="relative px-4 py-3.5 overflow-hidden">
               <div className="absolute -right-4 -top-4 w-20 h-20 rounded-full pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(245,158,11,0.12) 0%, transparent 70%)' }} />
-              <p className="text-xs font-black tracking-widest" style={{ color: C.amber.hex, fontFamily: 'Orbitron, sans-serif' }}>⚡ SHADOW COACH</p>
+              <p className="text-xs font-black tracking-widest" style={{ color: C.amber.hex, fontFamily: 'Syne, sans-serif' }}>⚡ SHADOW COACH</p>
               <p className="text-sm font-bold text-white mt-0.5">Kimi K2.6 — Personal Trainer AI</p>
               <p className="text-xs mt-0.5" style={{ color: '#6b7280' }}>Calorie · Macro · Schede · Arti Marziali</p>
             </div>
           </div>
-          <QuickGrid prompts={TRAINER_QUICK} onSend={sendWithContext} accentColor="amber" />
+          <QuickGrid prompts={personalizePrompts(TRAINER_QUICK)} onSend={sendWithContext} accentColor="amber" />
         </>
       )}
       <div className="space-y-3 min-h-[120px]">
@@ -1162,7 +1169,7 @@ function RoutineOverlay({ title, emoji, color = 'orange', steps, voiceOn, onExit
   return createPortal(
     <div className="fixed inset-0 z-[130] flex flex-col items-center justify-center px-6"
       style={{ background: 'rgba(3,7,18,0.96)', backdropFilter: 'blur(12px)' }}>
-      <p className="text-xs font-black tracking-widest mb-6" style={{ color: col.hex, fontFamily: 'Orbitron, sans-serif' }}>{emoji} {title} · {idx + 1}/{steps.length}</p>
+      <p className="text-xs font-black tracking-widest mb-6" style={{ color: col.hex, fontFamily: 'Syne, sans-serif' }}>{emoji} {title} · {idx + 1}/{steps.length}</p>
       <motion.p key={idx} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
         className="text-2xl font-black text-white text-center leading-tight">{step?.name}</motion.p>
       <p className="text-sm text-center mt-2" style={{ color: '#9ca3af' }}>{step?.cue}</p>
@@ -1220,7 +1227,7 @@ function SkillRadar({ skills, size = 170 }) {
 
 // ─── Tab: Curriculum ──────────────────────────────────────────────────────────
 function CurriculumCoach({ onGoLive }) {
-  const [disc, setDisc] = useState('muaythai');
+  const [disc, setDisc] = useState('mma');
   const [expandedLevel, setExpandedLevel] = useState(0);
   const [openTech, setOpenTech] = useState(null); // libreria tecniche: tecnica espansa
   const [progress, setProgress] = useState(() => loadCurrProgress());
@@ -1362,13 +1369,13 @@ Rispondi in italiano, max 15 righe, tono da maestro pratico.`;
             <div className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-black tracking-widest" style={{ color: '#fbbf24', fontFamily: 'Orbitron, sans-serif' }}>👑 TRONO DEL MONARCA</p>
+                  <p className="text-xs font-black tracking-widest" style={{ color: '#fbbf24', fontFamily: 'Syne, sans-serif' }}>👑 TRONO DEL MONARCA</p>
                   <p className="text-[11px] mt-1" style={{ color: '#9ca3af' }}>
                     {ms.done}/{ms.topics} tecniche · {ms.examsDone}/{ms.examsTot} esami · {ms.active.length} discipline attive
                   </p>
                 </div>
                 <div className="text-center flex-shrink-0">
-                  <span className="text-3xl font-black" style={{ color: ms.rank === 'S' ? C.rose.hex : '#fbbf24', fontFamily: 'Orbitron, sans-serif', textShadow: '0 0 18px rgba(251,191,36,0.5)' }}>{ms.rank}</span>
+                  <span className="text-3xl font-black" style={{ color: ms.rank === 'S' ? C.rose.hex : '#fbbf24', fontFamily: 'Syne, sans-serif', textShadow: '0 0 18px rgba(251,191,36,0.5)' }}>{ms.rank}</span>
                   <p className="text-[8px] font-mono tracking-widest" style={{ color: '#6b7280' }}>RANGO GLOBALE</p>
                 </div>
               </div>
@@ -1414,7 +1421,7 @@ Rispondi in italiano, max 15 righe, tono da maestro pratico.`;
           <div className="absolute -right-6 -top-6 w-28 h-28 rounded-full pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(139,92,246,0.12) 0%, transparent 70%)', animation: 'drift-slow 10s ease-in-out infinite' }} />
           <div className="flex items-center justify-between mb-3">
             <div>
-              <p className="text-xs font-black tracking-widest" style={{ color: C.violet.hex, fontFamily: 'Orbitron, sans-serif' }}>📚 CURRICULUM</p>
+              <p className="text-xs font-black tracking-widest" style={{ color: C.violet.hex, fontFamily: 'Syne, sans-serif' }}>📚 CURRICULUM</p>
               <div className="flex items-center gap-2 mt-0.5">
                 <p className="text-lg font-black text-white">{curriculum.name}</p>
                 {rank && (
@@ -1446,14 +1453,14 @@ Rispondi in italiano, max 15 righe, tono da maestro pratico.`;
 
       {/* ⚔ MAESTRIA DELLA DISCIPLINA — sale solo con tanta pratica */}
       <div className="rounded-2xl px-4 py-2.5 flex items-center gap-3" style={{ background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.2)' }}>
-        <p className="text-[8px] font-black tracking-[0.18em] whitespace-nowrap" style={{ color: '#fbbf24', fontFamily: 'Orbitron, sans-serif' }}>⚔ MAESTRIA</p>
+        <p className="text-[8px] font-black tracking-[0.18em] whitespace-nowrap" style={{ color: '#fbbf24', fontFamily: 'Syne, sans-serif' }}>⚔ MAESTRIA</p>
         <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(55,65,81,0.5)' }}>
           <motion.div className="h-full rounded-full"
             animate={{ width: `${Math.max(1.5, discMastery)}%` }}
             transition={{ duration: 0.7, ease: [0.2, 0.8, 0.3, 1] }}
             style={{ background: 'linear-gradient(90deg, #b45309, #fbbf24, #fff)', boxShadow: '0 0 8px rgba(251,191,36,0.6)' }} />
         </div>
-        <p className="text-[10px] font-black whitespace-nowrap" style={{ color: '#fff', fontFamily: 'Orbitron, sans-serif' }}>
+        <p className="text-[10px] font-black whitespace-nowrap" style={{ color: '#fff', fontFamily: 'Syne, sans-serif' }}>
           {discMastery}<span style={{ color: '#6b7280' }}>/100</span>
         </p>
       </div>
@@ -1465,7 +1472,7 @@ Rispondi in italiano, max 15 righe, tono da maestro pratico.`;
         return (
           <div className="rounded-2xl p-4 space-y-2" style={{ background: 'linear-gradient(135deg, rgba(245,158,11,0.08), rgba(17,24,39,0.9))', border: `1px solid ${C.amber.border}` }}>
             <div className="flex items-center justify-between gap-2">
-              <p className="text-xs font-black tracking-widest" style={{ color: C.amber.hex, fontFamily: 'Orbitron, sans-serif' }}>🗝️ SEGRETO DEL GIORNO</p>
+              <p className="text-xs font-black tracking-widest" style={{ color: C.amber.hex, fontFamily: 'Syne, sans-serif' }}>🗝️ SEGRETO DEL GIORNO</p>
               <span className="text-[10px] px-2 py-0.5 rounded-full font-bold whitespace-nowrap" style={{ background: 'rgba(55,65,81,0.4)', color: '#9ca3af' }}>
                 {unlockedSecrets.length}/{discSecrets.length} rivelati · grado {rank?.rank || 'E'}
               </span>
@@ -1501,7 +1508,7 @@ Rispondi in italiano, max 15 righe, tono da maestro pratico.`;
               style={{ background: 'linear-gradient(160deg, rgba(245,158,11,0.14), rgba(17,24,39,0.98))', border: `1px solid ${C.amber.border}`, boxShadow: `0 0 40px ${C.amber.glow}` }}
               onClick={(e) => e.stopPropagation()}>
               <p className="text-center text-3xl">🗝️</p>
-              <p className="text-center text-sm font-black tracking-widest" style={{ color: C.amber.hex, fontFamily: 'Orbitron, sans-serif' }}>SEGRETI SBLOCCATI — GRADO {unlockModal.rank}</p>
+              <p className="text-center text-sm font-black tracking-widest" style={{ color: C.amber.hex, fontFamily: 'Syne, sans-serif' }}>SEGRETI SBLOCCATI — GRADO {unlockModal.rank}</p>
               <p className="text-center text-xs" style={{ color: '#9ca3af' }}>
                 Il Maestro ti ritiene pronto. {unlockModal.total === 1 ? 'Un nuovo segreto' : `${unlockModal.total} nuovi segreti`} di {curriculum.name}{unlockModal.total > 5 ? ' — ecco i primi:' : ':'}
               </p>
@@ -1536,11 +1543,11 @@ Rispondi in italiano, max 15 righe, tono da maestro pratico.`;
         return (
           <div className="rounded-2xl p-4 space-y-3" style={{ background: 'linear-gradient(160deg, rgba(120,53,15,0.25), rgba(17,24,39,0.94))', border: '1px solid rgba(251,191,36,0.4)', boxShadow: '0 0 26px rgba(251,191,36,0.12)' }}>
             <div className="flex items-center justify-between">
-              <p className="text-xs font-black tracking-widest" style={{ color: '#fbbf24', fontFamily: 'Orbitron, sans-serif' }}>⛰ LA SCALATA</p>
-              <p className="text-sm font-black" style={{ color: '#fff', fontFamily: 'Orbitron, sans-serif' }}>{fp.level}<span style={{ color: '#78716c' }}>/100</span></p>
+              <p className="text-xs font-black tracking-widest" style={{ color: '#fbbf24', fontFamily: 'Syne, sans-serif' }}>⛰ LA SCALATA</p>
+              <p className="text-sm font-black" style={{ color: '#fff', fontFamily: 'Syne, sans-serif' }}>{fp.level}<span style={{ color: '#78716c' }}>/100</span></p>
             </div>
             <div>
-              <p className="text-base font-black tracking-wide" style={{ color: '#fde68a', fontFamily: 'Orbitron, sans-serif' }}>{tt.title}</p>
+              <p className="text-base font-black tracking-wide" style={{ color: '#fde68a', fontFamily: 'Syne, sans-serif' }}>{tt.title}</p>
               <p className="text-[10px]" style={{ color: '#a8a29e' }}>{tt.sub}</p>
             </div>
             <div className="h-2 rounded-full overflow-hidden" style={{ background: 'rgba(51,65,85,0.6)', border: '1px solid rgba(251,191,36,0.2)' }}>
@@ -1565,7 +1572,7 @@ Rispondi in italiano, max 15 righe, tono da maestro pratico.`;
         return (
           <div className="rounded-2xl p-4 space-y-3" style={{ background: 'linear-gradient(160deg, rgba(14,116,144,0.1), rgba(17,24,39,0.92))', border: '1px solid rgba(56,189,248,0.3)' }}>
             <div className="flex items-center justify-between">
-              <p className="text-xs font-black tracking-widest" style={{ color: '#7dd3fc', fontFamily: 'Orbitron, sans-serif' }}>📖 TECNICHE</p>
+              <p className="text-xs font-black tracking-widest" style={{ color: '#7dd3fc', fontFamily: 'Syne, sans-serif' }}>📖 TECNICHE</p>
               <span className="text-[10px] px-2 py-0.5 rounded-full font-bold" style={{ background: 'rgba(56,189,248,0.12)', color: '#7dd3fc', border: '1px solid rgba(56,189,248,0.3)' }}>
                 {unlockedCount}/{all.length} · LIV {fProfile.level}
               </span>
@@ -1615,7 +1622,7 @@ Rispondi in italiano, max 15 righe, tono da maestro pratico.`;
                             ))}
                             <button onClick={() => trainLive(`Insegna la tecnica "${t.name}" (${CAT_LABEL[cat].replace(/^[^ ]+ /, '')}): guida questi step — ${t.steps.join(' / ')} — e correggimi dalla camera mentre la eseguo.`)}
                               className="w-full mt-1 py-2 rounded-lg text-[10px] font-black tracking-widest"
-                              style={{ background: 'linear-gradient(90deg, #38bdf8, #0ea5e9)', color: '#04121c', fontFamily: 'Orbitron, sans-serif' }}>
+                              style={{ background: 'linear-gradient(90deg, #38bdf8, #0ea5e9)', color: '#04121c', fontFamily: 'Syne, sans-serif' }}>
                               ▶ ALLENA ORA
                             </button>
                           </div>
@@ -1633,7 +1640,7 @@ Rispondi in italiano, max 15 righe, tono da maestro pratico.`;
       {/* 🗡️ ARMATA DELLE OMBRE — ogni grado A/S estrae un soldato */}
       <div className="rounded-2xl p-4 space-y-2" style={{ background: 'linear-gradient(160deg, rgba(76,29,149,0.14), rgba(17,24,39,0.9))', border: '1px solid rgba(167,139,250,0.3)', boxShadow: '0 0 22px rgba(139,92,246,0.12)' }}>
         <div className="flex items-center justify-between">
-          <p className="text-xs font-black tracking-widest" style={{ color: '#c4b5fd', fontFamily: 'Orbitron, sans-serif' }}>🗡️ ARMATA DELLE OMBRE</p>
+          <p className="text-xs font-black tracking-widest" style={{ color: '#c4b5fd', fontFamily: 'Syne, sans-serif' }}>🗡️ ARMATA DELLE OMBRE</p>
           <span className="text-[10px] px-2 py-0.5 rounded-full font-bold" style={{ background: 'rgba(139,92,246,0.15)', color: '#a78bfa', border: '1px solid rgba(167,139,250,0.35)' }}>
             {Object.keys(army).filter((d) => CURRICULUM[d]).length}/{Object.keys(CURRICULUM).length}
           </span>
@@ -1690,7 +1697,7 @@ Rispondi in italiano, max 15 righe, tono da maestro pratico.`;
       {objective ? (
         <div className="rounded-2xl p-4 space-y-3" style={{ background: 'linear-gradient(135deg, rgba(16,185,129,0.08), rgba(17,24,39,0.9))', border: `1px solid ${C.emerald.border}` }}>
           <div className="flex items-center justify-between">
-            <p className="text-xs font-black tracking-widest" style={{ color: C.emerald.hex, fontFamily: 'Orbitron, sans-serif' }}>
+            <p className="text-xs font-black tracking-widest" style={{ color: C.emerald.hex, fontFamily: 'Syne, sans-serif' }}>
               {objective.levelComplete ? '🎓 PRONTO PER L\'ESAME' : '🎯 OBIETTIVO DI OGGI'}
             </p>
             <span className="text-[10px] px-2 py-0.5 rounded-full font-bold" style={{ background: 'rgba(55,65,81,0.4)', color: '#9ca3af' }}>{objective.level.label}</span>
@@ -1755,7 +1762,7 @@ Rispondi in italiano, max 15 righe, tono da maestro pratico.`;
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
           className="rounded-2xl p-4 space-y-2.5"
           style={{ background: 'linear-gradient(160deg, rgba(251,191,36,0.1), rgba(17,24,39,0.94))', border: '1px solid rgba(251,191,36,0.4)', boxShadow: '0 0 24px rgba(251,191,36,0.12)' }}>
-          <p className="text-xs font-black tracking-widest" style={{ color: '#fbbf24', fontFamily: 'Orbitron, sans-serif' }}>
+          <p className="text-xs font-black tracking-widest" style={{ color: '#fbbf24', fontFamily: 'Syne, sans-serif' }}>
             🎯 PARTI DA ZERO — {curriculum.name.toUpperCase()}
           </p>
           <div className="space-y-1.5">
@@ -1779,7 +1786,7 @@ Rispondi in italiano, max 15 righe, tono da maestro pratico.`;
           })()}
           <button onClick={() => trainLive(`Prima sessione da zero in ${curriculum.name}: insegna "${objective?.topic || curriculum.levels[0].topics[0]}" con drill semplici, guarda la camera e correggi tutto.`)}
             className="w-full py-2.5 rounded-xl text-xs font-black tracking-widest"
-            style={{ background: 'linear-gradient(90deg, #fbbf24, #f59e0b)', color: '#1c1204', fontFamily: 'Orbitron, sans-serif', boxShadow: '0 0 16px rgba(251,191,36,0.4)' }}>
+            style={{ background: 'linear-gradient(90deg, #fbbf24, #f59e0b)', color: '#1c1204', fontFamily: 'Syne, sans-serif', boxShadow: '0 0 16px rgba(251,191,36,0.4)' }}>
             ▶ INIZIA LA PRIMA SESSIONE
           </button>
         </motion.div>
@@ -1876,7 +1883,7 @@ Rispondi in italiano, max 15 righe, tono da maestro pratico.`;
                         {isDone && <div className="absolute top-0 left-0 w-full h-px" style={{ background: `linear-gradient(90deg, transparent, ${col.hex}88, transparent)` }} />}
                         <span className="text-base mt-0.5">{isDone ? '🏆' : '🎯'}</span>
                         <div>
-                          <p className="text-[10px] font-black tracking-widest mb-0.5" style={{ color: isDone ? col.hex : '#374151', fontFamily: 'Orbitron, sans-serif' }}>MILESTONE</p>
+                          <p className="text-[10px] font-black tracking-widest mb-0.5" style={{ color: isDone ? col.hex : '#374151', fontFamily: 'Syne, sans-serif' }}>MILESTONE</p>
                           <p className="text-xs leading-relaxed" style={{ color: isDone ? col.hex : '#6b7280' }}>{level.milestone}</p>
                         </div>
                       </div>
@@ -3022,7 +3029,7 @@ function BreathingGuide({ protocol, onExit, voiceOn, enqueueSpeak }) {
         ✕ Esci
       </button>
 
-      <p className="text-[11px] font-black tracking-widest mb-1 text-center" style={{ color: C.emerald.hex, fontFamily: 'Orbitron, sans-serif' }}>
+      <p className="text-[11px] font-black tracking-widest mb-1 text-center" style={{ color: C.emerald.hex, fontFamily: 'Syne, sans-serif' }}>
         {protocol.name?.toUpperCase()}
       </p>
       <p className="text-xs text-center mb-6 max-w-xs" style={{ color: '#6b7280' }}>{protocol.subtitle}</p>
@@ -3031,7 +3038,7 @@ function BreathingGuide({ protocol, onExit, voiceOn, enqueueSpeak }) {
         <circle cx={110} cy={110} r={R_MAX + 8} fill="none" stroke="rgba(16,185,129,0.12)" strokeWidth={1.5} />
         <circle cx={110} cy={110} r={r} fill="rgba(16,185,129,0.14)" stroke={C.emerald.hex} strokeWidth={2.5}
           style={{ transition: 'r 1s linear' }} />
-        <text x={110} y={104} textAnchor="middle" fontSize={15} fontWeight={800} fill="#e5f7f0" style={{ fontFamily: 'Orbitron, sans-serif' }}>
+        <text x={110} y={104} textAnchor="middle" fontSize={15} fontWeight={800} fill="#e5f7f0" style={{ fontFamily: 'Syne, sans-serif' }}>
           {(curPhase?.label || 'FINE').toUpperCase()}
         </text>
         <text x={110} y={132} textAnchor="middle" fontSize={30} fontWeight={900} fill={C.emerald.hex}>
@@ -3058,7 +3065,7 @@ function BreathingGuide({ protocol, onExit, voiceOn, enqueueSpeak }) {
   );
 }
 
-function VisualCoach({ setPlayerStats }) {
+function VisualCoach({ setPlayerStats, aiStatus }) {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   // Ref per enqueueSpeak (dichiarata molto più sotto, ~riga 4130): alcuni callback
@@ -3070,12 +3077,23 @@ function VisualCoach({ setPlayerStats }) {
   const enqueueSpeakRef = useRef(() => {});
   const [step, setStep] = useState('setup');
   const [sessionContext, setSessionContext] = useState('');
+  const [academyLesson, setAcademyLesson] = useState(null);
+  const [studioClock, setStudioClock] = useState({ phase: 'ready', round: 1, left: 120 });
+  const [studioPaused, setStudioPaused] = useState(false);
+  const [studioCombos, setStudioCombos] = useState(0);
+  const [studioSaved, setStudioSaved] = useState(false);
+  const studioSamplesRef = useRef([]);
+  const studioComboRef = useRef({ armed: { L: false, R: false }, last: null, at: 0, count: 0 });
+  const studioLessonRef = useRef(null);
+  const studioPhaseRef = useRef('ready');
+  studioLessonRef.current = academyLesson;
+  studioPhaseRef.current = studioClock.phase;
   const [streaming, setStreaming] = useState(false);
   const wakeLockRef = useRef(null);
   const [analysis, setAnalysis] = useState(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [autoMode, setAutoMode] = useState(false);
-  const [mode, setMode] = useState('muaythai');
+  const [mode, setMode] = useState('mma');
   const [pastSessions, setPastSessions] = useState(() => loadSessions());
   const [coachProgress, setCoachProgress] = useState(() => loadCoachProgress());
   // ── MEMORIA DEL MAESTRO cross-device: idrata lo storico da KV (coach_sessions)
@@ -3125,6 +3143,12 @@ function VisualCoach({ setPlayerStats }) {
     if (!p || !p.mode) return;
     setMode(p.mode);
     setSessionContext(p.context || '');
+    if (p.mirror) {
+      setMirrorTech(p.mirror);
+      setMirrorOn(true);
+      setSkeletonOn(true);
+    }
+    if (p.academyLesson) setAcademyLesson(p.academyLesson);
     if (p.exam) {
       examRef.current = { ...p.exam, mode: p.mode };
       setExamBanner({ label: p.exam.label, milestone: p.exam.milestone });
@@ -3297,6 +3321,7 @@ function VisualCoach({ setPlayerStats }) {
   const [sampleCount, setSampleCount] = useState(0);          // campioni inviati in sessione
   const [framingHint, setFramingHint] = useState('');     // avviso "inquadra il corpo"
   const [trackQuality, setTrackQuality] = useState('none'); // full | upper | partial | none
+  const lastLocalQualityRef = useRef('none');
   const [repCount, setRepCount] = useState(0);            // conta-ripetizioni (guidato)
   const repCountRef = useRef(0);
   const repPhaseRef = useRef('up');
@@ -4312,6 +4337,12 @@ function VisualCoach({ setPlayerStats }) {
     }
   };
 
+  useEffect(() => {
+    if (step !== 'live' || !streaming || !streamRef.current || !videoRef.current) return;
+    if (videoRef.current.srcObject !== streamRef.current) videoRef.current.srcObject = streamRef.current;
+    videoRef.current.play().catch(() => {});
+  }, [step, streaming, academyLesson]);
+
   const flipCamera = async () => {
     const next = facingMode === 'environment' ? 'user' : 'environment';
     setFacingMode(next);
@@ -4329,6 +4360,14 @@ function VisualCoach({ setPlayerStats }) {
     kinHistRef.current = []; trendRef.current = []; lastTrendTRef.current = 0; // fatica misurata su QUESTA sessione
     unlockSpeech();                       // gesto utente: sblocca la voce per l'auto mode
     setScore({ a: 0, b: 0 }); setLastPoint(null);
+    if (academyLesson) {
+      setStudioClock({ phase: 'ready', round: 1, left: academyLesson.roundSeconds || 120 });
+      setStudioPaused(false); setStudioCombos(0); setStudioSaved(false);
+      studioSamplesRef.current = [];
+      studioComboRef.current = { armed: { L: false, R: false }, last: null, at: 0, count: 0 };
+      mirrorMatchRef.current = null;
+      lastLandmarksRef.current = null;
+    }
     setStep('live'); setAnalysis(null);
     await startCamera();
   };
@@ -4514,6 +4553,12 @@ function VisualCoach({ setPlayerStats }) {
           ctx.clearRect(0, 0, canvas.width, canvas.height);
           const result = lm.detectForVideo(video, performance.now());
           if (result.landmarks.length > 0) {
+            const visible = (i) => (result.landmarks[0][i]?.visibility ?? 0) > 0.45;
+            const quality = visible(11) && visible(12) && visible(23) && visible(24)
+              ? (visible(25) || visible(26) ? 'full' : 'upper') : 'partial';
+            if (quality !== lastLocalQualityRef.current) {
+              lastLocalQualityRef.current = quality; setTrackQuality(quality);
+            }
             const du = new DrawingUtils(ctx);
             const bodyConns = poseRef.current?.bodyConnections || PoseLandmarker.POSE_CONNECTIONS;
             du.drawConnectors(result.landmarks[0], bodyConns,
@@ -4537,6 +4582,19 @@ function VisualCoach({ setPlayerStats }) {
               const nowK = performance.now();
               const K = kinHistRef.current;
               K.push({ t: nowK, eL: jointAngle(L, 11, 13, 15), eR: jointAngle(L, 12, 14, 16), kL: jointAngle(L, 23, 25, 27), kR: jointAngle(L, 24, 26, 28) });
+              if (studioLessonRef.current?.id === 'one-two' && studioPhaseRef.current === 'round') {
+                const combo = studioComboRef.current;
+                for (const [side, angle] of [['L', K[K.length - 1].eL], ['R', K[K.length - 1].eR]]) {
+                  if (angle == null) continue;
+                  if (angle < 115) combo.armed[side] = true;
+                  if (angle >= 153 && combo.armed[side]) {
+                    combo.armed[side] = false;
+                    if (combo.last && combo.last !== side && nowK - combo.at < 1600) {
+                      combo.count += 1; setStudioCombos(combo.count); combo.last = null;
+                    } else { combo.last = side; combo.at = nowK; }
+                  }
+                }
+              }
               while (K.length > 220) K.shift();
               while (K.length && nowK - K[0].t > 3500) K.shift();
               if (nowK - lastTrendTRef.current > 5000) {
@@ -4668,6 +4726,9 @@ function VisualCoach({ setPlayerStats }) {
             lastLandmarksRef.current = null;
             prevLmRef.current = null;
             setCentered('none');
+            if (lastLocalQualityRef.current !== 'none') {
+              lastLocalQualityRef.current = 'none'; setTrackQuality('none');
+            }
           }
           rafRef.current = requestAnimationFrame(loop);
         };
@@ -4726,6 +4787,52 @@ function VisualCoach({ setPlayerStats }) {
       }
     }
   }, [mirrorState, mirrorOn, voiceOn, enqueueSpeak]);
+
+  useEffect(() => {
+    if (step !== 'live' || !academyLesson || studioPaused || !['round', 'rest'].includes(studioClock.phase)) return undefined;
+    const tick = setInterval(() => {
+      if (studioPhaseRef.current === 'round' && lastLandmarksRef.current && ['full', 'upper'].includes(lastLocalQualityRef.current)) {
+        const match = mirrorMatchRef.current;
+        if (match && Number.isFinite(match.score)) {
+          studioSamplesRef.current.push({ score: match.score, hint: match.hints?.[0] || '' });
+        }
+      }
+      setStudioClock((current) => {
+        if (current.left > 1) return { ...current, left: current.left - 1 };
+        if (current.phase === 'round') return current.round === (academyLesson.rounds || 3)
+          ? { phase: 'done', round: current.round, left: 0 }
+          : { phase: 'rest', round: current.round, left: 30 };
+        return { phase: 'round', round: current.round + 1, left: academyLesson.roundSeconds || 120 };
+      });
+    }, 1000);
+    return () => clearInterval(tick);
+  }, [step, academyLesson, studioPaused, studioClock.phase]);
+
+  const studioAnnouncementRef = useRef('ready-1');
+  useEffect(() => {
+    if (!academyLesson || step !== 'live') return;
+    const current = `${studioClock.phase}-${studioClock.round}`;
+    if (current === studioAnnouncementRef.current) return;
+    studioAnnouncementRef.current = current;
+    if (studioClock.phase === 'round') enqueueSpeakRef.current(`Round ${studioClock.round}. ${academyLesson.roundPlan?.[studioClock.round - 1] || academyLesson.focus}`, true);
+    if (studioClock.phase === 'rest') enqueueSpeakRef.current('Recupera 30 secondi. Respira e torna in guardia.', true);
+    if (studioClock.phase === 'done') enqueueSpeakRef.current('Sessione completata. Ottimo lavoro. Guarda il riepilogo.', true);
+  }, [academyLesson, step, studioClock.phase, studioClock.round]);
+
+  useEffect(() => {
+    if (!academyLesson?.id || studioClock.phase !== 'done' || studioSaved) return;
+    const samples = studioSamplesRef.current;
+    const average = samples.length ? Math.round(samples.reduce((sum, sample) => sum + sample.score, 0) / samples.length) : null;
+    try {
+      const key = 'shadow_monarch_mma_academy_v1';
+      const previous = JSON.parse(localStorage.getItem(key) || '{}');
+      localStorage.setItem(key, JSON.stringify({ ...previous,
+        done: { ...(previous.done || {}), [academyLesson.id]: true },
+        lastSession: { lessonId: academyLesson.id, date: new Date().toISOString(), score: average, samples: samples.length, combinations: studioCombos, rounds: academyLesson.rounds || 3 },
+      }));
+    } catch {}
+    setStudioSaved(true);
+  }, [academyLesson, studioClock.phase, studioCombos, studioSaved]);
 
   // ── Motore workout: timer 1s, countdown vocale, gong e insegnamento a ogni fase ──
   const startCoachWorkout = useCallback(() => {
@@ -5281,6 +5388,32 @@ function VisualCoach({ setPlayerStats }) {
 
   // ── Setup ──────────────────────────────────────────────────────────────────
   if (step === 'setup') {
+    if (academyLesson) return (
+      <div className="coach-academy-setup space-y-4 pb-5">
+        <div className="rounded-2xl p-5" style={{ background: 'linear-gradient(145deg,#153239,#111a29)', border: '1px solid #6de2d366' }}>
+          <p className="academy-eyebrow text-[10px] font-bold tracking-[.2em] text-cyan-300">LEZIONE GUIDATA / MMA</p>
+          <h2 className="text-2xl font-black text-white mt-2">{academyLesson.title}</h2>
+          <p className="text-sm text-slate-300 leading-relaxed mt-3">{academyLesson.focus}</p>
+        </div>
+        <div className="rounded-xl p-4 bg-white/[.04] border border-white/10">
+          <p className="text-[10px] font-bold tracking-widest text-cyan-300">IL DRILL</p>
+          <p className="text-sm text-slate-200 mt-2 leading-relaxed">{academyLesson.drill}</p>
+        </div>
+        <div className="rounded-xl p-4 bg-white/[.04] border border-white/10">
+          <p className="text-[10px] font-bold tracking-widest text-cyan-300">FEEDBACK DALLA CAMERA</p>
+          <p className="text-sm text-slate-200 mt-2">{academyLesson.camera}</p>
+          <p className="text-xs text-slate-400 mt-2 leading-relaxed">{aiStatus === 'offline' ? 'Lo specchio posturale è attivo. In questa anteprima il servizio AI è offline: riceverai solo le correzioni locali basate sulla posa.' : 'Lo specchio posturale è già attivo. Inquadra il corpo intero; il feedback AI dipende dalla connessione al servizio.'}</p>
+        </div>
+        <div className="flex gap-2">
+          <button onClick={() => { unlockSpeech(); setWarmupKind('warmup'); }} className="flex-1 rounded-xl border border-orange-400/40 bg-orange-400/10 text-orange-200 py-3 text-xs font-bold">Riscaldamento 3'</button>
+          <button onClick={() => { unlockSpeech(); setWarmupKind('cooldown'); }} className="flex-1 rounded-xl border border-sky-400/40 bg-sky-400/10 text-sky-200 py-3 text-xs font-bold">Defaticamento</button>
+        </div>
+        <button onClick={startSession} className="academy-start w-full rounded-xl py-4 bg-cyan-300 text-slate-950 font-black text-sm">AVVIA CAMERA E LEZIONE</button>
+        <button onClick={() => setAcademyLesson(null)} className="w-full py-2 text-xs text-slate-400">Altre modalità del coach</button>
+        {warmupKind === 'warmup' && <RoutineOverlay title="RISCALDAMENTO" emoji="🔥" color="orange" steps={WARMUP_STEPS} voiceOn={voiceOn} onExit={() => setWarmupKind(null)} />}
+        {warmupKind === 'cooldown' && <RoutineOverlay title="DEFATICAMENTO" emoji="🧘" color="blue" steps={COOLDOWN_STEPS} voiceOn={voiceOn} onExit={() => setWarmupKind(null)} />}
+      </div>
+    );
     return (
       <div className="space-y-4">
         {/* 🎓/🎯 Sessione pre-configurata dal Curriculum */}
@@ -5292,13 +5425,13 @@ function VisualCoach({ setPlayerStats }) {
               : { background: 'linear-gradient(135deg, rgba(16,185,129,0.1), rgba(17,24,39,0.9))', border: `1px solid ${C.emerald.border}` }}>
             {examBanner.milestone ? (
               <>
-                <p className="text-xs font-black tracking-widest" style={{ color: C.rose.hex, fontFamily: 'Orbitron, sans-serif' }}>🎓 ESAME MILESTONE — {examBanner.label}</p>
+                <p className="text-xs font-black tracking-widest" style={{ color: C.rose.hex, fontFamily: 'Syne, sans-serif' }}>🎓 ESAME MILESTONE — {examBanner.label}</p>
                 <p className="text-[11px] mt-1 text-gray-300">{examBanner.milestone}</p>
                 <p className="text-[10px] mt-1" style={{ color: '#6b7280' }}>Il Maestro giudica da esaminatore: serve ≥75/100 per la promozione. Avvia la sessione quando sei pronto.</p>
               </>
             ) : (
               <>
-                <p className="text-xs font-black tracking-widest" style={{ color: C.emerald.hex, fontFamily: 'Orbitron, sans-serif' }}>🎯 OBIETTIVO DAL PERCORSO</p>
+                <p className="text-xs font-black tracking-widest" style={{ color: C.emerald.hex, fontFamily: 'Syne, sans-serif' }}>🎯 OBIETTIVO DAL PERCORSO</p>
                 <p className="text-[11px] mt-1 text-gray-300">{examBanner.objective}</p>
               </>
             )}
@@ -5310,7 +5443,7 @@ function VisualCoach({ setPlayerStats }) {
           <div className="rounded-2xl px-4 py-3 flex items-center gap-3"
             style={{ background: 'linear-gradient(135deg, rgba(16,185,129,0.07), rgba(17,24,39,0.85))', border: `1px solid ${C.emerald.border}` }}>
             <div className="flex-1 min-w-0">
-              <p className="text-[10px] font-black tracking-widest" style={{ color: C.emerald.hex, fontFamily: 'Orbitron, sans-serif' }}>
+              <p className="text-[10px] font-black tracking-widest" style={{ color: C.emerald.hex, fontFamily: 'Syne, sans-serif' }}>
                 🎯 PERCORSO — {liveObjective.level.label}
               </p>
               <p className="text-xs mt-0.5 text-gray-300 truncate">
@@ -5351,7 +5484,7 @@ function VisualCoach({ setPlayerStats }) {
             ))}
             <div className="flex items-start justify-between gap-2">
               <div>
-                <p className="text-xs font-black tracking-widest" style={{ color: '#fbbf24', fontFamily: 'Orbitron, sans-serif' }}>🎁 ARENA EDITION</p>
+                <p className="text-xs font-black tracking-widest" style={{ color: '#fbbf24', fontFamily: 'Syne, sans-serif' }}>🎁 ARENA EDITION</p>
                 <p className="text-[11px] mt-1 leading-snug text-gray-300">
                   Buon compleanno, Monarca. 👑 Il Coach è stato forgiato di nuovo: arena con riflettori, impatti con scintille e detriti,
                   esplosione sui <b style={{ color: '#34d399' }}>PERFECT</b> — e un motore d'animazione che consuma la metà.
@@ -5367,14 +5500,14 @@ function VisualCoach({ setPlayerStats }) {
           <div className="h-px w-full" style={{ background: 'linear-gradient(90deg, transparent, #10b981 40%, #0d9488 70%, transparent)', animation: 'frame-glow-shift 4s linear infinite', backgroundSize: '200% 100%' }} />
           <div className="relative px-4 py-3.5 overflow-hidden">
             <div className="absolute -right-4 -top-4 w-20 h-20 rounded-full pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(16,185,129,0.12) 0%, transparent 70%)', animation: 'drift-slow 8s ease-in-out infinite' }} />
-            <p className="text-xs font-black tracking-widest" style={{ color: C.emerald.hex, fontFamily: 'Orbitron, sans-serif' }}>📷 VISUAL LIVE COACH</p>
+            <p className="text-xs font-black tracking-widest" style={{ color: C.emerald.hex, fontFamily: 'Syne, sans-serif' }}>📷 VISUAL LIVE COACH</p>
             <p className="text-xs mt-0.5" style={{ color: '#6b7280' }}>Groq Scout · Cosmos · Gemma Brain · 27 discipline</p>
           </div>
         </div>
 
         {DISCIPLINE_GROUPS.map((group) => (
           <div key={group.label}>
-            <p className="text-[10px] font-black text-gray-600 mb-2 tracking-widest" style={{ fontFamily: 'Orbitron, sans-serif' }}>{group.label}</p>
+            <p className="text-[10px] font-black text-gray-600 mb-2 tracking-widest" style={{ fontFamily: 'Syne, sans-serif' }}>{group.label}</p>
             <div className="flex flex-wrap gap-1.5">
               {group.items.map((d) => {
                 const isActive = mode === d.id;
@@ -5422,7 +5555,7 @@ function VisualCoach({ setPlayerStats }) {
 
         {mode === 'breathing' && (
           <div className="p-3 rounded-xl" style={{ background: C.emerald.bg, border: `1px solid ${C.emerald.border}` }}>
-            <p className="text-[10px] font-black text-gray-500 mb-2 tracking-widest" style={{ fontFamily: 'Orbitron, sans-serif' }}>🌬️ PROTOCOLLO DI RESPIRAZIONE</p>
+            <p className="text-[10px] font-black text-gray-500 mb-2 tracking-widest" style={{ fontFamily: 'Syne, sans-serif' }}>🌬️ PROTOCOLLO DI RESPIRAZIONE</p>
             <div className="flex flex-wrap gap-1.5 mb-3">
               {BREATHING_PROTOCOLS.map((p) => {
                 const isActive = breathingProtocolId === p.id;
@@ -5457,7 +5590,7 @@ function VisualCoach({ setPlayerStats }) {
           return (
             <div className="p-3 rounded-xl" style={{ background: 'rgba(180,120,30,0.07)', border: `1px solid ${C.amber.border}` }}>
               <div className="flex items-center justify-between mb-1.5">
-                <p className="text-[10px] font-black tracking-widest" style={{ color: C.amber.hex, fontFamily: 'Orbitron, sans-serif' }}>
+                <p className="text-[10px] font-black tracking-widest" style={{ color: C.amber.hex, fontFamily: 'Syne, sans-serif' }}>
                   {kd.emoji} LA VIA — {kd.name.toUpperCase()}
                 </p>
                 {dp && (
@@ -5478,7 +5611,7 @@ function VisualCoach({ setPlayerStats }) {
           <button onClick={startCoachWorkout}
             className="w-full p-3.5 rounded-xl text-left transition-transform active:scale-[0.98]"
             style={{ background: 'linear-gradient(135deg, rgba(217,119,6,0.28), rgba(180,83,9,0.14))', border: `1px solid ${C.amber.hex}55` }}>
-            <p className="text-[11px] font-black tracking-widest" style={{ color: '#fbbf24', fontFamily: 'Orbitron, sans-serif' }}>
+            <p className="text-[11px] font-black tracking-widest" style={{ color: '#fbbf24', fontFamily: 'Syne, sans-serif' }}>
               💪 DAMMI UN WORKOUT
             </p>
             <p className="text-[10px] mt-1 leading-snug" style={{ color: '#d1d5db' }}>
@@ -5536,7 +5669,7 @@ function VisualCoach({ setPlayerStats }) {
             ? { background: `linear-gradient(135deg, ${C.violet.hex}, #4f46e5)`, boxShadow: `0 8px 28px ${C.violet.glow}` }
             : { background: `linear-gradient(135deg, ${C.emerald.hex}, #0d9488)`, boxShadow: `0 8px 28px ${C.emerald.glow}` }}>
           <span className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent)', animation: 'chip-sheen 2.5s ease-in-out infinite', backgroundSize: '200% 100%' }} />
-          <span className="relative" style={{ fontFamily: 'Orbitron, sans-serif', letterSpacing: '0.05em' }}>
+          <span className="relative" style={{ fontFamily: 'Syne, sans-serif', letterSpacing: '0.05em' }}>
             {isPartnerMode ? `👥 INIZIA MATCH — ${rounds}×${roundDuration/60}MIN` : '📷 INIZIA SESSIONE LIVE'}
           </span>
         </motion.button>
@@ -5561,6 +5694,62 @@ function VisualCoach({ setPlayerStats }) {
         )}
       </div>
     );
+  }
+
+  if (academyLesson) {
+    const visiblePose = streaming && ['full', 'upper'].includes(trackQuality);
+    const poseScore = visiblePose && mirrorState ? Math.round(mirrorState.score) : null;
+    const cue = !streaming ? 'La camera non è disponibile. Controlla i permessi.'
+      : !visiblePose ? 'Arretra finché spalle, bacino e gambe sono inquadrati.'
+        : mirrorState?.hints?.[0] || 'Posizione stabile. Mantieni la guardia e respira.';
+    const scoreColor = poseScore == null ? '#7c899c' : poseScore >= 82 ? '#6de2d3' : poseScore >= 60 ? '#ffd184' : '#ff9b9b';
+    const samples = studioSamplesRef.current;
+    const average = samples.length ? Math.round(samples.reduce((sum, sample) => sum + sample.score, 0) / samples.length) : null;
+    const commonCue = Object.entries(samples.reduce((counts, sample) => {
+      if (sample.hint) counts[sample.hint] = (counts[sample.hint] || 0) + 1;
+      return counts;
+    }, {})).sort((a, b) => b[1] - a[1])[0]?.[0];
+    return createPortal(<div className="mma-studio" style={{ '--studio-accent': '#6de2d3' }}>
+      <video ref={videoRef} className="mma-studio-video" style={{ transform: facingMode === 'user' ? 'scaleX(-1)' : 'none' }} playsInline muted />
+      <canvas ref={canvasRef} hidden />
+      <canvas ref={overlayRef} className="mma-studio-skeleton" style={{ opacity: skeletonOn ? 1 : 0, transform: facingMode === 'user' ? 'scaleX(-1)' : 'none' }} />
+      <div className="mma-studio-shade" />
+      <header className="mma-studio-header">
+        <button className="mma-studio-close" onClick={stopCamera} aria-label="Chiudi lezione"><X size={18} /></button>
+        <div><small>COACH LIVE / MMA</small><strong>{academyLesson.title}</strong></div>
+        <span className={`mma-studio-badge ${streaming ? 'live' : ''}`}>{streaming ? 'LIVE' : 'CAMERA'}</span>
+      </header>
+      <div className="mma-studio-topline">
+        <span className={`mma-studio-tracking ${visiblePose ? 'ready' : ''}`}><i />{visiblePose ? trackQuality === 'full' ? 'Corpo inquadrato' : 'Busto inquadrato' : 'Cerca il corpo'}</span>
+        <span>{aiStatus === 'offline' ? 'FEEDBACK LOCALE' : 'SPECCHIO ATTIVO'}</span>
+      </div>
+      <div className="mma-studio-feedback">
+        <div className="mma-studio-score" style={{ '--score': `${poseScore ?? 0}%`, '--score-color': scoreColor }}><span>{poseScore == null ? '—' : poseScore}<small>{poseScore == null ? '' : '%'}</small></span></div>
+        <div className="mma-studio-cue"><small>CORREZIONE ADESSO</small><p>{cue}</p><span>{academyLesson.camera} · posa istantanea</span></div>
+      </div>
+      <footer className="mma-studio-panel">
+        <div className="mma-studio-rounds" style={{ gridTemplateColumns: `repeat(${academyLesson.rounds || 3},1fr)` }}>{Array.from({ length: academyLesson.rounds || 3 }, (_, index) => index + 1).map((round) => <span key={round} className={round < studioClock.round || studioClock.phase === 'done' ? 'complete' : round === studioClock.round ? 'current' : ''}>ROUND {round}</span>)}</div>
+        {studioClock.phase === 'done' ? <div className="mma-studio-summary">
+          <small>LEZIONE COMPLETATA</small><h2>{academyLesson.rounds || 3} round. Un passo avanti.</h2>
+          <div><span>POSA MEDIA<em>{average == null ? '—' : `${average}%`}</em></span><span>CAMPIONI<em>{samples.length}</em></span>{academyLesson.id === 'one-two' && <span>1–2 RILEVATE<em>{studioCombos}</em></span>}</div>
+          <p>{commonCue ? `Nel prossimo allenamento concentrati su: ${commonCue}.` : 'Il prossimo passo è ripetere la lezione con il corpo intero inquadrato.'}</p>
+          <button className="mma-studio-main" onClick={stopCamera}>Rivedi la lezione</button>
+        </div> : <>
+          <div className="mma-studio-phase"><div><small>{studioClock.phase === 'ready' ? 'PRONTO A INIZIARE' : studioClock.phase === 'rest' ? 'RECUPERO' : `ROUND ${studioClock.round} IN CORSO`}</small><strong>{String(Math.floor(studioClock.left / 60)).padStart(2, '0')}:{String(studioClock.left % 60).padStart(2, '0')}</strong></div><p>{studioClock.phase === 'rest' ? 'Respira, recupera e torna in guardia.' : academyLesson.roundPlan?.[studioClock.round - 1] || academyLesson.drill}</p></div>
+          {academyLesson.id === 'one-two' && <p className="mma-studio-combos">{studioCombos} sequenze alternate rilevate <span>stima dalla posa, non verifica tecnica completa</span></p>}
+          <div className="mma-studio-actions">
+            {studioClock.phase === 'ready' ? streaming
+              ? <button className="mma-studio-main" onClick={() => setStudioClock({ phase: 'round', round: 1, left: academyLesson.roundSeconds || 120 })}>Inizia round 1</button>
+              : <button className="mma-studio-main" onClick={() => startCamera()}>Riprova fotocamera</button>
+              : studioClock.phase === 'rest' ? <button className="mma-studio-main" onClick={() => setStudioClock({ phase: 'round', round: studioClock.round + 1, left: academyLesson.roundSeconds || 120 })}>Inizia round {studioClock.round + 1}</button>
+                : <button className="mma-studio-main" onClick={() => setStudioPaused((value) => !value)}>{studioPaused ? 'Riprendi round' : 'Pausa round'}</button>}
+            <button className="mma-studio-tool" onClick={flipCamera} aria-label="Cambia fotocamera"><FlipHorizontal2 size={19} /></button>
+            <button className="mma-studio-tool" onClick={() => setVoiceOn((value) => !value)} aria-label={voiceOn ? 'Disattiva voce' : 'Attiva voce'}>{voiceOn ? <Volume2 size={19} /> : <VolumeX size={19} />}</button>
+          </div>
+          <button className="mma-studio-advanced" onClick={() => setAcademyLesson(null)}>Apri strumenti avanzati</button>
+        </>}
+      </footer>
+    </div>, document.body);
   }
 
   // ── Live — camera overlay (video a tutto schermo + comandi sovrapposti) ──────
@@ -5589,7 +5778,7 @@ function VisualCoach({ setPlayerStats }) {
           {currentDisc?.emoji}
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-xs font-black text-white leading-tight" style={{ fontFamily: 'Orbitron, sans-serif' }}>
+          <p className="text-xs font-black text-white leading-tight" style={{ fontFamily: 'Syne, sans-serif' }}>
             {currentDisc?.label?.toUpperCase()}
             <span className="font-bold" style={{ color: '#9ca3af' }}> · {masterTitle(mode).toUpperCase()}</span>
           </p>
@@ -5642,7 +5831,7 @@ function VisualCoach({ setPlayerStats }) {
         <div className="absolute inset-x-0 z-20 px-3" style={{ top: 'calc(max(12px, env(safe-area-inset-top)) + 52px)' }}>
           <div className="rounded-xl p-3" style={{ background: 'rgba(0,0,0,0.78)', border: `1px solid ${C.amber.hex}66`, backdropFilter: 'blur(6px)' }}>
             <div className="flex items-center justify-between gap-2">
-              <p className="text-[12px] font-black text-white truncate" style={{ fontFamily: 'Orbitron, sans-serif' }}>
+              <p className="text-[12px] font-black text-white truncate" style={{ fontFamily: 'Syne, sans-serif' }}>
                 {workout.phases[workout.idx].emoji} {workout.phases[workout.idx].name.toUpperCase()}
               </p>
               <p className="text-lg font-black font-mono leading-none" style={{ color: workout.left <= 5 ? '#ef4444' : '#fbbf24' }}>{workout.left}s</p>
@@ -5686,7 +5875,7 @@ function VisualCoach({ setPlayerStats }) {
                 4-4
               </motion.div>
               <div className="flex-1 min-w-0">
-                <p className="text-[10px] font-black tracking-widest" style={{ color: C.amber.hex, fontFamily: 'Orbitron, sans-serif' }}>
+                <p className="text-[10px] font-black tracking-widest" style={{ color: C.amber.hex, fontFamily: 'Syne, sans-serif' }}>
                   🪑 ANGOLO — respira col cerchio: cresce inspira, cala espira
                 </p>
                 <p className="text-xs text-white mt-1 leading-snug">
@@ -5703,11 +5892,11 @@ function VisualCoach({ setPlayerStats }) {
               transition={{ type: 'spring', stiffness: 260, damping: 20 }}
               className="p-3 rounded-2xl space-y-2"
               style={{ background: 'rgba(127,29,29,0.5)', border: `1px solid ${C.red.border}`, backdropFilter: 'blur(8px)' }}>
-              <p className="text-[10px] font-black tracking-widest" style={{ color: '#fbbf24', fontFamily: 'Orbitron, sans-serif' }}>
+              <p className="text-[10px] font-black tracking-widest" style={{ color: '#fbbf24', fontFamily: 'Syne, sans-serif' }}>
                 🦵 LIVELLO CALCIO — REFERTO MATCH
               </p>
               <div className="flex items-center gap-3">
-                <p className="text-3xl font-black leading-none" style={{ color: '#fff', textShadow: '0 0 16px rgba(251,191,36,0.7)', fontFamily: 'Orbitron, sans-serif' }}>
+                <p className="text-3xl font-black leading-none" style={{ color: '#fff', textShadow: '0 0 16px rgba(251,191,36,0.7)', fontFamily: 'Syne, sans-serif' }}>
                   {kickReport.level}
                 </p>
                 <div className="flex-1">
@@ -5736,7 +5925,7 @@ function VisualCoach({ setPlayerStats }) {
                 initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ opacity: 0, scale: 1.15 }}
                 transition={{ type: 'spring', stiffness: 400, damping: 18 }}
                 className="text-4xl font-black text-white text-center px-4"
-                style={{ fontFamily: 'Orbitron, sans-serif', textShadow: '0 0 28px rgba(220,38,38,0.9), 0 2px 8px rgba(0,0,0,0.8)' }}>
+                style={{ fontFamily: 'Syne, sans-serif', textShadow: '0 0 28px rgba(220,38,38,0.9), 0 2px 8px rgba(0,0,0,0.8)' }}>
                 {reactCall}
               </motion.p>
             )}
@@ -5787,7 +5976,7 @@ function VisualCoach({ setPlayerStats }) {
           <div className="flex justify-center items-end gap-2 mt-2 pointer-events-none">
             <button onClick={() => setShadowOn(true)}
               className="pointer-events-auto px-3 py-2.5 rounded-xl text-[9px] font-black tracking-widest whitespace-nowrap"
-              style={{ background: 'rgba(127,29,29,0.75)', border: '1px solid rgba(239,68,68,0.6)', color: '#fecaca', fontFamily: 'Orbitron, sans-serif', backdropFilter: 'blur(6px)', boxShadow: '0 0 14px rgba(239,68,68,0.25)' }}>
+              style={{ background: 'rgba(127,29,29,0.75)', border: '1px solid rgba(239,68,68,0.6)', color: '#fecaca', fontFamily: 'Syne, sans-serif', backdropFilter: 'blur(6px)', boxShadow: '0 0 14px rgba(239,68,68,0.25)' }}>
               🥊 SPARRING
             </button>
             <RepCoach mode={repMode} count={vcCount} onSelect={startReps} onStop={stopReps} />
@@ -5802,7 +5991,7 @@ function VisualCoach({ setPlayerStats }) {
 
             {guidedPhase === 'gen' && (
               <div className="text-center py-3">
-                <p className="text-sm font-black" style={{ color: C.emerald.hex, fontFamily: 'Orbitron, sans-serif' }}>🎯 Genero il tuo circuito…</p>
+                <p className="text-sm font-black" style={{ color: C.emerald.hex, fontFamily: 'Syne, sans-serif' }}>🎯 Genero il tuo circuito…</p>
                 <p className="text-[11px] mt-1" style={{ color: 'rgba(209,250,229,0.7)' }}>Esercizi su misura per {currentDisc?.label}</p>
               </div>
             )}
@@ -5862,12 +6051,12 @@ function VisualCoach({ setPlayerStats }) {
                 )}
                 <div className="flex items-center justify-center gap-5 pt-1">
                   <div>
-                    <p className="text-5xl font-black text-white tabular-nums leading-none" style={{ fontFamily: 'Orbitron, sans-serif' }}>{Math.floor(guidedTimeLeft / 60)}:{String(guidedTimeLeft % 60).padStart(2, '0')}</p>
+                    <p className="text-5xl font-black text-white tabular-nums leading-none" style={{ fontFamily: 'Syne, sans-serif' }}>{Math.floor(guidedTimeLeft / 60)}:{String(guidedTimeLeft % 60).padStart(2, '0')}</p>
                     <p className="text-[8px] tracking-widest uppercase mt-1" style={{ color: 'rgba(209,250,229,0.6)' }}>tempo</p>
                   </div>
                   <div className="w-px h-12" style={{ background: 'rgba(255,255,255,0.1)' }} />
                   <div>
-                    <p className="text-5xl font-black tabular-nums leading-none" style={{ fontFamily: 'Orbitron, sans-serif', color: C.emerald.hex }}>{repCount}</p>
+                    <p className="text-5xl font-black tabular-nums leading-none" style={{ fontFamily: 'Syne, sans-serif', color: C.emerald.hex }}>{repCount}</p>
                     <p className="text-[8px] tracking-widest uppercase mt-1" style={{ color: 'rgba(209,250,229,0.6)' }}>rip</p>
                   </div>
                 </div>
@@ -6129,7 +6318,7 @@ function VisualCoach({ setPlayerStats }) {
                       </motion.div>
                     );
                   })()
-                : <p className="text-xs font-bold" style={{ color: C.violet.hex, fontFamily: 'Orbitron, sans-serif' }}>Primo comando in arrivo…</p>
+                : <p className="text-xs font-bold" style={{ color: C.violet.hex, fontFamily: 'Syne, sans-serif' }}>Primo comando in arrivo…</p>
               }
             </motion.div>
           )}
@@ -6300,7 +6489,7 @@ function VisualCoach({ setPlayerStats }) {
               style={{ background: '#08090f', border: '1px solid rgba(20,184,166,0.25)', borderBottom: 'none' }}
               onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center justify-between mb-4">
-                <p className="text-sm font-black" style={{ color: C.emerald.hex, fontFamily: 'Orbitron, sans-serif', letterSpacing: '0.06em' }}>🧠 ANALISI SESSIONE</p>
+                <p className="text-sm font-black" style={{ color: C.emerald.hex, fontFamily: 'Syne, sans-serif', letterSpacing: '0.06em' }}>🧠 ANALISI SESSIONE</p>
                 <button onClick={() => setSessionAnalysis(null)} className="text-gray-500 font-black text-lg leading-none">✕</button>
               </div>
               <p className="text-sm text-white/90 whitespace-pre-wrap leading-relaxed">{sessionAnalysis.content}</p>
@@ -6338,7 +6527,7 @@ function VisualCoach({ setPlayerStats }) {
                 return (
                   <>
                     <div className="flex items-center justify-between mb-1">
-                      <p className="text-sm font-black" style={{ color: C.violet.hex, fontFamily: 'Orbitron, sans-serif', letterSpacing: '0.06em' }}>
+                      <p className="text-sm font-black" style={{ color: C.violet.hex, fontFamily: 'Syne, sans-serif', letterSpacing: '0.06em' }}>
                         {sessionReport.exam ? '🎓 ESITO ESAME' : '🥋 PAGELLA SESSIONE'}
                       </p>
                       <button onClick={() => setSessionReport(null)} className="text-gray-500 font-black text-lg leading-none">✕</button>
@@ -6447,17 +6636,24 @@ const TABS = [
   { id: 'visual',     label: 'Live',   icon: '📷', color: C.emerald },
 ];
 
-export default function Coach({ playerStats, setPlayerStats }) {
+export default function Coach({ playerStats, setPlayerStats, aiStatus }) {
   const [tab, setTab] = useState(() => {
-    try { return localStorage.getItem(PENDING_COACH_QUESTION_KEY) ? 'chat' : 'trainer'; } catch { return 'trainer'; }
+    try {
+      const requested = localStorage.getItem('shadow_monarch_coach_open_tab');
+      if (['visual', 'curriculum', 'chat', 'trainer'].includes(requested)) return requested;
+      return localStorage.getItem(PENDING_COACH_QUESTION_KEY) ? 'chat' : 'curriculum';
+    } catch { return 'curriculum'; }
   });
+  useEffect(() => {
+    try { localStorage.removeItem('shadow_monarch_coach_open_tab'); } catch {}
+  }, []);
 
   return (
-    <div className="min-h-full text-white pb-8" style={{ background: '#030712' }}>
+    <div className="min-h-full text-white pb-8" style={{ background: '#0b0d19' }}>
       {/* Header */}
-      <div className="sticky top-0 z-10" style={{ background: 'rgba(3,7,18,0.94)', backdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+      <div className="sticky top-0 z-10" style={{ background: 'rgba(11,13,25,0.94)', backdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
         {/* Animated top border */}
-        <div className="h-px w-full" style={{ background: 'linear-gradient(90deg, transparent, #00f2ff 30%, #a855f7 70%, transparent)', animation: 'frame-glow-shift 4s linear infinite', backgroundSize: '200% 100%' }} />
+        <div className="h-px w-full" style={{ background: 'linear-gradient(90deg, transparent, #6de2d3 30%, #b8a4ff 70%, transparent)', animation: 'frame-glow-shift 4s linear infinite', backgroundSize: '200% 100%' }} />
 
         <div className="relative px-4 pt-3 pb-3 max-w-2xl mx-auto overflow-hidden">
           {/* Ambient orbs */}
@@ -6467,13 +6663,13 @@ export default function Coach({ playerStats, setPlayerStats }) {
           {/* Title row */}
           <div className="flex items-center justify-between mb-3 relative">
             <div>
-              <h1 className="text-xl font-black tracking-tight leading-none" style={{ fontFamily: 'Orbitron, sans-serif', background: 'linear-gradient(135deg, #ffffff 20%, #00f2ff 60%, #a855f7 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-                ⚡ AI COACH
+              <h1 className="text-xl font-black tracking-tight leading-none" style={{ fontFamily: 'Syne, sans-serif', background: 'linear-gradient(135deg, #ffffff 20%, #6de2d3 60%, #b8a4ff 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                ⚡ COACH
               </h1>
-              <p className="text-[10px] mt-0.5 font-mono tracking-widest" style={{ color: '#374151' }}>GROQ SCOUT · COSMOS · GEMMA BRAIN · NVIDIA NIM</p>
+              <p className="text-[10px] mt-1 font-mono tracking-widest" style={{ color: '#91a6ab' }}>TECNICA · PRATICA · PROGRESSI</p>
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold" style={{ background: 'rgba(0,242,255,0.08)', color: '#00f2ff', border: '1px solid rgba(0,242,255,0.2)', animation: 'pulse-glow 2s ease-in-out infinite' }}>● SISTEMA ATTIVO</span>
+              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold" style={{ fontFamily: 'Barlow Semi Condensed, sans-serif', background: 'rgba(109,226,211,0.08)', color: '#6de2d3', border: '1px solid rgba(109,226,211,0.3)' }}>MMA / DA ZERO</span>
             </div>
           </div>
 
@@ -6490,7 +6686,7 @@ export default function Coach({ playerStats, setPlayerStats }) {
                   <span className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.06) 50%, transparent 100%)', animation: 'chip-sheen 2.5s ease-in-out infinite', backgroundSize: '200% 100%' }} />
                 )}
                 <span className="block text-base leading-none mb-0.5">{t.icon}</span>
-                <span className="block text-[10px] tracking-wide" style={{ fontFamily: 'Orbitron, sans-serif', fontSize: '9px' }}>{t.label}</span>
+                <span className="block text-[10px] tracking-wide" style={{ fontFamily: 'Syne, sans-serif', fontSize: '9px' }}>{t.label}</span>
               </motion.button>
             ))}
           </div>
@@ -6504,7 +6700,7 @@ export default function Coach({ playerStats, setPlayerStats }) {
             {tab === 'trainer'    && <PersonalTrainer />}
             {tab === 'curriculum' && <CurriculumCoach onGoLive={() => setTab('visual')} />}
             {tab === 'chat'       && <CoachChat />}
-            {tab === 'visual'     && <VisualCoach setPlayerStats={setPlayerStats} />}
+            {tab === 'visual'     && <VisualCoach setPlayerStats={setPlayerStats} aiStatus={aiStatus} />}
           </motion.div>
         </AnimatePresence>
       </div>

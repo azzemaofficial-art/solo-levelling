@@ -1,6 +1,6 @@
 /* ─────────────────────────────────────────────────────────────────────────────
    DESIGN TOKENS — Solo Leveling design system (Tappa 1)
-   Fondato su ui-ux-pro-max: stile Dark OLED, Orbitron + JetBrains Mono, glow
+   Fondato su ui-ux-pro-max: stile Dark OLED, Syne + JetBrains Mono, glow
    minimale per leggibilità, token semantici (no hex sparsi), focus visibili.
    ───────────────────────────────────────────────────────────────────────────── */
 @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap');
@@ -29,7 +29,7 @@
   --color-focus: var(--c-blue-bright);
 
   /* ── Tipografia ── */
-  --font-display: 'Orbitron', sans-serif;
+  --font-display: 'Syne', sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, monospace;
   --fs-xs: 11px; --fs-sm: 13px; --fs-base: 15px; --fs-md: 18px; --fs-lg: 24px; --fs-xl: 32px;
   --lh-body: 1.55; --lh-tight: 1.18;

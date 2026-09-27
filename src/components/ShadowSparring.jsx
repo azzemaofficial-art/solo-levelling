@@ -141,10 +141,10 @@ export default function ShadowSparring({ active, onExit, readState, speak, onCom
       <div className="flex justify-center mt-14 pointer-events-none">
         <div className="flex items-center gap-4 rounded-2xl px-5 py-2"
           style={{ background: 'rgba(6,10,20,0.85)', border: '1px solid rgba(239,68,68,0.45)', backdropFilter: 'blur(8px)' }}>
-          <p className="text-[9px] font-black tracking-[0.25em]" style={{ color: '#f87171', fontFamily: 'Orbitron, sans-serif' }}>
+          <p className="text-[9px] font-black tracking-[0.25em]" style={{ color: '#f87171', fontFamily: 'Syne, sans-serif' }}>
             🥊 SHADOW SPARRING · LIV {level}
           </p>
-          <p className="text-sm font-black" style={{ color: '#fff', fontFamily: 'Orbitron, sans-serif' }}>{score} PT</p>
+          <p className="text-sm font-black" style={{ color: '#fff', fontFamily: 'Syne, sans-serif' }}>{score} PT</p>
           <p className="text-[10px] font-bold" style={{ color: '#94a3b8' }}>
             {Math.min(attackIdx + 1, sequence.length)}/{sequence.length}
           </p>
@@ -160,7 +160,7 @@ export default function ShadowSparring({ active, onExit, readState, speak, onCom
             <motion.div key="intro" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}
               className="text-center">
               <motion.p key={countdown} initial={{ scale: 2, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
-                className="text-6xl font-black" style={{ color: '#fff', fontFamily: 'Orbitron, sans-serif', textShadow: '0 0 30px rgba(239,68,68,0.8)' }}>
+                className="text-6xl font-black" style={{ color: '#fff', fontFamily: 'Syne, sans-serif', textShadow: '0 0 30px rgba(239,68,68,0.8)' }}>
                 {countdown > 0 ? countdown : 'VIA'}
               </motion.p>
             </motion.div>
@@ -170,10 +170,10 @@ export default function ShadowSparring({ active, onExit, readState, speak, onCom
             <motion.div key={`atk-${attackIdx}`} initial={{ opacity: 0, scale: 1.6 }} animate={{ opacity: 1, scale: 1 }}
               className="text-center px-6 py-4 rounded-3xl"
               style={{ background: 'rgba(6,10,20,0.88)', border: '2px solid rgba(239,68,68,0.6)', boxShadow: '0 0 34px rgba(239,68,68,0.3)' }}>
-              <p className="text-[10px] font-black tracking-[0.3em] mb-1" style={{ color: '#f87171', fontFamily: 'Orbitron, sans-serif' }}>
+              <p className="text-[10px] font-black tracking-[0.3em] mb-1" style={{ color: '#f87171', fontFamily: 'Syne, sans-serif' }}>
                 {attack.cat === 'takedown' ? '⚠ REAGISCI: SPRAWL' : '⚠ DIFENDI O CONTRATTACCA'}
               </p>
-              <p className="text-3xl font-black" style={{ color: '#fff', fontFamily: 'Orbitron, sans-serif', textShadow: '0 0 20px rgba(239,68,68,0.7)' }}>
+              <p className="text-3xl font-black" style={{ color: '#fff', fontFamily: 'Syne, sans-serif', textShadow: '0 0 20px rgba(239,68,68,0.7)' }}>
                 {attack.label}
               </p>
               <motion.div className="h-1.5 rounded-full mt-3 mx-auto" style={{ background: 'rgba(239,68,68,0.85)', width: '70%' }}
@@ -187,7 +187,7 @@ export default function ShadowSparring({ active, onExit, readState, speak, onCom
             <motion.div key={`res-${attackIdx}`} initial={{ opacity: 0, scale: 0.7 }} animate={{ opacity: 1, scale: 1 }}
               className="text-center px-8 py-4 rounded-3xl"
               style={{ background: 'rgba(6,10,20,0.9)', border: `2px solid ${gStyle.color}`, boxShadow: `0 0 34px ${gStyle.color}55` }}>
-              <p className="text-3xl font-black" style={{ color: gStyle.color, fontFamily: 'Orbitron, sans-serif', textShadow: `0 0 18px ${gStyle.color}` }}>
+              <p className="text-3xl font-black" style={{ color: gStyle.color, fontFamily: 'Syne, sans-serif', textShadow: `0 0 18px ${gStyle.color}` }}>
                 {gStyle.label}
               </p>
               <p className="text-[11px] font-bold mt-1" style={{ color: '#cbd5e1' }}>+{lastGrade.points} pt</p>
@@ -198,20 +198,20 @@ export default function ShadowSparring({ active, onExit, readState, speak, onCom
             <motion.div key="report" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
               className="text-center px-8 py-5 rounded-3xl pointer-events-auto"
               style={{ background: 'rgba(6,10,20,0.94)', border: '1px solid rgba(251,191,36,0.5)', boxShadow: '0 0 40px rgba(251,191,36,0.2)' }}>
-              <p className="text-[10px] font-black tracking-[0.35em]" style={{ color: '#fbbf24', fontFamily: 'Orbitron, sans-serif' }}>FIGHT IQ</p>
-              <p className="text-5xl font-black my-1" style={{ color: '#fff', fontFamily: 'Orbitron, sans-serif', textShadow: '0 0 26px rgba(251,191,36,0.8)' }}>{iq}</p>
+              <p className="text-[10px] font-black tracking-[0.35em]" style={{ color: '#fbbf24', fontFamily: 'Syne, sans-serif' }}>FIGHT IQ</p>
+              <p className="text-5xl font-black my-1" style={{ color: '#fff', fontFamily: 'Syne, sans-serif', textShadow: '0 0 26px rgba(251,191,36,0.8)' }}>{iq}</p>
               <p className="text-[11px] mb-3" style={{ color: '#94a3b8' }}>
                 {score} punti · livello {level} · {results.filter((r) => r.grade === 'perfect').length} perfette
               </p>
               <div className="flex gap-2 justify-center">
                 <button onClick={() => startRound(nextLevel(iq, level))}
                   className="px-4 py-2 rounded-xl text-[10px] font-black tracking-widest"
-                  style={{ background: 'linear-gradient(90deg,#fbbf24,#f59e0b)', color: '#1c1204', fontFamily: 'Orbitron, sans-serif' }}>
+                  style={{ background: 'linear-gradient(90deg,#fbbf24,#f59e0b)', color: '#1c1204', fontFamily: 'Syne, sans-serif' }}>
                   ▶ LIVELLO {nextLevel(iq, level)}
                 </button>
                 <button onClick={onExit}
                   className="px-4 py-2 rounded-xl text-[10px] font-black tracking-widest"
-                  style={{ background: 'rgba(148,163,184,0.2)', color: '#cbd5e1', border: '1px solid rgba(148,163,184,0.3)', fontFamily: 'Orbitron, sans-serif' }}>
+                  style={{ background: 'rgba(148,163,184,0.2)', color: '#cbd5e1', border: '1px solid rgba(148,163,184,0.3)', fontFamily: 'Syne, sans-serif' }}>
                   ESCI
                 </button>
               </div>
@@ -224,7 +224,7 @@ export default function ShadowSparring({ active, onExit, readState, speak, onCom
       {(phase === 'fight' || phase === 'intro') && (
         <button onClick={onExit}
           className="absolute top-4 right-4 z-[61] px-3 py-1.5 rounded-lg text-[9px] font-black tracking-widest pointer-events-auto"
-          style={{ background: 'rgba(239,68,68,0.85)', color: '#fff', fontFamily: 'Orbitron, sans-serif' }}>
+          style={{ background: 'rgba(239,68,68,0.85)', color: '#fff', fontFamily: 'Syne, sans-serif' }}>
           ✕ FINE
         </button>
       )}

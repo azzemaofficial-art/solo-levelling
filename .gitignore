@@ -24,3 +24,6 @@ public/ramen_popup_v4/ramen_popup_transparent.gif
 public/ramen_popup_v4/ramen_popup_transparent.webm
 public/ramen_popup_v4/ramen_popup_alpha.mp4
 public/ramen_popup_v4/ramen_popup_alpha.webm
+
+# Foto ricette originali (1254px, ~13MB): in produzione servono le versioni 560px in public/recipes.
+assets-src/

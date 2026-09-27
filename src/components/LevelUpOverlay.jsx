@@ -71,7 +71,7 @@ export default function LevelUpOverlay({ level, onDone }) {
           className="text-[13px] font-bold uppercase" style={{ color: 'rgba(56,189,248,0.95)' }}>
           ⟢ System ⟣
         </motion.p>
-        <p className="mt-2 text-[30px] font-black text-white" style={{ fontFamily: 'Orbitron, sans-serif', textShadow: '0 0 30px rgba(255,210,74,0.6)' }}>
+        <p className="mt-2 text-[30px] font-black text-white" style={{ fontFamily: 'Syne, sans-serif', textShadow: '0 0 30px rgba(255,210,74,0.6)' }}>
           LEVEL UP
         </p>
         <motion.div
@@ -79,7 +79,7 @@ export default function LevelUpOverlay({ level, onDone }) {
           transition={{ delay: 0.35, type: 'spring', stiffness: 200, damping: 12 }}
           className="mt-3 flex items-center gap-2">
           <span className="text-[64px] font-black leading-none"
-            style={{ fontFamily: 'Orbitron, sans-serif', color: '#ffd24a', textShadow: '0 0 40px rgba(255,210,74,0.8), 0 0 80px rgba(245,179,1,0.5)' }}>
+            style={{ fontFamily: 'Syne, sans-serif', color: '#ffd24a', textShadow: '0 0 40px rgba(255,210,74,0.8), 0 0 80px rgba(245,179,1,0.5)' }}>
             {level}
           </span>
         </motion.div>

@@ -127,7 +127,7 @@ export function ShadowRiseFx({ fx, onDone }) {
             <motion.p
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }}
               className="text-[10px] font-black tracking-[0.5em] mb-2"
-              style={{ color: '#c4b5fd', fontFamily: 'Orbitron, sans-serif' }}>
+              style={{ color: '#c4b5fd', fontFamily: 'Syne, sans-serif' }}>
               ⌈ ESTRAZIONE ⌋
             </motion.p>
 
@@ -139,7 +139,7 @@ export function ShadowRiseFx({ fx, onDone }) {
             <motion.p
               initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.3 }}
               className="text-xl font-black tracking-widest mt-3 text-center"
-              style={{ color: '#fff', fontFamily: 'Orbitron, sans-serif', textShadow: '0 0 18px rgba(139,92,246,0.9), 0 0 44px rgba(139,92,246,0.6)' }}>
+              style={{ color: '#fff', fontFamily: 'Syne, sans-serif', textShadow: '0 0 18px rgba(139,92,246,0.9), 0 0 44px rgba(139,92,246,0.6)' }}>
               OMBRA ESTRATTA
             </motion.p>
 
@@ -153,7 +153,7 @@ export function ShadowRiseFx({ fx, onDone }) {
             <motion.p
               initial={{ opacity: 0 }} animate={{ opacity: [0, 1, 0.6, 1] }} transition={{ delay: 2.1, duration: 1.1 }}
               className="text-[9px] tracking-[0.35em] mt-4"
-              style={{ color: '#7c6a9c', fontFamily: 'Orbitron, sans-serif' }}>
+              style={{ color: '#7c6a9c', fontFamily: 'Syne, sans-serif' }}>
               [SYSTEM] ALZATI. COMBATTI PER ME.
             </motion.p>
           </div>

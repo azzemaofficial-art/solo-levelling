@@ -364,7 +364,7 @@ Regole obbligatorie: esattamente 8 vocaboli e 9 esercizi; almeno 3 type e almeno
         </div>
 
         <p className="text-[10px] uppercase tracking-widest text-blue-300/80 mb-1">{activeUnit?.emoji} {activeUnit?.title}</p>
-        <h2 className="text-lg font-black text-white mb-4 leading-snug" style={{ fontFamily: 'Russo One, sans-serif' }}>{ex.q}</h2>
+        <h2 className="text-lg font-black text-white mb-4 leading-snug" style={{ fontFamily: 'Syne, sans-serif' }}>{ex.q}</h2>
 
         {idx === 0 && lessonGuide && (
           <div className="mb-4 rounded-2xl p-3 space-y-2" style={{ background: 'rgba(59,95,196,0.12)', border: '1px solid rgba(59,95,196,0.35)' }}>
@@ -441,7 +441,7 @@ Regole obbligatorie: esattamente 8 vocaboli e 9 esercizi; almeno 3 type e almeno
         <motion.div initial={{ scale: 0.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: 'spring', stiffness: 300, damping: 18 }} className="text-6xl mb-3">
           {acc === 100 ? '🏆' : acc >= 80 ? '🎉' : '💪'}
         </motion.div>
-        <h2 className="text-2xl font-black text-white mb-1" style={{ fontFamily: 'Russo One, sans-serif' }}>{activeUnit?.title}</h2>
+        <h2 className="text-2xl font-black text-white mb-1" style={{ fontFamily: 'Syne, sans-serif' }}>{activeUnit?.title}</h2>
         <p className="text-sm text-gray-400 mb-6">{sessionCorrect}/{total} corrette · {acc}%</p>
         <div className="grid grid-cols-2 gap-3 w-full max-w-xs mb-8">
           <div className="rounded-2xl p-4" style={{ background: 'rgba(59,95,196,0.14)', border: '1px solid rgba(59,95,196,0.4)' }}>
@@ -479,7 +479,7 @@ Regole obbligatorie: esattamente 8 vocaboli e 9 esercizi; almeno 3 type e almeno
         <div className="flex items-end justify-between mt-3">
           <div>
             <p className="text-[10px] uppercase tracking-[0.3em] text-blue-300/80">Cours de français</p>
-            <h1 className="text-2xl font-black text-white leading-none" style={{ fontFamily: 'Russo One, sans-serif' }}>Français 🇫🇷</h1>
+            <h1 className="text-2xl font-black text-white leading-none" style={{ fontFamily: 'Syne, sans-serif' }}>Français 🇫🇷</h1>
           </div>
           <div className="text-right">
             <p className="text-lg font-black" style={{ color: '#ff8a3d' }}>🔥 {streak.count || 0}</p>

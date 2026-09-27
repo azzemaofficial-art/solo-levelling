@@ -113,7 +113,7 @@ export default function MealBurst({ fx, onDone, soundEnabled = true, soundTheme 
                 transition={{ duration: 2.1, times: [0, 0.15, 0.78, 1], ease: 'easeOut' }}
                 className="text-base font-black uppercase tracking-[0.22em] z-10 text-center px-3 -mb-1"
                 style={{
-                  color: '#fff', fontFamily: 'Orbitron, sans-serif',
+                  color: '#fff', fontFamily: 'Syne, sans-serif',
                   textShadow: `0 0 5px ${k.color}, 0 0 16px ${k.color}, 0 0 36px ${k.glow}`,
                 }}>
                 {fx.name}
@@ -158,7 +158,7 @@ export default function MealBurst({ fx, onDone, soundEnabled = true, soundTheme 
               transition={{ duration: 2.15, times: [0, 0.12, 0.75, 1], ease: 'easeOut' }}
               className="text-lg font-black tracking-widest z-10"
               style={{
-                color: '#fff', fontFamily: 'Orbitron, sans-serif',
+                color: '#fff', fontFamily: 'Syne, sans-serif',
                 textShadow: `0 0 6px ${k.color}, 0 0 18px ${k.color}, 0 0 34px ${k.glow}`,
               }}>
               +{fx.delta}{fx.unit || ' kcal'}{fx.name ? '' : ` · ${k.label}`}

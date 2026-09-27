@@ -281,7 +281,7 @@ export default function NeuralIntro({ onDone, duration = 4800 }) {
           style={{ background: '#02030a' }}>
           <canvas ref={canvasRef} className="absolute inset-0" />
           <div className="absolute inset-x-0 bottom-[18%] flex flex-col items-center pointer-events-none">
-            <div className="flex" style={{ fontFamily: 'Orbitron, sans-serif' }}>
+            <div className="flex" style={{ fontFamily: 'Syne, sans-serif' }}>
               {'SOLO LEVELING'.split('').map((ch, i) => (
                 <motion.span key={i}
                   initial={{ opacity: 0, y: 18, filter: 'blur(10px)' }}

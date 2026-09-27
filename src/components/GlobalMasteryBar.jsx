@@ -31,10 +31,10 @@ export default function GlobalMasteryBar() {
     <div className="w-full max-w-[390px] px-3 pb-1 shrink-0" aria-label={`Maestria globale livello ${level}`}>
       <div className="rounded-xl px-3 py-1.5" style={{ background: 'rgba(10,10,14,0.92)', border: '1px solid rgba(251,191,36,0.25)', boxShadow: '0 -2px 18px rgba(251,191,36,0.08)' }}>
         <div className="flex items-center justify-between mb-1">
-          <p className="text-[8px] font-black tracking-[0.2em]" style={{ color: '#fbbf24', fontFamily: 'Orbitron, sans-serif' }}>
+          <p className="text-[8px] font-black tracking-[0.2em]" style={{ color: '#fbbf24', fontFamily: 'Syne, sans-serif' }}>
             ⚔ MAESTRIA · {t.title}
           </p>
-          <p className="text-[9px] font-black" style={{ color: '#fff', fontFamily: 'Orbitron, sans-serif' }}>{level}<span style={{ color: '#6b7280' }}>/100</span></p>
+          <p className="text-[9px] font-black" style={{ color: '#fff', fontFamily: 'Syne, sans-serif' }}>{level}<span style={{ color: '#6b7280' }}>/100</span></p>
         </div>
         <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(55,65,81,0.5)' }}>
           <motion.div className="h-full rounded-full"

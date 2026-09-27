@@ -102,7 +102,7 @@ export default function AwakeningFx({ fx, onDone }) {
               <motion.p
                 initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.55 }}
                 className="text-[10px] font-black tracking-[0.5em]"
-                style={{ color: '#7dd3fc', fontFamily: 'Orbitron, sans-serif' }}>
+                style={{ color: '#7dd3fc', fontFamily: 'Syne, sans-serif' }}>
                 ⌈ RISVEGLIO ⌋
               </motion.p>
 
@@ -113,7 +113,7 @@ export default function AwakeningFx({ fx, onDone }) {
                 transition={{ delay: 0.62, type: 'spring', stiffness: 320, damping: 17 }}
                 className="text-8xl font-black leading-none"
                 style={{
-                  fontFamily: 'Orbitron, sans-serif',
+                  fontFamily: 'Syne, sans-serif',
                   color: '#fff',
                   textShadow: '0 0 12px #fbbf24, 0 0 34px #f59e0b, 0 0 80px rgba(245,158,11,0.8), 0 4px 16px rgba(0,0,0,0.9)',
                   WebkitTextStroke: '2px #f59e0b',
@@ -124,7 +124,7 @@ export default function AwakeningFx({ fx, onDone }) {
               <motion.p
                 initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.9 }}
                 className="text-xs font-black tracking-[0.3em] text-center"
-                style={{ color: '#fde68a', fontFamily: 'Orbitron, sans-serif', textShadow: '0 0 14px rgba(251,191,36,0.8)' }}>
+                style={{ color: '#fde68a', fontFamily: 'Syne, sans-serif', textShadow: '0 0 14px rgba(251,191,36,0.8)' }}>
                 GRADO {fx.rank} RAGGIUNTO
               </motion.p>
 
@@ -138,7 +138,7 @@ export default function AwakeningFx({ fx, onDone }) {
               <motion.p
                 initial={{ opacity: 0 }} animate={{ opacity: [0, 1, 0.6, 1] }} transition={{ delay: 1.5, duration: 1.2 }}
                 className="text-[9px] tracking-[0.35em] mt-2"
-                style={{ color: '#64748b', fontFamily: 'Orbitron, sans-serif' }}>
+                style={{ color: '#64748b', fontFamily: 'Syne, sans-serif' }}>
                 [SYSTEM] POTERE RICONOSCIUTO
               </motion.p>
             </div>

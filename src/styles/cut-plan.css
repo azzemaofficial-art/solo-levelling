@@ -1,0 +1,285 @@
+/* ─────────────────────────────────────────────────────────────────────────────
+   PROTOCOLLO CUT — Oggi, Pasti, Training, MMA (Accademia), Progressi.
+   --lime è l'accento della vista corrente (lavanda di default, cambia per tab).
+   Grigi: una sola famiglia fredda (--t2 → --t4), superfici navy.
+   ───────────────────────────────────────────────────────────────────────────── */
+
+/* ── Base ── */
+.cut-page{
+  --lime:#b8a4ff;--ink:#0b0d19;
+  --t2:#bfc2da;--t3:#9296b2;--t4:#767a96;
+  --surface:#171b2a;--surface-2:#11141f;--line:#ffffff1c;
+  min-height:100%;padding:28px 20px 120px;overflow:hidden;
+  color:#f5f3ff;background:var(--ink);font-family:var(--font-body);
+}
+.cut-page *{box-sizing:border-box}
+.cut-page p{letter-spacing:0;line-height:1.62;text-wrap:pretty}
+.cut-page h1,.cut-page h2{text-wrap:balance}
+.cut-view-food{--lime:#ffac91}
+.cut-view-program{--lime:#ffd184}
+.cut-view-mma{--lime:#6de2d3}
+.cut-view-progress{--lime:#8fb9ff}
+
+/* Ruoli tipografici: etichette in maiuscoletto condensato */
+.cut-kicker,.cut-topline,.cut-section-title,.cut-feature small,.cut-status small,.cut-metrics small,.cut-goal small,.cut-meal span,.cut-recipe small,.cut-week-picker,.cut-day-strip button,.cut-toggle,.cut-primary,.cut-creatine small,
+.mma-lesson-top,.mma-detail-row small,.mma-stage small,.mma-signal small,.mma-section-title{font-family:var(--font-label);font-weight:700;letter-spacing:.12em}
+
+.cut-topline{display:flex;justify-content:space-between;margin-bottom:31px;color:var(--t4);font-size:11px}
+.cut-topline span:last-child{margin-right:42px}
+.cut-kicker{color:var(--lime);font-size:12px}
+.cut-fine{margin:13px 0;color:var(--t3);font-size:11px}
+.cut-section{margin-top:32px}
+.cut-section-title{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:13px;color:#d3d5ea;font-size:12px}
+.cut-section-title button{display:flex;align-items:center;gap:5px;border:0;background:none;color:var(--lime);font:inherit;letter-spacing:0;text-transform:none;cursor:pointer}
+
+/* ── Testate: hero di Oggi e intestazioni delle altre viste ── */
+.cut-hero{position:relative;min-height:310px;padding-top:8px;isolation:isolate}
+.cut-hero:after{content:'';position:absolute;right:-95px;top:18px;z-index:0;width:270px;height:270px;background:radial-gradient(circle,color-mix(in srgb,var(--lime) 22%,transparent),transparent 66%)}
+.cut-hero-copy{position:relative;z-index:2;width:70%}
+.cut-hero-art{position:absolute;right:-80px;top:-15px;z-index:1;width:210px;height:325px;object-fit:contain;opacity:.86;filter:grayscale(.65) contrast(1.1) drop-shadow(0 20px 35px #000);animation:cut-appear .7s ease-out both}
+.cut-hero-line{position:absolute;bottom:13px;left:0;right:0;height:1px;background:linear-gradient(90deg,var(--lime),#ffffff14)}
+.cut-page-head{position:relative;isolation:isolate;padding:0 0 20px;animation:cut-rise .42s cubic-bezier(.16,1,.3,1) both}
+.cut-page-head:before{content:'';position:absolute;right:-88px;top:-90px;z-index:-1;width:240px;height:240px;border-radius:50%;background:radial-gradient(circle,color-mix(in srgb,var(--lime) 17%,transparent),transparent 68%);pointer-events:none;animation:cut-breathe 8s ease-in-out infinite}
+.cut-hero h1,.cut-page-head h1{margin:13px 0 17px;font-family:var(--font-display);font-size:clamp(34px,10vw,45px);font-weight:700;line-height:1.06;letter-spacing:-.07em}
+.cut-page-head h1{margin-bottom:13px}
+.cut-hero h1 em,.cut-page-head h1 em{font-style:normal;color:var(--lime)}
+.cut-hero p,.cut-page-head p{color:var(--t2);font-size:13px}
+.cut-hero p{max-width:195px}
+.cut-page-head p{max-width:320px}
+
+/* ── Oggi ── */
+.cut-status{display:grid;grid-template-columns:1fr 1.25fr .9fr;gap:10px;margin-top:12px}
+.cut-status>div{display:flex;flex-direction:column;gap:6px}
+.cut-status small,.cut-metrics small,.cut-goal small{color:var(--t3);font-size:9px}
+.cut-status strong{font-family:var(--font-display);font-size:19px;font-weight:400;white-space:nowrap}
+.cut-status strong span{color:var(--t3);font-family:'Manrope',sans-serif;font-size:11px}
+.cut-setup{display:flex;align-items:center;gap:12px;width:100%;margin-top:18px;padding:15px;border:1px solid color-mix(in srgb,var(--lime) 45%,transparent);border-radius:4px;background:color-mix(in srgb,var(--lime) 9%,var(--surface));color:#fff;text-align:left;cursor:pointer}
+.cut-setup span{display:flex;flex:1;flex-direction:column;gap:4px}
+.cut-setup small{color:var(--lime);font:700 10px/normal var(--font-label);letter-spacing:.12em}
+.cut-setup b{font:650 17px/normal var(--font-display);letter-spacing:-.035em}
+.cut-setup em{color:var(--t2);font-size:12px;font-style:normal;line-height:1.5}
+.cut-setup>svg{flex:none;color:var(--lime)}
+
+.cut-feature{display:flex;gap:14px;min-height:110px;padding:17px 15px;border:1px solid #ffffff12;border-left:2px solid var(--lime);border-radius:4px;background:var(--surface)}
+.cut-feature-icon{display:grid;place-items:center;width:37px;min-width:37px;height:37px;border-radius:3px;background:#b8a4ff1a;color:var(--lime)}
+.cut-feature small{color:var(--lime);font-size:10px;text-transform:uppercase}
+.cut-feature h2{margin:5px 0;font:650 21px/normal var(--font-display);letter-spacing:-.035em}
+.cut-feature p{margin:0;color:var(--t2);font-size:12px}
+.cut-football{border-left-color:#8fb9ff}
+.cut-football .cut-feature-icon,.cut-football small{color:#8fb9ff}
+.cut-football .cut-feature-icon{background:#8fb9ff1a}
+.cut-recovery{border-left-color:#7f86a6}
+.cut-recovery .cut-feature-icon,.cut-recovery small{color:var(--t2)}
+
+.cut-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.cut-actions button,.cut-secondary{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:13px 10px;border:1px solid #ffffff21;background:#ffffff08;color:#e6e7f5;font-family:inherit;font-size:11px;font-weight:700;cursor:pointer}
+.cut-actions button:first-child{border-color:var(--lime);background:var(--lime);color:#11131f}
+.cut-secondary{width:100%;margin-top:24px}
+
+.cut-metrics{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.cut-metrics>div{display:flex;flex-direction:column;gap:6px;padding-top:12px;border-top:1px solid #ffffff30}
+.cut-metrics b{font-size:18px}
+.cut-brief{padding:17px 0 0;border-top:1px solid #ffffff24}
+.cut-brief p{color:#e2e3f3;font-size:13px}
+
+.cut-creatine{position:relative;display:flex;gap:14px;margin-top:28px;padding:17px;overflow:hidden;border:1px solid #ffd18455;border-radius:4px;background:#261e13}
+.cut-creatine:after{content:'';position:absolute;right:-35px;top:-50px;width:150px;height:150px;background:radial-gradient(circle,#ffd18424,transparent 72%);pointer-events:none;animation:cut-breathe 6s ease-in-out infinite}
+.cut-creatine-icon{display:grid;place-items:center;flex:none;width:37px;height:37px;background:#ffd18425;color:#ffd184}
+.cut-creatine small{color:#ffd184;font-size:9px}
+.cut-creatine h2{margin:5px 0;font:650 17px/normal var(--font-display);letter-spacing:-.035em}
+.cut-creatine p{margin:0 0 11px;color:var(--t2);font-size:11px}
+.cut-creatine button{display:flex;align-items:center;gap:6px;padding:8px 11px;border:0;background:#ffd184;color:#1c1609;font:700 11px/normal 'Manrope',sans-serif;cursor:pointer}
+.cut-creatine.taken{border-color:#8cb88e66;background:#17241f}
+.cut-creatine.taken button{background:#a5d4aa}
+
+/* ── Controlli condivisi: settimana, giorni, note, CTA ── */
+.cut-week-picker{display:flex;align-items:center;justify-content:space-between;height:52px;margin:10px 0 17px;border-top:1px solid #ffffff25;border-bottom:1px solid #ffffff25;color:#d3d5ea;font-size:11px}
+.cut-week-picker strong{color:var(--lime);font-size:18px}
+.cut-week-picker button{padding:10px;border:0;background:none;color:#d3d5ea;cursor:pointer}
+.cut-day-strip{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin:16px 0 22px}
+.cut-day-strip button{height:36px;border:1px solid #ffffff17;background:#ffffff06;color:var(--t3);font:700 10px/normal var(--font-label);text-transform:uppercase;cursor:pointer}
+.cut-day-strip button.active{border-color:var(--lime);background:var(--lime);color:#11131f}
+.cut-note{padding:12px 13px;border-left:2px solid var(--lime);background:#b8a4ff12;color:#e2e0f5;font-size:12px}
+.cut-primary{display:flex;align-items:center;justify-content:center;gap:9px;width:100%;margin:15px 0;padding:15px 14px;border:0;background:var(--lime);color:#11131f;font:700 12px/normal var(--font-label);cursor:pointer}
+.cut-primary.done{border:1px solid #4c8056;background:#1d3521;color:#c4e8c3}
+.cut-toggle{display:flex;justify-content:space-between;width:100%;margin:15px 0;padding:12px;border:1px solid #ffffff2b;background:none;color:#d3d5ea;font:700 11px/normal var(--font-label);cursor:pointer}
+.cut-toggle.active{border-color:var(--lime);color:var(--lime)}
+.cut-rule{padding:0 0 11px;border-bottom:1px solid #ffffff14;color:var(--t2);font-size:12px}
+
+/* ── Pasti ── */
+.cut-meal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:11px}
+.cut-meal-head span{font:650 20px/normal var(--font-display);letter-spacing:-.035em}
+.cut-meal-head strong{color:var(--lime);font-size:11px}
+.cut-meal{display:flex;align-items:center;gap:14px;padding:14px 0;border-top:1px solid #ffffff1c;animation:cut-rise .42s cubic-bezier(.16,1,.3,1) both}
+.cut-meal:nth-of-type(2){animation-delay:.06s}
+.cut-meal:nth-of-type(3){animation-delay:.12s}
+.cut-meal:nth-of-type(4){animation-delay:.18s}
+.cut-meal span{color:var(--lime);font-size:10px;text-transform:uppercase}
+.cut-meal p{margin:7px 0 0;color:#e2e3f3;font-size:13px}
+.cut-meal-copy{flex:1}
+.cut-meal-image{flex:none;width:84px;height:84px;object-fit:cover;border-radius:3px;background:var(--surface)}
+
+.cut-recipes{display:grid;gap:8px}
+.cut-recipe{display:flex;align-items:center;gap:12px;width:100%;height:74px;padding:0 11px 0 0;border:1px solid #ffffff18;background:var(--surface);color:#fff;text-align:left;cursor:pointer}
+.cut-recipe img{width:67px;height:73px;object-fit:cover;background:var(--surface)}
+.cut-recipe span{display:flex;flex:1;flex-direction:column;gap:5px}
+.cut-recipe small{color:var(--lime);font-size:9px;text-transform:uppercase}
+.cut-recipe b{font-size:13px}
+
+.cut-modal-backdrop{position:fixed;inset:0;z-index:150;display:flex;align-items:flex-end;justify-content:center;background:#000b}
+.cut-modal{position:relative;width:min(390px,100vw);max-height:86vh;overflow:auto;padding:20px 22px 35px;border-top:2px solid var(--lime);background:#131626;box-shadow:0 -20px 70px #000}
+.cut-modal>img{width:100%;height:190px;object-fit:cover;border-radius:3px;background:var(--surface)}
+.cut-modal small{display:block;margin-top:16px;color:var(--lime);letter-spacing:.13em}
+.cut-modal h2{margin:8px 0 20px;font:650 24px/normal var(--font-display);letter-spacing:-.035em}
+.cut-modal h3{color:var(--lime);font-size:12px;text-transform:uppercase;letter-spacing:.13em}
+.cut-modal p{color:#e2e3f3;font-size:13px}
+.cut-close{float:right;margin-bottom:8px;padding:6px 2px;border:0;background:none;color:var(--t2);cursor:pointer}
+
+/* ── Training ── */
+.cut-phase-list{display:grid;gap:5px;margin:20px 0}
+.cut-phase-list details{padding:12px;border:1px solid #ffffff1b;background:var(--surface)}
+.cut-phase-list summary{display:flex;justify-content:space-between;list-style:none;cursor:pointer}
+.cut-phase-list summary span{color:var(--lime);font-size:10px;letter-spacing:.1em}
+.cut-phase-list summary b{font-size:12px}
+.cut-phase-list p{margin:10px 0 0;color:var(--t2);font-size:12px}
+.cut-exercise{display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-bottom:1px solid #ffffff1a}
+.cut-exercise>span{color:var(--lime);font-size:11px;font-weight:700}
+.cut-exercise div{display:flex;flex-direction:column;gap:4px}
+.cut-exercise b{font-size:12px}
+.cut-exercise small{color:var(--t3);font-size:11px}
+
+.cut-video{position:relative;display:block;width:100%;height:140px;overflow:hidden;border:1px solid #ffffff25;background:linear-gradient(135deg,#1b2033,#121524);color:white;text-align:left;cursor:pointer}
+.cut-video img{position:absolute;right:-15px;top:-45px;height:205px;opacity:.4;filter:grayscale(1)}
+.cut-video span{position:relative;z-index:1;display:flex;flex-direction:column;gap:5px;margin:19px}
+.cut-video span svg{color:var(--lime)}
+.cut-video b{font-size:13px}
+.cut-video small{color:var(--t2);font-size:11px}
+.cut-video-links{display:grid;gap:6px;margin-top:8px}
+.cut-video-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:4px}
+.cut-video-tabs button{padding:9px 3px;border:1px solid #ffffff2b;background:var(--surface);color:var(--t2);font:700 10px/normal 'Manrope',sans-serif;cursor:pointer}
+.cut-video-tabs button.active{background:var(--lime);color:#11131f}
+.cut-video-frame{width:100%;aspect-ratio:16/9;border:0;background:#000}
+.cut-video-links a,.cut-source{display:flex;justify-content:space-between;gap:15px;padding:11px 0;border-bottom:1px solid #ffffff20;color:#dcdcf2;font-size:12px;text-decoration:none}
+
+/* ── Progressi ── */
+.cut-goal{display:grid;grid-template-columns:80px 1fr 60px;align-items:center;gap:10px;margin:25px 0}
+.cut-goal>div:first-child,.cut-goal>div:last-child{display:flex;flex-direction:column;gap:5px}
+.cut-goal b{font-size:13px}
+.cut-goal-track{height:3px;background:#ffffff30}
+.cut-goal-track span{display:block;height:3px;background:var(--lime);transform-origin:left;transition:transform .5s ease}
+.cut-form{display:grid;gap:12px;padding:18px;background:var(--surface)}
+.cut-form label{display:flex;flex-direction:column;gap:7px;color:var(--t2);font-size:11px}
+.cut-form input{padding:11px;border:1px solid #ffffff26;border-radius:3px;background:var(--surface-2);color:white;font:inherit;transition:border-color .2s ease,box-shadow .2s ease}
+.cut-form input::placeholder{color:var(--t4)}
+.cut-form input:focus{outline:none;border-color:var(--lime);box-shadow:0 0 0 3px color-mix(in srgb,var(--lime) 22%,transparent)}
+.cut-form .cut-primary{margin:2px 0 0}
+.cut-form-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.cut-form-row input{min-width:0}
+.cut-error{margin:0;color:#ffb4a8;font-size:12px}
+.cut-history{display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;padding:12px 0;border-bottom:1px solid #ffffff1e;font-size:12px}
+.cut-history span{color:var(--t3)}
+.cut-profile{margin:0 0 26px;border:1px solid #ffffff1b;background:var(--surface)}
+.cut-profile summary{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;list-style:none;cursor:pointer}
+.cut-profile summary span{color:var(--lime);font:700 11px/normal var(--font-label);letter-spacing:.12em}
+.cut-profile summary b{color:var(--t2);font-size:12px}
+.cut-profile[open] summary{border-bottom:1px solid #ffffff14}
+.cut-sex{display:grid;grid-template-columns:1fr 1fr;gap:4px}
+.cut-sex button{height:38px;border:1px solid #ffffff26;background:var(--surface-2);color:var(--t2);font:700 11px/normal var(--font-label);letter-spacing:.1em;text-transform:uppercase;cursor:pointer}
+.cut-sex button.active{border-color:var(--lime);color:var(--lime)}
+
+/* ── Accademia MMA (vista mma) ── */
+.mma-head{min-height:205px;overflow:hidden}
+.cut-view-mma .mma-head{background:linear-gradient(135deg,#142331,#0b0d19 70%)}
+.mma-head>p{max-width:225px}
+.mma-head img{position:absolute;right:-45px;bottom:-46px;width:175px;height:220px;object-fit:contain;opacity:.57;filter:grayscale(.5)}
+.mma-signal{position:relative;display:flex;align-items:center;justify-content:space-between;margin:2px 0 26px;padding:14px 18px;overflow:hidden;border:1px solid #6de2d33b;background:#13282d}
+.mma-signal:before{content:'';position:absolute;inset:0 auto 0 0;width:2px;background:var(--lime)}
+.mma-signal>div:first-child{display:flex;align-items:baseline;flex-wrap:wrap;gap:7px}
+.mma-signal small{width:100%;color:#9bb6bb;font-size:9px}
+.mma-signal strong{color:var(--lime);font:700 28px/normal var(--font-display);letter-spacing:-.06em}
+.mma-signal span{color:#b3cbd0;font-size:10px}
+.mma-signal-mark{display:grid;place-items:center;width:45px;height:45px;border:1px solid #6de2d344;border-radius:50%;color:var(--lime);animation:mma-mark 4s ease-in-out infinite}
+.mma-last-session{display:flex;align-items:center;justify-content:space-between;gap:14px;margin:-14px 0 24px;padding:13px 15px;border:1px solid #6de2d32e;border-left:2px solid #6de2d3;background:#111d29}
+.mma-last-session>div:first-child{display:flex;flex-direction:column;gap:2px;min-width:0}
+.mma-last-session small{color:#6de2d3;font:700 10px var(--font-label);letter-spacing:.13em}
+.mma-last-session strong{color:#f0fffc;font:700 15px var(--font-display);letter-spacing:-.03em}
+.mma-last-session span{color:#9fb4bc;font:500 11px var(--font-body)}
+.mma-last-score{flex:none;text-align:right}
+.mma-last-score strong{display:block;color:#6de2d3;font:700 22px var(--font-display)}
+
+.mma-section-title{margin:20px 0 10px}
+.mma-section-title>span:last-child{color:var(--lime)}
+.mma-stage-list,.mma-lesson-list{display:grid;gap:6px}
+.mma-stage{display:flex;align-items:center;gap:12px;padding:12px;border:1px solid #ffffff19;background:#121b1e;color:white;text-align:left;cursor:pointer}
+.mma-stage.active{border-color:var(--lime);background:#183c40}
+.mma-stage-no{width:33px;color:var(--lime);font:400 19px/normal 'Syne',sans-serif}
+.mma-stage>span:nth-child(2){display:flex;flex:1;flex-direction:column;gap:2px}
+.mma-stage small{color:#8ea8ad;font-size:9px;text-transform:uppercase}
+.mma-stage b,.mma-lesson b{font-family:var(--font-display);font-weight:600;letter-spacing:-.025em}
+.mma-stage b{font-size:14px}
+.mma-stage svg{color:#8ea8ad;transform:rotate(-90deg)}
+.mma-stage.active svg{color:var(--lime);transform:rotate(0)}
+.mma-stage-goal{margin:11px 0 26px;padding:9px 13px;border-left:2px solid var(--lime);background:#6de2d30d;color:#b8cdd0;font-size:12px;line-height:1.5}
+.mma-lesson{display:flex;align-items:center;gap:12px;padding:12px;border:1px solid #ffffff19;background:#131b1d;color:#edf7f7;text-align:left;cursor:pointer}
+.mma-lesson.active{border-color:#6de2d380;background:#16383c}
+.mma-lesson-index{display:grid;place-items:center;width:28px;height:28px;border:1px solid #6de2d355;color:var(--lime);font-size:10px;font-weight:700}
+.mma-lesson>span:nth-child(2){display:flex;flex:1;flex-direction:column;gap:3px}
+.mma-lesson b{font-size:13px}
+.mma-lesson small{color:#93aeb3;font-size:10px}
+.mma-lesson>svg{color:var(--lime)}
+
+.mma-lesson-detail{margin-top:24px;padding:20px 16px;border:1px solid #6de2d355;border-top:2px solid var(--lime);background:#14232a;animation:cut-rise .35s cubic-bezier(.16,1,.3,1) both}
+.mma-lesson-top{display:flex;justify-content:space-between;color:var(--lime);font-size:10px}
+.mma-lesson-top strong{color:#a6bcc0}
+.mma-lesson-detail h2{margin:11px 0 16px;font:650 24px/normal var(--font-display);letter-spacing:-.035em}
+.mma-focus{display:flex;align-items:start;gap:11px;padding:11px;background:#6de2d315;color:var(--lime)}
+.mma-focus svg{flex:none}
+.mma-focus p{margin:0;color:#e0eef0;font-size:12px}
+.mma-detail-row{display:grid;grid-template-columns:90px 1fr;gap:10px;padding:13px 0;border-bottom:1px solid #ffffff17}
+.mma-detail-row small{color:var(--lime);font-size:9px}
+.mma-detail-row p{margin:0;color:#bacbd0;font-size:11px}
+.mma-round-plan{padding:15px 0 2px;border-bottom:1px solid #ffffff17}
+.mma-round-plan>small{display:block;margin-bottom:9px;color:#6de2d3;font:700 10px var(--font-label);letter-spacing:.13em}
+.mma-round-plan p{display:flex;gap:12px;margin:0;padding:6px 0;color:#bed0d2;font:500 11px var(--font-body);line-height:1.45}
+.mma-round-plan b{flex:none;color:#6de2d3;font:700 12px var(--font-label);letter-spacing:.08em}
+.mma-live{display:flex;align-items:center;gap:12px;width:100%;margin-top:18px;padding:13px;border:0;background:var(--lime);color:#071a1e;text-align:left;cursor:pointer}
+.mma-live span{flex:1;font-family:var(--font-label);font-size:15px;font-weight:800;letter-spacing:.025em}
+.mma-live small{display:block;margin-top:3px;font-family:var(--font-body);font-size:10px;font-weight:400;letter-spacing:0}
+.mma-practiced{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;margin-top:7px;padding:11px;border:1px solid #6de2d370;background:transparent;color:#bcecf2;font:700 11px/normal 'Manrope',sans-serif;cursor:pointer}
+.mma-guidance{padding:16px;border:1px solid #ffffff1b;background:#151f29}
+.mma-guidance p{color:#adbec2;font-size:12px}
+.mma-guidance button{display:flex;align-items:center;justify-content:space-between;width:100%;padding:13px 0 0;border:0;border-top:1px solid #ffffff23;background:none;color:var(--lime);font:700 12px/normal 'Manrope',sans-serif;cursor:pointer}
+
+/* ── Stati: hover, pressione, focus da tastiera ── */
+.cut-page button,.cut-page a,.cut-page summary{transition:background-color .2s ease,border-color .2s ease,color .2s ease,filter .2s ease,transform .15s ease}
+.cut-page button:active{transform:scale(.98)}
+.cut-page summary::-webkit-details-marker{display:none}
+.cut-recipe:hover,.mma-lesson:hover,.mma-stage:hover{border-color:var(--lime);transform:translateY(-2px)}
+.cut-primary:hover,.cut-actions button:hover,.mma-live:hover,.cut-creatine button:hover{filter:brightness(1.1)}
+.cut-actions button:not(:first-child):hover,.cut-secondary:hover,.cut-toggle:hover,.cut-day-strip button:not(.active):hover,.cut-video-tabs button:not(.active):hover,.cut-sex button:not(.active):hover{border-color:color-mix(in srgb,var(--lime) 60%,transparent);color:#fff}
+.cut-week-picker button:hover,.cut-section-title button:hover,.cut-source:hover,.cut-video-links a:hover{color:var(--lime)}
+.cut-phase-list details:hover,.cut-profile:hover{border-color:#ffffff33}
+.cut-setup:hover{border-color:var(--lime)}
+.cut-close:hover{color:#fff}
+.cut-page :is(button,a,summary,input):focus-visible,.cut-app-shell .game-nav button:focus-visible{outline:2px solid var(--lime,#b8a4ff);outline-offset:2px}
+
+/* Cifre tabellari: dopo le regole con `font:` (la scorciatoia le azzera) */
+.cut-status strong,.cut-metrics b,.cut-goal b,.cut-history,.cut-week-picker strong,.cut-meal-head strong,.mma-signal strong,.mma-last-score strong{font-variant-numeric:tabular-nums}
+
+/* ── Guscio dell'app quando una vista Cut è attiva (App.jsx) ── */
+.cut-app-shell{background:#0b0d19!important;border-color:#ffffff10!important}
+.cut-app-shell .game-nav{background:#121524!important;border-top:1px solid #b8a4ff33!important;box-shadow:0 -10px 28px #0008}
+.cut-app-shell .game-nav button{min-width:0;padding-left:10px;padding-right:10px}
+.cut-app-shell .game-nav button span{letter-spacing:.04em!important}
+.cut-app-shell .game-nav button .system-font{font-family:var(--font-label);font-size:11px;letter-spacing:.055em!important}
+.cut-app-shell .hud-chip{border-color:#b8a4ff77!important;border-radius:3px;background:#1a1d2c!important;color:#ddd5ff!important}
+.cut-app-shell .page-shell:after,.cut-app-shell .warp-flash,.cut-app-shell .fx-particles{display:none!important}
+
+/* ── Movimento ── */
+@keyframes cut-appear{from{opacity:0;transform:translateY(15px)}to{opacity:.86;transform:translateY(0)}}
+@keyframes cut-rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+@keyframes cut-breathe{50%{transform:scale(1.1);opacity:.7}}
+@keyframes mma-mark{50%{transform:rotate(7deg) scale(1.05);box-shadow:0 0 22px #6de2d333}}
+@media (prefers-reduced-motion:reduce){.cut-page *,.cut-page *:before,.cut-page *:after{animation:none!important;transition:none!important}}
+
+@media (min-width:600px){.cut-page{padding-left:26px;padding-right:26px}}
