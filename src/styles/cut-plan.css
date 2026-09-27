@@ -283,3 +283,128 @@
 @media (prefers-reduced-motion:reduce){.cut-page *,.cut-page *:before,.cut-page *:after{animation:none!important;transition:none!important}}
 
 @media (min-width:600px){.cut-page{padding-left:26px;padding-right:26px}}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   COLORE E MOVIMENTO — ogni vista ha una coppia di accenti (--lime → --accent-2)
+   usata per gradienti, aurora di sfondo e bagliori. Solo transform/opacity e
+   background-position: niente animazioni di layout.
+   ───────────────────────────────────────────────────────────────────────────── */
+.cut-page{--accent-2:#ff8fd8;--accent-3:#ffd184;--grad:linear-gradient(115deg,var(--lime),var(--accent-2));position:relative;background:transparent}
+.cut-view-food{--accent-2:#ffd166;--accent-3:#ff7aa2}
+.cut-view-program{--accent-2:#ff8a5b;--accent-3:#ffe29a}
+.cut-view-mma{--accent-2:#7aa8ff;--accent-3:#b8a4ff}
+.cut-view-progress{--accent-2:#c69bff;--accent-3:#6de2d3}
+
+/* Aurora: due macchie di colore che respirano dietro la testata. z-index -1 finisce
+   nel contesto di .page-shell (isolato), sotto il contenuto ma sopra lo sfondo app. */
+.cut-page:before,.cut-page:after{content:'';position:absolute;z-index:-1;border-radius:50%;pointer-events:none;will-change:transform}
+.cut-page:before{top:-120px;left:-140px;width:420px;height:420px;background:radial-gradient(circle,color-mix(in srgb,var(--lime) 42%,transparent),transparent 65%);animation:cut-drift 14s ease-in-out infinite alternate}
+.cut-page:after{top:260px;right:-170px;width:400px;height:400px;background:radial-gradient(circle,color-mix(in srgb,var(--accent-2) 32%,transparent),transparent 65%);animation:cut-drift 18s ease-in-out -6s infinite alternate-reverse}
+
+/* Entrata a cascata dei blocchi (finisce su transform:none per non rompere i fixed) */
+.cut-page>:not(.mma-pro,.cut-modal-backdrop){animation:cut-enter .55s cubic-bezier(.16,1,.3,1) both}
+.cut-page>:nth-child(2){animation-delay:.04s}.cut-page>:nth-child(3){animation-delay:.08s}.cut-page>:nth-child(4){animation-delay:.12s}
+.cut-page>:nth-child(5){animation-delay:.16s}.cut-page>:nth-child(6){animation-delay:.2s}.cut-page>:nth-child(7){animation-delay:.24s}
+.cut-page>:nth-child(8){animation-delay:.28s}.cut-page>:nth-child(n+9){animation-delay:.32s}
+
+/* Testate */
+.cut-topline span:first-child{display:flex;align-items:center;gap:8px}
+.cut-topline span:first-child:before{content:'';width:6px;height:6px;border-radius:50%;background:var(--grad);box-shadow:0 0 10px var(--lime);animation:cut-pulse 2.4s ease-in-out infinite}
+.cut-kicker{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.cut-hero h1 em,.cut-page-head h1 em{background:linear-gradient(100deg,var(--lime),var(--accent-2),var(--accent-3),var(--lime));background-size:300% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:cut-shine 7s linear infinite}
+.cut-hero-art{filter:grayscale(.15) saturate(1.2) contrast(1.05) drop-shadow(0 0 26px color-mix(in srgb,var(--lime) 45%,transparent)) drop-shadow(0 20px 30px #000);animation:cut-appear .7s ease-out both,cut-float 6s ease-in-out .7s infinite}
+.cut-hero-line{height:2px;background:linear-gradient(90deg,var(--lime),var(--accent-2),var(--accent-3),transparent);background-size:200% 100%;animation:cut-shine 6s linear infinite}
+.cut-page-head:before{background:radial-gradient(circle,color-mix(in srgb,var(--accent-2) 26%,transparent),transparent 68%)}
+
+/* Oggi: tre valori, tre colori */
+.cut-status>div{padding-top:10px;border-top:2px solid var(--lime)}
+.cut-status>div:nth-child(2){border-top-color:var(--accent-2)}
+.cut-status>div:nth-child(3){border-top-color:var(--accent-3)}
+.cut-status>div:nth-child(1) small{color:var(--lime)}
+.cut-status>div:nth-child(2) small{color:var(--accent-2)}
+.cut-status>div:nth-child(3) small{color:var(--accent-3)}
+.cut-feature{position:relative;overflow:hidden;background:linear-gradient(135deg,color-mix(in srgb,var(--lime) 16%,var(--surface)),var(--surface) 62%)}
+.cut-football{background:linear-gradient(135deg,#8fb9ff26,var(--surface) 62%)}
+.cut-recovery{background:linear-gradient(135deg,#7f86a622,var(--surface) 62%)}
+.cut-feature:after{content:'';position:absolute;right:-40px;bottom:-60px;width:160px;height:160px;border-radius:50%;background:radial-gradient(circle,color-mix(in srgb,var(--accent-2) 16%,transparent),transparent 70%);pointer-events:none;animation:cut-breathe 7s ease-in-out infinite}
+.cut-feature-icon{background:var(--grad);color:#11131f;box-shadow:0 6px 18px color-mix(in srgb,var(--lime) 35%,transparent);animation:cut-bob 3.2s ease-in-out infinite}
+.cut-football .cut-feature-icon{background:linear-gradient(135deg,#8fb9ff,#6de2d3);color:#11131f}
+.cut-recovery .cut-feature-icon{background:linear-gradient(135deg,#7f86a6,#b8a4ff);color:#11131f}
+.cut-metrics>div{border-top:0;background:linear-gradient(90deg,var(--lime),transparent) top/100% 2px no-repeat}
+.cut-metrics>div:nth-child(2){background-image:linear-gradient(90deg,var(--accent-2),transparent)}
+.cut-brief{padding:17px 16px;border:0;border-radius:4px;background:linear-gradient(120deg,color-mix(in srgb,var(--lime) 14%,transparent),color-mix(in srgb,var(--accent-2) 10%,transparent))}
+.cut-creatine.taken .cut-creatine-icon{animation:cut-pop .5s cubic-bezier(.34,1.56,.64,1)}
+.cut-setup{background:linear-gradient(120deg,color-mix(in srgb,var(--lime) 18%,var(--surface)),color-mix(in srgb,var(--accent-2) 12%,var(--surface)))}
+.cut-setup>svg{animation:cut-nudge 1.6s ease-in-out infinite}
+
+/* CTA a gradiente con riflesso che passa */
+.cut-primary,.cut-actions button:first-child,.mma-live{position:relative;overflow:hidden;border-color:transparent;background:var(--grad);background-size:140% 100%;box-shadow:0 8px 24px color-mix(in srgb,var(--lime) 28%,transparent)}
+.cut-primary:after,.cut-actions button:first-child:after,.mma-live:after{content:'';position:absolute;inset:0;background:linear-gradient(105deg,transparent 35%,#ffffff55 50%,transparent 65%);transform:translateX(-120%);animation:cut-sheen 4.5s ease-in-out 1.2s infinite;pointer-events:none}
+.cut-primary.done{background:linear-gradient(115deg,#1d3521,#20402f);box-shadow:none}
+.cut-primary.done:after{display:none}
+.cut-primary:hover,.cut-actions button:first-child:hover{background-position:100% 0}
+
+/* Controlli */
+.cut-week-picker strong{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.cut-day-strip button.active{border-color:transparent;background:var(--grad);box-shadow:0 4px 14px color-mix(in srgb,var(--lime) 35%,transparent);animation:cut-pop .35s cubic-bezier(.34,1.56,.64,1)}
+.cut-note{border-left:0;border-radius:3px;background:linear-gradient(90deg,color-mix(in srgb,var(--lime) 20%,transparent),color-mix(in srgb,var(--accent-2) 8%,transparent));box-shadow:inset 3px 0 0 var(--lime)}
+.cut-toggle.active{background:color-mix(in srgb,var(--lime) 12%,transparent)}
+
+/* Pasti e ricette: colori a rotazione, foto che si animano */
+.cut-meal-image{box-shadow:0 0 0 1px color-mix(in srgb,var(--lime) 40%,transparent),0 8px 20px #0007;transition:transform .35s cubic-bezier(.16,1,.3,1)}
+.cut-meal:hover .cut-meal-image{transform:scale(1.06) rotate(-2deg)}
+.cut-meal-1 span{color:var(--accent-2)}
+.cut-meal-3 span{color:#b8a4ff}
+.cut-meal-2 span{color:var(--accent-3)}
+.cut-recipe{--tint:var(--lime);overflow:hidden;background:linear-gradient(90deg,color-mix(in srgb,var(--tint) 16%,var(--surface)),var(--surface) 75%)}
+.cut-recipe:nth-child(4n+2){--tint:var(--accent-2)}
+.cut-recipe:nth-child(4n+3){--tint:#6de2d3}
+.cut-recipe:nth-child(4n+4){--tint:#b8a4ff}
+.cut-recipe small,.cut-recipe>svg{color:var(--tint)}
+.cut-recipe img{transition:transform .45s cubic-bezier(.16,1,.3,1)}
+.cut-recipe:hover{border-color:var(--tint)}
+.cut-recipe:hover img{transform:scale(1.12)}
+.cut-recipe:hover>svg{transform:translateX(3px)}
+.cut-recipe>svg{transition:transform .2s ease}
+.cut-modal-backdrop{animation:cut-fade .25s ease both}
+.cut-modal{border-top:0;background:linear-gradient(180deg,color-mix(in srgb,var(--lime) 12%,#131626),#131626 40%);animation:cut-sheet .42s cubic-bezier(.16,1,.3,1) both}
+.cut-modal:before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--grad)}
+
+/* Training */
+.cut-phase-list details[open]{border-color:color-mix(in srgb,var(--lime) 45%,transparent);background:linear-gradient(135deg,color-mix(in srgb,var(--lime) 12%,var(--surface)),var(--surface))}
+.cut-exercise>span{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent;font-size:13px}
+.cut-video{background:linear-gradient(135deg,color-mix(in srgb,var(--lime) 22%,#1b2033),#121524 70%)}
+.cut-video span svg{animation:cut-pulse 2.4s ease-in-out infinite}
+
+/* Progressi: barra a gradiente con scia */
+.cut-goal-track{height:6px;border-radius:6px;overflow:hidden;background:#ffffff18}
+.cut-goal-track span{height:6px;border-radius:6px;background:linear-gradient(90deg,var(--lime),var(--accent-2),var(--lime));background-size:200% 100%;animation:cut-shine 3s linear infinite}
+.cut-profile[open]{border-color:color-mix(in srgb,var(--lime) 35%,transparent)}
+.cut-sex button.active{background:color-mix(in srgb,var(--lime) 14%,var(--surface-2))}
+
+/* Accademia MMA */
+.mma-signal{background:linear-gradient(120deg,#6de2d326,#7aa8ff1a)}
+.mma-signal strong{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.mma-stage.active{background:linear-gradient(120deg,#6de2d333,#7aa8ff22)}
+.mma-lesson.active{background:linear-gradient(120deg,#6de2d32e,#7aa8ff1c)}
+.mma-lesson-detail{border-top:0;box-shadow:inset 0 3px 0 var(--lime)}
+.mma-lesson-detail{background:linear-gradient(160deg,#16303a,#141c2b 60%)}
+
+/* Nav: filo arcobaleno che scorre sopra le cinque sezioni */
+.cut-app-shell .game-nav:before{height:2px;background:linear-gradient(90deg,#b8a4ff,#ff8fd8,#ffac91,#ffd184,#6de2d3,#8fb9ff,#b8a4ff);background-size:200% 100%;opacity:.85;animation:cut-shine 9s linear infinite}
+
+@keyframes cut-enter{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@keyframes cut-drift{from{transform:translate(0,0) scale(1)}to{transform:translate(60px,40px) scale(1.15)}}
+@keyframes cut-shine{to{background-position:-300% 0}}
+@keyframes cut-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-9px)}}
+@keyframes cut-pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.55;transform:scale(.8)}}
+@keyframes cut-bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+@keyframes cut-pop{0%{transform:scale(.85)}60%{transform:scale(1.12)}100%{transform:scale(1)}}
+@keyframes cut-nudge{0%,100%{transform:translateX(0)}50%{transform:translateX(4px)}}
+@keyframes cut-sheen{0%{transform:translateX(-120%)}35%,100%{transform:translateX(120%)}}
+@keyframes cut-fade{from{opacity:0}}
+@keyframes cut-sheet{from{transform:translateY(100%)}to{transform:none}}
+
+/* Chi chiede meno movimento (sistema o modalità leggera dell'app) resta con i colori, senza loop */
+@media (prefers-reduced-motion:reduce){.cut-page:before,.cut-page:after,.cut-app-shell .game-nav:before{animation:none!important}}
+.fx-lite .cut-page:before,.fx-lite .cut-page:after,.fx-lite .cut-page *,.fx-lite .cut-page *:after,.fx-lite.cut-app-shell .game-nav:before{animation-iteration-count:1!important}
