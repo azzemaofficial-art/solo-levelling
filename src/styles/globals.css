@@ -1306,3 +1306,8 @@ button, a { transition: transform 0.14s ease, filter 0.14s ease, background-colo
 @media (prefers-reduced-motion: reduce) {
   .game-nav::before, .menu-drawer-premium, .menu-drawer-premium button { animation: none !important; }
 }
+
+/* Touch (iPhone): l'hover resta "attaccato" dopo il tap → niente bottoni che restano sollevati */
+@media (hover: none) {
+  .neon-cinema button:not(:disabled):hover { transform: none; }
+}

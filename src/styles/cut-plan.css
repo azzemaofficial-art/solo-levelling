@@ -441,9 +441,8 @@
 @media (prefers-reduced-motion:reduce){.cut-trend-line{stroke-dashoffset:0}.cut-trend-area,.cut-trend-dot{opacity:1}}
 
 /* Tocca il guerriero → il drago passa in picchiata */
-.cut-page .cut-hero .cut-hero-summon{position:absolute;display:block;inset:0 0 0 auto;z-index:1;width:45%;padding:0;border:0;background:none;cursor:pointer;-webkit-tap-highlight-color:transparent}
-.cut-hero-summon .cut-hero-art{pointer-events:none}
-.cut-hero-summon:active .cut-hero-art{filter:grayscale(0) saturate(1.4) drop-shadow(0 0 34px color-mix(in srgb,var(--accent-2) 70%,transparent)) drop-shadow(0 20px 30px #000)}
+.cut-page .cut-hero .cut-hero-summon{position:absolute;display:block;inset:0 0 0 auto;z-index:3;width:42%;padding:0;border:0;background:none;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.cut-hero:has(.cut-hero-summon:active) .cut-hero-art{filter:grayscale(0) saturate(1.4) drop-shadow(0 0 34px color-mix(in srgb,var(--accent-2) 70%,transparent)) drop-shadow(0 20px 30px #000)}
 
 /* ── Pasti con ricetta ── */
 .cut-page button.cut-meal{width:100%;margin:0;padding:14px 0;border:0;border-top:1px solid #ffffff1c;border-radius:0;background:none;color:inherit;font:inherit;text-align:left;cursor:pointer}
@@ -477,3 +476,30 @@
 .cut-page .cut-exercise .cut-video-tabs{display:grid;grid-template-columns:repeat(auto-fit,minmax(0,1fr));gap:4px}
 /* la nav dell'app resta sopra il foglio ricetta: spazio perché l'ultima riga si legga */
 .cut-modal{padding-bottom:calc(110px + env(safe-area-inset-bottom))}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   TELEFONO (è il dispositivo principale): notch, zoom iOS, dita, leggibilità
+   ───────────────────────────────────────────────────────────────────────────── */
+.cut-page{padding-top:calc(28px + env(safe-area-inset-top))}
+.cut-app-shell .app-menu-btn{display:grid;place-items:center;width:42px;height:42px;padding:0!important;border-radius:50%!important;background:#161a2cb3!important;border-color:#b8a4ff55!important;color:#e7e0ff!important;box-shadow:0 6px 20px #0008;-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
+.cut-topline span:last-child{margin-right:52px}
+/* iOS ingrandisce la pagina se un campo ha testo sotto 16px */
+.cut-form input{font-size:16px}
+/* bersagli comodi per il pollice (≥ 44px) */
+.cut-day-strip button{height:44px;font-size:11px}
+.cut-week-picker button{min-width:44px;min-height:44px}
+.cut-close{min-height:44px;padding:10px 4px}
+/* testi più leggibili sullo schermo piccolo */
+.cut-fine{font-size:12px}
+.cut-feature p,.cut-rule,.cut-phase-list p,.cut-creatine p,.cut-exercise small{font-size:13px}
+.cut-meal p,.cut-hero p,.cut-page-head p{font-size:14px}
+.cut-exercise b{font-size:14px}
+/* su touch l'hover resta "attaccato" dopo il tap: niente sollevamenti */
+@media (hover:none){
+  .cut-recipe:hover,.mma-lesson:hover,.mma-stage:hover,.cut-meal:hover .cut-meal-image,.cut-recipe:hover img,.cut-recipe:hover>svg,.cut-meal:hover .cut-meal-go{transform:none}
+  .menu-drawer-premium button:hover{transform:none}
+}
+/* il bottone "evoca drago" è invisibile: niente stili ereditati dai bottoni neon */
+.cut-page .cut-hero .cut-hero-summon,.cut-page .cut-hero .cut-hero-summon:active,.cut-page .cut-hero .cut-hero-summon:focus{-webkit-appearance:none;appearance:none;background:transparent!important;border:0!important;box-shadow:none!important;filter:none!important;transform:none!important;outline:none}
+.cut-page .cut-hero .cut-hero-summon:focus-visible{outline:2px solid var(--lime);outline-offset:-6px;border-radius:12px}
+.cut-page .cut-hero .cut-hero-summon:before,.cut-page .cut-hero .cut-hero-summon:after{display:none!important}

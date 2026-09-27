@@ -163,7 +163,7 @@ export default function CutPlan({ view = 'today', onNavigate, systemLogs = [], o
     {view === 'today' && <>
       <section className="cut-hero">
         <div className="cut-hero-copy"><span className="cut-kicker">IL TUO PERCORSO • 12 SETTIMANE</span><h1>Il prossimo<br /><em>livello.</em></h1><p>{profile ? `Da ${formatKg(profile.startWeightKg)} kg verso ${formatKg(profile.targetWeightKg)} kg. ` : ''}Forza, velocità e continuità. Una giornata alla volta.</p></div>
-        <button type="button" className="cut-hero-summon" onClick={summonDragon} aria-label="Evoca il drago"><img src="/avatar8.png" alt="" className="cut-hero-art" /></button>
+        <img src="/avatar8.png" alt="" className="cut-hero-art" /><button type="button" className="cut-hero-summon" onClick={summonDragon} aria-label="Evoca il drago" />
         <div className="cut-hero-line" />
       </section>
       <section className="cut-status">
@@ -206,7 +206,7 @@ export default function CutPlan({ view = 'today', onNavigate, systemLogs = [], o
       <div className="cut-week-picker"><button aria-label="Settimana precedente" onClick={() => setTrainingWeek((n) => Math.max(0, n - 1))}><ChevronLeft size={20} /></button><span>SETTIMANA <strong>{trainingWeek + 1}</strong> / 12</span><button aria-label="Settimana successiva" onClick={() => setTrainingWeek((n) => Math.min(11, n + 1))}><ChevronRight size={20} /></button></div>
       <p className="cut-fine">Schema settimanale stabile, progressione graduale. Tieni la seduta opzionale solo se recuperi bene.</p>
       <p className="cut-note"><strong>{currentPhase.name}:</strong> {currentPhase.detail}</p>
-      <div className="cut-phase-list">{phases.map((phase) => <details key={phase.weeks} open={phase.weeks === '1–2'}><summary><span>SETTIMANE {phase.weeks}</span><b>{phase.name}</b></summary><p>{phase.detail}</p></details>)}</div>
+      <div className="cut-phase-list">{phases.map((phase) => <details key={phase.weeks}><summary><span>SETTIMANE {phase.weeks}</span><b>{phase.name}</b></summary><p>{phase.detail}</p></details>)}</div>
       <div className="cut-day-strip">{dayNames.map((name, index) => <button key={name} className={day === index ? 'active' : ''} onClick={() => setDay(index)}>{name.slice(0, 3)}</button>)}</div>
       <section className={`cut-feature cut-${trainingDays[day].type}`}><div className="cut-feature-icon">{sessionIcon(trainingDays[day].type)}</div><div>{trainingDays[day].duration !== '—' && <small>{trainingDays[day].duration}</small>}<h2>{trainingDays[day].short}</h2><p>{trainingDays[day].detail}</p></div></section>
       {trainingDays[day].exercises && <><button className={`cut-toggle ${light ? 'active' : ''}`} onClick={() => setLight((n) => !n)}>{light ? 'Versione leggera attiva' : 'Sono stanco: versione leggera'} <RotateCcw size={15} /></button><div className="cut-exercises">{(light ? trainingDays[day].exercises.filter((_, index) => index < 3) : trainingDays[day].exercises).map(([name, prescription], index) => <div className={`cut-exercise ${exerciseVideo?.name === name ? 'open' : ''}`} key={name}><span>{String(index + 1).padStart(2, '0')}</span><div className="cut-exercise-main"><b>{name}</b><small>{light && index > 0 ? '1–2 serie facili' : trainingWeek < 2 ? prescription.replace(/^3 ×/, '2 ×').replace(/^4–6 rip\./, '3–4 rip. al 70–80%') : prescription}</small>

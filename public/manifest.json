@@ -1,15 +1,16 @@
 {
-  "name": "Shadow Monarch System",
-  "short_name": "System",
+  "name": "Shadow \u00b7 Protocollo Cut",
+  "short_name": "Shadow",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#050505",
-  "theme_color": "#050505",
+  "background_color": "#0b0d19",
+  "theme_color": "#0b0d19",
   "icons": [
     {
-      "src": "https://cdn-icons-png.flaticon.com/512/8154/8154085.png",
-      "sizes": "512x512",
-      "type": "image/png"
+      "src": "/avatar8.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "any"
     }
   ]
 }

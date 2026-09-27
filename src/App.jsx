@@ -1,6 +1,7 @@
 import React, { Suspense, lazy, useMemo, useState, useEffect, useCallback } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import ProtocolIcon from './components/ProtocolIcon';
+import { Menu as MenuIcon, X as CloseIcon } from 'lucide-react';
 import DragonSky, { summonDragon } from './components/DragonSky';
 import { applyCutRemote } from './utils/cutSync';
 import { playSfx } from './utils/sfx';
@@ -1499,14 +1500,15 @@ useEffect(() => { localStorage.setItem('shadow_monarch_macros', JSON.stringify(m
         <img src="/boss4.png" alt="" className="anime-float-reverse absolute right-10 bottom-40 w-24 opacity-12 grayscale" />
         <div className="absolute inset-0 starfield"></div>
       </div>}
-      <DragonSky enabled={!cutFxLite} />
-      <div className="absolute top-2 right-2 z-[90] flex items-center gap-1">
+      {/* in home il drago vola nella fascia vuota tra frase e numeri, non sopra i titoli */}
+      <DragonSky enabled={!cutFxLite} lane={activePage === 'cut' ? 'mid' : 'top'} />
+      <div className="absolute right-2 z-[90] flex items-center gap-1" style={{ top: 'calc(0.5rem + env(safe-area-inset-top))' }}>
         <button
           onClick={() => { setMenuOpen((prev) => !prev); triggerFxBurst('light'); }}
           aria-label={menuOpen ? 'Chiudi menu' : 'Apri menu'}
-          className="hud-chip text-[10px] px-2 py-1 border border-cyan-300/60 text-cyan-200 bg-black/50 backdrop-blur-md"
+          className="hud-chip app-menu-btn text-[10px] px-2 py-1 border border-cyan-300/60 text-cyan-200 bg-black/50 backdrop-blur-md"
         >
-          {menuOpen ? 'CLOSE' : 'MENU'}
+          {menuOpen ? <CloseIcon size={19} aria-hidden="true" /> : <MenuIcon size={19} aria-hidden="true" />}
         </button>
       </div>
       {!['cut', 'food', 'program', 'mma', 'progress', 'coach'].includes(activePage) && <div className="absolute top-2 left-2 z-[80] flex items-center gap-1">
