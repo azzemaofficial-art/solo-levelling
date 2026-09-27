@@ -1242,3 +1242,68 @@ button, a { transition: transform 0.14s ease, filter 0.14s ease, background-colo
     scroll-behavior: auto !important;
   }
 }
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Coerenza con il Protocollo Cut (palette lavanda/rosa/pesca/turchese/blu):
+   menu "Esplora" e barra di navigazione su tutte le pagine.
+   ───────────────────────────────────────────────────────────────────────────── */
+.menu-drawer-premium {
+  border-left: 0 !important;
+  background:
+    radial-gradient(circle at 15% 8%, rgba(184, 164, 255, 0.22), transparent 38%),
+    radial-gradient(circle at 90% 55%, rgba(255, 143, 216, 0.14), transparent 40%),
+    radial-gradient(circle at 25% 100%, rgba(109, 226, 211, 0.14), transparent 42%),
+    linear-gradient(170deg, #13162a, #0b0d19) !important;
+  box-shadow: -18px 0 50px rgba(0, 0, 0, 0.55), inset 2px 0 0 rgba(184, 164, 255, 0.35);
+  animation: drawer-slide 0.38s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.menu-drawer-premium > p,
+.menu-drawer-premium > div > p {
+  font-family: var(--font-label);
+  font-weight: 700;
+  letter-spacing: 0.14em !important;
+  background: linear-gradient(100deg, #b8a4ff, #ff8fd8);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent !important;
+}
+/* Ogni riquadro prende la tinta dal proprio colore del testo (border-*-300 / text-*-200) */
+.menu-drawer-premium button {
+  border-radius: 7px;
+  border-color: color-mix(in srgb, currentColor 32%, transparent) !important;
+  background: linear-gradient(135deg, color-mix(in srgb, currentColor 16%, transparent), color-mix(in srgb, currentColor 4%, transparent));
+  font-family: var(--font-label);
+  font-weight: 700;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  animation: drawer-item 0.42s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.menu-drawer-premium button:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, currentColor 70%, transparent) !important;
+  box-shadow: 0 8px 20px color-mix(in srgb, currentColor 18%, transparent);
+}
+.menu-drawer-premium button:active { transform: scale(0.97); }
+.menu-drawer-premium button:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+.menu-drawer-premium > div:nth-of-type(2) button { animation-delay: 0.05s; }
+.menu-drawer-premium > div:nth-of-type(3) button { animation-delay: 0.1s; }
+.menu-drawer-premium > div:nth-of-type(n+4) button { animation-delay: 0.15s; }
+@keyframes drawer-slide { from { transform: translateX(40px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes drawer-item { from { transform: translateY(8px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/* Nav: stesso filo arcobaleno ed etichette del Cut anche fuori dal Cut */
+.game-nav::before {
+  height: 2px;
+  background: linear-gradient(90deg, #b8a4ff, #ff8fd8, #ffac91, #ffd184, #6de2d3, #8fb9ff, #b8a4ff);
+  background-size: 200% 100%;
+  opacity: 0.85;
+  animation: nav-rainbow 9s linear infinite;
+}
+.game-nav button .system-font { font-family: var(--font-label); font-size: 11px; letter-spacing: 0.055em !important; }
+@keyframes nav-rainbow { to { background-position: -200% 0; } }
+
+.fx-lite .game-nav::before,
+.fx-lite .menu-drawer-premium,
+.fx-lite .menu-drawer-premium button { animation: none !important; }
+@media (prefers-reduced-motion: reduce) {
+  .game-nav::before, .menu-drawer-premium, .menu-drawer-premium button { animation: none !important; }
+}
