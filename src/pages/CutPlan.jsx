@@ -46,6 +46,21 @@ export default function CutPlan({ view = 'today', onNavigate, systemLogs = [], o
   const [videoOpen, setVideoOpen] = useState(false);
   const [videoId, setVideoId] = useState('1763945815001');
   useEffect(() => { localStorage.setItem(KEY, JSON.stringify({ ...saved, week, trainingWeek })); }, [saved, week, trainingWeek]);
+  // Promemoria Telegram serali (api/telegram/cut-nudge): il server riceve solo
+  // due date, e solo quando cambiano. Senza chat_id collegato non parte nulla.
+  const lastWeighDate = [...(saved.progress || [])].reverse().find((entry) => entry.weight)?.date || null;
+  useEffect(() => {
+    let chatId = '';
+    try { chatId = localStorage.getItem('shadow_monarch_tg_chat_id') || ''; } catch { /* storage bloccato */ }
+    if (!/^\d+$/.test(chatId)) return undefined;
+    const timer = setTimeout(() => {
+      fetch('/api/telegram/cut-state', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: chatId, creatineDate: saved.creatineDate || null, lastWeighDate }),
+      }).catch(() => { /* offline: si riallinea al prossimo cambio */ });
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [saved.creatineDate, lastWeighDate]);
   const today = getMondayIndex();
   const selectedMeal = mealWeeks[week][day];
   const todayTraining = trainingDays[today];
