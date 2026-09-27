@@ -2,6 +2,7 @@
 // 5 job separati chiamano questo endpoint agli orari: 08:00 12:00 16:00 19:00 21:00 UTC
 // Invia il promemoria del momento giusto + un nudge scientifico che ruota ogni giorno.
 import { safeEqual } from '../../lib/secrets.js';
+import { saveCutState, sendCutNudges } from '../../lib/cutReminders.js';
 
 // Per ogni slot: un pool di messaggi (pasto + abitudine/integratore fondati sui paper).
 // Ruotano per giorno dell'anno → ogni giorno un consiglio diverso, mai lo stesso a raffica.
@@ -40,12 +41,16 @@ const SLOTS = {
 };
 
 export default async function handler(req, res) {
+  // POST dall'app: stato del Protocollo Cut per il promemoria serale (vedi lib/cutReminders.js).
+  if (req.method === 'POST') return saveCutState(req, res);
+
   // Fail-closed: prima era aperto a chiunque (spam notifiche verso la chat).
   // I job cron-job.org devono chiamare con ?secret=<CRON_SECRET>.
   const cronSecret = process.env.CRON_SECRET;
   if (!cronSecret) return res.status(500).json({ error: 'CRON_SECRET non impostato su Vercel' });
   const provided = req.query?.secret || (req.headers?.authorization || '').replace('Bearer ', '');
   if (!safeEqual(String(provided || ''), cronSecret)) return res.status(401).json({ error: 'unauthorized' });
+  if (req.query?.task === 'cut-nudge') return sendCutNudges(res);
 
   const botToken = process.env.SHADOW_BOT_TOKEN;
   // SHADOW_BOT_CHAT_ID può contenere più ID (allow-list multi-utente, separati da

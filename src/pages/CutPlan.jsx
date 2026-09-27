@@ -46,7 +46,7 @@ export default function CutPlan({ view = 'today', onNavigate, systemLogs = [], o
   const [videoOpen, setVideoOpen] = useState(false);
   const [videoId, setVideoId] = useState('1763945815001');
   useEffect(() => { localStorage.setItem(KEY, JSON.stringify({ ...saved, week, trainingWeek })); }, [saved, week, trainingWeek]);
-  // Promemoria Telegram serali (api/telegram/cut-nudge): il server riceve solo
+  // Promemoria Telegram serali (lib/cutReminders.js via remind): il server riceve solo
   // due date, e solo quando cambiano. Senza chat_id collegato non parte nulla.
   const lastWeighDate = [...(saved.progress || [])].reverse().find((entry) => entry.weight)?.date || null;
   useEffect(() => {
@@ -54,7 +54,7 @@ export default function CutPlan({ view = 'today', onNavigate, systemLogs = [], o
     try { chatId = localStorage.getItem('shadow_monarch_tg_chat_id') || ''; } catch { /* storage bloccato */ }
     if (!/^\d+$/.test(chatId)) return undefined;
     const timer = setTimeout(() => {
-      fetch('/api/telegram/cut-state', {
+      fetch('/api/telegram/remind', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ chat_id: chatId, creatineDate: saved.creatineDate || null, lastWeighDate }),
       }).catch(() => { /* offline: si riallinea al prossimo cambio */ });

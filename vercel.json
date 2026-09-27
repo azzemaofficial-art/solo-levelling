@@ -55,19 +55,11 @@
     "api/telegram/supplements.js": {
       "memory": 256,
       "maxDuration": 30
-    },
-    "api/telegram/cut-state.js": {
-      "memory": 256,
-      "maxDuration": 10
-    },
-    "api/telegram/cut-nudge.js": {
-      "memory": 256,
-      "maxDuration": 30
     }
   },
   "crons": [
     {
-      "path": "/api/telegram/cut-nudge",
+      "path": "/api/telegram/remind?task=cut-nudge",
       "schedule": "30 18 * * *"
     }
   ]

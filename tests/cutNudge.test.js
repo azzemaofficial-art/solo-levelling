@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { nudgeLines } from '../api/telegram/cut-nudge.js';
+import { nudgeLines } from '../lib/cutReminders.js';
 
 test('cut-nudge: nessuno stato → nessun messaggio', () => {
   assert.deepEqual(nudgeLines(null, '2026-09-27'), []);
