@@ -3,12 +3,13 @@ import { ArrowRight, BookOpen, Check, ChevronLeft, ChevronRight, PlayCircle, Plu
 import ProtocolIcon from '../components/ProtocolIcon';
 import { dayNames, evidence, mealWeeks, nutritionRules, phases, recipes, trainingDays } from '../data/cutPlan';
 import { dayTargetFor, formatKg, useCutProfile } from '../utils/cutProfile';
+import { CUT_PLAN_KEY, CUT_SYNC_EVENT, CUT_XP } from '../utils/cutSync';
 import MmaAcademy from '../components/MmaAcademy';
 import CountUp from '../components/CountUp';
 import WeightTrend from '../components/WeightTrend';
 import '../styles/cut-plan.css';
 
-const KEY = 'shadow_monarch_cut_plan_v1';
+const KEY = CUT_PLAN_KEY;
 const readSaved = () => {
   try { return JSON.parse(localStorage.getItem(KEY) || '{}'); } catch { return {}; }
 };
@@ -26,7 +27,7 @@ const emptyProfileForm = (p) => ({
 });
 
 // XP per azione: ogni chiave si paga una volta sola (niente farming togliendo e rimettendo la spunta).
-const XP = { session: 40, creatine: 10, measure: 15 };
+const XP = CUT_XP;
 
 export default function CutPlan({ view = 'today', onNavigate, systemLogs = [], onGainXp }) {
   const [profile, saveProfile] = useCutProfile();
@@ -49,6 +50,14 @@ export default function CutPlan({ view = 'today', onNavigate, systemLogs = [], o
   // Promemoria Telegram serali (lib/cutReminders.js via remind): il server riceve solo
   // due date, e solo quando cambiano. Senza chat_id collegato non parte nulla.
   const lastWeighDate = [...(saved.progress || [])].reverse().find((entry) => entry.weight)?.date || null;
+  const sessionDoneDate = saved.completed?.[`${trainingWeek}-${getMondayIndex()}`] ? getLocalDateKey() : null;
+  const kcalTargetsKey = [0, 1, 2, 3, 4, 5, 6].map((index) => dayTargetFor(profile, index)).join(',');
+  // Spunte arrivate da Telegram (utils/cutSync): rileggi lo stato salvato.
+  useEffect(() => {
+    const onSync = () => setSaved(readSaved());
+    window.addEventListener(CUT_SYNC_EVENT, onSync);
+    return () => window.removeEventListener(CUT_SYNC_EVENT, onSync);
+  }, []);
   useEffect(() => {
     let chatId = '';
     try { chatId = localStorage.getItem('shadow_monarch_tg_chat_id') || ''; } catch { /* storage bloccato */ }
@@ -56,11 +65,11 @@ export default function CutPlan({ view = 'today', onNavigate, systemLogs = [], o
     const timer = setTimeout(() => {
       fetch('/api/telegram/remind', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chat_id: chatId, creatineDate: saved.creatineDate || null, lastWeighDate }),
+        body: JSON.stringify({ chat_id: chatId, creatineDate: saved.creatineDate || null, sessionDoneDate, lastWeighDate, kcalTargets: kcalTargetsKey.split(',').map(Number) }),
       }).catch(() => { /* offline: si riallinea al prossimo cambio */ });
     }, 1500);
     return () => clearTimeout(timer);
-  }, [saved.creatineDate, lastWeighDate]);
+  }, [saved.creatineDate, sessionDoneDate, lastWeighDate, kcalTargetsKey]);
   const today = getMondayIndex();
   const selectedMeal = mealWeeks[week][day];
   const todayTraining = trainingDays[today];

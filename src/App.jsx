@@ -2,6 +2,7 @@ import React, { Suspense, lazy, useMemo, useState, useEffect, useCallback } from
 import { AnimatePresence, motion } from 'framer-motion';
 import ProtocolIcon from './components/ProtocolIcon';
 import DragonSky, { summonDragon } from './components/DragonSky';
+import { applyCutRemote } from './utils/cutSync';
 import { playSfx } from './utils/sfx';
 import { formatAiErrorDetail, requestSystemAI, subscribeAiStatus } from './utils/aiClient';
 import { runStorageMigrations } from './utils/storageMigrations';
@@ -403,6 +404,11 @@ useEffect(() => { localStorage.setItem('shadow_monarch_macros', JSON.stringify(m
   // Applica payload Telegram al log di oggi (usato da URL param e da server claim)
   const applyTgImport = useCallback((payload) => {
     if (!payload?.type) return;
+    // 💊/✅ premuti sui promemoria Telegram del Protocollo Cut
+    if (payload.type === 'cut_creatine' || payload.type === 'cut_session') {
+      applyCutRemote(payload, grantCutXp);
+      return;
+    }
     // 🧠 Gate della Conoscenza: XP guadagnato studiando su Telegram → livello del personaggio
     if (payload.type === 'learn_xp' || payload.type === 'learn_boss') {
       const gained = Number(payload.amount || 0);

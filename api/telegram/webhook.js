@@ -4,6 +4,7 @@
 import { GATES, GATE_IDS, nextQuestion, gradeAnswer, startBoss, bossQuestion, gradeBoss, progressLine, progressCard, initLearn, normalize as normLearn, gateButtons, levelOf, loadGen, baseCount, existingStems, safeHtml, studyLabel, difficultyForLevel } from '../../lib/learn.js';
 import { NUTRITION_PRINCIPLES, knowledgePromptFor } from '../../lib/knowledgeBase.js';
 import { kvGet, kvSet, kvPush, kvListRange, kvListReplace, KvError } from '../../lib/kv.js';
+import { handleCutCallback } from '../../lib/cutReminders.js';
 import { safeEqual } from '../../lib/secrets.js';
 import { FR_ALL_UNITS, frUnitByIndex } from '../../lib/frenchCurriculum.js';
 import { PL_ALL_UNITS, plUnitByIndex } from '../../lib/polishCurriculum.js';
@@ -1002,6 +1003,11 @@ async function dispatch(req, res) {
     const cChat = cbq.message?.chat?.id;
     if (!isAllowed(cChat)) { await answerCbq(botToken, cbq.id); return res.status(200).json({ ok: true }); }
     const data = String(cbq.data || '');
+    // 💊/✅ bottoni dei promemoria del Protocollo Cut (lib/cutReminders.js)
+    if (data.startsWith('cut|')) {
+      await handleCutCallback(cbq);
+      return res.status(200).json({ ok: true });
+    }
     // ▶️ prossima domanda normale
     if (data === 'lnext') {
       await answerCbq(botToken, cbq.id);

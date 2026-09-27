@@ -59,6 +59,14 @@
   },
   "crons": [
     {
+      "path": "/api/telegram/remind?task=cut-morning",
+      "schedule": "30 5 * * *"
+    },
+    {
+      "path": "/api/telegram/remind?task=cut-training",
+      "schedule": "30 15 * * *"
+    },
+    {
       "path": "/api/telegram/remind?task=cut-nudge",
       "schedule": "30 18 * * *"
     }
