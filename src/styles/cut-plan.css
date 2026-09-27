@@ -407,7 +407,7 @@
 
 /* Chi chiede meno movimento (sistema o modalità leggera dell'app) resta con i colori, senza loop */
 @media (prefers-reduced-motion:reduce){.cut-page:before,.cut-page:after,.cut-app-shell .game-nav:before{animation:none!important}}
-.fx-lite .cut-page:before,.fx-lite .cut-page:after,.fx-lite .cut-page *,.fx-lite .cut-page *:after,.fx-lite.cut-app-shell .game-nav:before{animation-iteration-count:1!important}
+.cut-fx-lite .cut-page:before,.cut-fx-lite .cut-page:after,.cut-fx-lite .cut-page *,.cut-fx-lite .cut-page *:after,.cut-fx-lite .game-nav:before{animation-iteration-count:1!important}
 
 /* ── Andamento peso (WeightTrend) ── */
 .cut-trend{margin:0 0 22px;padding:16px 14px 8px;border:1px solid #ffffff1b;border-radius:4px;background:linear-gradient(160deg,color-mix(in srgb,var(--lime) 12%,var(--surface)),var(--surface) 55%)}

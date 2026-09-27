@@ -1131,7 +1131,6 @@ body { overscroll-behavior: contain; }
 .fx-lite .nav-tab-active,
 .fx-lite .hud-chip::after,
 .fx-lite .quick-add-fab,
-.fx-lite .menu-drawer-premium,
 .fx-lite .premium-shell::before,
 .fx-lite .premium-shell::after {
   animation: none !important;
@@ -1301,9 +1300,9 @@ button, a { transition: transform 0.14s ease, filter 0.14s ease, background-colo
 .game-nav button .system-font { font-family: var(--font-label); font-size: 11px; letter-spacing: 0.055em !important; }
 @keyframes nav-rainbow { to { background-position: -200% 0; } }
 
-.fx-lite .game-nav::before,
-.fx-lite .menu-drawer-premium,
-.fx-lite .menu-drawer-premium button { animation: none !important; }
+.cut-fx-lite .game-nav::before,
+.cut-fx-lite .menu-drawer-premium,
+.cut-fx-lite .menu-drawer-premium button { animation: none !important; }
 @media (prefers-reduced-motion: reduce) {
   .game-nav::before, .menu-drawer-premium, .menu-drawer-premium button { animation: none !important; }
 }

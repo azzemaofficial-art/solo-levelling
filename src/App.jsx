@@ -1,6 +1,7 @@
 import React, { Suspense, lazy, useMemo, useState, useEffect, useCallback } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import ProtocolIcon from './components/ProtocolIcon';
+import DragonSky, { summonDragon } from './components/DragonSky';
 import { playSfx } from './utils/sfx';
 import { formatAiErrorDetail, requestSystemAI, subscribeAiStatus } from './utils/aiClient';
 import { runStorageMigrations } from './utils/storageMigrations';
@@ -396,6 +397,7 @@ useEffect(() => { localStorage.setItem('shadow_monarch_macros', JSON.stringify(m
     });
     emitUiToast({ message: `${message} +${gained} XP`, tone: 'success', durationMs: 3500 });
     triggerFxBurst('success');
+    if (gained >= 40) summonDragon(); // allenamento completato → il drago passa in picchiata
   }, [triggerFxBurst]);
 
   // Applica payload Telegram al log di oggi (usato da URL param e da server claim)
@@ -657,6 +659,10 @@ useEffect(() => { localStorage.setItem('shadow_monarch_macros', JSON.stringify(m
     });
   }, [systemLogs]);
   const shouldReduceFx = mobilePerformanceMode || fxMode === 'lite' || (fxMode === 'auto' && (isNarrowViewport || prefersReducedMotion));
+  // Cut e draghi sono solo transform/opacity: niente modalità leggera automatica sui
+  // telefoni (quella serve agli effetti pesanti del System). Si spengono solo con
+  // FX lite scelto a mano o con "riduci movimento" di sistema.
+  const cutFxLite = fxMode === 'lite' || prefersReducedMotion;
   const checkAiConnection = async () => {
     setAiStatus('checking');
     setAiStatusDetail('');
@@ -1424,7 +1430,7 @@ useEffect(() => { localStorage.setItem('shadow_monarch_macros', JSON.stringify(m
 
   return (
     <div
-      className={`app-shell-fs gameframe-shell premium-shell system-scanlines neon-cinema theme-${activePage} ${['cut', 'food', 'program', 'mma', 'progress'].includes(activePage) ? 'cut-app-shell' : ''} ${shouldReduceFx ? 'fx-lite' : ''} max-w-[390px] mx-auto bg-void-black relative shadow-2xl overflow-hidden border-x border-white/5 flex flex-col`}>
+      className={`app-shell-fs gameframe-shell premium-shell system-scanlines neon-cinema theme-${activePage} ${['cut', 'food', 'program', 'mma', 'progress'].includes(activePage) ? 'cut-app-shell' : ''} ${shouldReduceFx ? 'fx-lite' : ''} ${cutFxLite ? 'cut-fx-lite' : ''} max-w-[390px] mx-auto bg-void-black relative shadow-2xl overflow-hidden border-x border-white/5 flex flex-col`}>
       {showIntro && activePage === 'system' && <NeuralIntro onDone={() => setShowIntro(false)} />}
       {tgBindPrompt ? (
         <div className="fixed inset-0 z-[999] bg-black/95 backdrop-blur-sm p-5 flex flex-col items-center justify-center gap-4 text-center">
@@ -1487,6 +1493,7 @@ useEffect(() => { localStorage.setItem('shadow_monarch_macros', JSON.stringify(m
         <img src="/boss4.png" alt="" className="anime-float-reverse absolute right-10 bottom-40 w-24 opacity-12 grayscale" />
         <div className="absolute inset-0 starfield"></div>
       </div>}
+      <DragonSky enabled={!cutFxLite} />
       <div className="absolute top-2 right-2 z-[90] flex items-center gap-1">
         <button
           onClick={() => { setMenuOpen((prev) => !prev); triggerFxBurst('light'); }}
