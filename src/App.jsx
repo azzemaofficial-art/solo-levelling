@@ -387,6 +387,17 @@ useEffect(() => { localStorage.setItem('shadow_monarch_macros', JSON.stringify(m
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
+  // XP dal Protocollo Cut (sessioni, creatina, misure): stesso modello a livelli di
+  // tutte le altre pagine; il level-up overlay parte da solo al cambio di livello.
+  const grantCutXp = useCallback((gained, message) => {
+    setPlayerStats((prev) => {
+      const { level, exp } = applyXp(prev, gained);
+      return { ...prev, level, exp };
+    });
+    emitUiToast({ message: `${message} +${gained} XP`, tone: 'success', durationMs: 3500 });
+    triggerFxBurst('success');
+  }, [triggerFxBurst]);
+
   // Applica payload Telegram al log di oggi (usato da URL param e da server claim)
   const applyTgImport = useCallback((payload) => {
     if (!payload?.type) return;
@@ -1733,7 +1744,7 @@ useEffect(() => { localStorage.setItem('shadow_monarch_macros', JSON.stringify(m
               transition={shouldReduceFx ? { duration: 0.14, ease: 'linear' } : { duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
               className={`min-h-full page-shell page-shell-${activePage}`}
             >
-            {['cut', 'food', 'program', 'mma', 'progress'].includes(activePage) && <CutPlan view={activePage === 'cut' ? 'today' : activePage} onNavigate={handleTabChange} systemLogs={systemLogs} />}
+            {['cut', 'food', 'program', 'mma', 'progress'].includes(activePage) && <CutPlan view={activePage === 'cut' ? 'today' : activePage} onNavigate={handleTabChange} systemLogs={systemLogs} onGainXp={grantCutXp} />}
             {activePage === 'system' && (
               <SystemHub
                 systemLogs={systemLogs}

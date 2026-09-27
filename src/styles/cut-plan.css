@@ -408,3 +408,34 @@
 /* Chi chiede meno movimento (sistema o modalità leggera dell'app) resta con i colori, senza loop */
 @media (prefers-reduced-motion:reduce){.cut-page:before,.cut-page:after,.cut-app-shell .game-nav:before{animation:none!important}}
 .fx-lite .cut-page:before,.fx-lite .cut-page:after,.fx-lite .cut-page *,.fx-lite .cut-page *:after,.fx-lite.cut-app-shell .game-nav:before{animation-iteration-count:1!important}
+
+/* ── Andamento peso (WeightTrend) ── */
+.cut-trend{margin:0 0 22px;padding:16px 14px 8px;border:1px solid #ffffff1b;border-radius:4px;background:linear-gradient(160deg,color-mix(in srgb,var(--lime) 12%,var(--surface)),var(--surface) 55%)}
+.cut-trend figcaption{display:flex;justify-content:space-between;gap:12px;margin-bottom:6px}
+.cut-trend figcaption span{display:flex;flex-direction:column;gap:4px}
+.cut-trend figcaption span:last-child{text-align:right}
+.cut-trend small{color:var(--t3);font:700 9px/normal var(--font-label);letter-spacing:.12em}
+.cut-trend b{font:700 22px/normal var(--font-display);letter-spacing:-.04em;font-variant-numeric:tabular-nums}
+.cut-trend .down b{color:#7ee0b0}
+.cut-trend .up b{color:#ffb4a8}
+.cut-trend svg{display:block;width:100%;height:auto;overflow:visible}
+.cut-trend-grid line{stroke:#ffffff14;stroke-width:1}
+.cut-trend-grid text,.cut-trend-axis{fill:var(--t4);font:600 9px var(--font-label);text-anchor:end}
+.cut-trend-axis{text-anchor:start}
+.cut-trend-axis.end{text-anchor:end}
+.cut-trend-goal line{stroke:var(--accent-2);stroke-width:1.2;stroke-dasharray:4 4;opacity:.8}
+.cut-trend-goal text{fill:var(--accent-2);font:700 9px var(--font-label);letter-spacing:.06em;text-anchor:end}
+.cut-trend-line{fill:none;stroke-width:3;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:1;stroke-dashoffset:1;animation:cut-draw 1.4s cubic-bezier(.65,0,.35,1) .2s forwards}
+.cut-trend-area{opacity:0;animation:cut-fade-in .8s ease 1s forwards}
+.cut-trend-dot{fill:#ffffffb0;opacity:0;animation:cut-fade-in .4s ease forwards}
+.cut-trend-now{fill:var(--accent-2);stroke:#11131f;stroke-width:2;transform-box:fill-box;transform-origin:center;animation:cut-pulse 2.4s ease-in-out 1.6s infinite}
+.cut-trend-empty{display:flex;align-items:center;gap:14px;margin:0 0 22px;padding:16px;border:1px dashed color-mix(in srgb,var(--lime) 40%,transparent);border-radius:4px}
+.cut-trend-empty svg{flex:none;width:90px}
+.cut-trend-empty path{fill:none;stroke:var(--lime);stroke-width:2.5;stroke-linecap:round;stroke-dasharray:6 6;animation:cut-dash 1.6s linear infinite}
+.cut-trend-empty p{margin:0;color:var(--t2);font-size:12px}
+.cut-xp{margin-left:6px;padding:2px 6px;border-radius:3px;background:#11131f26;font-size:10px;letter-spacing:.06em}
+.cut-creatine .cut-xp{background:#1c160926}
+@keyframes cut-draw{to{stroke-dashoffset:0}}
+@keyframes cut-fade-in{to{opacity:1}}
+@keyframes cut-dash{to{stroke-dashoffset:-24}}
+@media (prefers-reduced-motion:reduce){.cut-trend-line{stroke-dashoffset:0}.cut-trend-area,.cut-trend-dot{opacity:1}}
