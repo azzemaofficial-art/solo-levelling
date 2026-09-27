@@ -4,7 +4,8 @@ import { mealWeeks, trainingDays } from '../src/data/cutPlan.js';
 import { mealRecipes } from '../src/data/mealRecipes.js';
 import { exerciseVideos } from '../src/data/exerciseVideos.js';
 
-const allMeals = mealWeeks.flat().flatMap((d) => [d.breakfast, d.lunch, d.snack, d.dinner]);
+const mealsOf = (d) => [d.breakfast, d.lunch, d.snack, d.preFootball, d.dinner].filter(Boolean);
+const allMeals = mealWeeks.flat().flatMap(mealsOf);
 
 test('piano: ogni pasto dei 28 giorni ha la sua ricetta completa', () => {
   const missing = [...new Set(allMeals.filter((meal) => !mealRecipes[meal]))];
@@ -22,7 +23,18 @@ test('piano: ogni esercizio ha almeno un video YouTube', () => {
 
 test('piano: giornate in un range plausibile per un cut (stime)', () => {
   for (const day of mealWeeks.flat()) {
-    const kcal = [day.breakfast, day.lunch, day.snack, day.dinner].reduce((sum, meal) => sum + mealRecipes[meal].kcal, 0);
+    const kcal = mealsOf(day).reduce((sum, meal) => sum + mealRecipes[meal].kcal, 0);
     assert.ok(kcal >= 1800 && kcal <= 2700, `${day.day}: ${kcal}`);
+  }
+});
+
+test('piano: lunedì piadina tacchino e mozzarella light a pranzo, pollo a cena, pre-calcio contato', () => {
+  for (const week of mealWeeks) {
+    const monday = week[0];
+    assert.match(monday.lunch, /^Piadina tacchino e mozzarella light/);
+    assert.match(monday.dinner, /^Pollo alla piastra/);
+    assert.ok(monday.preFootball);
+    const kcal = mealsOf(monday).reduce((sum, meal) => sum + mealRecipes[meal].kcal, 0);
+    assert.ok(Math.abs(kcal - 2450) <= 150, `lunedì ${kcal} kcal vs obiettivo 2450`);
   }
 });

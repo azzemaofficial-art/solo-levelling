@@ -503,3 +503,4 @@
 .cut-page .cut-hero .cut-hero-summon,.cut-page .cut-hero .cut-hero-summon:active,.cut-page .cut-hero .cut-hero-summon:focus{-webkit-appearance:none;appearance:none;background:transparent!important;border:0!important;box-shadow:none!important;filter:none!important;transform:none!important;outline:none}
 .cut-page .cut-hero .cut-hero-summon:focus-visible{outline:2px solid var(--lime);outline-offset:-6px;border-radius:12px}
 .cut-page .cut-hero .cut-hero-summon:before,.cut-page .cut-hero .cut-hero-summon:after{display:none!important}
+.cut-meal-icon{display:grid;place-items:center;color:#8fb9ff;background:radial-gradient(circle at 30% 25%,#8fb9ff33,var(--surface) 70%)!important}

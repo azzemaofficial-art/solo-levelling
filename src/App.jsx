@@ -70,7 +70,16 @@ function App() {
   };
   const [activePage, setActivePage] = useState('cut');
   const pageScrollRef = React.useRef(null);
-  useEffect(() => { if (pageScrollRef.current) pageScrollRef.current.scrollTop = 0; }, [activePage]);
+  // Su telefono il bottone menu galleggia sopra i contenuti: si nasconde quando scorri
+  // in giù e ricompare appena scorri in su (come nelle app native).
+  const [menuTucked, setMenuTucked] = useState(false);
+  const lastScrollRef = React.useRef(0);
+  const onPageScroll = useCallback((event) => {
+    const y = event.currentTarget.scrollTop;
+    const delta = y - lastScrollRef.current;
+    if (Math.abs(delta) > 6) { setMenuTucked(delta > 0 && y > 80); lastScrollRef.current = y; }
+  }, []);
+  useEffect(() => { if (pageScrollRef.current) pageScrollRef.current.scrollTop = 0; lastScrollRef.current = 0; setMenuTucked(false); }, [activePage]);
   const [lastPageIndex, setLastPageIndex] = useState(0);
   const [showIntro, setShowIntro] = useState(false);
   const [levelUpTo, setLevelUpTo] = useState(null);
@@ -1514,7 +1523,7 @@ useEffect(() => { localStorage.setItem('shadow_monarch_macros', JSON.stringify(m
       </div>}
       {/* in home il drago vola nella fascia vuota tra frase e numeri, non sopra i titoli */}
       <DragonSky enabled={dragonsEnabled} lane={activePage === 'cut' ? 'mid' : 'top'} />
-      <div className="absolute right-2 z-[90] flex items-center gap-1" style={{ top: 'calc(0.5rem + env(safe-area-inset-top))' }}>
+      <div className={`app-menu-dock absolute right-2 z-[90] flex items-center gap-1 ${menuTucked && !menuOpen ? 'is-tucked' : ''}`} style={{ top: 'calc(0.5rem + env(safe-area-inset-top))' }}>
         <button
           onClick={() => { setMenuOpen((prev) => !prev); triggerFxBurst('light'); }}
           aria-label={menuOpen ? 'Chiudi menu' : 'Apri menu'}
@@ -1768,7 +1777,7 @@ useEffect(() => { localStorage.setItem('shadow_monarch_macros', JSON.stringify(m
       ) : null}
       
       {/* Pagine (Passiamo tutte le memorie come prop) */}
-      <div ref={pageScrollRef} className="flex-1 overflow-y-auto no-scrollbar relative z-10">
+      <div ref={pageScrollRef} onScroll={onPageScroll} className="flex-1 overflow-y-auto no-scrollbar relative z-10">
         <Suspense fallback={<div className="p-6 text-xs text-cyan-200 uppercase tracking-widest">Loading System Module...</div>}>
           <AnimatePresence mode="wait" initial={false}>
             <motion.div

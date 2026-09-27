@@ -97,6 +97,19 @@ export const mealRecipes = {
     steps: ['Cuoci la pasta e condiscila con l’olio a crudo.', 'Scotta la carne su piastra molto calda, 1–2 minuti per lato: il cavallo è magro e si asciuga se cuoce troppo.', 'Servi con le verdure grigliate o al vapore.'],
   },
 
+  'Piadina tacchino e mozzarella light: piadina 1, fesa di tacchino 100 g, mozzarella light 100 g, pomodoro e rucola': {
+    title: 'Piadina tacchino e mozzarella light', time: '10 min', kcal: 560, protein: 49,
+    ingredients: ['Piadina classica o integrale 1 (circa 90 g)', 'Fesa di tacchino 100 g', 'Mozzarella light 100 g', 'Pomodoro 1, rucola', 'Origano, pepe'],
+    steps: ['Scalda la piadina in padella 1 minuto per lato.', 'Su metà metti la mozzarella a fette e il tacchino, chiudi a mezzaluna e ripassala 1–2 minuti per lato finché la mozzarella si scioglie.', 'Apri e aggiungi pomodoro, rucola, origano e pepe freschi.'],
+  },
+
+  // ── Pre-calcio (lunedì e giovedì) ──
+  'Pre-calcio: banana + 2 fette di pane con miele': {
+    title: 'Pre-calcio veloce', time: '2 min', kcal: 300, protein: 7,
+    ingredients: ['Banana 1', 'Pane 60 g (2 fette)', 'Miele 15 g', 'Acqua'],
+    steps: ['Mangialo 1–2 ore prima della partita.', 'Carboidrati facili da digerire, pochi grassi e poche fibre: energia senza pesantezza.', 'Bevi 300–500 ml d’acqua nell’ora prima di giocare.'],
+  },
+
   // ── Spuntini ──
   'Salato: skyr salato 170 g con cracker integrali 50 g': {
     title: 'Skyr salato e cracker',
@@ -142,6 +155,11 @@ export const mealRecipes = {
   },
 
   // ── Cene ──
+  'Pollo alla piastra 200 g, riso 90 g crudo, verdure grigliate e olio EVO 10 g': {
+    title: 'Pollo alla piastra con riso', time: '25 min', kcal: 680, protein: 55,
+    ingredients: ['Petto di pollo 200 g', 'Riso basmati 90 g crudo', 'Zucchine e peperoni 200 g', 'Olio EVO 10 g', 'Limone, paprika, rosmarino'],
+    steps: ['Cuoci il riso.', 'Batti il pollo a spessore uniforme, condiscilo con limone, paprika e sale e cuocilo sulla piastra calda 4–5 minuti per lato.', 'Griglia le verdure a fette; olio a crudo su tutto. Dopo il calcio: carboidrati + proteine per ricaricare e recuperare.'],
+  },
   'Burger plate: burger magro 180 g, patate al forno 350 g, insalata, salsa yogurt': {
     title: 'Burger plate con patate',
     time: '40 min', kcal: 655, protein: 47,

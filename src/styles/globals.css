@@ -1311,3 +1311,7 @@ button, a { transition: transform 0.14s ease, filter 0.14s ease, background-colo
 @media (hover: none) {
   .neon-cinema button:not(:disabled):hover { transform: none; }
 }
+
+/* Bottone menu che si ritira scorrendo in giù (vedi onPageScroll in App.jsx) */
+.app-menu-dock { transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease; }
+.app-menu-dock.is-tucked { transform: translateY(-72px); opacity: 0; pointer-events: none; }
