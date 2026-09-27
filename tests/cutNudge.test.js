@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { nudgeLines, morningText, trainingText, mondayIndex } from '../lib/cutReminders.js';
+import { nudgeLines, morningText, trainingText, mondayIndex, comboOfDay } from '../lib/cutReminders.js';
 
 test('cut-nudge: nessuno stato → nessun messaggio', () => {
   assert.deepEqual(nudgeLines(null, '2026-09-27'), []);
@@ -63,4 +63,9 @@ test('briefing: giorno di riposo senza kcal note', () => {
 test('pre-allenamento: esercizi nei giorni di forza, niente nei giorni di riposo', () => {
   assert.match(trainingText('2026-10-03'), /Goblet squat/);
   assert.equal(trainingText('2026-09-27'), null);
+});
+
+test('briefing: combo del giorno, diversa tra due giorni consecutivi', () => {
+  assert.match(morningText({}, '2026-09-29'), /Combo del giorno/);
+  assert.notEqual(comboOfDay('2026-09-29').id, comboOfDay('2026-09-30').id);
 });

@@ -5,3 +5,60 @@
 @media(max-width:700px){.mma-pro--session .mma-pro-header{padding-top:calc(10px + env(safe-area-inset-top));padding-bottom:10px}.mma-pro--session .mma-pro-header span{display:none}.mma-pro--session .mma-pro-heading{padding:13px 0}.mma-pro--session .mma-pro-heading .mma-pro-eyebrow,.mma-pro--session .mma-pro-heading .mma-pro-pill{display:none}.mma-pro--session h1{font-size:23px;margin:0}.mma-pro--session .mma-pro-workspace{gap:12px}.mma-pro--session .mma-technique svg{max-height:175px}.mma-pro--session .mma-technique-label{padding:9px 13px}.mma-pro--session .mma-pro-camera{aspect-ratio:4/2.7;max-height:31vh}.mma-pro--session .mma-pro-correction{padding:11px 13px;margin-top:9px}.mma-pro--session .mma-pro-correction strong{font-size:15px;margin:5px 0}.mma-pro--session .mma-pro-controls{gap:10px}.mma-pro--session .mma-pro-clock{padding:6px 0 11px}.mma-pro--session .mma-pro-clock strong{font-size:56px}.mma-pro--session .mma-pro-clock>div{margin-top:5px}.mma-pro--session .mma-pro-current-drill{padding:2px 0}.mma-pro--session .mma-pro-current-drill h2{font-size:17px;margin:4px 0}.mma-pro--session .mma-pro-primary{min-height:45px;padding:12px}.mma-pro--session .mma-pro-method{margin-top:15px}.mma-pro--session .mma-pro-note{font-size:10px}.mma-pro--session .mma-pro-text{padding:4px}}
 .mma-technique-impact{transform-box:fill-box;transform-origin:center;animation:mma-impact .45s ease-out both}
 @keyframes mma-impact{from{transform:scale(.4);opacity:0}to{transform:scale(1);opacity:1}}
+
+/* ── Manichino condiviso ── */
+.mma-figure{display:block;width:100%;height:auto}
+
+/* ── Libreria combo (Accademia MMA) ── */
+.mma-combos{margin-top:30px}
+.mma-combo-cats{display:flex;gap:6px;margin:0 -20px 12px;padding:0 20px 4px;overflow-x:auto;scrollbar-width:none}
+.mma-combo-cats::-webkit-scrollbar{display:none}
+.mma-combo-cats button{flex:none;display:flex;align-items:center;gap:6px;min-height:40px;padding:0 14px;border:1px solid #ffffff1f;border-radius:20px;background:#121b24;color:#b9c9d2;font:700 12px/1 var(--font-label);letter-spacing:.04em;cursor:pointer}
+.mma-combo-cats button em{font-style:normal;font-size:10px;opacity:.6}
+.mma-combo-cats button.active{border-color:var(--tone);background:color-mix(in srgb,var(--tone) 18%,#121b24);color:#fff}
+.mma-combo-list{display:grid;gap:8px}
+.mma-page .mma-combo-card,.mma-combo-card{position:relative;display:grid;gap:8px;width:100%;padding:14px 44px 14px 14px;border:1px solid #ffffff17;border-radius:8px;background:linear-gradient(135deg,#15262f,#101922);color:#eef7f8;text-align:left;cursor:pointer}
+.mma-combo-card.learned{border-color:#6de2d366}
+.mma-combo-card-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.mma-combo-card-top b{font:700 16px/1.2 var(--font-display);letter-spacing:-.02em}
+.mma-combo-card-top small{flex:none;padding:3px 7px;border-radius:10px;font:700 9px/1 var(--font-label);letter-spacing:.08em;text-transform:uppercase}
+.lvl-1{background:#6de2d322;color:#8ff0e2}.lvl-2{background:#ffd18422;color:#ffd184}.lvl-3{background:#ff8fd822;color:#ffb0e4}
+.mma-combo-chips{display:flex;flex-wrap:wrap;gap:4px}
+.mma-combo-chips i{min-width:26px;padding:4px 7px;border-radius:5px;background:#6de2d31c;color:#9ff3e6;font:700 11px/1 var(--font-label);font-style:normal;text-align:center}
+.mma-combo-why{color:#9fb4bc;font-size:12px;line-height:1.5}
+.mma-combo-go{position:absolute;right:14px;top:50%;transform:translateY(-50%);color:#6de2d3}
+
+/* ── Player combo: schermo intero, pensato per il telefono ── */
+.mma-combo{position:fixed;inset:0;z-index:520;overflow-y:auto;overscroll-behavior:contain;padding:calc(12px + env(safe-area-inset-top)) 16px calc(24px + env(safe-area-inset-bottom));background:radial-gradient(circle at 20% 0%,#1d3a44,transparent 55%),#0a1019;color:#eef7f8;animation:cut-enter .3s cubic-bezier(.16,1,.3,1) both}
+.mma-combo-head{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+.mma-combo-head>div{flex:1;min-width:0}
+.mma-combo-head small{color:#6de2d3;font:700 10px/1 var(--font-label);letter-spacing:.14em}
+.mma-combo-head h2{margin:4px 0 0;font:700 24px/1.1 var(--font-display);letter-spacing:-.04em}
+.mma-combo-icon{display:grid;place-items:center;flex:none;width:44px;height:44px;border:1px solid #ffffff22;border-radius:50%;background:#14212c;color:#dff;cursor:pointer}
+.mma-combo-icon[aria-pressed="true"]{border-color:#6de2d399;color:#6de2d3}
+.mma-combo-modes{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:4px;margin-bottom:10px;border-radius:12px;background:#111c26}
+.mma-combo-modes button{min-height:40px;border:0;border-radius:9px;background:transparent;color:#9fb4bc;font:700 13px/1 var(--font-label);letter-spacing:.03em;cursor:pointer}
+.mma-combo-modes button.active{background:#6de2d3;color:#062220}
+.mma-combo-stage{overflow:hidden;border:1px solid #6de2d330;border-radius:16px;background:linear-gradient(160deg,#142736,#0c1620)}
+.mma-combo-phase{margin:0;padding:8px 14px 10px;border-top:1px solid #ffffff10;color:#8fb2bb;font:700 11px/1.3 var(--font-label);letter-spacing:.06em}
+.mma-combo-steps{display:flex;gap:6px;margin:12px 0;overflow-x:auto;scrollbar-width:none}
+.mma-combo-steps::-webkit-scrollbar{display:none}
+.mma-combo-steps button{flex:none;display:flex;flex-direction:column;align-items:flex-start;gap:3px;min-width:72px;min-height:52px;padding:8px 10px;border:1px solid #ffffff1c;border-radius:10px;background:#121d27;color:#b7c9d1;text-align:left;cursor:pointer;transition:background-color .2s ease,border-color .2s ease,transform .2s ease}
+.mma-combo-steps b{font:700 15px/1 var(--font-display);color:#6de2d3}
+.mma-combo-steps span{font:600 11px/1.2 var(--font-body)}
+.mma-combo-steps button.active{border-color:#6de2d3;background:#173a3c;transform:translateY(-2px)}
+.mma-combo-coach{min-height:118px;padding:14px 16px;border-radius:14px;background:#111c26;border-left:3px solid #6de2d3}
+.mma-combo-coach small{color:#6de2d3;font:700 10px/1 var(--font-label);letter-spacing:.12em}
+.mma-combo-coach p{margin:8px 0 0;color:#dcebef;font-size:15px;line-height:1.55}
+.mma-combo-coach .mma-combo-mistake{color:#ffc9a8;font-size:13px}
+.mma-combo-controls{display:flex;align-items:center;justify-content:center;gap:22px;margin:16px 0 8px}
+.mma-combo-controls button{display:grid;place-items:center;width:48px;height:48px;border:1px solid #ffffff22;border-radius:50%;background:#14212c;color:#dff;cursor:pointer}
+.mma-combo-controls button:disabled{opacity:.35}
+.mma-combo-controls .mma-combo-play{width:68px;height:68px;border:0;background:linear-gradient(135deg,#6de2d3,#7aa8ff);color:#062220;box-shadow:0 10px 30px #6de2d344}
+.mma-combo-speeds{display:flex;justify-content:center;gap:6px;margin-bottom:8px}
+.mma-combo-speeds button{min-height:38px;padding:0 16px;border:1px solid #ffffff1f;border-radius:19px;background:#121d27;color:#b7c9d1;font:700 12px/1 var(--font-label);cursor:pointer}
+.mma-combo-speeds button.active{border-color:#6de2d3;color:#6de2d3}
+.mma-combo-foot{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}
+.mma-combo-foot button{min-height:46px;padding:0 10px;border:1px solid #ffffff1f;border-radius:12px;background:#121d27;color:#cfe0e6;font:700 12px/1.2 var(--font-label);cursor:pointer}
+.mma-combo-learned.done{border-color:#6de2d3;background:#16393a;color:#9ff3e6;display:flex;align-items:center;justify-content:center;gap:6px}
+@media (prefers-reduced-motion:reduce){.mma-combo{animation:none}}
