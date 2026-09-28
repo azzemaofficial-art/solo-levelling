@@ -17,7 +17,7 @@ export const summonChase = () => {
 };
 
 const CUTE = { idle: '/dragons/cute-idle.webp', hit: '/dragons/cute-hit.webp', flee: '/dragons/cute-fast.webp' };
-const CHASE_MS = 7000;
+const CHASE_MS = 7400;
 
 // Scarica prima tutto (3 stati del draghetto + video del gigante): la scena parte
 // solo quando è pronta, così niente buchi o immagini che compaiono in ritardo.
@@ -47,7 +47,7 @@ function DragonChase({ onDone }) {
     <div className="dragon-chase-dark" />
     <div className="dragon-chase-shake">
       <div className="dragon-chase-giant">
-        <video autoPlay muted loop playsInline disablePictureInPicture preload="auto">
+        <video autoPlay muted playsInline disablePictureInPicture preload="auto">
           <source src="/dragons/giant.mov" type='video/quicktime; codecs="hvc1"' />
           <source src="/dragons/giant.webm" type="video/webm" />
         </video>

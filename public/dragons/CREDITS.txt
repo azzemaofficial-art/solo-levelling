@@ -1,2 +1,2 @@
 flyer.webp, cute-idle.webp, cute-hit.webp, cute-fast.webp — "Dragon Evolved" by Quaternius, CC0 1.0 (https://quaternius.com), ricolorato e renderizzato in Blender (tools/blender/dragon-quaternius*.py).
-giant.mov / giant.webm — floor10-astral-dragon.glb del progetto, battito d’ali procedurale e render in Blender (tools/blender/giant-dragon.py), video con alpha (HEVC per Safari, VP9 per Chrome).
+giant.mov / giant.webm — video generato da Emanuele con Sora (ChatGPT) su fondo verde, scontornato con ffmpeg (chromakey + despill), video con alpha: HEVC .mov per Safari/iPhone, VP9 .webm per Chrome.
