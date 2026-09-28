@@ -1,2 +1,3 @@
-flyer.webp, cute-idle.webp, cute-hit.webp, cute-fast.webp — "Dragon Evolved" by Quaternius, CC0 1.0 (https://quaternius.com), ricolorato e renderizzato in Blender (tools/blender/dragon-quaternius*.py).
-giant.mov / giant.webm — video generato da Emanuele con Sora (ChatGPT) su fondo verde, scontornato con ffmpeg (chromakey + despill), video con alpha: HEVC .mov per Safari/iPhone, VP9 .webm per Chrome.
+cute-idle-v2.webp, cute-hit-v2.webp, cute-fast-v2.webp — "Dragon Evolved" by Quaternius, CC0 1.0 (https://quaternius.com), ricolorato e renderizzato in Blender a 860 px (tools/blender/dragon-quaternius-states.py).
+giant-v3.mov / giant-v3.webm — video generato da Emanuele con Sora (ChatGPT) su fondo verde, scontornato con ffmpeg (chromakey + despill) a 960 px: HEVC con alpha per Safari/iPhone, VP9 con alpha per Chrome.
+I file hanno la versione nel nome perché /dragons/* è in cache per un anno (vercel.json): un nuovo render va salvato con un nuovo suffisso.

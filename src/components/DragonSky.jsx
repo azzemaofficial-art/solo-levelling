@@ -16,7 +16,9 @@ export const summonChase = () => {
   try { window.dispatchEvent(new CustomEvent(DRAGON_CHASE_EVENT)); } catch { /* SSR/test */ }
 };
 
-const CUTE = { idle: '/dragons/cute-idle.webp', hit: '/dragons/cute-hit.webp', flee: '/dragons/cute-fast.webp' };
+// Nomi con versione: la cache del telefono li tiene per un anno (vercel.json), quindi
+// ogni nuovo render va salvato con un nuovo suffisso.
+const CUTE = { idle: '/dragons/cute-idle-v2.webp', hit: '/dragons/cute-hit-v2.webp', flee: '/dragons/cute-fast-v2.webp' };
 const CHASE_MS = 7400;
 
 // Scarica prima tutto (3 stati del draghetto + video del gigante): la scena parte
@@ -31,10 +33,11 @@ function preloadChase() {
     const done = () => resolve();
     v.addEventListener('canplaythrough', done, { once: true });
     v.addEventListener('error', done, { once: true });
-    v.src = v.canPlayType('video/quicktime; codecs="hvc1"') ? '/dragons/giant.mov' : '/dragons/giant.webm';
+    v.src = v.canPlayType('video/quicktime; codecs="hvc1"') ? '/dragons/giant-v3.mov' : '/dragons/giant-v3.webm';
     v.load();
   });
-  return Promise.race([Promise.all([...images, video]), new Promise((r) => setTimeout(r, 4000))]);
+  // il gigante in alta qualità pesa ~2 MB: fino a 8 s di attesa la prima volta, poi è in cache
+  return Promise.race([Promise.all([...images, video]), new Promise((r) => setTimeout(r, 8000))]);
 }
 
 function DragonChase({ onDone }) {
@@ -48,22 +51,22 @@ function DragonChase({ onDone }) {
     <div className="dragon-chase-shake">
       <div className="dragon-chase-giant">
         <video autoPlay muted playsInline disablePictureInPicture preload="auto">
-          <source src="/dragons/giant.mov" type='video/quicktime; codecs="hvc1"' />
-          <source src="/dragons/giant.webm" type="video/webm" />
+          <source src="/dragons/giant-v3.mov" type='video/quicktime; codecs="hvc1"' />
+          <source src="/dragons/giant-v3.webm" type="video/webm" />
         </video>
       </div>
     </div>
     <div className={`dragon-chase-cute is-${stage}`}>
-      <img src={CUTE[stage]} alt="" width="326" height="226" draggable="false" />
+      <img src={CUTE[stage]} alt="" width="560" height="387" draggable="false" />
       {stage === 'hit' && <span className="dragon-chase-alert">!</span>}
     </div>
   </div>;
 }
 
-const DRAGON_SRC = '/dragons/flyer.webp'; // Quaternius CC0, vedi public/dragons/CREDITS.txt
+const DRAGON_SRC = '/dragons/cute-fast-v2.webp'; // stesso volo della fuga · Quaternius CC0, vedi public/dragons/CREDITS.txt
 
 export function Dragon({ className = '' }) {
-  return <img className={`dragon ${className}`} src={DRAGON_SRC} alt="" width="319" height="224" decoding="async" draggable="false" />;
+  return <img className={`dragon ${className}`} src={DRAGON_SRC} alt="" width="560" height="387" decoding="async" draggable="false" />;
 }
 
 export default function DragonSky({ enabled = true, lane = 'top' }) {

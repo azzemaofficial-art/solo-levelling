@@ -70,5 +70,16 @@
       "path": "/api/telegram/remind?task=cut-nudge",
       "schedule": "30 18 * * *"
     }
+  ],
+  "headers": [
+    {
+      "source": "/dragons/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    }
   ]
 }
