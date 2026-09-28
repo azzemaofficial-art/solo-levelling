@@ -62,8 +62,10 @@ const weeklyRotation = [
   [2, 5, 3, 6, 1, 0, 4],
 ];
 
-// Lunedì fisso (scelta di Emanuele): piadina tacchino e mozzarella light a pranzo, pollo a cena.
-const MONDAY_LUNCH = 'Piadina tacchino e mozzarella light: piadina 1, fesa di tacchino 100 g, mozzarella light 100 g, pomodoro e rucola';
+// Lunedì fisso (abitudine di Emanuele): cracker a metà mattina, 2 piadine tacchino e mozzarella
+// light a pranzo, pre-calcio, pollo a cena.
+const MONDAY_LUNCH = '2 piadine con tacchino e mozzarella light: 2 piadine, fesa di tacchino 140 g, mozzarella light 70 g, pomodoro e rucola';
+const MONDAY_SNACK = 'Spuntino di metà mattina: cracker integrali 30 g';
 const MONDAY_DINNER = 'Pollo alla piastra 200 g, riso 90 g crudo, verdure grigliate e olio EVO 10 g';
 // Nei giorni di calcio (lun, gio) lo spuntino pre-partita è un pasto vero, contato nel totale.
 export const PRE_FOOTBALL = 'Pre-calcio: banana + 2 fette di pane con miele';
@@ -72,6 +74,7 @@ export const mealWeeks = weeklyRotation.map((rotation, weekIndex) => rotation.ma
   const dinnerIndex = (n + weekIndex) % dinners.length;
   const lunchIndex = (n + weekIndex) % lunches.length;
   const snackIndex = (n + day) % snacks.length;
+  const mondaySnack = day === 0;
   const special = day === 2 ? 'McDonald’s: scegli il panino che ti piace, porzione piccola/media di patatine e bevanda senza zuccheri; registra il pasto reale.'
     : day === 6 ? 'Pizza a scelta + contorno o insalata. Mangiala senza compensazioni punitive.'
       : day === 0 ? MONDAY_DINNER : dinners[dinnerIndex];
@@ -80,12 +83,13 @@ export const mealWeeks = weeklyRotation.map((rotation, weekIndex) => rotation.ma
     breakfast: breakfasts[n],
     lunch: day === 0 ? MONDAY_LUNCH : day === 5 ? 'Pasta bianca 100 g cruda con olio EVO 10 g + carne di cavallo 170–200 g + verdure' : lunches[lunchIndex],
     preFootball: day === 0 || day === 3 ? PRE_FOOTBALL : null,
-    snack: snacks[snackIndex],
+    snack: mondaySnack ? MONDAY_SNACK : snacks[snackIndex],
+    snackTime: mondaySnack ? 'morning' : 'afternoon',
     dinner: special,
     images: {
       Colazione: `/recipes/${breakfastImages[n]}.jpg`,
       Pranzo: `/recipes/${day === 0 ? 'turkey-breakfast-wrap' : day === 5 ? 'white-pasta-horse-steak' : lunchImages[lunchIndex]}.jpg`,
-      Spuntino: `/recipes/${snackImages[snackIndex]}.jpg`,
+      Spuntino: `/recipes/${mondaySnack ? 'skyr-crackers' : snackImages[snackIndex]}.jpg`,
       Cena: `/recipes/${day === 0 ? 'chicken-rice-bowl' : day === 2 ? 'burger-fries' : day === 6 ? 'pizza' : dinnerImages[dinnerIndex]}.jpg`,
     },
     note: day === 0 || day === 3 ? 'Calcio la sera: il pre-calcio va 1–2 ore prima della partita; la cena dopo, con proteine e carboidrati per recuperare.'

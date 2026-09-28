@@ -31,7 +31,8 @@ test('piano: giornate in un range plausibile per un cut (stime)', () => {
 test('piano: lunedì piadina tacchino e mozzarella light a pranzo, pollo a cena, pre-calcio contato', () => {
   for (const week of mealWeeks) {
     const monday = week[0];
-    assert.match(monday.lunch, /^Piadina tacchino e mozzarella light/);
+    assert.match(monday.lunch, /^2 piadine con tacchino e mozzarella light/);
+    assert.match(monday.snack, /cracker integrali 30 g/);
     assert.match(monday.dinner, /^Pollo alla piastra/);
     assert.ok(monday.preFootball);
     const kcal = mealsOf(monday).reduce((sum, meal) => sum + mealRecipes[meal].kcal, 0);

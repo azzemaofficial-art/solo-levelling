@@ -3,18 +3,18 @@ import '../styles/dragons.css';
 
 // Draghi che ogni tanto attraversano il cielo dietro le pagine + una picchiata in
 // primo piano sull'evento DRAGON_SWOOP_EVENT (allenamento completato, tocco sul
-// guerriero, menu). Il drago è un render Blender del modello 3D del progetto
-// (tools/blender/dragon-flap.py) salvato come WebP animato: aspetto 3D senza
-// caricare three.js sulla home.
+// guerriero, menu). Il drago è un modello con scheletro e animazione di volo vera
+// (Quaternius, CC0) ricolorato e renderizzato in Blender (tools/blender/dragon-quaternius.py),
+// salvato come WebP animato: aspetto 3D senza caricare three.js sulla home.
 export const DRAGON_SWOOP_EVENT = 'shadow_dragon_swoop';
 export const summonDragon = () => {
   try { window.dispatchEvent(new CustomEvent(DRAGON_SWOOP_EVENT)); } catch { /* SSR/test */ }
 };
 
-const DRAGON_SRC = '/dragons/astral.webp';
+const DRAGON_SRC = '/dragons/flyer.webp'; // Quaternius CC0, vedi public/dragons/CREDITS.txt
 
 export function Dragon({ className = '' }) {
-  return <img className={`dragon ${className}`} src={DRAGON_SRC} alt="" width="305" height="289" decoding="async" draggable="false" />;
+  return <img className={`dragon ${className}`} src={DRAGON_SRC} alt="" width="319" height="224" decoding="async" draggable="false" />;
 }
 
 export default function DragonSky({ enabled = true, lane = 'top' }) {

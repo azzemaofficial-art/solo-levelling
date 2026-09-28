@@ -92,7 +92,9 @@ export default function CutPlan({ view = 'today', onNavigate, systemLogs = [], o
   }, [saved.creatineDate, sessionDoneDate, lastWeighDate, kcalTargetsKey]);
   const today = getMondayIndex();
   const selectedMeal = mealWeeks[week][day];
-  const mealSlots = Object.entries({ Colazione: selectedMeal.breakfast, Pranzo: selectedMeal.lunch, Spuntino: selectedMeal.snack, ...(selectedMeal.preFootball ? { 'Pre-calcio': selectedMeal.preFootball } : {}), Cena: selectedMeal.dinner });
+  const mealSlots = Object.entries(selectedMeal.snackTime === 'morning'
+    ? { Colazione: selectedMeal.breakfast, Spuntino: selectedMeal.snack, Pranzo: selectedMeal.lunch, ...(selectedMeal.preFootball ? { 'Pre-calcio': selectedMeal.preFootball } : {}), Cena: selectedMeal.dinner }
+    : { Colazione: selectedMeal.breakfast, Pranzo: selectedMeal.lunch, Spuntino: selectedMeal.snack, ...(selectedMeal.preFootball ? { 'Pre-calcio': selectedMeal.preFootball } : {}), Cena: selectedMeal.dinner });
   const planTotals = mealSlots.reduce((sum, [, meal]) => {
     const recipe = recipeFor(meal);
     return { kcal: sum.kcal + (recipe?.kcal || 0), protein: sum.protein + (recipe?.protein || 0) };

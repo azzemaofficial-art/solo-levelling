@@ -97,10 +97,16 @@ export const mealRecipes = {
     steps: ['Cuoci la pasta e condiscila con l’olio a crudo.', 'Scotta la carne su piastra molto calda, 1–2 minuti per lato: il cavallo è magro e si asciuga se cuoce troppo.', 'Servi con le verdure grigliate o al vapore.'],
   },
 
-  'Piadina tacchino e mozzarella light: piadina 1, fesa di tacchino 100 g, mozzarella light 100 g, pomodoro e rucola': {
-    title: 'Piadina tacchino e mozzarella light', time: '10 min', kcal: 560, protein: 49,
-    ingredients: ['Piadina classica o integrale 1 (circa 90 g)', 'Fesa di tacchino 100 g', 'Mozzarella light 100 g', 'Pomodoro 1, rucola', 'Origano, pepe'],
-    steps: ['Scalda la piadina in padella 1 minuto per lato.', 'Su metà metti la mozzarella a fette e il tacchino, chiudi a mezzaluna e ripassala 1–2 minuti per lato finché la mozzarella si scioglie.', 'Apri e aggiungi pomodoro, rucola, origano e pepe freschi.'],
+  '2 piadine con tacchino e mozzarella light: 2 piadine, fesa di tacchino 140 g, mozzarella light 70 g, pomodoro e rucola': {
+    title: '2 piadine tacchino e mozzarella light', time: '10 min', kcal: 850, protein: 59,
+    ingredients: ['Piadine 2 (circa 90 g l’una; le integrali o “light” da 60 g fanno risparmiare ~200 kcal)', 'Fesa di tacchino 140 g', 'Mozzarella light 70 g', 'Pomodoro, rucola', 'Origano, pepe'],
+    steps: ['Scalda le piadine in padella 1 minuto per lato.', 'Dividi mozzarella e tacchino tra le due, chiudi a mezzaluna e ripassale 1–2 minuti per lato finché la mozzarella si scioglie.', 'Apri e aggiungi pomodoro e rucola freschi. È il pasto più ricco del giorno: il lunedì c’è il calcio.'],
+  },
+
+  'Spuntino di metà mattina: cracker integrali 30 g': {
+    title: 'Cracker di metà mattina', time: '1 min', kcal: 125, protein: 4,
+    ingredients: ['Cracker integrali 30 g (una confezione monoporzione)', 'Acqua'],
+    steps: ['Va bene così, è uno spuntino leggero.', 'Se a pranzo arrivi con troppa fame, aggiungi uno yogurt greco (≈ +100 kcal, +17 g proteine) o un frutto.'],
   },
 
   // ── Pre-calcio (lunedì e giovedì) ──
