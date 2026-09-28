@@ -9,7 +9,7 @@ import { CUT_PLAN_KEY, CUT_SYNC_EVENT, CUT_XP } from '../utils/cutSync';
 import { dateOfWeekday, durationMinutes, kindForSession, logWorkout, unlogWorkout } from '../utils/trainingLog';
 import TrainingLog, { TrainingWeekDots, useTrainingLog } from '../components/TrainingLog';
 import MmaAcademy from '../components/MmaAcademy';
-import { summonDragon } from '../components/DragonSky';
+import { summonChase } from '../components/DragonSky';
 import CountUp from '../components/CountUp';
 import WeightTrend from '../components/WeightTrend';
 import '../styles/cut-plan.css';
@@ -179,7 +179,7 @@ export default function CutPlan({ view = 'today', onNavigate, systemLogs = [], o
     {view === 'today' && <>
       <section className="cut-hero">
         <div className="cut-hero-copy"><span className="cut-kicker">IL TUO PERCORSO • 12 SETTIMANE</span><h1>Il prossimo<br /><em>livello.</em></h1><p>{profile ? `Da ${formatKg(profile.startWeightKg)} kg verso ${formatKg(profile.targetWeightKg)} kg. ` : ''}Forza, velocità e continuità. Una giornata alla volta.</p></div>
-        <img src="/avatar8.png" alt="" className="cut-hero-art" /><button type="button" className="cut-hero-summon" onClick={summonDragon} aria-label="Evoca il drago" />
+        <img src="/avatar8.png" alt="" className="cut-hero-art" /><button type="button" className="cut-hero-summon" onClick={summonChase} aria-label="Evoca il drago" />
         <div className="cut-hero-line" />
       </section>
       <section className="cut-status">

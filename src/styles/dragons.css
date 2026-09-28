@@ -57,3 +57,35 @@
   .dragons-forced .dragon-swoop .dragon-arc{animation-duration:2.4s!important;animation-iteration-count:1!important}
   .dragons-forced .dragon-swoop{animation-duration:2.4s!important}
 }
+
+/* ── Scena: arriva il drago gigante, il draghetto scappa (7 s) ── */
+.dragon-chase{position:absolute;inset:0;z-index:46;overflow:hidden;pointer-events:none}
+.dragon-chase-dark{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 42%,#1a0f2e55,#07050fe6 70%);animation:chase-dark 7s ease both}
+@keyframes chase-dark{0%{opacity:0}12%{opacity:.92}80%{opacity:.92}100%{opacity:0}}
+.dragon-chase-shake{position:absolute;inset:0;animation:chase-shake 7s linear both}
+@keyframes chase-shake{0%,55%,90%,100%{transform:translate3d(0,0,0)}58%{transform:translate3d(-3px,2px,0)}61%{transform:translate3d(4px,-2px,0)}64%{transform:translate3d(-4px,-1px,0)}67%{transform:translate3d(3px,3px,0)}70%{transform:translate3d(-5px,1px,0)}73%{transform:translate3d(5px,-3px,0)}76%{transform:translate3d(-3px,2px,0)}80%{transform:translate3d(4px,1px,0)}84%{transform:translate3d(-2px,-2px,0)}}
+/* il gigante arriva da lontano verso lo schermo: parte piccolo e scuro, accelera, ci passa sopra */
+.dragon-chase-giant{position:absolute;left:50%;top:40%;width:min(110vw,480px);transform:translate3d(-50%,-50%,0) scale(.08);opacity:0;will-change:transform,opacity;animation:chase-giant 7s cubic-bezier(.5,0,.85,.35) .3s both}
+.dragon-chase-giant video{display:block;width:100%;height:auto;background:transparent}
+@keyframes chase-giant{0%{transform:translate3d(-50%,-50%,0) scale(.08);opacity:0}10%{opacity:.85}62%{transform:translate3d(-50%,-48%,0) scale(1.15);opacity:1}88%{transform:translate3d(-50%,-40%,0) scale(2.9);opacity:1}100%{transform:translate3d(-50%,-30%,0) scale(3.8);opacity:0}}
+/* il draghetto: vola tranquillo, sobbalza, scappa */
+.dragon-chase-cute{position:absolute;left:8%;top:58%;width:min(38vw,150px);will-change:transform;animation:chase-cute-in .5s ease both}
+.dragon-chase-cute img{display:block;width:100%;height:auto}
+.dragon-chase-cute.is-idle img{animation:chase-bob 1.4s ease-in-out infinite alternate}
+.dragon-chase-cute.is-hit{transform:translate3d(-8px,-26px,0) rotate(-10deg);transition:transform .18s cubic-bezier(.3,1.6,.6,1)}
+.dragon-chase-cute.is-flee{transform:translate3d(min(95vw,440px),-190px,0) scale(.65) rotate(-12deg);transition:transform 1.25s cubic-bezier(.55,0,.9,.45)}
+.dragon-chase-alert{position:absolute;left:52%;top:-22%;display:grid;place-items:center;width:30px;height:30px;border-radius:50%;background:#ffd184;color:#1c1609;font:900 20px/1 var(--font-display);box-shadow:0 0 18px #ffd184aa;animation:chase-pop .3s cubic-bezier(.3,1.6,.6,1) both}
+@keyframes chase-cute-in{from{opacity:0;transform:translate3d(-40px,0,0)}to{opacity:1}}
+@keyframes chase-bob{from{transform:translate3d(0,-5px,0)}to{transform:translate3d(0,5px,0)}}
+@keyframes chase-pop{from{transform:scale(0)}to{transform:scale(1)}}
+@media (prefers-reduced-motion:reduce){
+  :not(.dragons-forced)>.dragon-chase{display:none}
+  .dragons-forced .dragon-chase-dark{animation-duration:7s!important}
+  .dragons-forced .dragon-chase-shake{animation-duration:7s!important}
+  .dragons-forced .dragon-chase-giant{animation-duration:7s!important}
+  .dragons-forced .dragon-chase-cute.is-idle img{animation-duration:1.4s!important;animation-iteration-count:infinite!important}
+  .dragons-forced .dragon-chase-cute.is-hit{transition-duration:.18s!important}
+  .dragons-forced .dragon-chase-cute.is-flee{transition-duration:1.25s!important}
+}
+.cut-fx-lite:not(.dragons-forced) .dragon-chase{display:none}
+.dragon-sky{transition:opacity .4s ease}.dragon-sky.is-hidden{opacity:0}

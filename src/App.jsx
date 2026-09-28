@@ -2,7 +2,7 @@ import React, { Suspense, lazy, useMemo, useState, useEffect, useCallback } from
 import { AnimatePresence, motion } from 'framer-motion';
 import ProtocolIcon from './components/ProtocolIcon';
 import { Menu as MenuIcon, X as CloseIcon } from 'lucide-react';
-import DragonSky, { summonDragon } from './components/DragonSky';
+import DragonSky, { summonChase, summonDragon } from './components/DragonSky';
 import { applyCutRemote } from './utils/cutSync';
 import { playSfx } from './utils/sfx';
 import { formatAiErrorDetail, requestSystemAI, subscribeAiStatus } from './utils/aiClient';
@@ -1635,7 +1635,7 @@ useEffect(() => { localStorage.setItem('shadow_monarch_macros', JSON.stringify(m
                 <button key={mode} onClick={() => setDragonMode(mode)} aria-pressed={dragonMode === mode} className={`text-[10px] px-2 py-2 border uppercase tracking-widest ${dragonMode === mode ? 'border-fuchsia-300/70 text-fuchsia-100 bg-fuchsia-400/10' : 'border-white/15 text-gray-300'}`}>{label}</button>
               ))}
             </div>
-            <button onClick={() => { setMenuOpen(false); setTimeout(summonDragon, 350); }} disabled={!dragonsEnabled} className="w-full mb-4 text-[10px] px-2 py-3 border border-violet-300/50 text-violet-100 uppercase tracking-widest disabled:opacity-40">Evoca il drago ora</button>
+            <button onClick={() => { setMenuOpen(false); setTimeout(summonChase, 350); }} disabled={!dragonsEnabled} className="w-full mb-4 text-[10px] px-2 py-3 border border-violet-300/50 text-violet-100 uppercase tracking-widest disabled:opacity-40">Evoca il drago ora</button>
             <p className="text-[9px] uppercase tracking-widest text-gray-400 mb-2">Quick Actions</p>
             <div className="grid grid-cols-1 gap-2 mb-4">
               <button onClick={quickAddWater} className="text-[10px] px-2 py-2 border border-cyan-300/50 text-cyan-200 uppercase tracking-widest">+400 ml acqua</button>
