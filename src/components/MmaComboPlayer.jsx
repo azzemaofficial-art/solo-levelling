@@ -1,10 +1,13 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { Suspense, lazy, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { ArrowLeft, Check, Pause, Play, SkipBack, SkipForward, Volume2, VolumeX } from 'lucide-react';
+import { ArrowLeft, Camera, Check, Pause, Play, SkipBack, SkipForward, Volume2, VolumeX } from 'lucide-react';
 import MmaFigure, { useSkeletonPlayer } from './MmaFigure';
 import { MOVES, comboKeys } from '../data/mmaMoves';
 import { LEVELS } from '../data/mmaCombos';
 import { localDateKey, logWorkout, readTrainingLog, unlogWorkout } from '../utils/trainingLog';
+
+// Coach con camera: caricato solo quando serve (MediaPipe e giudice)
+const MmaComboTrainer = lazy(() => import('./MmaComboTrainer'));
 
 const ORDINAL = ['Primo', 'Secondo', 'Terzo', 'Quarto', 'Quinto', 'Sesto'];
 const SPEEDS = [[0.35, 'Lento'], [0.6, 'Medio'], [1, 'Reale']];
@@ -43,6 +46,7 @@ export default function MmaComboPlayer({ combo, learned, onLearned, onClose }) {
   const script = useMemo(() => lessonScript(combo), [combo]);
   const loopKeys = useMemo(() => comboKeys(combo.moves), [combo]);
   const [mode, setMode] = useState('learn'); // learn | loop
+  const [training, setTraining] = useState(false);
   const [segment, setSegment] = useState(0);
   const [finished, setFinished] = useState(false);
   const [playing, setPlaying] = useState(true);
@@ -127,6 +131,8 @@ export default function MmaComboPlayer({ combo, learned, onLearned, onClose }) {
     </div>
     {mode === 'loop' && <div className="mma-combo-speeds">{SPEEDS.map(([value, label]) => <button key={value} className={loopSpeed === value ? 'active' : ''} onClick={() => setLoopSpeed(value)}>{label}</button>)}</div>}
 
+    <button className="mma-combo-camera" onClick={() => { setPlaying(false); window.speechSynthesis?.cancel(); try { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; window.speechSynthesis?.speak(u); } catch { /* voce */ } setTraining(true); }}><Camera size={20} /><span><b>Allenala con il coach</b><small>Ti guarda con la camera e ti corregge colpo per colpo</small></span></button>
+    {training && <Suspense fallback={<div className="mma-train"><p className="mma-train-overlay">Preparo il coach…</p></div>}><MmaComboTrainer combo={combo} onClose={() => setTraining(false)} onLearned={() => { if (!learned) onLearned(); }} /></Suspense>}
     <button className={`mma-combo-done ${doneToday ? 'done' : ''}`} onClick={toggleDone}>{doneToday ? <><Check size={18} /> Allenamento segnato oggi</> : <>✅ Fatto: segna l’allenamento</>}</button>
     <div className="mma-combo-foot">
       <button onClick={() => setStance((s) => (s === 'orthodox' ? 'southpaw' : 'orthodox'))}>{stance === 'orthodox' ? 'Guardia destra' : 'Guardia mancina'} · cambia</button>

@@ -16,7 +16,8 @@ self.onmessage = async ({ data }) => {
   if (data.type === 'frame') {
     try {
       const result = detector.detectForVideo(data.bitmap, data.time);
-      self.postMessage({ type: 'pose', points: result.landmarks[0] || [], time: data.time, aspect: data.aspect });
+      // world = coordinate 3D stimate in metri (origine tra le anche): servono al giudice delle combo
+      self.postMessage({ type: 'pose', points: result.landmarks[0] || [], world: result.worldLandmarks?.[0] || [], time: data.time, aspect: data.aspect });
     } catch { self.postMessage({ type: 'error', message: 'Il riconoscimento si è interrotto. La sessione è in pausa.' }); }
     finally { data.bitmap.close(); }
   }

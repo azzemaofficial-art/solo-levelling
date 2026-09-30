@@ -39,3 +39,12 @@ Frame processing occurs locally. No recording or image uploads. The browser down
 Browser checks: model loads and processes a synthetic empty frame in the worker; guided countdown, pause/resume, report and discard; desktop and 390-pixel layouts. No camera permission was granted and no real-person tracking accuracy is claimed. Real-device trials in varied light, framing and stance remain necessary before relaxing detection thresholds.
 
 References are linked in the studio's “Metodo e limiti” panel: England Boxing coaching handbook (basic striking) and Google's Pose Landmarker documentation.
+
+## Coach con camera sulle combo (MmaComboTrainer)
+
+Entry: MMA → Combo → una combo → “Allenala con il coach”. Stesso worker MediaPipe del Coach Studio, ma a ~30 fps (`useMmaCamera(onFrame, { minInterval: 33 })`) e con le coordinate 3D stimate (`worldLandmarks`, metri, origine tra le anche).
+
+- `lib/mmaComboJudge.js`: calibrazione sulla guardia personale (busto, braccia, distanza pugni-naso, rotazione spalle, altezza testa, appoggio piedi); segmentazione di ogni gesto (arto fuori dalla guardia → 150 ms di calma); classificazione in diretto / gancio / montante (anche al corpo), gomito, clinch, ginocchiata, teep, calcio basso/corpo/testa, switch kick, check, schivata, rotolamento, parata, finta, cambio di livello; la mano che cade non è un colpo. `judgeRep` allinea attesi e visti con distanza di modifica e valuta guardia dell’altra mano, distensione, ritorno, rotazione, gomito nel gancio, mani alte nei calci, sbilanciamento, ritmo. “Perfetta” solo senza errori importanti.
+- Soglie in `THRESH`: tarate su un atleta sintetico 3D (`tests/helpers/synthFighter.js`) con rumore di 1,5 cm e fotogrammi persi. **Da ritarare con prove reali**: nessuna accuratezza su persone vere è ancora dichiarata.
+- Atterramenti (double leg, sprawl) sono guidati, non giudicati. Niente potenza, impatto o precisione millimetrica: una camera sola.
+- Replay: si registrano solo i punti del corpo della ripetizione (niente video) e si ridisegnano al rallentatore con i segni sugli errori, accanto al manichino.

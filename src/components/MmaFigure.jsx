@@ -24,6 +24,7 @@ export function useSkeletonPlayer({ keys, speed = 1, playing = true, repeat = In
       raf = requestAnimationFrame(loop);
       const dt = lastRef.current == null ? 0 : Math.min(64, now - lastRef.current);
       lastRef.current = now;
+      if (!playing) { if (lastRef.paintedPaused) return; lastRef.paintedPaused = true; } else lastRef.paintedPaused = false;
       if (playing) clockRef.current += dt * speed;
       const lap = Math.floor(clockRef.current / total);
       if (lap >= repeat) {

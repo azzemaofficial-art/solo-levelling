@@ -62,3 +62,71 @@
 .mma-combo-foot button{min-height:46px;padding:0 10px;border:1px solid #ffffff1f;border-radius:12px;background:#121d27;color:#cfe0e6;font:700 12px/1.2 var(--font-label);cursor:pointer}
 .mma-combo-learned.done{border-color:#6de2d3;background:#16393a;color:#9ff3e6;display:flex;align-items:center;justify-content:center;gap:6px}
 @media (prefers-reduced-motion:reduce){.mma-combo{animation:none}}
+
+/* ── Coach con camera sulla combo (MmaComboTrainer) ── */
+.mma-combo-camera{display:flex;align-items:center;gap:12px;width:100%;min-height:62px;margin-top:14px;padding:10px 16px;border:1px solid #6de2d3;border-radius:14px;background:linear-gradient(135deg,#173a3c,#1a2440);color:#eafffb;text-align:left;cursor:pointer;box-shadow:0 0 0 0 #6de2d355;animation:mma-cam-pulse 2.6s ease-in-out infinite}
+.mma-combo-camera svg{flex:none;color:#6de2d3}
+.mma-combo-camera span{display:flex;flex-direction:column;gap:3px}
+.mma-combo-camera b{font:800 15px/1.1 var(--font-label);letter-spacing:.03em}
+.mma-combo-camera small{color:#a9c9cc;font-size:12px}
+@keyframes mma-cam-pulse{50%{box-shadow:0 0 0 6px #6de2d31a}}
+.mma-train{position:fixed;inset:0;z-index:540;display:flex;flex-direction:column;gap:10px;overflow-y:auto;padding:calc(10px + env(safe-area-inset-top)) 14px calc(18px + env(safe-area-inset-bottom));background:#070b12;color:#eef7f8}
+.mma-train-head{display:flex;align-items:center;gap:12px}
+.mma-train-head>div{flex:1;min-width:0}
+.mma-train-head small{color:#6de2d3;font:700 10px/1 var(--font-label);letter-spacing:.14em}
+.mma-train-head h2{margin:4px 0 0;font:700 21px/1.1 var(--font-display);letter-spacing:-.04em}
+.mma-train-setup{display:grid;gap:12px}
+.mma-train-ghost{overflow:hidden;border:1px solid #6de2d330;border-radius:14px;background:#0f1a24}
+.mma-train-setup h3{margin:4px 0 0;font:700 16px/1.2 var(--font-display)}
+.mma-train-setup ol{margin:0;padding-left:20px;color:#cfe0e6;font-size:14px;line-height:1.6;list-style:decimal}
+.mma-train-note{margin:0;color:#8fa9b3;font-size:12px;line-height:1.5}
+.mma-train-reps{display:grid;grid-template-columns:repeat(auto-fit,minmax(0,1fr));gap:6px}
+.mma-train-reps button{min-height:42px;border:1px solid #ffffff22;border-radius:10px;background:#111c26;color:#b7c9d1;font:700 12px/1.1 var(--font-label);cursor:pointer}
+.mma-train-reps button.active{border-color:#6de2d3;color:#6de2d3;background:#16303a}
+.mma-train-stage{position:relative;overflow:hidden;flex:none;aspect-ratio:3/4;max-height:58vh;border:1px solid #6de2d333;border-radius:16px;background:#050b11}
+.mma-train-stage video,.mma-train-stage canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.mma-train-overlay{position:absolute;inset:auto 12px 12px;display:grid;gap:8px;padding:12px;border-radius:10px;background:#0b142bd9;color:#d8eaf0;font-size:13px}
+.mma-train-overlay.error{color:#ffc9a8}
+.mma-train-overlay button{min-height:40px;border:0;border-radius:8px;background:#6de2d3;color:#062220;font-weight:800}
+.mma-train-calib{position:absolute;left:12px;right:12px;bottom:12px;display:grid;gap:8px;padding:12px 14px;border-radius:12px;background:#0a162bf0;color:#9ff3e6}
+.mma-train-calib strong{font:700 15px/1.3 var(--font-display)}
+.mma-train-calib>div{height:4px;border-radius:4px;background:#ffffff1a;overflow:hidden}
+.mma-train-calib i{display:block;height:100%;background:#6de2d3;transition:width .15s linear}
+.mma-train-demo{position:absolute;inset:auto 0 0;display:grid;gap:4px;padding:8px;background:linear-gradient(transparent,#070b12ee 30%)}
+.mma-train-demo span{text-align:center;color:#9ff3e6;font:700 12px/1 var(--font-label);letter-spacing:.1em}
+.mma-train-count,.mma-train-go{position:absolute;inset:0;display:grid;place-items:center;color:#fff;font:800 92px/1 var(--font-display);text-shadow:0 0 30px #6de2d3;pointer-events:none;animation:mma-count .7s cubic-bezier(.2,1.4,.5,1) both}
+.mma-train-go{font-size:56px;animation:mma-go 1.2s ease-out both}
+@keyframes mma-count{from{transform:scale(1.8);opacity:0}to{transform:none;opacity:1}}
+@keyframes mma-go{0%{transform:scale(.6);opacity:0}25%{transform:none;opacity:1}100%{opacity:0}}
+.mma-train-score{position:absolute;top:12px;right:12px;display:grid;place-items:center;width:84px;height:84px;border-radius:50%;background:#0a162bf0;border:3px solid currentColor;animation:mma-count .45s cubic-bezier(.2,1.4,.5,1) both}
+.mma-train-score b{font:800 30px/1 var(--font-display)}
+.mma-train-score small{font:800 9px/1 var(--font-label);letter-spacing:.08em}
+.grade-perfect{color:#7ee0b0}.grade-good{color:#ffd184}.grade-redo{color:#ff9b9b}
+.mma-train-moves{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none}
+.mma-train-moves::-webkit-scrollbar{display:none}
+.mma-train-moves span{flex:none;display:flex;flex-direction:column;gap:2px;min-width:70px;padding:8px 10px;border:1px solid #ffffff1c;border-radius:10px;background:#111c26;color:#9fb4bc;font:600 11px/1.2 var(--font-body);transition:background-color .2s ease,border-color .2s ease,transform .2s ease}
+.mma-train-moves b{font:700 15px/1 var(--font-display);color:#6de2d3}
+.mma-train-moves em{font-style:normal;font:800 12px/1 var(--font-label)}
+.mma-train-moves .st-ok{border-color:#7ee0b0;background:#133a2c;color:#d8ffe9;transform:translateY(-2px)}
+.mma-train-moves .st-partial{border-color:#ffd184;background:#3a3016;color:#fff1cc}
+.mma-train-moves .st-missing{opacity:.75}
+.mma-train-moves .st-guided{border-style:dashed}
+.mma-train-feedback,.mma-train-summary{display:grid;gap:10px;padding:14px 16px;border-radius:14px;background:#111c26;border-left:3px solid #6de2d3}
+.mma-train-feedback p,.mma-train-summary p{margin:0;color:#dcebef;font-size:15px;line-height:1.55}
+.mma-train-summary small{color:#6de2d3;font:700 10px/1 var(--font-label);letter-spacing:.14em}
+.mma-train-summary h3{margin:0;font:800 26px/1 var(--font-display)}
+.mma-train-bars{display:flex;align-items:flex-end;gap:4px;height:70px}
+.mma-train-bars i{flex:1;border-radius:4px 4px 0 0;background:currentColor;opacity:.85}
+.mma-train-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.mma-train-actions button{display:flex;align-items:center;justify-content:center;gap:6px;min-height:46px;border:1px solid #ffffff22;border-radius:12px;background:#16222e;color:#dff;font:700 12px/1.1 var(--font-label);cursor:pointer}
+.mma-train-replay{position:fixed;inset:0;z-index:560;display:flex;flex-direction:column;gap:12px;overflow-y:auto;padding:calc(12px + env(safe-area-inset-top)) 14px calc(18px + env(safe-area-inset-bottom));background:#05080ef5}
+.mma-train-replay header{display:flex;align-items:center;justify-content:space-between;color:#9ff3e6;font:700 14px/1 var(--font-label);letter-spacing:.08em}
+.mma-train-replay-grid{display:grid;gap:10px}
+.mma-train-replay-grid>div{overflow:hidden;border:1px solid #ffffff1a;border-radius:12px;background:#0d1620}
+.mma-train-replay-grid small{display:block;padding:8px 12px 0;color:#8fa9b3;font:700 10px/1 var(--font-label);letter-spacing:.14em}
+.mma-train-replay-canvas{display:block;width:100%;height:auto}
+.mma-train-replay ul{display:grid;gap:6px;margin:0;padding:0;list-style:none}
+.mma-train-replay li{display:grid;gap:3px;padding:10px 12px;border-radius:10px;background:#111c26;color:#dcebef;font-size:13px}
+.mma-train-replay li span{color:#ffc9a8;font-size:12px}
+.mma-train-replay li.st-ok{border-left:3px solid #7ee0b0}.mma-train-replay li.st-partial{border-left:3px solid #ffd184}.mma-train-replay li.st-missing{border-left:3px solid #ff9b9b}
+@media (prefers-reduced-motion:reduce){.mma-combo-camera,.mma-train-count,.mma-train-go,.mma-train-score{animation:none}}

@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 const CONNECTIONS = [[11,12],[11,13],[13,15],[12,14],[14,16],[11,23],[12,24],[23,24],[23,25],[25,27],[24,26],[26,28]];
-export default function useMmaCamera(onFrame) {
+// minInterval: ms minimi tra due fotogrammi analizzati (80 = ~12 fps per le lezioni;
+// le combo chiedono 33 = fino a ~30 fps, perché un jab dura 150–200 ms).
+export default function useMmaCamera(onFrame, { minInterval = 80 } = {}) {
   const videoRef = useRef(null), canvasRef = useRef(null), onFrameRef = useRef(onFrame);
   onFrameRef.current = onFrame;
   const runtime = useRef({ generation: 0 });
@@ -39,7 +41,7 @@ export default function useMmaCamera(onFrame) {
         if (data.type === 'ready') { clearTimeout(r.timeout); setStatus('ready'); loop(); }
         if (data.type === 'pose') {
           busy = false;
-          onFrameRef.current(data.points, data.time, data.aspect);
+          onFrameRef.current(data.points, data.time, data.aspect, data.world);
           const canvas = canvasRef.current, video = videoRef.current;
           if (!canvas || !video) return;
           if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) { canvas.width = video.videoWidth; canvas.height = video.videoHeight; }
@@ -61,7 +63,7 @@ export default function useMmaCamera(onFrame) {
         r.raf = requestAnimationFrame(loop);
         const video = videoRef.current, now = performance.now();
         if (busy && now - lastSent > 5000) { fail('Il riconoscimento non risponde. Riprova con la camera o passa alla guida.'); return; }
-        if (!video || video.readyState < 2 || document.hidden || busy || now - lastSent < 80 || video.currentTime === lastVideoTime) return;
+        if (!video || video.readyState < 2 || document.hidden || busy || now - lastSent < minInterval || video.currentTime === lastVideoTime) return;
         busy = true; lastSent = now; lastVideoTime = video.currentTime;
         try {
           const bitmap = await createImageBitmap(video);
@@ -73,7 +75,7 @@ export default function useMmaCamera(onFrame) {
     } catch (e) {
       fail(e.name === 'NotAllowedError' ? 'Accesso alla fotocamera non consentito. Abilitalo nel browser oppure usa la guida senza camera.' : e.name === 'NotFoundError' ? 'Nessuna fotocamera disponibile. Puoi allenarti con la guida a round.' : 'Fotocamera occupata o non disponibile. Chiudi le altre app che la usano e riprova.');
     }
-  }, [release]);
+  }, [release, minInterval]);
   useEffect(() => {
     if (runtime.current.stream && videoRef.current) {
       videoRef.current.srcObject = runtime.current.stream;
