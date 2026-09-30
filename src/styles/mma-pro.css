@@ -130,3 +130,12 @@
 .mma-train-replay li span{color:#ffc9a8;font-size:12px}
 .mma-train-replay li.st-ok{border-left:3px solid #7ee0b0}.mma-train-replay li.st-partial{border-left:3px solid #ffd184}.mma-train-replay li.st-missing{border-left:3px solid #ff9b9b}
 @media (prefers-reduced-motion:reduce){.mma-combo-camera,.mma-train-count,.mma-train-go,.mma-train-score{animation:none}}
+/* voto dell'ultimo colpo (giudice 3D) + badge di precisione */
+.mma-pro-precision{margin-left:auto;font-style:normal;padding:2px 7px;border-radius:20px;background:#6de2d31f;color:#9cebdc;font:700 9px var(--font-label);letter-spacing:.06em;white-space:nowrap}
+.mma-pro-strike{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 9px;margin-top:10px;padding:9px 12px;border-radius:9px;background:#0b1d22;border:1px solid #6de2d340;animation:mmaStrikeIn .35s cubic-bezier(.2,1.4,.4,1)}
+.mma-pro-strike b{font:700 14px var(--font-display);color:#d5f8ed}
+.mma-pro-strike i{font:700 18px var(--font-display);font-style:normal;color:#6de2d3;font-variant-numeric:tabular-nums}
+.mma-pro .mma-pro-strike small{flex-basis:100%;font:500 12px/1.4 var(--font-body);letter-spacing:0;color:#9dc5c0}
+.mma-pro-strike.fix{border-color:#f0bd8666;background:#2a2218}.mma-pro-strike.fix i{color:#f0bd86}.mma-pro-strike.fix small{color:#f5d6ae}
+@keyframes mmaStrikeIn{from{transform:scale(.85);opacity:0}to{transform:none;opacity:1}}
+@media(prefers-reduced-motion:reduce){.mma-pro-strike{animation:none}}

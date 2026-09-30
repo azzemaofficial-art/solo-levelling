@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { ArrowLeft, Check, Pause, Play, RotateCcw, Video, Volume2, VolumeX, X } from 'lucide-react';
 import useMmaCamera from '../hooks/useMmaCamera';
 import MmaFigure, { useSkeletonPlayer } from './MmaFigure';
-import { observeMmaPose } from '../../lib/mmaCoachEngine';
+import { createReadiness, readPose } from '../../lib/mmaReadiness';
 import { coachFeedback, createComboJudge, needsFeet, EXPECT } from '../../lib/mmaComboJudge';
 import { MOVES, comboKeys } from '../data/mmaMoves';
 import { localDateKey, logWorkout } from '../utils/trainingLog';
@@ -105,6 +105,7 @@ export default function MmaComboTrainer({ combo, onClose, onLearned }) {
   const [replay, setReplay] = useState(null);
   const [paused, setPaused] = useState(false);
   const judgeRef = useRef(createComboJudge({ stance }));
+  const readyRef = useRef(createReadiness()), hintRef = useRef({ text: '', at: 0 });
   // riferimento stabile: il genitore può ridisegnarsi spesso, non deve azzerare i timer
   const onLearnedRef = useRef(onLearned); onLearnedRef.current = onLearned;
   const phaseRef = useRef(phase); phaseRef.current = phase;
@@ -132,22 +133,28 @@ export default function MmaComboTrainer({ combo, onClose, onLearned }) {
   const onFrame = useCallback((points, t, aspect, world) => {
     const judge = judgeRef.current;
     const ph = phaseRef.current;
-    const pose = observeMmaPose(points, aspect);
     if (ph === 'calibrate') {
-      const ready = pose.visible && (!feet || pose.full) && pose.bothGuard && pose.lean < 25;
-      setFraming(!pose.visible ? 'Inquadra testa, braccia e busto' : feet && !pose.full ? 'Allontanati: servono anche i piedi (calci/ginocchia)' : !pose.bothGuard ? 'Mani in guardia vicino al viso' : 'Perfetto, resta così…');
-      if (ready && world?.length) {
-        const done = judge.calibrate(world);
-        setCalib((c) => Math.min(1, c + 1 / 12));
-        if (done) {
-          setPhase('demo');
-          say(`Guarda la combo: ${combo.name}.`, voice);
-          later(() => { setPhase('countdown'); setCount(3); say('Tre. Due. Uno. Via!', voice); }, Math.max(3200, moves.length * 1100));
-        }
+      // tollerante: guardia in 3D, mano dietro coperta ok, la barra non si azzera per un fotogramma
+      const read = readPose(points, world, { aspect, needFeet: feet });
+      const progress = readyRef.current.update(read.ok, t);
+      setFraming(read.hint); setCalib(progress);
+      const now = performance.now();
+      if (!read.ok && (read.hint !== hintRef.current.text ? now - hintRef.current.at > 2500 : now - hintRef.current.at > 7000)) { hintRef.current = { text: read.hint, at: now }; say(read.hint, voice); }
+      if (read.ok && world?.length) judge.calibrate(world);
+      if (readyRef.current.done && judge.isCalibrated()) {
+        readyRef.current.reset();
+        setPhase('demo');
+        say(`Guarda la combo: ${combo.name}.`, voice);
+        later(() => { setPhase('countdown'); setCount(3); say('Tre. Due. Uno. Via!', voice); }, Math.max(3200, moves.length * 1100));
       }
       return;
     }
     if (ph !== 'go' || !world?.length) return;
+    if (!readPose(points, world, { aspect }).visible) {
+      judge.abort();
+      if (t - repRef.current.start > 2600 + moves.length * 1100) finishRep();
+      return;
+    }
     const info = judge.push(world, t, points);
     if (!info) return;
     if (info.activeKeys.length) repRef.current.lastActive = t;
@@ -162,7 +169,7 @@ export default function MmaComboTrainer({ combo, onClose, onLearned }) {
       if ((done >= needed && judge.idle() && quietFor > 600) || t - repRef.current.start > 2600 + moves.length * 1100) finishRep();
     }
   }, [feet, combo.name, moves, voice, finishRep]);
-  const camera = useMmaCamera(onFrame, { minInterval: 33 });
+  const camera = useMmaCamera(onFrame, { minInterval: 33, canSwap: () => phaseRef.current !== 'go' });
 
   // countdown → via
   useEffect(() => {
@@ -195,7 +202,7 @@ export default function MmaComboTrainer({ combo, onClose, onLearned }) {
 
   const startCamera = () => {
     try { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; window.speechSynthesis?.speak(u); } catch { /* voce */ }
-    judgeRef.current = createComboJudge({ stance });
+    judgeRef.current = createComboJudge({ stance }); readyRef.current.reset();
     setCalib(0); setResults([]); setCurrent(null);
     setPhase('calibrate');
     say(feet ? 'Mettiti a due o tre metri, corpo intero in inquadratura, mani in guardia.' : 'Mettiti a un metro e mezzo, busto e braccia in inquadratura, mani in guardia.', voice);

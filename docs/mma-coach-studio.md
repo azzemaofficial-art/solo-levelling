@@ -48,3 +48,14 @@ Entry: MMA → Combo → una combo → “Allenala con il coach”. Stesso worke
 - Soglie in `THRESH`: tarate su un atleta sintetico 3D (`tests/helpers/synthFighter.js`) con rumore di 1,5 cm e fotogrammi persi. **Da ritarare con prove reali**: nessuna accuratezza su persone vere è ancora dichiarata.
 - Atterramenti (double leg, sprawl) sono guidati, non giudicati. Niente potenza, impatto o precisione millimetrica: una camera sola.
 - Replay: si registrano solo i punti del corpo della ripetizione (niente video) e si ridisegnano al rallentatore con i segni sugli errori, accanto al manichino.
+
+## Tracciamento v2 (Coach Studio + combo)
+
+- **Modello adattivo** (`src/workers/mmaPose.worker.js`): parte con `pose_landmarker_lite` su CPU, scarica `pose_landmarker_full` in sottofondo e ci passa solo quando la pagina lo consente (`useMmaCamera(..., { canSwap })`: mai durante un round o una ripetizione). Se il full supera 55 ms di mediana torna al lite e il telefono viene ricordato (`shadow_monarch_pose_lite_only`). GPU esclusa: nei worker il primo `detectForVideo` si bloccava in Chromium headless e non è verificabile su iPhone.
+- **Filtro One Euro** (`lib/poseFilter.js`) su punti 2D e 3D: circa −50% di tremolio da fermo, picco di un jab da 100 ms conservato oltre l’80%.
+- **Pronto a mani libere** (`lib/mmaReadiness.js`): guardia misurata in 3D, mano dietro coperta accettata (tre quarti), barra che sale in 1,3 s e scende a metà velocità. Suggerimenti vocali: troppo vicino, piedi fuori, di profilo, mani basse. Il Coach Studio parte da solo; se perde il corpo per 2,5 s va in pausa e riparte da solo dopo 1 s che ti rivede.
+- **Coach Studio con il giudice 3D**: i colpi delle lezioni non passano più dalla macchina a stati 2D a 12 fps ma da `createComboJudge` a ~30 fps; ogni colpo ha nome, voto e al massimo una correzione vocale ogni 3,5 s (`rateGesture`). Il motore 2D resta come ripiego (`createMmaObserver` senza `external`).
+- **Fix camera**: riassegnare lo stesso stream a ogni cambio di stato interrompeva `play()` (AbortError) e lasciava un finto “Tocca il video”, che metteva in pausa la sessione appena partita.
+- **Giudice**: un colpo netto che torna in guardia si chiude subito (1-1-2 veloce senza pause = tre colpi); clinch con isteresi di 150 ms; ginocchio del calcio dal secondo valore più alto (un fotogramma rumoroso non trasforma un check in calcio); `abort()` butta via i gesti a metà.
+
+Validazione: `tests/mmaTracking.test.js` (filtro, pronto, 1-1-2 veloce a 15 fps, combo con tremolio di 2 cm filtrato, colpo singolo, abort). End-to-end nel browser con pose sintetiche: partenza senza tocchi, 4 jab e 4 cross contati su 4 e 4, correzione sulla guardia, ripresa automatica dopo l’uscita dall’inquadratura. MediaPipe reale in Chromium: lite → full in circa 2 s, stabile.

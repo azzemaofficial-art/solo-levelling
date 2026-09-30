@@ -82,11 +82,12 @@ const to2d = (w) => w.map((p) => ({ x: 0.5 + p.x * 0.5 - p.z * 0.25, y: 0.5 + p.
 
 // Sequenza di fotogrammi {world, points, t} per una lista di gesti, a `fps`.
 // opts.mutate(moveId, pose) → posa modificata (per simulare errori).
-export function synthSequence(moveIds, { fps = 30, gapMs = 120, mutate, start = 0 } = {}) {
+// opts.tempo < 1 = colpi più veloci (0,5 = un jab vero da ~90 ms di andata).
+export function synthSequence(moveIds, { fps = 30, gapMs = 120, mutate, start = 0, tempo = 1, lead = 400 } = {}) {
   const dt = 1000 / fps;
-  const keys = [{ p: BASE3D, ms: 400 }];
+  const keys = [{ p: BASE3D, ms: lead }];
   for (const id of moveIds) {
-    const [out, hold, back] = LEG.includes(id) ? TIMING.leg : BODY.includes(id) ? TIMING.body : TIMING.arm;
+    const [out, hold, back] = (LEG.includes(id) ? TIMING.leg : BODY.includes(id) ? TIMING.body : TIMING.arm).map((ms) => ms * tempo);
     const peaks = PEAKS[id] || [{}];
     peaks.forEach((over, i) => {
       let p = pose({ ...(i > 0 ? peaks.slice(0, i).reduce((acc, o) => ({ ...acc, ...o }), {}) : {}), ...over });
