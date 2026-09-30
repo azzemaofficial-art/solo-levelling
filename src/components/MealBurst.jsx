@@ -26,10 +26,14 @@ const KIND = {
   water: { emoji: '💧', label: 'ACQUA', color: '#38bdf8', glow: 'rgba(56,189,248,0.5)' },
 };
 
-// Preload: il primo burst non deve aspettare il download del gif.
+// Preload: il primo burst non deve aspettare il download del gif (1,5 MB) — ma NON
+// all'avvio: rubava banda al codice della home. Parte a pagina caricata, quando il
+// telefono è libero.
 if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
-  const preloadImg = new Image();
-  preloadImg.src = RAMEN_GIF;
+  const warm = () => { const preloadImg = new Image(); preloadImg.src = RAMEN_GIF; };
+  const whenIdle = () => (window.requestIdleCallback ? window.requestIdleCallback(warm, { timeout: 15000 }) : setTimeout(warm, 4000));
+  if (document.readyState === 'complete') setTimeout(whenIdle, 6000);
+  else window.addEventListener('load', () => setTimeout(whenIdle, 6000), { once: true });
 }
 
 const prefersReducedMotion = () =>

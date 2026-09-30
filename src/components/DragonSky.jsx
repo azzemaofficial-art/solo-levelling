@@ -73,6 +73,9 @@ export default function DragonSky({ enabled = true, lane = 'top' }) {
   const [swoops, setSwoops] = useState([]);
   const [chase, setChase] = useState(null);
   const busyRef = useRef(false);
+  // i draghi di sfondo (~600 KB) arrivano dopo il codice della home, non insieme
+  const [warm, setWarm] = useState(false);
+  useEffect(() => { const id = setTimeout(() => setWarm(true), 2500); return () => clearTimeout(id); }, []);
 
   useEffect(() => {
     const onSwoop = () => {
@@ -105,10 +108,10 @@ export default function DragonSky({ enabled = true, lane = 'top' }) {
 
   if (!enabled) return null;
   return <>
-    <div className={`dragon-sky dragon-lane-${lane} ${chase ? 'is-hidden' : ''}`} aria-hidden="true">
+    {warm && <div className={`dragon-sky dragon-lane-${lane} ${chase ? 'is-hidden' : ''}`} aria-hidden="true">
       <div className="dragon-flight dragon-flight-a"><div className="dragon-arc"><Dragon /></div></div>
       <div className="dragon-flight dragon-flight-b"><div className="dragon-arc"><Dragon className="dragon-far" /></div></div>
-    </div>
+    </div>}
     {chase && <DragonChase key={chase} onDone={endChase} />}
     {swoops.map((key) => <div key={key} className="dragon-swoop" aria-hidden="true"><div className="dragon-arc"><Dragon /></div></div>)}
   </>;
