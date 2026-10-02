@@ -411,6 +411,13 @@ useEffect(() => { localStorage.setItem('shadow_monarch_macros', JSON.stringify(m
     if (gained >= 40) summonDragon(); // allenamento completato → il drago passa in picchiata
   }, [triggerFxBurst]);
 
+  // Diario calorie (cut/bulk) di chi non ha il menu fisso: il suo obiettivo diventa quello dell'app
+  const applyFuelTargets = useCallback((t, goal) => {
+    setDailyGoal((prev) => (prev === t.kcal ? prev : t.kcal));
+    setMacroGoals((prev) => (prev?.protein === t.protein && prev?.carbs === t.carbs && prev?.fats === t.fat ? prev : { carbs: t.carbs, protein: t.protein, fats: t.fat }));
+    setPlayerStats((prev) => (prev.objective === goal ? prev : { ...prev, objective: goal }));
+  }, []);
+
   // Applica payload Telegram al log di oggi (usato da URL param e da server claim)
   const applyTgImport = useCallback((payload) => {
     if (!payload?.type) return;
@@ -448,7 +455,7 @@ useEffect(() => { localStorage.setItem('shadow_monarch_macros', JSON.stringify(m
         carbs: Math.max(0, Number(l.carbs || 0) - Number(payload.carbs || 0)),
         fatMacros: Math.max(0, Number(l.fatMacros || 0) - Number(payload.fat || 0)),
       } : l)));
-      emitUiToast({ message: `↩️ Pasto annullato${payload.name ? `: ${payload.name}` : ''} (da Telegram)`, tone: 'info', durationMs: 3200 });
+      emitUiToast({ message: `↩️ Pasto annullato${payload.name ? `: ${payload.name}` : ''}${payload.local ? '' : ' (da Telegram)'}`, tone: 'info', durationMs: 3200 });
       return;
     }
     const todayDdMm = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit' });
@@ -1788,7 +1795,7 @@ useEffect(() => { localStorage.setItem('shadow_monarch_macros', JSON.stringify(m
               transition={shouldReduceFx ? { duration: 0.14, ease: 'linear' } : { duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
               className={`min-h-full page-shell page-shell-${activePage}`}
             >
-            {['cut', 'food', 'program', 'mma', 'progress'].includes(activePage) && <CutPlan view={activePage === 'cut' ? 'today' : activePage} onNavigate={handleTabChange} systemLogs={systemLogs} onGainXp={grantCutXp} />}
+            {['cut', 'food', 'program', 'mma', 'progress'].includes(activePage) && <CutPlan view={activePage === 'cut' ? 'today' : activePage} onNavigate={handleTabChange} systemLogs={systemLogs} onGainXp={grantCutXp} onFoodEvent={applyTgImport} onFuelTargets={applyFuelTargets} />}
             {activePage === 'system' && (
               <SystemHub
                 systemLogs={systemLogs}

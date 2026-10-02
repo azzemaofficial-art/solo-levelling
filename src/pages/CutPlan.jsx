@@ -9,6 +9,8 @@ import { CUT_PLAN_KEY, CUT_SYNC_EVENT, CUT_XP } from '../utils/cutSync';
 import { dateOfWeekday, durationMinutes, kindForSession, logWorkout, unlogWorkout } from '../utils/trainingLog';
 import TrainingLog, { TrainingWeekDots, useTrainingLog } from '../components/TrainingLog';
 import MmaAcademy from '../components/MmaAcademy';
+import FuelTracker from '../components/FuelTracker';
+import { fuelTargets, readFuelGoal, usesFixedMenu } from '../utils/fuelPlan';
 import { summonChase } from '../components/DragonSky';
 import CountUp from '../components/CountUp';
 import WeightTrend from '../components/WeightTrend';
@@ -41,8 +43,10 @@ const emptyProfileForm = (p) => ({
 // XP per azione: ogni chiave si paga una volta sola (niente farming togliendo e rimettendo la spunta).
 const XP = CUT_XP;
 
-export default function CutPlan({ view = 'today', onNavigate, systemLogs = [], onGainXp }) {
+export default function CutPlan({ view = 'today', onNavigate, systemLogs = [], onGainXp, onFoodEvent, onFuelTargets }) {
   const [profile, saveProfile] = useCutProfile();
+  // il menu fisso è il piano di Emanuele; chiunque altro (es. Alessandro) conta le calorie da sé
+  const [fixedMenu] = useState(() => { try { return usesFixedMenu(localStorage.getItem('shadow_monarch_tg_chat_id')); } catch { return false; } });
   const trainingLog = useTrainingLog();
   const [profileForm, setProfileForm] = useState(() => emptyProfileForm(profile));
   const [profileError, setProfileError] = useState('');
@@ -71,7 +75,10 @@ export default function CutPlan({ view = 'today', onNavigate, systemLogs = [], o
   // due date, e solo quando cambiano. Senza chat_id collegato non parte nulla.
   const lastWeighDate = [...(saved.progress || [])].reverse().find((entry) => entry.weight)?.date || null;
   const sessionDoneDate = saved.completed?.[`${trainingWeek}-${getMondayIndex()}`] ? getLocalDateKey() : null;
-  const kcalTargetsKey = [0, 1, 2, 3, 4, 5, 6].map((index) => dayTargetFor(profile, index)).join(',');
+  const fuelGoal = readFuelGoal(profile);
+  const fuel = fixedMenu ? null : fuelTargets({ sex: profile?.sex, age: profile?.age, heightCm: profile?.heightCm, weightKg: [...(saved.progress || [])].reverse().find((e) => e.weight)?.weight || profile?.currentWeightKg || profile?.startWeightKg, activity: profile?.activity, goal: fuelGoal });
+  const targetFor = (index) => (fuel ? fuel.kcal : dayTargetFor(profile, index));
+  const kcalTargetsKey = [0, 1, 2, 3, 4, 5, 6].map(targetFor).join(',');
   // Spunte arrivate da Telegram (utils/cutSync): rileggi lo stato salvato.
   useEffect(() => {
     const onSync = () => setSaved(readSaved());
@@ -162,6 +169,7 @@ export default function CutPlan({ view = 'today', onNavigate, systemLogs = [], o
   const setProfileField = (field) => (event) => setProfileForm((prev) => ({ ...prev, [field]: event.target.value }));
   const kcalRange = [0, 1, 2, 3, 4, 5, 6].map((index) => dayTargetFor(profile, index));
   const rules = nutritionRules.map((rule, index) => {
+    if (index === 0 && fuel) return `Il tuo obiettivo: circa ${fuel.kcal.toLocaleString('it-IT')} kcal e ${fuel.protein} g di proteine al giorno (${fuelGoal === 'bulk' ? 'bulk' : 'cut'}). Conta la media della settimana, non il singolo giorno.`;
     if (index === 0) return `Partenza indicativa: ${Math.min(...kcalRange).toLocaleString('it-IT')}–${Math.max(...kcalRange).toLocaleString('it-IT')} kcal in base alla giornata. Le porzioni sono una guida, non un obbligo matematico.`;
     if (index === 1 && profile) return rule.replace(/circa \d+–\d+ g al giorno/, `circa ${Math.round(profile.startWeightKg * 1.8 / 5) * 5}–${Math.round(profile.startWeightKg * 2 / 5) * 5} g al giorno`);
     return rule;
@@ -175,21 +183,21 @@ export default function CutPlan({ view = 'today', onNavigate, systemLogs = [], o
   };
 
   return <main className={`cut-page cut-view-${view}`}>
-    <header className="cut-topline"><span>SHADOW / 01</span><span>PROTOCOLLO CUT</span></header>
+    <header className="cut-topline"><span>SHADOW / 01</span><span>PROTOCOLLO {fixedMenu || fuelGoal === 'cut' ? 'CUT' : 'BULK'}</span></header>
     {view === 'today' && <>
       <section className="cut-hero">
-        <div className="cut-hero-copy"><span className="cut-kicker">IL TUO PERCORSO • 12 SETTIMANE</span><h1>Il prossimo<br /><em>livello.</em></h1><p>{profile ? `Da ${formatKg(profile.startWeightKg)} kg verso ${formatKg(profile.targetWeightKg)} kg. ` : ''}Forza, velocità e continuità. Una giornata alla volta.</p></div>
+        <div className="cut-hero-copy"><span className="cut-kicker">IL TUO PERCORSO • 12 SETTIMANE</span><h1>Il prossimo<br /><em>livello.</em></h1><p>{!fixedMenu ? (fuel ? `${fuelGoal === 'bulk' ? 'Bulk' : 'Cut'}: circa ${fuel.kcal.toLocaleString('it-IT')} kcal e ${fuel.protein} g di proteine al giorno. ` : '') : profile ? `Da ${formatKg(profile.startWeightKg)} kg verso ${formatKg(profile.targetWeightKg)} kg. ` : ''}Forza, velocità e continuità. Una giornata alla volta.</p></div>
         <img src="/avatar8.png" alt="" className="cut-hero-art" /><button type="button" className="cut-hero-summon" onClick={summonChase} aria-label="Evoca il drago" />
         <div className="cut-hero-line" />
       </section>
       <section className="cut-status">
-        <div><small>OBIETTIVO</small><strong>{profile ? <><CountUp value={profile.targetWeightKg} decimals={2} /> <span>kg</span></> : '—'}</strong></div><div><small>OGGI</small><strong><CountUp value={dayTargetFor(profile, today)} /> <span>kcal*</span></strong></div><div><small>FASE</small><strong>{currentPhase.name}</strong></div>
+        <div><small>OBIETTIVO</small><strong>{profile ? <><CountUp value={profile.targetWeightKg} decimals={2} /> <span>kg</span></> : '—'}</strong></div><div><small>OGGI</small><strong><CountUp value={targetFor(today)} /> <span>kcal*</span></strong></div><div><small>FASE</small><strong>{currentPhase.name}</strong></div>
       </section>
-      {!profile && <button className="cut-setup" onClick={() => onNavigate('progress')}><span><small>PRIMO PASSO</small><b>Imposta il tuo profilo</b><em>Peso, obiettivo e altezza: calorie e progressi si adattano a te.</em></span><ArrowRight size={18} /></button>}
+      {(fixedMenu ? !profile : !fuel) && <button className="cut-setup" onClick={() => onNavigate(fixedMenu ? 'progress' : 'food')}><span><small>PRIMO PASSO</small><b>Imposta il tuo profilo</b><em>Peso, obiettivo e altezza: calorie e progressi si adattano a te.</em></span><ArrowRight size={18} /></button>}
       <p className="cut-fine">*Stima iniziale. Adattala alla media del peso, alla vita e all’energia negli allenamenti.</p>
       <section className="cut-section"><div className="cut-section-title"><span>OGGI / {dayNames[today].toUpperCase()}</span><button onClick={() => onNavigate('program')}>Settimana <ArrowRight size={15} /></button></div>
         <div className={`cut-feature cut-${todayTraining.type}`}><div className="cut-feature-icon">{sessionIcon(todayTraining.type)}</div><div>{todayTraining.duration !== '—' && <small>{todayTraining.duration}</small>}<h2>{todayTraining.short}</h2><p>{todayTraining.detail}</p></div></div>
-        <div className="cut-actions"><button onClick={() => onNavigate('program')}>{isRestDay(todayTraining) ? 'Vedi la settimana' : 'Apri sessione'} <ArrowRight size={16} /></button><button onClick={() => onNavigate('food')}>Pasti di oggi <Utensils size={16} /></button></div>
+        <div className="cut-actions"><button onClick={() => onNavigate('program')}>{isRestDay(todayTraining) ? 'Vedi la settimana' : 'Apri sessione'} <ArrowRight size={16} /></button><button onClick={() => onNavigate('food')}>{fixedMenu ? 'Pasti di oggi' : 'Diario calorie'} <Utensils size={16} /></button></div>
       </section>
       <section className="cut-section"><div className="cut-section-title"><span>IL TUO SEGNALE</span><button onClick={() => onNavigate('progress')}>Progressi <ArrowRight size={15} /></button></div>
         <div className="cut-metrics"><div><small>PESO RECENTE</small><b>{latestWeight ? <><CountUp value={round1(latestWeight)} decimals={1} /> kg</> : 'Da registrare'}</b></div><div><small>GIROVITA</small><b>{latestWaist ? `${round1(latestWaist)} cm` : profile?.startWaistCm ? `${formatKg(profile.startWaistCm)} cm iniziali` : 'Da registrare'}</b></div></div>
@@ -202,7 +210,8 @@ export default function CutPlan({ view = 'today', onNavigate, systemLogs = [], o
 
     {view === 'mma' && <MmaAcademy onNavigate={onNavigate} />}
 
-    {view === 'food' && <>
+    {view === 'food' && !fixedMenu && <FuelTracker profile={profile} saveProfile={saveProfile} weightKg={latestWeight} systemLogs={systemLogs} onLogFood={onFoodEvent} onUndoFood={onFoodEvent} onTargets={onFuelTargets} />}
+    {view === 'food' && fixedMenu && <>
       <section className="cut-page-head"><span className="cut-kicker">28 GIORNI • 4 SETTIMANE</span><h1>Mangia bene.<br /><em>Con gusto.</em></h1><p>Un piano vario che include già McDonald’s, pasta con carne di cavallo, pizza e ricette fit porn. Ripeti la rotazione nei tre mesi cambiando verdure, frutta e fonti proteiche equivalenti.</p></section>
       <div className="cut-week-picker"><button aria-label="Settimana precedente" onClick={() => setWeek((n) => Math.max(0, n - 1))}><ChevronLeft size={20} /></button><span>SETTIMANA <strong>{week + 1}</strong> / 4</span><button aria-label="Settimana successiva" onClick={() => setWeek((n) => Math.min(3, n + 1))}><ChevronRight size={20} /></button></div>
       <div className="cut-day-strip">{dayNames.map((name, index) => <button key={name} className={day === index ? 'active' : ''} onClick={() => setDay(index)}>{name.slice(0, 3)}</button>)}</div>

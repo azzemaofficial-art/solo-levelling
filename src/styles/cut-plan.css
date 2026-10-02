@@ -549,3 +549,74 @@
 .tlog-del:hover{color:#ffb4a8}
 .mma-combo-done{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;min-height:52px;margin-top:14px;border:0;border-radius:14px;background:linear-gradient(135deg,#6de2d3,#7aa8ff);color:#062220;font:800 14px/1 var(--font-label);letter-spacing:.03em;cursor:pointer}
 .mma-combo-done.done{background:#16393a;color:#9ff3e6;border:1px solid #6de2d3}
+/* ── Diario calorie cut/bulk (FuelTracker) ── */
+.fuel{--fuel:var(--lime)}.fuel-bulk{--fuel:#ffb36b}
+.fuel-goal{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0 0 16px}
+.fuel-goal button{display:flex;flex-direction:column;align-items:flex-start;gap:4px;padding:14px;border:1px solid #ffffff22;border-radius:6px;background:var(--surface);color:var(--t2);text-align:left;cursor:pointer;transition:border-color .2s,background .2s,transform .15s}
+.fuel-goal button b{font:800 18px/1 var(--font-display);letter-spacing:.04em;color:#fff}
+.fuel-goal button small{font-size:11px;line-height:1.35;color:var(--t3)}
+.fuel-goal button:active{transform:scale(.98)}
+.fuel-goal button.active{border-color:var(--fuel);background:linear-gradient(135deg,color-mix(in srgb,var(--fuel) 20%,var(--surface)),var(--surface));color:var(--fuel)}
+.fuel-goal button.active b{color:var(--fuel)}
+.fuel-today{display:flex;align-items:center;gap:16px;padding:16px;border-radius:6px;background:linear-gradient(120deg,color-mix(in srgb,var(--fuel) 12%,var(--surface)),var(--surface));margin:0 0 10px}
+.fuel-ring{width:104px;height:104px;flex:none}
+.fuel-ring circle{fill:none;stroke-width:11}
+.fuel-ring-bg{stroke:#ffffff14}
+.fuel-ring-fg{stroke:var(--fuel);stroke-linecap:round;transition:stroke-dashoffset .8s cubic-bezier(.2,.8,.2,1)}
+.fuel-ring-fg.over{stroke:#ff8a7a}
+.fuel-today-copy{min-width:0;flex:1}
+.fuel-today-copy small{color:var(--t3);font:700 9px/normal var(--font-label);letter-spacing:.14em}
+.fuel-today-copy strong{display:block;margin:4px 0 2px;font:700 28px/1.05 var(--font-display);letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.fuel-today-copy strong span{font-size:12px;color:var(--t3);letter-spacing:0}
+.fuel-today-copy p{margin:0 0 9px;color:var(--fuel);font-size:13px;font-weight:600}
+.fuel-today-copy p.over{color:#ff8a7a}
+.fuel-protein{height:5px;border-radius:5px;background:#ffffff14;overflow:hidden}
+.fuel-protein i{display:block;height:100%;background:var(--accent-2);transform-origin:left;transition:transform .6s ease}
+.fuel-today-copy em{display:block;margin-top:5px;font-style:normal;font-size:11px;color:var(--t2)}
+.fuel-macros{margin:0 0 14px;flex-wrap:wrap}
+.fuel-add{margin:0 0 12px}
+.fuel-slots,.fuel-activity{display:grid;grid-template-columns:repeat(4,1fr);gap:4px}
+.fuel-activity{grid-template-columns:repeat(3,1fr)}
+.fuel-slots button,.fuel-activity button{min-height:38px;padding:6px 4px;border:1px solid #ffffff22;background:var(--surface-2);color:var(--t2);font:700 10px/1.2 var(--font-label);letter-spacing:.04em;cursor:pointer}
+.fuel-activity button{display:flex;flex-direction:column;align-items:center;gap:2px}
+.fuel-activity button small{font:500 10px/1.2 var(--font-body,inherit);letter-spacing:0;color:var(--t4)}
+.fuel-slots button.active,.fuel-activity button.active{border-color:var(--fuel);color:var(--fuel);background:color-mix(in srgb,var(--fuel) 14%,var(--surface-2))}
+.fuel-add .cut-primary{background:var(--fuel)}
+.fuel-add .cut-primary:disabled{opacity:.4;cursor:not-allowed}
+.fuel-recents{margin:0 0 18px}
+.fuel-recents>small{display:block;margin:0 0 7px;color:var(--t3);font:700 9px/normal var(--font-label);letter-spacing:.14em}
+.fuel-recents>div{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none}
+.fuel-recents>div::-webkit-scrollbar{display:none}
+.fuel-recents button{display:flex;align-items:center;gap:5px;flex:none;padding:8px 11px;border:1px solid #ffffff22;border-radius:20px;background:var(--surface);color:#fff;font-size:12px;white-space:nowrap;cursor:pointer}
+.fuel-recents button em{font-style:normal;color:var(--t3);font-size:11px}
+.fuel-recents button:active{border-color:var(--fuel)}
+.fuel-slot-group{margin:0 0 10px}
+.fuel-slot-group>small{display:block;margin:0 0 4px;color:var(--t4);font:700 9px/normal var(--font-label);letter-spacing:.14em}
+.fuel-item{display:flex;align-items:center;gap:10px;padding:10px 0 10px 12px;border-left:2px solid var(--fuel);background:var(--surface);margin:0 0 4px}
+.fuel-item span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}
+.fuel-item b{font:700 12px/normal var(--font-label);font-variant-numeric:tabular-nums;white-space:nowrap}
+.fuel-item b em{font-style:normal;font-weight:500;color:var(--t3)}
+.fuel-item button{width:40px;height:34px;display:grid;place-items:center;border:0;background:none;color:var(--t3);cursor:pointer}
+.fuel-item button:hover{color:#ff8a7a}
+.fuel-week{position:relative;display:grid;grid-template-columns:repeat(7,1fr);gap:6px;height:96px;align-items:end;border-bottom:1px solid #ffffff1c}
+.fuel-week>div{position:relative;height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center}
+.fuel-week i{display:block;width:100%;border-radius:3px 3px 0 0;background:color-mix(in srgb,var(--fuel) 55%,transparent);transition:height .6s ease}
+.fuel-week .today i{background:var(--fuel)}
+.fuel-week .over i{background:#ff8a7a}
+.fuel-week .under i{background:color-mix(in srgb,var(--accent-2) 60%,transparent)}
+.fuel-week-labels{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin:5px 0 4px;text-align:center;font:700 10px/normal var(--font-label);color:var(--t4)}
+.fuel-week-labels .today{color:#fff}
+.fuel-week-target{position:absolute;left:0;right:0;height:0;border-top:1px dashed #ffffffa0;pointer-events:none}
+.fuel-explain{padding:14px 18px 0;margin:0}
+@media(prefers-reduced-motion:reduce){.fuel-ring-fg,.fuel-protein i,.fuel-week i{transition:none}}
+/* il modulo non deve mai allargare la pagina su iPhone */
+.fuel{min-width:0;max-width:100%}
+.fuel .cut-form{min-width:0}
+.fuel .cut-form-row>label,.fuel .cut-form label,.fuel .cut-form input{min-width:0;width:100%;box-sizing:border-box}
+.fuel .cut-form-row{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+.fuel-slots,.fuel-activity,.fuel .cut-sex{grid-template-columns:repeat(var(--n,2),minmax(0,1fr))}
+.fuel-slots{--n:4}.fuel-activity{--n:3}
+.fuel-slots button,.fuel-activity button,.fuel .cut-sex button{min-width:0;box-sizing:border-box}
+.fuel-goal{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+/* le decorazioni sporgono a destra: con hidden iOS (focus su un campo) poteva spostare la pagina di lato */
+@supports (overflow:clip){.cut-page{overflow-x:clip}}
