@@ -111,3 +111,28 @@ export function calibrationFrames(n = 15) {
   const w = toArray(BASE3D);
   return Array.from({ length: n }, () => w);
 }
+
+// Calibra un giudice come fa l'app: 3D + 2D dell'immagine
+export function calibrateJudge(judge, n = 15) {
+  const w = toArray(BASE3D), p = to2d(w);
+  for (let i = 0; i < n; i += 1) judge.calibrate(w, p, 1);
+  return judge;
+}
+
+// Come MediaPipe su un telefono vero: profondità (z) schiacciata, tremolio 3D e 2D,
+// fotogrammi persi. depth 0,4 = un jab verso la camera in 3D sembra lungo meno della metà.
+export function realistic(frames, { depth = 0.4, sigma = 0.02, sigma2d = 0.006, drop = 0.1, seed = 7 } = {}) {
+  let s = seed;
+  const rnd = () => { s = (s * 16807) % 2147483647; return s / 2147483647; };
+  const gauss = () => Math.sqrt(-2 * Math.log(rnd() + 1e-9)) * Math.cos(2 * Math.PI * rnd());
+  return frames.filter(() => rnd() > drop).map((f) => ({
+    ...f,
+    world: f.world.map((p) => ({ ...p, x: p.x + gauss() * sigma, y: p.y + gauss() * sigma, z: p.z * depth + gauss() * sigma * 1.5 })),
+    points: f.points.map((p) => ({ ...p, x: p.x + gauss() * sigma2d, y: p.y + gauss() * sigma2d })),
+  }));
+}
+
+// Il "tuo" modo di tirare un colpo: ampiezza diversa (k) rispetto all'atleta di riferimento
+export const amplitude = (k) => (id, p) => Object.fromEntries(Object.entries(p).map(([j, v]) => {
+  const b = BASE3D[j]; return [j, b ? P(b.x + (v.x - b.x) * k, b.y + (v.y - b.y) * k, b.z + (v.z - b.z) * k) : v];
+}));

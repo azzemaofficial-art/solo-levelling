@@ -59,3 +59,15 @@ Entry: MMA → Combo → una combo → “Allenala con il coach”. Stesso worke
 - **Giudice**: un colpo netto che torna in guardia si chiude subito (1-1-2 veloce senza pause = tre colpi); clinch con isteresi di 150 ms; ginocchio del calcio dal secondo valore più alto (un fotogramma rumoroso non trasforma un check in calcio); `abort()` butta via i gesti a metà.
 
 Validazione: `tests/mmaTracking.test.js` (filtro, pronto, 1-1-2 veloce a 15 fps, combo con tremolio di 2 cm filtrato, colpo singolo, abort). End-to-end nel browser con pose sintetiche: partenza senza tocchi, 4 jab e 4 cross contati su 4 e 4, correzione sulla guardia, ripresa automatica dopo l’uscita dall’inquadratura. MediaPipe reale in Chromium: lite → full in circa 2 s, stabile.
+
+## Il coach impara i tuoi colpi (v3, dopo la prima prova su iPhone)
+
+Prova reale (3 ottobre 2026): la guardia bassa non veniva segnalata, nelle combo "non ho visto X" e colpi in più mai fatti.
+
+- **Guardia**: il controllo di partenza (3D, 0,8 busti dal naso) era usato anche in sessione e considerava "in guardia" una mano al petto. Ora la guardia è il pugno sopra la linea della **sua spalla nell'immagine 2D** (`postureOf`, `THRESH.guardDown`); il Coach Studio dice "Mano sinistra/destra su!" dopo 0,7 s di fila (nessun colpo, neanche al corpo, resta giù così a lungo).
+- **Colpi non visti / colpi in più**: con la profondità schiacciata come la stima MediaPipe su telefono (atleta sintetico con z × 0,4, rumore 2D e 3D, colpi veloci) le regole fisse riproducono esattamente il problema: 36 mancati e 36 in più su 20 combo di pugni. Rimedi:
+  - attivazione anche dallo spostamento 2D del polso rispetto al naso (`THRESH.out2d`), normalizzato sul busto in calibrazione;
+  - **insegnamento** (`src/components/MmaTeach.jsx`, `lib/mmaTemplates.js`): 3 esempi per colpo, k-NN con scala per caratteristica dalla varianza dentro il colpo; un gesto lontano da ogni esempio resta `unclear` e non è mai un colpo in più. Sullo stesso test: 0 mancati e 0 in più; controllo incrociato degli esempi al 100%;
+  - distensione e rotazione si confrontano con il colpo insegnato (`reachRatio`, `rotRef`), non con soglie 3D assolute che la profondità schiacciata falsa;
+  - un colpo partito fino a 0,7 s prima del "via" vale (`judgeRep(..., { since })`); un gesto poco chiaro nel posto di un colpo atteso è "parziale", non "non visto".
+- **Dati veri**: le clip (solo 13 punti dello scheletro, niente video, `lib/mmaClips.js`) dell'insegnamento, con consenso, e delle ripetizioni segnalate con "Il coach ha sbagliato" vanno in KV `mma_clips:<chatId>` (ultime 150, 120 giorni) tramite `/api/nvidia/visual` `{ poseClip }`. Servono a ritarare il riconoscimento su movimenti reali.

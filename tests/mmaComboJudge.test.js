@@ -3,11 +3,11 @@ import assert from 'node:assert/strict';
 import { createComboJudge, judgeSequence, coachFeedback, describeGesture, EXPECT } from '../lib/mmaComboJudge.js';
 import { COMBOS } from '../src/data/mmaCombos.js';
 import { MOVES } from '../src/data/mmaMoves.js';
-import { synthSequence, calibrationFrames, PEAKS } from './helpers/synthFighter.js';
+import { synthSequence, calibrationFrames, calibrateJudge, PEAKS } from './helpers/synthFighter.js';
 
 const run = (moves, opts) => {
   const judge = createComboJudge();
-  for (const w of calibrationFrames()) judge.calibrate(w);
+  calibrateJudge(judge);
   for (const f of synthSequence(moves, opts)) judge.push(f.world, f.t, f.points);
   return judge;
 };
@@ -15,7 +15,7 @@ const run = (moves, opts) => {
 test('giudice: calibrazione richiesta prima di giudicare', () => {
   const judge = createComboJudge();
   assert.equal(judge.isCalibrated(), false);
-  for (const w of calibrationFrames()) judge.calibrate(w);
+  calibrateJudge(judge);
   assert.equal(judge.isCalibrated(), true);
 });
 
@@ -117,7 +117,7 @@ function noisy(frames, { sigma = 0.015, drop = 0.1, seed = 7 } = {}) {
 
 test('giudice: con tremolio di 1,5 cm e 10% di fotogrammi persi la guardia ferma resta pulita', () => {
   const judge = createComboJudge();
-  for (const w of calibrationFrames()) judge.calibrate(w);
+  calibrateJudge(judge);
   for (const f of noisy(synthSequence([], { start: 0 }).concat(synthSequence([], { start: 3000 })))) judge.push(f.world, f.t, f.points);
   assert.deepEqual(judge.gestures().map(describeGesture), []);
 });
@@ -127,11 +127,34 @@ test('giudice: con rumore realistico le combo base restano riconosciute', () => 
   for (const combo of COMBOS.filter((c) => c.level === 1)) {
     for (const seed of [3, 11, 29]) {
       const judge = createComboJudge();
-      for (const w of calibrationFrames()) judge.calibrate(w);
+      calibrateJudge(judge);
       for (const f of noisy(synthSequence(combo.moves), { seed })) judge.push(f.world, f.t, f.points);
       const res = judge.judgeRep(combo.moves);
       if (res.grade === 'redo') failed.push(`${combo.name} seed ${seed}: ${res.total} [${judge.gestures().map(describeGesture).join(', ')}]`);
     }
   }
   assert.deepEqual(failed, []);
+});
+
+test('giudice: guardia bassa letta mano per mano (pugno sotto la linea della spalla)', () => {
+  const judge = calibrateJudge(createComboJudge());
+  const frames = synthSequence([], {});
+  // mano destra (dietro) che scende al petto e resta lì
+  const low = frames.map((f, i) => (i > 10 ? { ...f, points: f.points.map((p, k) => (k === 16 ? { ...p, y: p.y + 0.12 } : p)) } : f));
+  let last;
+  for (const f of low) last = judge.push(f.world, f.t, f.points, 1);
+  assert.equal(last.guard.L, true);
+  assert.equal(last.guard.R, false);
+  assert.equal(last.guardKnown.R, true);
+});
+
+test('giudice: mano che scende e resta giù = guardia abbassata, non un colpo in più', () => {
+  const judge = calibrateJudge(createComboJudge());
+  const frames = synthSequence(['jab'], {});
+  const lowFrom = frames.length - 25;
+  const low = frames.map((f, i) => (i > lowFrom - 30 && i < lowFrom ? { ...f, points: f.points.map((p, k) => (k === 16 ? { ...p, y: p.y + 0.15 } : p)) } : f));
+  for (const f of low) judge.push(f.world, f.t, f.points, 1);
+  const res = judge.judgeRep(['jab']);
+  assert.equal(res.extras, 0, judge.gestures().map(describeGesture).join(', '));
+  assert.equal(res.moves[0].status, 'ok');
 });

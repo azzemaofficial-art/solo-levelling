@@ -1,10 +1,14 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { ArrowLeft, Check, Pause, Play, RotateCcw, Video, Volume2, VolumeX, X } from 'lucide-react';
+import { ArrowLeft, Check, Flag, GraduationCap, Pause, Play, RotateCcw, Video, Volume2, VolumeX, X } from 'lucide-react';
 import useMmaCamera from '../hooks/useMmaCamera';
 import MmaFigure, { useSkeletonPlayer } from './MmaFigure';
 import { createReadiness, readPose } from '../../lib/mmaReadiness';
-import { coachFeedback, createComboJudge, needsFeet, EXPECT } from '../../lib/mmaComboJudge';
+import { coachFeedback, createComboJudge, describeGesture, needsFeet, EXPECT } from '../../lib/mmaComboJudge';
+import { loadTemplates } from '../../lib/mmaTemplates';
+import { encodeClip, readChatId, sendClips } from '../../lib/mmaClips';
+
+const MmaTeach = lazy(() => import('./MmaTeach'));
 import { MOVES, comboKeys } from '../data/mmaMoves';
 import { localDateKey, logWorkout } from '../utils/trainingLog';
 
@@ -104,7 +108,11 @@ export default function MmaComboTrainer({ combo, onClose, onLearned }) {
   const [current, setCurrent] = useState(null);   // ultimo risultato
   const [replay, setReplay] = useState(null);
   const [paused, setPaused] = useState(false);
-  const judgeRef = useRef(createComboJudge({ stance }));
+  const [templates, setTemplates] = useState(() => loadTemplates(stance));
+  const [teachOpen, setTeachOpen] = useState(false);
+  const [label, setLabel] = useState(null); // ultimo colpo letto, mostrato sulla camera
+  const [reported, setReported] = useState(false);
+  const judgeRef = useRef(createComboJudge({ stance, templates }));
   const readyRef = useRef(createReadiness()), hintRef = useRef({ text: '', at: 0 });
   // riferimento stabile: il genitore può ridisegnarsi spesso, non deve azzerare i timer
   const onLearnedRef = useRef(onLearned); onLearnedRef.current = onLearned;
@@ -118,12 +126,13 @@ export default function MmaComboTrainer({ combo, onClose, onLearned }) {
   const finishRep = useCallback(() => {
     if (phaseRef.current !== 'go') return;
     const judge = judgeRef.current;
-    const res = judge.judgeRep(moves);
     const t0 = repRef.current.start;
+    // vale anche un colpo partito un attimo prima del "via"
+    const res = judge.judgeRep(moves, { since: t0 - 700 });
     const frames = judge.frames().filter((f) => f.t >= t0 - 200);
     const marks = res.moves.flatMap((mv) => (mv.gesture && mv.issues.length ? [{ t: mv.gesture.peakT ?? mv.gesture.start, joint: MOVE_JOINT(mv.id, judge.lead, judge.rear), text: `${MOVES[mv.id].name}: ${mv.issues[0].text}` }] : []));
-    const entry = { ...res, frames, marks, feedback: coachFeedback(res, moveNames) };
-    setCurrent(entry);
+    const entry = { ...res, frames, marks, feedback: coachFeedback(res, moveNames), seen: judge.gestures().filter((g) => g.start >= t0 - 700).map((g) => g.move || describeGesture(g)) };
+    setCurrent(entry); setReported(false);
     setResults((prev) => [...prev, entry]);
     setPhase('result');
     say(entry.feedback, voice);
@@ -140,7 +149,7 @@ export default function MmaComboTrainer({ combo, onClose, onLearned }) {
       setFraming(read.hint); setCalib(progress);
       const now = performance.now();
       if (!read.ok && (read.hint !== hintRef.current.text ? now - hintRef.current.at > 2500 : now - hintRef.current.at > 7000)) { hintRef.current = { text: read.hint, at: now }; say(read.hint, voice); }
-      if (read.ok && world?.length) judge.calibrate(world);
+      if (read.ok && world?.length) judge.calibrate(world, points, aspect);
       if (readyRef.current.done && judge.isCalibrated()) {
         readyRef.current.reset();
         setPhase('demo');
@@ -155,13 +164,18 @@ export default function MmaComboTrainer({ combo, onClose, onLearned }) {
       if (t - repRef.current.start > 2600 + moves.length * 1100) finishRep();
       return;
     }
-    const info = judge.push(world, t, points);
+    const before = judge.gestures().length;
+    const info = judge.push(world, t, points, aspect);
     if (!info) return;
     if (info.activeKeys.length) repRef.current.lastActive = t;
+    if (info.gestures > before) {
+      const g = judge.gestures().at(-1);
+      setLabel({ text: g.move ? MOVES[g.move]?.name || describeGesture(g) : describeGesture(g), unclear: g.kind === 'unclear', n: t });
+    }
     // colpi che si accendono in diretta (ricalcolo leggero ogni 150 ms)
     if (t - repRef.current.lastLive > 150) {
       repRef.current.lastLive = t;
-      const r = judge.judgeRep(moves);
+      const r = judge.judgeRep(moves, { since: repRef.current.start - 700 });
       setLive(r.moves.map((mv) => mv.status));
       const needed = r.moves.filter((mv) => mv.status !== 'guided').length;
       const done = r.moves.filter((mv) => mv.status === 'ok' || mv.status === 'partial').length;
@@ -175,8 +189,9 @@ export default function MmaComboTrainer({ combo, onClose, onLearned }) {
   useEffect(() => {
     if (phase !== 'countdown') return undefined;
     if (count === 0) {
-      judgeRef.current.reset();
+      judgeRef.current.abort(); // un gesto rimasto a metà dalla ripetizione prima non conta
       repRef.current = { start: performance.now(), lastActive: 0, lastLive: 0 };
+      setLabel(null);
       setLive(moves.map(() => 'missing'));
       setPhase('go');
       return undefined;
@@ -202,7 +217,7 @@ export default function MmaComboTrainer({ combo, onClose, onLearned }) {
 
   const startCamera = () => {
     try { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; window.speechSynthesis?.speak(u); } catch { /* voce */ }
-    judgeRef.current = createComboJudge({ stance }); readyRef.current.reset();
+    judgeRef.current = createComboJudge({ stance, templates }); readyRef.current.reset();
     setCalib(0); setResults([]); setCurrent(null);
     setPhase('calibrate');
     say(feet ? 'Mettiti a due o tre metri, corpo intero in inquadratura, mani in guardia.' : 'Mettiti a un metro e mezzo, busto e braccia in inquadratura, mani in guardia.', voice);
@@ -233,6 +248,7 @@ export default function MmaComboTrainer({ combo, onClose, onLearned }) {
         <li>Mettiti di <b>tre quarti</b> rispetto alla camera, in guardia.</li>
         <li>Buona luce davanti a te, niente controluce.</li>
       </ol>
+      <button className={`mma-teach-banner ${templates ? 'done' : ''}`} onClick={() => setTeachOpen(true)}><GraduationCap size={22} /><span><b>{templates ? `Il coach conosce ${new Set(templates.items.map((it) => it.move)).size} tuoi colpi` : 'Prima insegnami i tuoi colpi'}</b><small>{templates ? 'Rifalli se cambi posto o angolo della camera.' : '2 minuti: 3 volte ogni colpo. Poi riconosco te, non un atleta medio.'}</small></span></button>
       {guided.length > 0 && <p className="mma-train-note">{guided.map((id) => MOVES[id].name).join(' e ')}: solo su materassina e con istruttore. Il coach non li giudica, esegui il gesto lento.</p>}
       <div className="mma-train-reps" role="radiogroup" aria-label="Ripetizioni">{[4, 6, 10].map((n) => <button key={n} role="radio" aria-checked={reps === n} className={reps === n ? 'active' : ''} onClick={() => setReps(n)}>{n} ripetizioni</button>)}</div>
       <div className="mma-train-reps"><button className={facing === 'user' ? 'active' : ''} onClick={() => setFacing('user')}>Camera frontale</button><button className={facing === 'environment' ? 'active' : ''} onClick={() => setFacing('environment')}>Camera posteriore</button></div>
@@ -248,6 +264,7 @@ export default function MmaComboTrainer({ combo, onClose, onLearned }) {
         {phase === 'demo' && <div className="mma-train-demo"><GhostDemo combo={combo} speed={0.7} /><span>Guarda la combo…</span></div>}
         {phase === 'countdown' && <div className="mma-train-count" key={count}>{count || 'VIA!'}</div>}
         {phase === 'go' && <div className="mma-train-go">VAI!</div>}
+        {phase === 'go' && label && <div key={label.n} className={`mma-live-label ${label.unclear ? 'unclear' : ''}`}>{label.unclear ? '?' : label.text}</div>}
         {phase === 'result' && current && <div className={`mma-train-score grade-${current.grade}`}><b>{current.total}</b><small>{current.grade === 'perfect' ? 'PERFETTA' : current.grade === 'good' ? 'BUONA' : 'RIPROVA'}</small></div>}
       </div>
 
@@ -261,7 +278,9 @@ export default function MmaComboTrainer({ combo, onClose, onLearned }) {
         <div className="mma-train-actions">
           <button onClick={() => setReplay(current)}><RotateCcw size={16} /> Rivedi al rallentatore</button>
           <button onClick={() => setPaused((v) => !v)}>{paused ? <><Play size={16} /> Continua</> : <><Pause size={16} /> Pausa</>}</button>
+          <button disabled={reported} onClick={() => { setReported(true); setPaused(true); sendClips([encodeClip(current.frames, { combo: combo.id, expected: moves, seen: current.seen, total: current.total, stance, templates: Boolean(templates), kind: 'rep' })], { chatId: readChatId(), kind: 'rep' }); }}>{reported ? <><Check size={16} /> Inviata</> : <><Flag size={16} /> Il coach ha sbagliato</>}</button>
         </div>
+        {reported && <p className="mma-train-note">Grazie: ho mandato i punti dello scheletro di questa ripetizione (niente video). Mi servono per correggere il riconoscimento.</p>}
       </section>}
 
       {phase === 'summary' && <section className="mma-train-summary">
@@ -274,6 +293,7 @@ export default function MmaComboTrainer({ combo, onClose, onLearned }) {
       </section>}
     </>}
 
+    {teachOpen && <Suspense fallback={null}><MmaTeach initialStance={stance} onClose={() => { setTeachOpen(false); const t = loadTemplates(stance); setTemplates(t); judgeRef.current.setTemplates(t); }} onDone={() => { const t = loadTemplates(stance); setTemplates(t); judgeRef.current.setTemplates(t); }} /></Suspense>}
     {replay && <div className="mma-train-replay" role="dialog" aria-label="Replay al rallentatore">
       <header><strong>Replay · rallentatore</strong><button className="mma-combo-icon" onClick={() => setReplay(null)} aria-label="Chiudi replay"><X size={18} /></button></header>
       <div className="mma-train-replay-grid">

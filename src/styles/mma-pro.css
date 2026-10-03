@@ -139,3 +139,35 @@
 .mma-pro-strike.fix{border-color:#f0bd8666;background:#2a2218}.mma-pro-strike.fix i{color:#f0bd86}.mma-pro-strike.fix small{color:#f5d6ae}
 @keyframes mmaStrikeIn{from{transform:scale(.85);opacity:0}to{transform:none;opacity:1}}
 @media(prefers-reduced-motion:reduce){.mma-pro-strike{animation:none}}
+/* ── Il coach impara i tuoi colpi ── */
+.mma-teach-banner{display:flex;align-items:center;gap:12px;width:100%;margin:0 0 14px;padding:14px 15px;border:1px solid #ffc86b55;border-radius:12px;background:linear-gradient(120deg,#3a2a12,#16202c);color:#ffe2b0;text-align:left;cursor:pointer}
+.mma-teach-banner>svg:first-child{flex:none;color:#ffc86b}
+.mma-teach-banner span{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.mma-teach-banner b{font:700 14px/1.25 var(--font-display);color:#fff}
+.mma-teach-banner small{font-size:11px;line-height:1.4;color:#d9c3a0}
+.mma-teach-banner.done{border-color:#6de2d344;background:linear-gradient(120deg,#123230,#16202c);color:#bff5ea}
+.mma-teach-banner.done>svg:first-child{color:#6de2d3}.mma-teach-banner.done small{color:#9cc9c1}
+.mma-teach-lead{font-size:14px;line-height:1.6;color:#d7e4ea;margin:4px 0 12px}
+.mma-teach-share{display:flex;gap:10px;align-items:flex-start;margin:6px 0 14px;font-size:12px;line-height:1.5;color:#a9bfcc}
+.mma-teach-share input{width:18px;height:18px;flex:none;margin-top:1px;accent-color:#6de2d3}
+.mma-teach-ghost{position:absolute;right:8px;bottom:8px;width:38%;max-width:170px;border-radius:12px;overflow:hidden;background:#070b12d9;border:1px solid #ffffff1f}
+.mma-teach-count{position:absolute;top:12px;left:50%;transform:translateX(-50%);display:flex;gap:10px;padding:9px 14px;border-radius:30px;background:#070b12cc}
+.mma-teach-count i{width:16px;height:16px;border-radius:50%;border:2px solid #6de2d3;transition:background .2s,transform .2s}
+.mma-teach-count i.on{background:#6de2d3;transform:scale(1.15)}
+.mma-teach-flash{position:absolute;inset:0;display:grid;place-items:center;pointer-events:none;font:800 30px/1 var(--font-display);animation:mma-teach-flash .7s ease-out both}
+.mma-teach-flash.ok{color:#6de2d3}.mma-teach-flash.ok svg{width:84px;height:84px;filter:drop-shadow(0 0 18px #6de2d3)}
+.mma-teach-flash.no{color:#ffb38a;text-shadow:0 0 18px #000}
+@keyframes mma-teach-flash{0%{opacity:0;transform:scale(.6)}25%{opacity:1;transform:scale(1.05)}100%{opacity:0;transform:scale(1.15)}}
+.mma-teach-bar{display:flex;flex-direction:column;gap:8px;padding:12px 2px}
+.mma-teach-bar p{margin:0;font-size:13px;line-height:1.5;color:#c9d8e0}
+.mma-teach-bar .mma-teach-stuck{color:#ffcf99}
+.mma-teach-bar button,.mma-teach-redo{align-self:flex-start;display:inline-flex;align-items:center;gap:6px;padding:9px 13px;border:1px solid #ffffff2a;border-radius:9px;background:#142132;color:#c9dbe6;font-size:12px;cursor:pointer}
+.mma-teach-redo{margin-left:6px;padding:5px 9px}
+/* colpo letto in diretta sulla camera */
+.mma-live-label{position:absolute;left:50%;top:22%;transform:translateX(-50%);z-index:3;padding:8px 16px;border-radius:30px;background:#0b1d22e6;border:1px solid #6de2d3;color:#d5f8ed;font:800 22px/1 var(--font-display);letter-spacing:-.01em;white-space:nowrap;pointer-events:none;animation:mma-live-label 1.4s ease-out both}
+.mma-live-label.fix{border-color:#f0bd86;color:#ffe2bf}
+.mma-live-label.unclear{border-color:#8fa3b5;color:#c3d0db}
+@keyframes mma-live-label{0%{opacity:0;transform:translate(-50%,10px) scale(.8)}15%{opacity:1;transform:translate(-50%,0) scale(1.05)}70%{opacity:1}100%{opacity:0;transform:translate(-50%,-8px)}}
+.mma-guard-alert{position:absolute;left:12px;right:12px;bottom:12px;z-index:3;padding:10px 14px;border-radius:10px;background:#5a1d1df0;border:1px solid #ff8a7a;color:#fff;font:800 18px/1.2 var(--font-display);text-align:center;animation:mma-guard-pulse 1s ease-in-out infinite alternate}
+@keyframes mma-guard-pulse{from{box-shadow:0 0 0 #ff8a7a00}to{box-shadow:0 0 24px #ff8a7a99}}
+@media(prefers-reduced-motion:reduce){.mma-live-label,.mma-teach-flash,.mma-guard-alert{animation:none}}

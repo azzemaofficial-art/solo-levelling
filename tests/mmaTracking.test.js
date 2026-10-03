@@ -4,7 +4,7 @@ import { createPoseFilter, WORLD_FILTER } from '../lib/poseFilter.js';
 import { createReadiness, readPose } from '../lib/mmaReadiness.js';
 import { createComboJudge, describeGesture, rateGesture } from '../lib/mmaComboJudge.js';
 import { COMBOS } from '../src/data/mmaCombos.js';
-import { synthSequence, calibrationFrames, BASE3D } from './helpers/synthFighter.js';
+import { synthSequence, calibrationFrames, calibrateJudge, BASE3D } from './helpers/synthFighter.js';
 
 const P = (x, y, z = 0) => ({ x, y, z, visibility: 0.99 });
 const worldOf = (over = {}) => { const a = Array.from({ length: 33 }, () => P(0, 0)); for (const [k, v] of Object.entries({ ...BASE3D, ...over })) a[k] = { ...v }; return a; };
@@ -40,7 +40,9 @@ test('pronto: guardia in 3D anche con la mano dietro coperta (tre quarti)', () =
 });
 
 test('pronto: mani basse, troppo vicino, piedi fuori → suggerimento giusto', () => {
-  assert.equal(readPose(image(), worldOf({ 15: P(0.2, -0.05, -0.1), 16: P(-0.2, -0.05, 0.05) })).key, 'guard');
+  assert.equal(readPose(image({ 15: P(0.43, 0.45), 16: P(0.57, 0.45) }), worldOf({ 15: P(0.2, -0.05, -0.1), 16: P(-0.2, -0.05, 0.05) })).key, 'guard');
+  // una sola mano sotto la spalla nell'immagine → ancora "guardia"
+  assert.equal(readPose(image({ 16: P(0.57, 0.36) }), worldOf()).key, 'guard');
   assert.equal(readPose(image({ 11: P(0.1, 0.3), 12: P(0.9, 0.3) }), worldOf()).key, 'close');
   assert.equal(readPose(image({ 27: P(0.44, 1.05), 28: P(0.56, 1.05) }), worldOf(), { needFeet: true }).key, 'feet');
   assert.equal(readPose(image({ 23: P(0.46, 1.1), 24: P(0.54, 1.1) }), worldOf()).visible, false);
@@ -59,7 +61,7 @@ test('pronto: un fotogramma storto non azzera la barra', () => {
 
 test('giudice: 1-1-2 veloce senza pause resta due jab e un diretto (anche a 15 fps)', () => {
   for (const fps of [30, 15]) {
-    const j = createComboJudge(); for (const w of calibrationFrames()) j.calibrate(w);
+    const j = createComboJudge(); calibrateJudge(j);
     for (const f of synthSequence(['jab', 'jab', 'cross'], { fps, tempo: 0.5, gapMs: 0 })) j.push(f.world, f.t, f.points);
     const r = j.judgeRep(['jab', 'jab', 'cross']);
     assert.ok(r.moves.every((m) => m.status === 'ok'), `${fps} fps: ${j.gestures().map(describeGesture)}`);
@@ -70,7 +72,7 @@ test('giudice: 1-1-2 veloce senza pause resta due jab e un diretto (anche a 15 f
 test('giudice + filtro: combo della libreria con tremolio di 2 cm restano promosse', () => {
   const failed = [];
   for (const c of COMBOS.filter((x) => !x.moves.includes('clinch'))) {
-    const j = createComboJudge(); for (const w of calibrationFrames()) j.calibrate(w);
+    const j = createComboJudge(); calibrateJudge(j);
     const f = createPoseFilter(WORLD_FILTER);
     for (const fr of noisy(synthSequence(c.moves, { fps: 24, tempo: 0.7 }), { seed: 5 })) j.push(f.apply(fr.world, fr.t), fr.t, fr.points);
     const r = j.judgeRep(c.moves);
@@ -80,17 +82,17 @@ test('giudice + filtro: combo della libreria con tremolio di 2 cm restano promos
 });
 
 test('colpo singolo: riconosce la tecnica e dà la correzione', () => {
-  const j = createComboJudge(); for (const w of calibrationFrames()) j.calibrate(w);
+  const j = createComboJudge(); calibrateJudge(j);
   for (const f of synthSequence(['jab', 'cross', 'hook'])) j.push(f.world, f.t, f.points);
   assert.deepEqual(j.gestures().map((g) => rateGesture(g)?.id), ['jab', 'cross', 'hook']);
-  const k = createComboJudge(); for (const w of calibrationFrames()) k.calibrate(w);
+  const k = createComboJudge(); calibrateJudge(k);
   for (const f of synthSequence(['cross'], { mutate: (id, p) => ({ ...p, 15: P(0.18, -0.05, -0.1) }) })) k.push(f.world, f.t, f.points);
   const rate = rateGesture(k.gestures().find((g) => g.kind === 'straight'));
   assert.equal(rate.id, 'cross'); assert.ok(rate.issues.some((it) => it.key === 'guard')); assert.ok(rate.score < 100);
 });
 
 test('giudice: abort butta via il gesto a metà (corpo uscito dall’inquadratura)', () => {
-  const j = createComboJudge(); for (const w of calibrationFrames()) j.calibrate(w);
+  const j = createComboJudge(); calibrateJudge(j);
   const frames = synthSequence(['jab']);
   const half = frames.findIndex((f) => f.world[15].z < -0.5);
   frames.slice(0, half).forEach((f) => j.push(f.world, f.t, f.points));

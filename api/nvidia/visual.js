@@ -2133,6 +2133,32 @@ export default async function handler(req, res) {
     } catch { return ''; }
   };
 
+  // ── CLIP DI MOVIMENTO MMA (solo punti dello scheletro, niente immagini) ─────
+  // Insegnamento dei colpi e ripetizioni segnalate "il coach ha sbagliato":
+  // servono a tarare il riconoscimento su movimenti veri. Lista mma_clips:<chatId>.
+  if (req.body?.poseClip) {
+    const chatId = resolveChatId(req.body?.chatId);
+    if (!chatId) return res.status(400).json({ ok: false, error: 'chatId mancante' });
+    const kind = ['teach', 'rep', 'session'].includes(req.body.poseClip.kind) ? req.body.poseClip.kind : 'rep';
+    const items = (Array.isArray(req.body.poseClip.items) ? req.body.poseClip.items : []).slice(0, 8)
+      .map((it) => JSON.stringify({ ...it, kind, ts: new Date().toISOString() }))
+      .filter((raw) => raw.length <= 150000);
+    if (!items.length) return res.status(400).json({ ok: false, error: 'clip vuota o troppo grande' });
+    const url = process.env.KV_REST_API_URL, token = process.env.KV_REST_API_TOKEN;
+    if (!url || !token) return res.status(503).json({ ok: false, error: 'archivio non configurato' });
+    const key = `mma_clips:${chatId}`;
+    try {
+      const r = await fetch(`${url}/pipeline`, {
+        method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify([...items.map((raw) => ['RPUSH', key, raw]), ['LTRIM', key, '-150', '-1'], ['EXPIRE', key, String(120 * 86400)]]),
+      });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return res.status(200).json({ ok: true, stored: items.length });
+    } catch (e) {
+      return res.status(502).json({ ok: false, error: String(e.message || e).slice(0, 80) });
+    }
+  }
+
   // ── CATTURA CAMPIONE COACH → alveare (nessuna immagine, solo dati) ─────────
   // Il Visual Coach manda qui ogni verdetto + (opzionale) pollice su/giù dell'utente.
   // Si accumula in KV coach_samples:<chatId> come array JSON, letto dall'export/ponte.
