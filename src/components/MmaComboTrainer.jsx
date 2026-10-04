@@ -252,7 +252,12 @@ export default function MmaComboTrainer({ combo, onClose, onLearned }) {
       {guided.length > 0 && <p className="mma-train-note">{guided.map((id) => MOVES[id].name).join(' e ')}: solo su materassina e con istruttore. Il coach non li giudica, esegui il gesto lento.</p>}
       <div className="mma-train-reps" role="radiogroup" aria-label="Ripetizioni">{[4, 6, 10].map((n) => <button key={n} role="radio" aria-checked={reps === n} className={reps === n ? 'active' : ''} onClick={() => setReps(n)}>{n} ripetizioni</button>)}</div>
       <div className="mma-train-reps"><button className={facing === 'user' ? 'active' : ''} onClick={() => setFacing('user')}>Camera frontale</button><button className={facing === 'environment' ? 'active' : ''} onClick={() => setFacing('environment')}>Camera posteriore</button></div>
-      <button className="mma-combo-done" onClick={startCamera}><Video size={19} /> Avvia la camera</button>
+      {templates
+        ? <button className="mma-combo-done" onClick={startCamera}><Video size={19} /> Avvia la camera</button>
+        : <>
+          <button className="mma-combo-done" onClick={() => setTeachOpen(true)}><GraduationCap size={19} /> Prima insegna i tuoi colpi (2 min)</button>
+          <button className="mma-train-skip" onClick={startCamera}><Video size={16} /> Avvia senza insegnare · meno preciso</button>
+        </>}
       <p className="mma-train-note">Il video resta sul telefono: niente registrazioni né invii. Il coach vede la posa in 3D stimato: ordine dei colpi, guardia, distensione, rotazione e ritorno. Non misura potenza né impatto.</p>
     </section> : <>
       <div className="mma-train-stage">

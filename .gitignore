@@ -27,3 +27,6 @@ public/ramen_popup_v4/ramen_popup_alpha.webm
 
 # Foto ricette originali (1254px, ~13MB): in produzione servono le versioni 560px in public/recipes.
 assets-src/
+
+# clip vere dello scheletro (dati personali): solo in locale, mai su GitHub
+tests/fixtures/private/

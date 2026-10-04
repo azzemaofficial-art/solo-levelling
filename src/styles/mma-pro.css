@@ -171,3 +171,4 @@
 .mma-guard-alert{position:absolute;left:12px;right:12px;bottom:12px;z-index:3;padding:10px 14px;border-radius:10px;background:#5a1d1df0;border:1px solid #ff8a7a;color:#fff;font:800 18px/1.2 var(--font-display);text-align:center;animation:mma-guard-pulse 1s ease-in-out infinite alternate}
 @keyframes mma-guard-pulse{from{box-shadow:0 0 0 #ff8a7a00}to{box-shadow:0 0 24px #ff8a7a99}}
 @media(prefers-reduced-motion:reduce){.mma-live-label,.mma-teach-flash,.mma-guard-alert{animation:none}}
+.mma-train-skip{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;margin:8px 0 0;padding:12px;border:1px solid #ffffff22;border-radius:12px;background:transparent;color:#9fb3c2;font-size:13px;cursor:pointer}

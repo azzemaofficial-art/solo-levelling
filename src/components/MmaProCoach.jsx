@@ -31,7 +31,7 @@ export default function MmaProCoach({ lesson, onClose }) {
   const [checks, setChecks] = useState([]), [effort, setEffort] = useState(null), [exitPrompt, setExitPrompt] = useState(false);
   const [facing, setFacing] = useState('user');
   const [strike, setStrike] = useState(null), [teachOpen, setTeachOpen] = useState(false), [guardAlert, setGuardAlert] = useState('');
-  const guardRef = useRef({ L: null, R: null, at: 0 });
+  const guardRef = useRef({ L: null, R: null, at: 0 }), lowGuardTold = useRef(false);
   const judgeRef = useRef(null), readinessRef = useRef(createReadiness()), seenRef = useRef(0), tipRef = useRef({ at: 0, clean: 0 }), hintRef = useRef({ text: '', at: 0 });
   const lostRef = useRef({ paused: false, back: null }), autoStartRef = useRef(false);
   const onCloseRef = useRef(onClose);
@@ -73,7 +73,12 @@ export default function MmaProCoach({ lesson, onClose }) {
       // niente pulsante da premere: quando ti vede in guardia per ~1,3 s parte da solo
       readinessRef.current.update(read.ok, at);
       if (read.ok && world?.length) judge.calibrate(world, points, aspect);
-      if (readinessRef.current.done && judge.isCalibrated()) observerRef.current.setCalibrated();
+      if (readinessRef.current.done && judge.isCalibrated()) {
+        observerRef.current.setCalibrated();
+        // guardia di partenza bassa (pugni all'altezza delle spalle o sotto): un consiglio, una volta sola
+        const low = judge.base()?.low2;
+        if (low && !lowGuardTold.current && [low.L, low.R].some((v) => v != null && v > -0.05)) { lowGuardTold.current = true; setTimeout(() => speak('Consiglio: guardia un po\' bassa. Porta i pugni all\'altezza degli zigomi.'), 2600); }
+      }
       const now = performance.now();
       if (!read.ok && read.hint && (read.hint !== hintRef.current.text ? now - hintRef.current.at > 2500 : now - hintRef.current.at > 7000)) { hintRef.current = { text: read.hint, at: now }; speak(read.hint, true); }
     } else if (working && judge?.isCalibrated() && world?.length && read.visible) {
@@ -269,8 +274,10 @@ export default function MmaProCoach({ lesson, onClose }) {
             <div className="mma-pro-plan">{Array.from({ length: config.rounds }, (_, i) => <div key={i}><b>0{i+1}</b><span>{mmaRoundPlans[lesson.id]?.[i] || lesson.focus}</span><small>{timeText(config.workMs)}</small></div>)}</div>
             <label className="mma-pro-warmed"><input type="checkbox" checked={warmedUp} onChange={e => setWarmedUp(e.target.checked)} />Ho già fatto riscaldamento</label>
             <p className="mma-pro-note">{warmedUp ? '5 secondi di preparazione, poi il primo round.' : 'Iniziamo con 3 minuti di riscaldamento guidato.'} 60 secondi di recupero fra i round.</p>
-            {!teaching.guidedOnly && <button className="mma-pro-primary" onClick={enterCamera}><Camera size={18} />Prepara la fotocamera <ArrowRight size={17} /></button>}
-            {!teaching.guidedOnly && <button className="mma-pro-secondary" onClick={() => setTeachOpen(true)}>🎓 {loadTemplates(stance) ? 'Rifai: insegna i tuoi colpi' : 'Insegna i tuoi colpi al coach (2 min)'}</button>}
+            {/* i colpi si leggono bene solo dopo l'insegnamento: per le lezioni di pugni è il primo passo */}
+            {!teaching.guidedOnly && punchLesson && !loadTemplates(stance) && <button className="mma-pro-primary" onClick={() => setTeachOpen(true)}>🎓 Prima insegna i tuoi colpi (2 min) <ArrowRight size={17} /></button>}
+            {!teaching.guidedOnly && <button className={punchLesson && !loadTemplates(stance) ? 'mma-pro-secondary' : 'mma-pro-primary'} onClick={enterCamera}><Camera size={18} />{punchLesson && !loadTemplates(stance) ? 'Prepara la fotocamera · meno preciso' : 'Prepara la fotocamera'} <ArrowRight size={17} /></button>}
+            {!teaching.guidedOnly && (loadTemplates(stance) || !punchLesson) && <button className="mma-pro-secondary" onClick={() => setTeachOpen(true)}>🎓 {loadTemplates(stance) ? 'Rifai: insegna i tuoi colpi' : 'Insegna i tuoi colpi al coach (2 min)'}</button>}
             <button className={teaching.guidedOnly ? 'mma-pro-primary' : 'mma-pro-secondary'} onClick={() => begin('guided')}><Play size={16} />{teaching.guidedOnly ? 'Inizia la guida a round' : 'Allenati senza fotocamera'}</button>
             <p className="mma-pro-privacy">Il video resta sul dispositivo. Nessuna registrazione o chiamata AI a consumo. Il riconoscimento richiede il download iniziale del modello.</p>
           </>}

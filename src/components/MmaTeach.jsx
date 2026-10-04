@@ -5,7 +5,7 @@ import useMmaCamera from '../hooks/useMmaCamera';
 import MmaFigure, { useSkeletonPlayer } from './MmaFigure';
 import { createComboJudge, describeGesture, limbOf, roleOf, teachSample } from '../../lib/mmaComboJudge';
 import { createReadiness, readPose } from '../../lib/mmaReadiness';
-import { TEACH_GROUPS, loadTemplates, saveTemplates, selfCheck } from '../../lib/mmaTemplates';
+import { TEACH_GROUPS, addTeachSample, loadTemplates, saveTemplates, selfCheck } from '../../lib/mmaTemplates';
 import { encodeClip, readChatId, sendClips } from '../../lib/mmaClips';
 import { MOVES, comboKeys } from '../data/mmaMoves';
 
@@ -107,9 +107,13 @@ export default function MmaTeach({ onClose, onDone, initialStance }) {
         }
         continue;
       }
-      L.items = [...L.items.filter((it) => !(it.move === id && it.redo)), sample];
+      // solo gesti ampi: un pezzo di colpo (andata o ritorno spezzati) non è un esempio
+      const mine = L.items.filter((it) => it.move === id);
+      const res = addTeachSample(mine, sample);
+      if (!res.accepted) continue;
+      L.items = [...L.items.filter((it) => it.move !== id), ...res.list];
       L.clips.push(encodeClip(judge.frames(), { from: g.start - 250, to: g.end + 250, move: id, stance, kind: 'teach' }));
-      L.got += 1; setGot(L.got); setFlash({ ok: true, text: `${L.got}`, n: Date.now() });
+      L.got = res.list.length; setGot(L.got); setFlash({ ok: true, text: `${L.got}`, n: Date.now() });
       setItems(L.items);
       if (L.got >= REPS) {
         speak(L.step + 1 < L.moves.length ? 'Perfetto.' : 'Finito!');
@@ -175,7 +179,7 @@ export default function MmaTeach({ onClose, onDone, initialStance }) {
       <div className="mma-train-reps"><button className={facing === 'user' ? 'active' : ''} onClick={() => setFacing('user')}>Camera frontale</button><button className={facing === 'environment' ? 'active' : ''} onClick={() => setFacing('environment')}>Camera posteriore</button></div>
       <ol>
         <li>Telefono fermo all’altezza del petto, tu a {groups.includes('kicks') ? '2–3' : '1,5–2'} metri.</li>
-        <li><b>Di tre quarti</b>, come starai durante le combo: il coach impara proprio quell’angolo.</li>
+        <li><b>Mettiti esattamente come ti allenerai</b> (stesso posto, stessa direzione dei colpi, anche verso il telefono): il coach impara proprio quella posizione.</li>
         <li>Colpi completi e tornando in guardia, alla tua velocità normale.</li>
       </ol>
       <label className="mma-teach-share"><input type="checkbox" checked={share} onChange={(e) => setShare(e.target.checked)} /><span>Invia i movimenti per migliorare il coach: solo i punti dello scheletro, <b>niente video</b>.</span></label>

@@ -71,3 +71,16 @@ Prova reale (3 ottobre 2026): la guardia bassa non veniva segnalata, nelle combo
   - distensione e rotazione si confrontano con il colpo insegnato (`reachRatio`, `rotRef`), non con soglie 3D assolute che la profondità schiacciata falsa;
   - un colpo partito fino a 0,7 s prima del "via" vale (`judgeRep(..., { since })`); un gesto poco chiaro nel posto di un colpo atteso è "parziale", non "non visto".
 - **Dati veri**: le clip (solo 13 punti dello scheletro, niente video, `lib/mmaClips.js`) dell'insegnamento, con consenso, e delle ripetizioni segnalate con "Il coach ha sbagliato" vanno in KV `mma_clips:<chatId>` (ultime 150, 120 giorni) tramite `/api/nvidia/visual` `{ poseClip }`. Servono a ritarare il riconoscimento su movimenti reali.
+
+## Prime clip vere (v4, 4 ottobre 2026)
+
+Tre ripetizioni 1-2 segnalate con "Il coach ha sbagliato" (iPhone, 30 fps, articolazioni visibili al 93–100%, nessun colpo insegnato). Il coach vedeva calci bassi, clinch e ganci: voti 0–11. Le clip si rigiocano offline nel giudice; i test `tests/mmaRealClips.test.js` le usano da `tests/fixtures/private/` (**escluso da git: il repo è pubblico**), altrimenti si saltano.
+
+Cosa mostravano i dati:
+- **Calci fantasma**: da fermo MediaPipe vede le due caviglie a 13 cm di altezza diversa; con un solo "pavimento" la gamba dietro risultava sempre sollevata. Ora ogni caviglia ha il suo riferimento (`base.ankleY`).
+- **Clinch fantasma**: la guardia reale ha già le braccia avanti in 3D (distensione 0,65–0,75); ora il clinch è relativo alla tua guardia.
+- **Colpi tirati verso la camera**: il pugno si avvicina al naso nell'immagine e in 3D la distensione quasi non cambia (0,68 → 0,69, la profondità va perfino al contrario). Segnali tarati sulle clip: spostamento 2D del polso (fermo ≤ 0,10, jab ≥ 0,17 → soglia `move2d` 0,14), allungamento del braccio nell'immagine (`grow2d`) con un riferimento che segue piano la guardia (`refMs`), isteresi per la fine del colpo, rimbalzi < 90 ms scartati, "pugno fermo da 0,2 s = nuova guardia", movimento comune delle due mani = testa/corpo, non pugno.
+- **Guardia**: i pugni in guardia stanno sulla linea delle spalle; la mano abbassata è ora relativa alla TUA guardia (0,15 busti sotto) o al petto; la guardia bassa di partenza diventa un consiglio detto una volta.
+- **Combo**: si cercano solo gli arti della combo (in una 1-2 i piedi non contano).
+
+Risultato sulle clip vere: senza esempi niente più calci o clinch, 0–2 gesti in più; con i tuoi colpi come esempi (incrociando le clip) 100, 76 e 72: jab e diretto riconosciuti in tutte e tre. Le regole fisse invece restano inaffidabili quando si tira verso la camera, quindi l'insegnamento è il primo passo nel coach delle combo e nelle lezioni di pugni. Durante l'insegnamento un pezzo di colpo (andata o ritorno spezzati) non diventa un esempio (`addTeachSample`).

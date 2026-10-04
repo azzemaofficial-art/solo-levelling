@@ -100,3 +100,14 @@ test('con i tuoi esempi niente correzioni false per la profondità schiacciata (
   const r = j.judgeRep(['jab']);
   assert.ok(r.moves[0].issues.some((it) => it.key === 'extend') || r.moves[0].status !== 'ok', JSON.stringify(r.moves[0]));
 });
+
+test('insegnamento: un pezzo di colpo non diventa un esempio, e viene scartato se poi arriva il colpo vero', async () => {
+  const { addTeachSample } = await import('../lib/mmaTemplates.js');
+  const S = (r) => ({ move: 'jab', limb: 'arm', role: 'lead', f: [0, 0, 0, r, 0, 1, 0, 0, 1] });
+  let st = addTeachSample([], S(0.1));
+  assert.equal(st.accepted, true);
+  st = addTeachSample(st.list, S(0.4)); // il colpo vero: il frammento da 0,1 si scarta
+  assert.deepEqual(st.list.map((s) => s.f[3]), [0.4]);
+  assert.equal(addTeachSample(st.list, S(0.15)).accepted, false);
+  assert.equal(addTeachSample(st.list, S(0.3)).list.length, 2);
+});
