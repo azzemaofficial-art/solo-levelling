@@ -9,6 +9,7 @@ import useMmaCamera from '../hooks/useMmaCamera';
 import { createReadiness, observerPose, readPose } from '../../lib/mmaReadiness.js';
 import { createComboJudge, rateGesture } from '../../lib/mmaComboJudge.js';
 import { loadTemplates } from '../../lib/mmaTemplates.js';
+import MmaCameraSetup from './MmaCameraSetup';
 
 const MmaTeach = lazy(() => import('./MmaTeach'));
 import { MOVES } from '../data/mmaMoves';
@@ -282,7 +283,7 @@ export default function MmaProCoach({ lesson, onClose }) {
             <p className="mma-pro-privacy">Il video resta sul dispositivo. Nessuna registrazione o chiamata AI a consumo. Il riconoscimento richiede il download iniziale del modello.</p>
           </>}
           {view === 'calibrate' && <>
-            <span className="mma-pro-eyebrow">PRIMA DI COMINCIARE</span><h2>Metti il coach nella posizione giusta.</h2><ol className="mma-pro-placement"><li>Telefono fermo, camera all’altezza del petto.</li><li>Lascia spazio intorno a testa, mani e piedi.</li><li>Luce davanti a te. Parti in guardia, ruotato a circa 45°.</li></ol>
+            <span className="mma-pro-eyebrow">PRIMA DI COMINCIARE</span><h2>Metti il coach nella posizione giusta.</h2><MmaCameraSetup stance={stance} compact /><ol className="mma-pro-placement"><li>Telefono fermo, all’altezza del petto, <b>di lato</b> come nello schema, a 2 metri.</li><li><b>Colpisci davanti a te, non verso il telefono</b>: il pugno che arriva dritto alla camera non si vede.</li><li>Luce davanti a te, niente controluce.</li></ol>
             {camera.error && <p role="alert" className="mma-pro-error">{camera.error}</p>}
             <button className="mma-pro-primary" disabled={!signal.calibrated || !readyCamera} onClick={() => begin('camera')}>Inizia la sessione <Play size={16} /></button>
             <p className="mma-pro-note">Non serve toccare: appena ti vedo in guardia per un secondo, la sessione parte da sola.</p>

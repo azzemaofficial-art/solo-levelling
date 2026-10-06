@@ -84,3 +84,45 @@ Cosa mostravano i dati:
 - **Combo**: si cercano solo gli arti della combo (in una 1-2 i piedi non contano).
 
 Risultato sulle clip vere: senza esempi niente più calci o clinch, 0–2 gesti in più; con i tuoi colpi come esempi (incrociando le clip) 100, 76 e 72: jab e diretto riconosciuti in tutte e tre. Le regole fisse invece restano inaffidabili quando si tira verso la camera, quindi l'insegnamento è il primo passo nel coach delle combo e nelle lezioni di pugni. Durante l'insegnamento un pezzo di colpo (andata o ritorno spezzati) non diventa un esempio (`addTeachSample`).
+
+## v5 (6 ottobre 2026): braccia solo in 2D, insegnamento a comando, telefono di lato
+
+**Cosa hanno mostrato le clip** (28 dell'insegnamento del 5 ottobre più una ripetizione con gli esempi attivi):
+- Molti "esempi" della v1 non contenevano nessun colpo: finestre di 1,6 s piatte o con le mani al petto. L'insegnamento prendeva qualsiasi movimento del braccio.
+- Con i colpi tirati verso il telefono il 3D è inutilizzabile: il polso del jab "va giù e indietro", e la profondità di un diretto risulta 50 cm lontano dalla camera.
+- Nelle rotazioni MediaPipe scambia sinistra e destra e "inventa" braccia aperte a T.
+- Video pubblici di pugilato (Wikimedia, pubblico dominio/CC) passati nello stesso MediaPipe confermano il limite: di fronte e da vicino lo scheletro resta fermo sul petto; con luce dura segue l'ombra sul muro.
+
+**Motore 2D** (`lib/mmaStrikes.js`):
+- polso rispetto al centro delle spalle, in busti dell'immagine;
+- un colpo è il braccio che si sposta (avvio 0,16, fine 0,09) **e si allunga più dell'altro**, perché la mano che para si accorcia;
+- guardia di riferimento che segue piano i tuoi aggiustamenti;
+- un colpo "va e torna": se la mano resta giù è un cambio di guardia;
+- correzione degli scambi sinistra/destra (`unflip`);
+- buchi di fotogrammi tollerati;
+- gomitate solo se il gomito si muove tanto e il pugno no.
+
+Tarato sulle clip vere: guardia ferma < 0,10, jab 0,19–0,31, diretto 0,44–0,51.
+
+**Giudice:**
+- senza esempi un colpo è "del braccio avanti/dietro" (`kind: 'strike'`) e vale come il colpo atteso di quel braccio;
+- il tipo (diretto, gancio, montante) lo decidono solo i tuoi esempi;
+- niente correzioni 3D sulle braccia (rotazione, gomito, sbilanciamento);
+- la mano che scende dritta mentre l'altra colpisce è "l'altra mano è scesa", non un colpo in più;
+- nelle combo senza schivate i movimenti della testa non contano.
+
+**Esempi v2** (`lib/mmaTemplates.js`, chiave `_v2`; gli esempi v1 vengono ignorati):
+- traiettoria del pugno (16 punti) confrontata con DTW;
+- tolleranza ricavata dalla variabilità dei tuoi colpi;
+- `cameraCheck`: se jab e diretto si muovono meno di 0,3 nell'immagine, stai colpendo verso il telefono.
+
+**Insegnamento a comando** (`MmaTeach.jsx`):
+1. guardia ferma 0,6 s, poi "VAI!";
+2. vale il colpo più ampio del braccio giusto partito entro 1,6 s;
+3. se hai usato l'altro braccio o il colpo non si è visto, te lo dice e si ripete;
+4. barre in diretta per ogni braccio;
+5. le clip inviate includono il momento del via.
+
+**Posizione** (`MmaCameraSetup.jsx`): telefono davanti ma a circa 45° dal lato del braccio avanti, a 2–3 m; colpi verso un bersaglio davanti, non verso il telefono.
+
+**Risultati sulle ripetizioni vere**, simulando la chiusura della ripetizione come nel coach e senza esempi: 0→100, 0→84, 6→100. La quarta (rotazioni forti e scambi di lato) resta difficile.

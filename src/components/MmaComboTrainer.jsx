@@ -7,6 +7,7 @@ import { createReadiness, readPose } from '../../lib/mmaReadiness';
 import { coachFeedback, createComboJudge, describeGesture, needsFeet, EXPECT } from '../../lib/mmaComboJudge';
 import { loadTemplates } from '../../lib/mmaTemplates';
 import { encodeClip, readChatId, sendClips } from '../../lib/mmaClips';
+import MmaCameraSetup from './MmaCameraSetup';
 
 const MmaTeach = lazy(() => import('./MmaTeach'));
 import { MOVES, comboKeys } from '../data/mmaMoves';
@@ -170,7 +171,8 @@ export default function MmaComboTrainer({ combo, onClose, onLearned }) {
     if (info.activeKeys.length) repRef.current.lastActive = t;
     if (info.gestures > before) {
       const g = judge.gestures().at(-1);
-      setLabel({ text: g.move ? MOVES[g.move]?.name || describeGesture(g) : describeGesture(g), unclear: g.kind === 'unclear', n: t });
+      // colpo di braccio senza tipo deciso: si dice quale braccio (è quello che conta nella combo)
+      if (g.kind !== 'drop') setLabel({ text: g.move ? MOVES[g.move]?.name || describeGesture(g) : g.kind === 'strike' ? `Braccio ${g.side === 'lead' ? 'avanti' : 'dietro'}` : describeGesture(g), unclear: g.kind === 'unclear', n: t });
     }
     // colpi che si accendono in diretta (ricalcolo leggero ogni 150 ms)
     if (t - repRef.current.lastLive > 150) {
@@ -241,11 +243,11 @@ export default function MmaComboTrainer({ combo, onClose, onLearned }) {
 
     {phase === 'setup' ? <section className="mma-train-setup">
       <div className="mma-train-ghost"><GhostDemo combo={combo} speed={0.6} /></div>
-      <h3>Come posizionarti</h3>
+      <h3>Dove mettere il telefono</h3>
+      <MmaCameraSetup stance={stance} />
       <ol>
-        <li>Appoggia il telefono in verticale all’altezza del petto.</li>
-        <li>{feet ? 'Allontanati 2–3 metri: servono anche i piedi.' : 'Allontanati 1,5–2 metri: busto e braccia interi.'}</li>
-        <li>Mettiti di <b>tre quarti</b> rispetto alla camera, in guardia.</li>
+        <li>Telefono in verticale, fermo, all’altezza del petto, {feet ? 'a 2–3 metri: servono anche i piedi' : 'a 2 metri'}.</li>
+        <li><b>Non colpire verso il telefono</b>: il pugno che arriva dritto alla camera non si vede.</li>
         <li>Buona luce davanti a te, niente controluce.</li>
       </ol>
       <button className={`mma-teach-banner ${templates ? 'done' : ''}`} onClick={() => setTeachOpen(true)}><GraduationCap size={22} /><span><b>{templates ? `Il coach conosce ${new Set(templates.items.map((it) => it.move)).size} tuoi colpi` : 'Prima insegnami i tuoi colpi'}</b><small>{templates ? 'Rifalli se cambi posto o angolo della camera.' : '2 minuti: 3 volte ogni colpo. Poi riconosco te, non un atleta medio.'}</small></span></button>
@@ -283,7 +285,7 @@ export default function MmaComboTrainer({ combo, onClose, onLearned }) {
         <div className="mma-train-actions">
           <button onClick={() => setReplay(current)}><RotateCcw size={16} /> Rivedi al rallentatore</button>
           <button onClick={() => setPaused((v) => !v)}>{paused ? <><Play size={16} /> Continua</> : <><Pause size={16} /> Pausa</>}</button>
-          <button disabled={reported} onClick={() => { setReported(true); setPaused(true); sendClips([encodeClip(current.frames, { combo: combo.id, expected: moves, seen: current.seen, total: current.total, stance, templates: Boolean(templates), kind: 'rep' })], { chatId: readChatId(), kind: 'rep' }); }}>{reported ? <><Check size={16} /> Inviata</> : <><Flag size={16} /> Il coach ha sbagliato</>}</button>
+          <button disabled={reported} onClick={() => { setReported(true); setPaused(true); sendClips([encodeClip(current.frames, { combo: combo.id, expected: moves, seen: current.seen, total: current.total, stance, templates: Boolean(templates), model: camera.profile?.model || null, engine: 5, kind: 'rep' })], { chatId: readChatId(), kind: 'rep' }); }}>{reported ? <><Check size={16} /> Inviata</> : <><Flag size={16} /> Il coach ha sbagliato</>}</button>
         </div>
         {reported && <p className="mma-train-note">Grazie: ho mandato i punti dello scheletro di questa ripetizione (niente video). Mi servono per correggere il riconoscimento.</p>}
       </section>}

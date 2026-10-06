@@ -71,7 +71,8 @@ test('giudice: 1-1-2 veloce senza pause resta due jab e un diretto (anche a 15 f
 
 test('giudice + filtro: combo della libreria con tremolio di 2 cm restano promosse', () => {
   const failed = [];
-  for (const c of COMBOS.filter((x) => !x.moves.includes('clinch'))) {
+  // (gomitate e clinch: senza esempi la camera non li distingue in modo affidabile)
+  for (const c of COMBOS.filter((x) => !x.moves.some((id) => ['clinch', 'rearElbow', 'leadElbow'].includes(id)))) {
     const j = createComboJudge(); calibrateJudge(j);
     const f = createPoseFilter(WORLD_FILTER);
     for (const fr of noisy(synthSequence(c.moves, { fps: 24, tempo: 0.7 }), { seed: 5 })) j.push(f.apply(fr.world, fr.t), fr.t, fr.points);
@@ -81,13 +82,13 @@ test('giudice + filtro: combo della libreria con tremolio di 2 cm restano promos
   assert.ok(failed.length <= 1, failed.join(' | '));
 });
 
-test('colpo singolo: riconosce la tecnica e dà la correzione', () => {
+test('colpo singolo: senza esempi conta i colpi per braccio (avanti = jab, dietro = diretto) e corregge la guardia', () => {
   const j = createComboJudge(); calibrateJudge(j);
-  for (const f of synthSequence(['jab', 'cross', 'hook'])) j.push(f.world, f.t, f.points);
-  assert.deepEqual(j.gestures().map((g) => rateGesture(g)?.id), ['jab', 'cross', 'hook']);
+  for (const f of synthSequence(['jab', 'cross', 'hook'])) j.push(f.world, f.t, f.points, 1);
+  assert.deepEqual(j.gestures().filter((g) => g.limb === 'arm').map((g) => rateGesture(g)?.id), ['jab', 'cross', 'jab']);
   const k = createComboJudge(); calibrateJudge(k);
-  for (const f of synthSequence(['cross'], { mutate: (id, p) => ({ ...p, 15: P(0.18, -0.05, -0.1) }) })) k.push(f.world, f.t, f.points);
-  const rate = rateGesture(k.gestures().find((g) => g.kind === 'straight'));
+  for (const f of synthSequence(['cross'], { mutate: (id, p) => ({ ...p, 15: P(0.18, -0.05, -0.1) }) })) k.push(f.world, f.t, f.points, 1);
+  const rate = rateGesture(k.gestures().find((g) => g.limb === 'arm' && g.side === 'rear'));
   assert.equal(rate.id, 'cross'); assert.ok(rate.issues.some((it) => it.key === 'guard')); assert.ok(rate.score < 100);
 });
 

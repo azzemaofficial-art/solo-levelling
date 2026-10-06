@@ -172,3 +172,30 @@
 @keyframes mma-guard-pulse{from{box-shadow:0 0 0 #ff8a7a00}to{box-shadow:0 0 24px #ff8a7a99}}
 @media(prefers-reduced-motion:reduce){.mma-live-label,.mma-teach-flash,.mma-guard-alert{animation:none}}
 .mma-train-skip{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;margin:8px 0 0;padding:12px;border:1px solid #ffffff22;border-radius:12px;background:transparent;color:#9fb3c2;font-size:13px;cursor:pointer}
+/* ── Dove mettere il telefono (schema dall'alto) ── */
+.mma-cam-setup{margin:4px 0 12px;padding:10px 12px;border:1px solid #6de2d333;border-radius:12px;background:#0d1a22}
+.mma-cam-setup svg{display:block;width:100%;max-width:300px;height:auto;margin:0 auto}
+.mma-cam-setup.compact svg{max-width:220px}
+.mma-cam-setup figcaption{margin-top:8px;font-size:12px;line-height:1.5;color:#b9cdd8}
+.mma-cam-setup .mcs-target{fill:none;stroke:#ffc86b;stroke-width:2;stroke-dasharray:4 3}
+.mma-cam-setup .mcs-punch{stroke:#ffc86b;stroke-width:3}
+.mma-cam-setup .mcs-arrow-head{fill:#ffc86b}
+.mma-cam-setup .mcs-you{fill:#6de2d322;stroke:#6de2d3;stroke-width:2}
+.mma-cam-setup .mcs-head{fill:#6de2d3}
+.mma-cam-setup .mcs-phone{fill:#b8a4ff33;stroke:#b8a4ff;stroke-width:2}
+.mma-cam-setup .mcs-view{stroke:#b8a4ff;stroke-width:1.5;stroke-dasharray:5 4}
+.mma-cam-setup .mcs-angle{fill:none;stroke:#9fb3c2;stroke-width:1.2}
+.mma-cam-setup .mcs-label{fill:#d7e4ea;font:600 11px var(--font-body,system-ui)}
+.mma-cam-setup .mcs-small{fill:#9fb3c2;font:500 10px var(--font-body,system-ui)}
+/* ── Insegnamento a comando ── */
+.mma-teach-go{position:absolute;inset:0;display:grid;place-items:center;pointer-events:none;color:#fff;font:900 76px/1 var(--font-display);text-shadow:0 0 28px #6de2d3,0 0 6px #000;animation:mma-teach-go .5s cubic-bezier(.2,1.5,.5,1) both}
+@keyframes mma-teach-go{from{opacity:0;transform:scale(.5)}to{opacity:1;transform:none}}
+.mma-teach-meter{position:absolute;left:8px;bottom:8px;display:flex;gap:6px;padding:6px 8px;border-radius:10px;background:#070b12cc}
+.mma-teach-meter>div{display:flex;flex-direction:column;align-items:center;gap:4px;opacity:.55}
+.mma-teach-meter>div.want{opacity:1}
+.mma-teach-meter small{font:700 8px var(--font-label);letter-spacing:.08em;color:#c9dbe6}
+.mma-teach-meter span{position:relative;width:14px;height:56px;border-radius:7px;background:#ffffff1a;overflow:hidden}
+.mma-teach-meter i{position:absolute;inset:0;background:linear-gradient(#ffc86b,#6de2d3);transform-origin:bottom;transition:transform .08s linear}
+.mma-teach-warn{margin:0 0 12px;padding:12px;border:1px solid #ffb38a77;border-radius:12px;background:#3a2018;color:#ffe2cf;font-size:13px;line-height:1.5}
+.mma-teach-warn .mma-cam-setup{margin-top:10px}
+@media(prefers-reduced-motion:reduce){.mma-teach-go{animation:none}.mma-teach-meter i{transition:none}}

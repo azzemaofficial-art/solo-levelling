@@ -22,8 +22,15 @@ const ROT_REAR = { 11: P(0.16, -0.45, 0.06), 12: P(-0.12, -0.45, -0.14) }; // sp
 export const PEAKS = {
   jab: [{ 11: P(0.15, -0.45, -0.08), 13: P(0.10, -0.52, -0.45), 15: P(0.05, -0.55, -0.72), 0: P(0.03, -0.62, -0.13) }],
   cross: [{ ...ROT_REAR, 14: P(-0.06, -0.50, -0.40), 16: P(0.0, -0.55, -0.68), 28: P(-0.14, 0.82, 0.13) }],
-  hook: [{ 11: P(0.16, -0.45, -0.05), 13: P(0.30, -0.46, -0.25), 15: P(0.03, -0.50, -0.46) }],
-  rearHook: [{ ...ROT_REAR, 14: P(-0.30, -0.46, -0.20), 16: P(-0.02, -0.50, -0.44) }],
+  // gancio vero: il gomito si alza di lato, il pugno esce largo e poi attraversa davanti al mento
+  hook: [
+    { 11: P(0.16, -0.45, -0.05), 13: P(0.38, -0.47, -0.12), 15: P(0.34, -0.52, -0.38) },
+    { 11: P(0.15, -0.45, -0.08), 13: P(0.30, -0.46, -0.25), 15: P(0.0, -0.50, -0.46) },
+  ],
+  rearHook: [
+    { ...ROT_REAR, 14: P(-0.38, -0.47, -0.10), 16: P(-0.34, -0.52, -0.36) },
+    { ...ROT_REAR, 14: P(-0.30, -0.46, -0.20), 16: P(0.02, -0.50, -0.44) },
+  ],
   uppercut: [
     { ...shift(null, UPPER, 0.05), 13: P(0.16, -0.10, -0.10), 15: P(0.12, -0.25, -0.25) },
     { 13: P(0.13, -0.35, -0.28), 15: P(0.06, -0.62, -0.38) },
@@ -78,12 +85,14 @@ const toArray = (p) => {
   for (const [k, v] of Object.entries(p)) arr[Number(k)] = v;
   return arr;
 };
-const to2d = (w) => w.map((p) => ({ x: 0.5 + p.x * 0.5 - p.z * 0.25, y: 0.5 + p.y * 0.45, visibility: 0.99 }));
+// camera di default: obliqua (il colpo in avanti si vede di lato nell'immagine).
+// view 'front': camera davanti, colpi verso il telefono (com'era il telefono di Emanuele)
+const to2d = (w, view = 'oblique') => w.map((p) => ({ x: 0.5 + p.x * 0.5 - (view === 'front' ? 0 : p.z * 0.25), y: 0.5 + p.y * 0.45 + (view === 'front' ? p.z * 0.04 : 0), visibility: 0.99 }));
 
 // Sequenza di fotogrammi {world, points, t} per una lista di gesti, a `fps`.
 // opts.mutate(moveId, pose) → posa modificata (per simulare errori).
 // opts.tempo < 1 = colpi più veloci (0,5 = un jab vero da ~90 ms di andata).
-export function synthSequence(moveIds, { fps = 30, gapMs = 120, mutate, start = 0, tempo = 1, lead = 400 } = {}) {
+export function synthSequence(moveIds, { fps = 30, gapMs = 120, mutate, start = 0, tempo = 1, lead = 400, view = 'oblique' } = {}) {
   const dt = 1000 / fps;
   const keys = [{ p: BASE3D, ms: lead }];
   for (const id of moveIds) {
@@ -100,8 +109,8 @@ export function synthSequence(moveIds, { fps = 30, gapMs = 120, mutate, start = 
   const frames = [];
   let t = start, prev = BASE3D;
   for (const k of keys) {
-    for (let e = 0; e < k.ms; e += dt) { const w = toArray(mixPose(prev, k.p, e / k.ms)); frames.push({ world: w, points: to2d(w), t }); t += dt; }
-    for (let e = 0; e < (k.hold || 0); e += dt) { const w = toArray(k.p); frames.push({ world: w, points: to2d(w), t }); t += dt; }
+    for (let e = 0; e < k.ms; e += dt) { const w = toArray(mixPose(prev, k.p, e / k.ms)); frames.push({ world: w, points: to2d(w, view), t }); t += dt; }
+    for (let e = 0; e < (k.hold || 0); e += dt) { const w = toArray(k.p); frames.push({ world: w, points: to2d(w, view), t }); t += dt; }
     prev = k.p;
   }
   return frames;
@@ -113,8 +122,8 @@ export function calibrationFrames(n = 15) {
 }
 
 // Calibra un giudice come fa l'app: 3D + 2D dell'immagine
-export function calibrateJudge(judge, n = 15) {
-  const w = toArray(BASE3D), p = to2d(w);
+export function calibrateJudge(judge, n = 15, view = 'oblique') {
+  const w = toArray(BASE3D), p = to2d(w, view);
   for (let i = 0; i < n; i += 1) judge.calibrate(w, p, 1);
   return judge;
 }
