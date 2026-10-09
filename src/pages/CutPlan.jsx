@@ -51,7 +51,10 @@ export default function CutPlan({ view = 'today', onNavigate, systemLogs = [], o
   const [profileForm, setProfileForm] = useState(() => emptyProfileForm(profile));
   const [profileError, setProfileError] = useState('');
   const [saved, setSaved] = useState(readSaved);
-  const [week, setWeek] = useState(() => Math.min(3, Math.max(0, Number(readSaved().week || 0))));
+  const [week, setWeek] = useState(() => Math.min(mealWeeks.length - 1, Math.max(0, Number(readSaved().week || 0))));
+  // foto delle ricette nuove non ancora caricate: al loro posto un’icona
+  const [missingImages, setMissingImages] = useState({});
+  const imageMissing = (src) => setMissingImages((prev) => (prev[src] ? prev : { ...prev, [src]: true }));
   const [trainingWeek, setTrainingWeek] = useState(() => Math.min(11, Math.max(0, Number(readSaved().trainingWeek || 0))));
   const [day, setDay] = useState(getMondayIndex);
   const [light, setLight] = useState(false);
@@ -99,9 +102,8 @@ export default function CutPlan({ view = 'today', onNavigate, systemLogs = [], o
   }, [saved.creatineDate, sessionDoneDate, lastWeighDate, kcalTargetsKey]);
   const today = getMondayIndex();
   const selectedMeal = mealWeeks[week][day];
-  const mealSlots = Object.entries(selectedMeal.snackTime === 'morning'
-    ? { Colazione: selectedMeal.breakfast, Spuntino: selectedMeal.snack, Pranzo: selectedMeal.lunch, ...(selectedMeal.preFootball ? { 'Pre-calcio': selectedMeal.preFootball } : {}), Cena: selectedMeal.dinner }
-    : { Colazione: selectedMeal.breakfast, Pranzo: selectedMeal.lunch, Spuntino: selectedMeal.snack, ...(selectedMeal.preFootball ? { 'Pre-calcio': selectedMeal.preFootball } : {}), Cena: selectedMeal.dinner });
+  const mealSlots = selectedMeal.slots.map((slot) => [slot.label, slot.meal]);
+  const slotImage = (label) => { const src = selectedMeal.slots.find((slot) => slot.label === label)?.image; return src && !missingImages[src] ? src : null; };
   const planTotals = mealSlots.reduce((sum, [, meal]) => {
     const recipe = recipeFor(meal);
     return { kcal: sum.kcal + (recipe?.kcal || 0), protein: sum.protein + (recipe?.protein || 0) };
@@ -109,7 +111,7 @@ export default function CutPlan({ view = 'today', onNavigate, systemLogs = [], o
   const openMeal = (label, meal) => {
     const recipe = recipeFor(meal);
     if (!recipe) return;
-    setSelectedRecipe({ ...recipe, image: selectedMeal.images[label], tag: `${label} • ${recipe.time}` });
+    setSelectedRecipe({ ...recipe, image: slotImage(label), tag: `${label} • ${recipe.time}` });
   };
   const todayTraining = trainingDays[today];
   const currentPhase = phases[trainingWeek < 2 ? 0 : trainingWeek < 4 ? 1 : trainingWeek < 8 ? 2 : 3];
@@ -212,18 +214,18 @@ export default function CutPlan({ view = 'today', onNavigate, systemLogs = [], o
 
     {view === 'food' && !fixedMenu && <FuelTracker profile={profile} saveProfile={saveProfile} weightKg={latestWeight} systemLogs={systemLogs} onLogFood={onFoodEvent} onUndoFood={onFoodEvent} onTargets={onFuelTargets} />}
     {view === 'food' && fixedMenu && <>
-      <section className="cut-page-head"><span className="cut-kicker">28 GIORNI • 4 SETTIMANE</span><h1>Mangia bene.<br /><em>Con gusto.</em></h1><p>Un piano vario che include già McDonald’s, pasta con carne di cavallo, pizza e ricette fit porn. Ripeti la rotazione nei tre mesi cambiando verdure, frutta e fonti proteiche equivalenti.</p></section>
-      <div className="cut-week-picker"><button aria-label="Settimana precedente" onClick={() => setWeek((n) => Math.max(0, n - 1))}><ChevronLeft size={20} /></button><span>SETTIMANA <strong>{week + 1}</strong> / 4</span><button aria-label="Settimana successiva" onClick={() => setWeek((n) => Math.min(3, n + 1))}><ChevronRight size={20} /></button></div>
+      <section className="cut-page-head"><span className="cut-kicker">{mealWeeks.length * 7} GIORNI • {mealWeeks.length} SETTIMANE</span><h1>Mangia bene.<br /><em>Con gusto.</em></h1><p>Un piano vario che include già McDonald’s, pasta con carne di cavallo, pizza, i cocktail del venerdì, tanta cucina orientale e patate dolci. Ripeti la rotazione nei tre mesi cambiando verdure, frutta e fonti proteiche equivalenti.</p></section>
+      <div className="cut-week-picker"><button aria-label="Settimana precedente" onClick={() => setWeek((n) => Math.max(0, n - 1))}><ChevronLeft size={20} /></button><span>SETTIMANA <strong>{week + 1}</strong> / {mealWeeks.length}</span><button aria-label="Settimana successiva" onClick={() => setWeek((n) => Math.min(mealWeeks.length - 1, n + 1))}><ChevronRight size={20} /></button></div>
       <div className="cut-day-strip">{dayNames.map((name, index) => <button key={name} className={day === index ? 'active' : ''} onClick={() => setDay(index)}>{name.slice(0, 3)}</button>)}</div>
       <section className="cut-meal-head"><span>{selectedMeal.day}</span><strong>obiettivo ≈ {dayTargetFor(profile, day).toLocaleString('it-IT')} kcal</strong></section>
       <div className="cut-plan-totals"><span><small>NEL PIANO</small><b>≈ {planTotals.kcal.toLocaleString('it-IT')} kcal</b></span><span className={planTotals.protein < 140 ? 'low' : ''}><small>PROTEINE</small><b>≈ {planTotals.protein} g</b></span></div>
       {planTotals.protein < 140 && <p className="cut-note">Proteine un po’ basse oggi: aggiungi uno yogurt greco (170 g ≈ +17 g) o 100 g di fiocchi di latte (+12 g).</p>}
 
-      {mealSlots.map(([label, meal], index) => { const recipe = recipeFor(meal); return <button type="button" className={`cut-meal cut-meal-${index}`} key={label} onClick={() => openMeal(label, meal)} aria-label={`Ricetta: ${recipe?.title || label}`}>{selectedMeal.images[label] ? <img className="cut-meal-image" src={selectedMeal.images[label]} alt="" loading="lazy" /> : <span className="cut-meal-image cut-meal-icon" aria-hidden="true"><ProtocolIcon name="football" size={34} /></span>}<div className="cut-meal-copy"><span>0{index + 1} / {label}</span><p>{meal}</p>{recipe && <em className="cut-meal-macros">≈ {recipe.kcal} kcal · {recipe.protein} g proteine · <b>Ricetta</b></em>}</div><ArrowRight size={16} className="cut-meal-go" /></button>; })}
+      {mealSlots.map(([label, meal], index) => { const recipe = recipeFor(meal); return <button type="button" className={`cut-meal cut-meal-${index}`} key={label} onClick={() => openMeal(label, meal)} aria-label={`Ricetta: ${recipe?.title || label}`}>{slotImage(label) ? <img className="cut-meal-image" src={slotImage(label)} alt="" loading="lazy" onError={() => imageMissing(slotImage(label))} /> : <span className="cut-meal-image cut-meal-icon" aria-hidden="true"><ProtocolIcon name={/calcio/i.test(label) ? 'football' : 'food'} size={34} /></span>}<div className="cut-meal-copy"><span>0{index + 1} / {label}</span><p>{meal}</p>{recipe && <em className="cut-meal-macros">≈ {recipe.kcal} kcal · {recipe.protein} g proteine · <b>Ricetta</b></em>}</div><ArrowRight size={16} className="cut-meal-go" /></button>; })}
       {selectedMeal.note && <p className="cut-note">{selectedMeal.note}</p>}
       <p className="cut-fine">Le calorie del giorno sono una stima. Quantità e prodotti reali possono cambiare molto il totale: usa il diario per calibrare le porzioni.</p>
       <button className="cut-primary" onClick={() => onNavigate('system')}>Registra ciò che hai mangiato <ArrowRight size={17} /></button>
-      <section className="cut-section"><div className="cut-section-title"><span>FIT PORN / RICETTE</span><BookOpen size={16} /></div><div className="cut-recipes">{recipes.map((recipe) => <button className="cut-recipe" key={recipe.title} onClick={() => setSelectedRecipe(recipe)}><img src={recipe.image} alt="" /><span><small>{recipe.tag}</small><b>{recipe.title}</b></span><ArrowRight size={17} /></button>)}</div></section>
+      <section className="cut-section"><div className="cut-section-title"><span>FIT PORN / RICETTE</span><BookOpen size={16} /></div><div className="cut-recipes">{recipes.map((recipe) => <button className="cut-recipe" key={recipe.title} onClick={() => setSelectedRecipe(recipe)}>{missingImages[recipe.image] ? <i className="cut-recipe-icon" aria-hidden="true"><ProtocolIcon name="food" size={30} /></i> : <img src={recipe.image} alt="" onError={() => imageMissing(recipe.image)} />}<span><small>{recipe.tag}</small><b>{recipe.title}</b></span><ArrowRight size={17} /></button>)}</div></section>
       <section className="cut-section"><div className="cut-section-title"><span>COME USARE IL PIANO</span></div>{rules.map((rule) => <p className="cut-rule" key={rule}>{rule}</p>)}</section>
     </>}
 
@@ -267,6 +269,6 @@ export default function CutPlan({ view = 'today', onNavigate, systemLogs = [], o
       <section className="cut-section"><div className="cut-section-title"><span>CHECK OGNI 4 SETTIMANE</span></div><p className="cut-rule">Segna anche quante trazioni e piegamenti consecutivi riesci a fare e i carichi usati. Se forza, energia o prestazioni calano troppo, alleggerisci l’allenamento e rivedi l’apporto energetico.</p><p className="cut-rule">Le stime di massa grassa della bilancia OKOK servono solo come riferimento: peso medio, girovita e prestazioni sono più utili per questo percorso.</p></section>
       <section className="cut-section"><div className="cut-section-title"><span>FONTI DEL PROTOCOLLO</span></div>{evidence.map((source) => <a className="cut-source" href={source.url} key={source.url} target="_blank" rel="noreferrer">{source.label}<ArrowRight size={15} /></a>)}</section>
     </>}
-    {selectedRecipe && <div className="cut-modal-backdrop" onClick={() => setSelectedRecipe(null)}><div className="cut-modal" role="dialog" aria-modal="true" aria-labelledby="cut-recipe-title" onClick={(e) => e.stopPropagation()}><button className="cut-close" onClick={() => setSelectedRecipe(null)}>Chiudi</button>{selectedRecipe.image && <img src={selectedRecipe.image} alt="" />}<small>{selectedRecipe.tag}</small><h2 id="cut-recipe-title">{selectedRecipe.title}</h2>{selectedRecipe.kcal && <div className="cut-macro-chips"><span>≈ {selectedRecipe.kcal} kcal</span><span>{selectedRecipe.protein} g proteine</span></div>}<h3>Ingredienti</h3>{Array.isArray(selectedRecipe.ingredients) ? <ul className="cut-ingredients">{selectedRecipe.ingredients.map((item) => <li key={item}>{item}</li>)}</ul> : <p>{selectedRecipe.ingredients}</p>}<h3>Preparazione</h3>{Array.isArray(selectedRecipe.steps) ? <ol className="cut-steps">{selectedRecipe.steps.map((step) => <li key={step}>{step}</li>)}</ol> : <p>{selectedRecipe.steps}</p>}{selectedRecipe.kcal && <p className="cut-fine">Valori stimati sulle quantità indicate: condimenti e marche li cambiano. Registra nel diario quello che mangi davvero.</p>}</div></div>}
+    {selectedRecipe && <div className="cut-modal-backdrop" onClick={() => setSelectedRecipe(null)}><div className="cut-modal" role="dialog" aria-modal="true" aria-labelledby="cut-recipe-title" onClick={(e) => e.stopPropagation()}><button className="cut-close" onClick={() => setSelectedRecipe(null)}>Chiudi</button>{selectedRecipe.image && !missingImages[selectedRecipe.image] && <img src={selectedRecipe.image} alt="" onError={() => imageMissing(selectedRecipe.image)} />}<small>{selectedRecipe.tag}</small><h2 id="cut-recipe-title">{selectedRecipe.title}</h2>{selectedRecipe.kcal && <div className="cut-macro-chips"><span>≈ {selectedRecipe.kcal} kcal</span><span>{selectedRecipe.protein} g proteine</span></div>}<h3>Ingredienti</h3>{Array.isArray(selectedRecipe.ingredients) ? <ul className="cut-ingredients">{selectedRecipe.ingredients.map((item) => <li key={item}>{item}</li>)}</ul> : <p>{selectedRecipe.ingredients}</p>}<h3>Preparazione</h3>{Array.isArray(selectedRecipe.steps) ? <ol className="cut-steps">{selectedRecipe.steps.map((step) => <li key={step}>{step}</li>)}</ol> : <p>{selectedRecipe.steps}</p>}{selectedRecipe.kcal && <p className="cut-fine">Valori stimati sulle quantità indicate: condimenti e marche li cambiano. Registra nel diario quello che mangi davvero.</p>}</div></div>}
   </main>;
 }

@@ -122,6 +122,7 @@
 .cut-recipes{display:grid;gap:8px}
 .cut-recipe{display:flex;align-items:center;gap:12px;width:100%;height:74px;padding:0 11px 0 0;border:1px solid #ffffff18;background:var(--surface);color:#fff;text-align:left;cursor:pointer}
 .cut-recipe img{width:67px;height:73px;object-fit:cover;background:var(--surface)}
+.cut-recipe-icon{flex:none;display:grid;place-items:center;width:67px;height:73px;background:var(--surface);color:var(--lime)}
 .cut-recipe span{display:flex;flex:1;flex-direction:column;gap:5px}
 .cut-recipe small{color:var(--lime);font-size:9px;text-transform:uppercase}
 .cut-recipe b{font-size:13px}
