@@ -4,8 +4,8 @@ import { ArrowLeft, Check, Flag, GraduationCap, Pause, Play, RotateCcw, Video, V
 import useMmaCamera from '../hooks/useMmaCamera';
 import MmaFigure, { useSkeletonPlayer } from './MmaFigure';
 import { createReadiness, readPose } from '../../lib/mmaReadiness';
-import { coachFeedback, createComboJudge, describeGesture, needsFeet, EXPECT } from '../../lib/mmaComboJudge';
-import { loadTemplates } from '../../lib/mmaTemplates';
+import { coachFeedback, createComboJudge, describeGesture, needsFeet, teachSample, EXPECT } from '../../lib/mmaComboJudge';
+import { forgetRep, learnFromRep, loadTemplates, saveTemplates } from '../../lib/mmaTemplates';
 import { encodeClip, readChatId, sendClips } from '../../lib/mmaClips';
 import MmaCameraSetup from './MmaCameraSetup';
 
@@ -114,6 +114,12 @@ export default function MmaComboTrainer({ combo, onClose, onLearned }) {
   const [label, setLabel] = useState(null); // ultimo colpo letto, mostrato sulla camera
   const [reported, setReported] = useState(false);
   const judgeRef = useRef(createComboJudge({ stance, templates }));
+  const templatesRef = useRef(templates); templatesRef.current = templates;
+  // nuovi esempi tuoi (da una combo riuscita, o tolti dopo "Il coach ha sbagliato"): salvati e subito in uso
+  const applyTemplates = useCallback((t) => {
+    if (!t || t === templatesRef.current || !saveTemplates(t)) return;
+    templatesRef.current = t; setTemplates(t); judgeRef.current.setTemplates(t);
+  }, []);
   const readyRef = useRef(createReadiness()), hintRef = useRef({ text: '', at: 0 });
   // riferimento stabile: il genitore può ridisegnarsi spesso, non deve azzerare i timer
   const onLearnedRef = useRef(onLearned); onLearnedRef.current = onLearned;
@@ -132,12 +138,15 @@ export default function MmaComboTrainer({ combo, onClose, onLearned }) {
     const res = judge.judgeRep(moves, { since: t0 - 700 });
     const frames = judge.frames().filter((f) => f.t >= t0 - 200);
     const marks = res.moves.flatMap((mv) => (mv.gesture && mv.issues.length ? [{ t: mv.gesture.peakT ?? mv.gesture.start, joint: MOVE_JOINT(mv.id, judge.lead, judge.rear), text: `${MOVES[mv.id].name}: ${mv.issues[0].text}` }] : []));
-    const entry = { ...res, frames, marks, feedback: coachFeedback(res, moveNames), seen: judge.gestures().filter((g) => g.start >= t0 - 700).map((g) => g.move || describeGesture(g)) };
+    const rep = Date.now();
+    const entry = { ...res, rep, frames, marks, feedback: coachFeedback(res, moveNames), seen: judge.gestures().filter((g) => g.start >= t0 - 700).map((g) => g.move || describeGesture(g)) };
+    // combo riuscita: i colpi riconosciuti diventano tuoi esempi in più (il coach impara mentre ti alleni)
+    applyTemplates(learnFromRep(templatesRef.current, res, { rep, sample: teachSample }));
     setCurrent(entry); setReported(false);
     setResults((prev) => [...prev, entry]);
     setPhase('result');
     say(entry.feedback, voice);
-  }, [moves, moveNames, voice]);
+  }, [moves, moveNames, voice, applyTemplates]);
 
   // fotogrammi dalla camera
   const onFrame = useCallback((points, t, aspect, world) => {
@@ -285,7 +294,7 @@ export default function MmaComboTrainer({ combo, onClose, onLearned }) {
         <div className="mma-train-actions">
           <button onClick={() => setReplay(current)}><RotateCcw size={16} /> Rivedi al rallentatore</button>
           <button onClick={() => setPaused((v) => !v)}>{paused ? <><Play size={16} /> Continua</> : <><Pause size={16} /> Pausa</>}</button>
-          <button disabled={reported} onClick={() => { setReported(true); setPaused(true); sendClips([encodeClip(current.frames, { combo: combo.id, expected: moves, seen: current.seen, total: current.total, stance, templates: Boolean(templates), model: camera.profile?.model || null, engine: 5, kind: 'rep' })], { chatId: readChatId(), kind: 'rep' }); }}>{reported ? <><Check size={16} /> Inviata</> : <><Flag size={16} /> Il coach ha sbagliato</>}</button>
+          <button disabled={reported} onClick={() => { setReported(true); setPaused(true); applyTemplates(forgetRep(templatesRef.current, current.rep)); sendClips([encodeClip(current.frames, { combo: combo.id, expected: moves, seen: current.seen, total: current.total, stance, templates: Boolean(templates), model: camera.profile?.model || null, engine: 6, kind: 'rep' })], { chatId: readChatId(), kind: 'rep' }); }}>{reported ? <><Check size={16} /> Inviata</> : <><Flag size={16} /> Il coach ha sbagliato</>}</button>
         </div>
         {reported && <p className="mma-train-note">Grazie: ho mandato i punti dello scheletro di questa ripetizione (niente video). Mi servono per correggere il riconoscimento.</p>}
       </section>}
