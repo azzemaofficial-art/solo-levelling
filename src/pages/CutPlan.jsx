@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react';
-import { ArrowRight, BookOpen, Check, ChevronLeft, ChevronRight, PlayCircle, Plus, RotateCcw, Utensils } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { ArrowRight, BookOpen, Check, ChevronLeft, ChevronRight, PlayCircle, Plus, RotateCcw, ThumbsDown, ThumbsUp, Utensils } from 'lucide-react';
 import ProtocolIcon from '../components/ProtocolIcon';
-import { dayNames, evidence, mealWeeks, nutritionRules, phases, recipes, trainingDays } from '../data/cutPlan';
+import { dayNames, evidence, mealWeeks, nutritionRules, phases, recipes, swapGroup, swapPools, trainingDays } from '../data/cutPlan';
+import { applyMealPrefs, togglePref } from '../utils/mealPrefs';
 import { recipeFor } from '../data/mealRecipes';
 import { videosFor } from '../data/exerciseVideos';
 import { dayTargetFor, formatKg, useCutProfile } from '../utils/cutProfile';
@@ -17,6 +18,9 @@ import WeightTrend from '../components/WeightTrend';
 import '../styles/cut-plan.css';
 
 const KEY = CUT_PLAN_KEY;
+// piatti su cui si può mettere 👍 / 👎 (i pasti fissi no): src/utils/mealPrefs.js
+const SWAPPABLE = new Set(Object.values(swapPools).flat().map((dish) => dish.id));
+const DISH_TITLE = Object.fromEntries(Object.values(swapPools).flat().map((dish) => [dish.id, recipeFor(dish.meal)?.title || dish.meal]));
 const readSaved = () => {
   try { return JSON.parse(localStorage.getItem(KEY) || '{}'); } catch { return {}; }
 };
@@ -53,6 +57,10 @@ export default function CutPlan({ view = 'today', onNavigate, systemLogs = [], o
   const [saved, setSaved] = useState(readSaved);
   const [week, setWeek] = useState(() => Math.min(mealWeeks.length - 1, Math.max(0, Number(readSaved().week || 0))));
   // foto delle ricette nuove non ancora caricate: al loro posto un’icona
+  // 👍 / 👎 sui piatti: salvati nel piano; un 👎 sostituisce quel piatto in tutte le settimane
+  const mealPrefs = saved.mealPrefs || {};
+  const plannedWeeks = useMemo(() => applyMealPrefs(mealWeeks, saved.mealPrefs || {}), [saved.mealPrefs]);
+  const setMealPref = (id, value) => setSaved((prev) => ({ ...prev, mealPrefs: togglePref(prev.mealPrefs, id, value) }));
   const [missingImages, setMissingImages] = useState({});
   const imageMissing = (src) => setMissingImages((prev) => (prev[src] ? prev : { ...prev, [src]: true }));
   const [trainingWeek, setTrainingWeek] = useState(() => Math.min(11, Math.max(0, Number(readSaved().trainingWeek || 0))));
@@ -101,18 +109,27 @@ export default function CutPlan({ view = 'today', onNavigate, systemLogs = [], o
     return () => clearTimeout(timer);
   }, [saved.creatineDate, sessionDoneDate, lastWeighDate, kcalTargetsKey]);
   const today = getMondayIndex();
-  const selectedMeal = mealWeeks[week][day];
+  const selectedMeal = plannedWeeks[week][day];
   const mealSlots = selectedMeal.slots.map((slot) => [slot.label, slot.meal]);
   const slotImage = (label) => { const src = selectedMeal.slots.find((slot) => slot.label === label)?.image; return src && !missingImages[src] ? src : null; };
   const planTotals = mealSlots.reduce((sum, [, meal]) => {
     const recipe = recipeFor(meal);
     return { kcal: sum.kcal + (recipe?.kcal || 0), protein: sum.protein + (recipe?.protein || 0), fiber: sum.fiber + (recipe?.fiber || 0) };
   }, { kcal: 0, protein: 0, fiber: 0 });
-  const openMeal = (label, meal) => {
+  const openMeal = (label, meal, id) => {
     const recipe = recipeFor(meal);
     if (!recipe) return;
-    setSelectedRecipe({ ...recipe, image: slotImage(label), tag: `${label} • ${recipe.time}` });
+    setSelectedRecipe({ ...recipe, id, image: slotImage(label), tag: `${label} • ${recipe.time}` });
   };
+  // pollici: piccoli sulla scheda del pasto, grandi nella ricetta
+  const thumbs = (id, big = false) => (
+    <div className={big ? 'cut-thumbs cut-thumbs-big' : 'cut-thumbs'} role="group" aria-label="Ti piace questo piatto?">
+      <button type="button" className={mealPrefs[id] === 'up' ? 'on up' : ''} aria-pressed={mealPrefs[id] === 'up'} aria-label="Mi piace" onClick={() => setMealPref(id, 'up')}><ThumbsUp size={big ? 17 : 15} />{big && ' Mi piace'}</button>
+      <button type="button" className={mealPrefs[id] === 'down' ? 'on down' : ''} aria-pressed={mealPrefs[id] === 'down'} aria-label="Non mi piace: sostituiscilo" onClick={() => setMealPref(id, 'down')}><ThumbsDown size={big ? 17 : 15} />{big && ' Non mi piace'}</button>
+    </div>
+  );
+  const likedIds = Object.keys(mealPrefs).filter((id) => mealPrefs[id] === 'up' && SWAPPABLE.has(id));
+  const dislikedIds = Object.keys(mealPrefs).filter((id) => mealPrefs[id] === 'down' && SWAPPABLE.has(id));
   const todayTraining = trainingDays[today];
   const currentPhase = phases[trainingWeek < 2 ? 0 : trainingWeek < 4 ? 1 : trainingWeek < 8 ? 2 : 3];
   const completed = saved.completed || {};
@@ -221,11 +238,12 @@ export default function CutPlan({ view = 'today', onNavigate, systemLogs = [], o
       <div className="cut-plan-totals"><span><small>NEL PIANO</small><b>≈ {planTotals.kcal.toLocaleString('it-IT')} kcal</b></span><span className={planTotals.protein < 140 ? 'low' : ''}><small>PROTEINE</small><b>≈ {planTotals.protein} g</b></span><span className={planTotals.fiber < 25 ? 'low' : ''}><small>FIBRE</small><b>≈ {planTotals.fiber} g</b></span></div>
       {planTotals.protein < 140 && <p className="cut-note">Proteine un po’ basse oggi: aggiungi uno yogurt greco (170 g ≈ +17 g) o 100 g di fiocchi di latte (+12 g).</p>}
 
-      {mealSlots.map(([label, meal], index) => { const recipe = recipeFor(meal); return <button type="button" className={`cut-meal cut-meal-${index}`} key={label} onClick={() => openMeal(label, meal)} aria-label={`Ricetta: ${recipe?.title || label}`}>{slotImage(label) ? <img className="cut-meal-image" src={slotImage(label)} alt="" loading="lazy" onError={() => imageMissing(slotImage(label))} /> : <span className="cut-meal-image cut-meal-icon" aria-hidden="true"><ProtocolIcon name={/calcio/i.test(label) ? 'football' : 'food'} size={34} /></span>}<div className="cut-meal-copy"><span>0{index + 1} / {label}</span><p>{meal}</p>{recipe && <em className="cut-meal-macros">≈ {recipe.kcal} kcal · {recipe.protein} g proteine{recipe.tags?.includes('sera prima') ? ' · 🌙 sera prima' : ''} · <b>Ricetta</b></em>}</div><ArrowRight size={16} className="cut-meal-go" /></button>; })}
+      {selectedMeal.slots.map(({ id, label, meal, swappedFrom, swapReason }, index) => { const recipe = recipeFor(meal); const canRate = Boolean(swapGroup(day, index)); return <div className={`cut-meal-row cut-meal-${index}`} key={label}><button type="button" className="cut-meal" onClick={() => openMeal(label, meal, id)} aria-label={`Ricetta: ${recipe?.title || label}`}>{slotImage(label) ? <img className="cut-meal-image" src={slotImage(label)} alt="" loading="lazy" onError={() => imageMissing(slotImage(label))} /> : <span className="cut-meal-image cut-meal-icon" aria-hidden="true"><ProtocolIcon name={/calcio/i.test(label) ? 'football' : 'food'} size={34} /></span>}<div className="cut-meal-copy"><span>0{index + 1} / {label}</span><p>{meal}</p>{swappedFrom && <small className="cut-meal-swap">{swapReason === 'gusto' ? `👎 al posto di ${recipeFor(swappedFrom)?.title || swappedFrom}` : `al posto di ${recipeFor(swappedFrom)?.title || swappedFrom}: tiene la settimana in equilibrio`}</small>}{recipe && <em className="cut-meal-macros">≈ {recipe.kcal} kcal · {recipe.protein} g proteine{recipe.tags?.includes('sera prima') ? ' · 🌙 sera prima' : ''} · <b>Ricetta</b></em>}</div><ArrowRight size={16} className="cut-meal-go" /></button>{canRate && thumbs(id)}</div>; })}
       {selectedMeal.note && <p className="cut-note">{selectedMeal.note}</p>}
       <p className="cut-fine">Le calorie del giorno sono una stima. Quantità e prodotti reali possono cambiare molto il totale: usa il diario per calibrare le porzioni.</p>
       <button className="cut-primary" onClick={() => onNavigate('system')}>Registra ciò che hai mangiato <ArrowRight size={17} /></button>
-      <section className="cut-section"><div className="cut-section-title"><span>FIT PORN / RICETTE</span><BookOpen size={16} /></div><div className="cut-recipes">{recipes.map((recipe) => <button className="cut-recipe" key={recipe.title} onClick={() => setSelectedRecipe(recipe)}>{missingImages[recipe.image] ? <i className="cut-recipe-icon" aria-hidden="true"><ProtocolIcon name="food" size={30} /></i> : <img src={recipe.image} alt="" onError={() => imageMissing(recipe.image)} />}<span><small>{recipe.tag}</small><b>{recipe.title}</b></span><ArrowRight size={17} /></button>)}</div></section>
+      <section className="cut-section"><div className="cut-section-title"><span>FIT PORN / RICETTE</span><BookOpen size={16} /></div><div className="cut-recipes">{recipes.filter((recipe) => mealPrefs[recipe.id] !== 'down').map((recipe) => <button className="cut-recipe" key={recipe.title} onClick={() => setSelectedRecipe(recipe)}>{missingImages[recipe.image] ? <i className="cut-recipe-icon" aria-hidden="true"><ProtocolIcon name="food" size={30} /></i> : <img src={recipe.image} alt="" onError={() => imageMissing(recipe.image)} />}<span><small>{recipe.tag}</small><b>{recipe.title}</b></span><ArrowRight size={17} /></button>)}</div></section>
+      <section className="cut-section cut-tastes"><div className="cut-section-title"><span>I TUOI GUSTI</span><ThumbsUp size={16} /></div>{likedIds.length || dislikedIds.length ? <><p className="cut-fine">👍 non vengono mai tolti e sono i primi sostituti. 👎 escono da tutte le settimane: al loro posto entra un piatto simile che tiene calorie, proteine, fibre, pesce e legumi in regola. Tocca un piatto per togliere il pollice.</p>{[[likedIds, 'up', '👍 Ti piacciono'], [dislikedIds, 'down', '👎 Non ti piacciono']].map(([ids, value, title]) => ids.length > 0 && <div className="cut-taste-group" key={value}><small>{title} · {ids.length}</small><div>{ids.map((id) => <button type="button" key={id} className={`cut-taste ${value}`} onClick={() => setMealPref(id, value)} aria-label={`Togli il pollice da ${DISH_TITLE[id]}`}>{DISH_TITLE[id]} <span aria-hidden="true">×</span></button>)}</div></div>)}</> : <p className="cut-fine">Metti 👍 o 👎 sui piatti del menu: li ricordo qui. Un 👎 sostituisce quel piatto in tutte le settimane con uno simile, senza uscire dalla dieta.</p>}</section>
       <section className="cut-section"><div className="cut-section-title"><span>COME USARE IL PIANO</span></div>{rules.map((rule) => <p className="cut-rule" key={rule}>{rule}</p>)}</section>
     </>}
 
@@ -269,6 +287,6 @@ export default function CutPlan({ view = 'today', onNavigate, systemLogs = [], o
       <section className="cut-section"><div className="cut-section-title"><span>CHECK OGNI 4 SETTIMANE</span></div><p className="cut-rule">Segna anche quante trazioni e piegamenti consecutivi riesci a fare e i carichi usati. Se forza, energia o prestazioni calano troppo, alleggerisci l’allenamento e rivedi l’apporto energetico.</p><p className="cut-rule">Le stime di massa grassa della bilancia OKOK servono solo come riferimento: peso medio, girovita e prestazioni sono più utili per questo percorso.</p></section>
       <section className="cut-section"><div className="cut-section-title"><span>FONTI DEL PROTOCOLLO</span></div>{evidence.map((source) => <a className="cut-source" href={source.url} key={source.url} target="_blank" rel="noreferrer">{source.label}<ArrowRight size={15} /></a>)}</section>
     </>}
-    {selectedRecipe && <div className="cut-modal-backdrop" onClick={() => setSelectedRecipe(null)}><div className="cut-modal" role="dialog" aria-modal="true" aria-labelledby="cut-recipe-title" onClick={(e) => e.stopPropagation()}><button className="cut-close" onClick={() => setSelectedRecipe(null)}>Chiudi</button>{selectedRecipe.image && !missingImages[selectedRecipe.image] && <img src={selectedRecipe.image} alt="" onError={() => imageMissing(selectedRecipe.image)} />}<small>{selectedRecipe.tag}</small><h2 id="cut-recipe-title">{selectedRecipe.title}</h2>{selectedRecipe.kcal && <div className="cut-macro-chips"><span>≈ {selectedRecipe.kcal} kcal</span><span>{selectedRecipe.protein} g proteine</span>{selectedRecipe.fiber != null && <span>{selectedRecipe.fiber} g fibre</span>}{selectedRecipe.cost != null && <span>≈ {selectedRecipe.cost.toFixed(2).replace('.', ',')} € a porzione</span>}{selectedRecipe.tags?.includes('sera prima') && <span>🌙 si prepara la sera prima</span>}</div>}<h3>Ingredienti</h3>{Array.isArray(selectedRecipe.ingredients) ? <ul className="cut-ingredients">{selectedRecipe.ingredients.map((item) => <li key={item}>{item}</li>)}</ul> : <p>{selectedRecipe.ingredients}</p>}<h3>Preparazione</h3>{Array.isArray(selectedRecipe.steps) ? <ol className="cut-steps">{selectedRecipe.steps.map((step) => <li key={step}>{step}</li>)}</ol> : <p>{selectedRecipe.steps}</p>}{selectedRecipe.kcal && <p className="cut-fine">Valori stimati sulle quantità indicate: condimenti e marche li cambiano. Registra nel diario quello che mangi davvero.</p>}</div></div>}
+    {selectedRecipe && <div className="cut-modal-backdrop" onClick={() => setSelectedRecipe(null)}><div className="cut-modal" role="dialog" aria-modal="true" aria-labelledby="cut-recipe-title" onClick={(e) => e.stopPropagation()}><button className="cut-close" onClick={() => setSelectedRecipe(null)}>Chiudi</button>{selectedRecipe.image && !missingImages[selectedRecipe.image] && <img src={selectedRecipe.image} alt="" onError={() => imageMissing(selectedRecipe.image)} />}<small>{selectedRecipe.tag}</small><h2 id="cut-recipe-title">{selectedRecipe.title}</h2>{SWAPPABLE.has(selectedRecipe.id) && <>{thumbs(selectedRecipe.id, true)}{mealPrefs[selectedRecipe.id] === 'down' && <p className="cut-thumbs-note">Fatto: non comparirà più nel piano, al suo posto c’è un piatto simile. Premi di nuovo 👎 per riaverlo.</p>}{mealPrefs[selectedRecipe.id] === 'up' && <p className="cut-thumbs-note">Salvato: non lo tolgo mai, ed è tra i primi sostituti.</p>}</>}{selectedRecipe.kcal && <div className="cut-macro-chips"><span>≈ {selectedRecipe.kcal} kcal</span><span>{selectedRecipe.protein} g proteine</span>{selectedRecipe.fiber != null && <span>{selectedRecipe.fiber} g fibre</span>}{selectedRecipe.cost != null && <span>≈ {selectedRecipe.cost.toFixed(2).replace('.', ',')} € a porzione</span>}{selectedRecipe.tags?.includes('sera prima') && <span>🌙 si prepara la sera prima</span>}</div>}<h3>Ingredienti</h3>{Array.isArray(selectedRecipe.ingredients) ? <ul className="cut-ingredients">{selectedRecipe.ingredients.map((item) => <li key={item}>{item}</li>)}</ul> : <p>{selectedRecipe.ingredients}</p>}<h3>Preparazione</h3>{Array.isArray(selectedRecipe.steps) ? <ol className="cut-steps">{selectedRecipe.steps.map((step) => <li key={step}>{step}</li>)}</ol> : <p>{selectedRecipe.steps}</p>}{selectedRecipe.kcal && <p className="cut-fine">Valori stimati sulle quantità indicate: condimenti e marche li cambiano. Registra nel diario quello che mangi davvero.</p>}</div></div>}
   </main>;
 }

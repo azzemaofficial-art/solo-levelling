@@ -221,11 +221,38 @@ export const mealWeeks = WEEKS.map((week) => week.map((ids, day) => ({
   note: NOTES[day],
 })));
 
+// Pasti che si possono cambiare col 👎 (src/utils/mealPrefs.js): giorno → { posizione del pasto: gruppo }.
+// Gli altri sono abitudini fisse di Emanuele (piadine, McDonald’s, cavallo, mamma, pizza, Gocciole,
+// cocktail, spuntini del calcio). Un piatto si sostituisce solo con uno dello stesso gruppo.
+const SWAP = [
+  { 0: 'colazione', 3: 'pollo e riso' },
+  { 0: 'colazione', 1: 'pranzo', 2: 'spuntino', 3: 'cena' },
+  { 0: 'colazione', 1: 'pranzo', 2: 'spuntino' },
+  { 0: 'colazione', 1: 'pranzo', 2: 'spuntino', 3: 'cena prima del calcio' },
+  { 0: 'colazione', 1: 'pranzo', 2: 'spuntino', 3: 'cena' },
+  { 2: 'spuntino', 3: 'cena' },
+  {},
+];
+export const swapGroup = (day, index) => SWAP[day]?.[index] || null;
+// i piatti di ogni gruppo: tutti quelli che il piano usa in quel posto nelle 6 settimane
+// (la cena prima del calcio del giovedì può diventare anche un pollo e riso del lunedì)
+export const swapPools = (() => {
+  const pools = {};
+  mealWeeks.forEach((week) => week.forEach((d, day) => d.slots.forEach((s, i) => {
+    const g = swapGroup(day, i);
+    if (!g) return;
+    pools[g] = pools[g] || [];
+    if (!pools[g].some((x) => x.id === s.id)) pools[g].push({ id: s.id, meal: s.meal, image: s.image });
+  })));
+  pools['cena prima del calcio'] = [...pools['cena prima del calcio'], ...pools['pollo e riso']];
+  return pools;
+})();
+
 // Sezione FIT PORN: le ricette più golose del menu (etichetta 'fit porn' in mealRecipes.js), ognuna con
 // la sua foto e la ricetta completa, più due extra fuori calendario.
-const FIT_PORN = Object.values(M)
-  .filter(([text], i, all) => mealRecipes[text]?.tags?.includes('fit porn') && all.findIndex(([t]) => t === text) === i)
-  .map(([text, img]) => ({ ...mealRecipes[text], image: `/recipes/${img}.jpg`, tag: `Fit porn • ${mealRecipes[text].time}` }));
+const FIT_PORN = Object.entries(M)
+  .filter(([, [text]], i, all) => mealRecipes[text]?.tags?.includes('fit porn') && all.findIndex(([, [t]]) => t === text) === i)
+  .map(([id, [text, img]]) => ({ ...mealRecipes[text], id, image: `/recipes/${img}.jpg`, tag: `Fit porn • ${mealRecipes[text].time}` }));
 export const recipes = [
   ...FIT_PORN,
   { title: 'Smash burger fit col panino', tag: 'Fit porn • 20 min', image: '/recipes/smash-burger.jpg', ingredients: 'Burger magro 180 g, bun 90 g, cheddar 20 g, lattuga, pomodoro, salsa yogurt.', steps: 'Scotta il burger su piastra rovente, aggiungi cheddar; tosta il bun e monta con verdure e salsa. Servi con patate al forno.' },
