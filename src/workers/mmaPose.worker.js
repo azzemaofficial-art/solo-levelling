@@ -4,7 +4,8 @@
 // fermi). Se il telefono è troppo lento col full (> 55 ms a fotogramma) torna al lite e l'app
 // se lo ricorda. Solo CPU: la GPU nei worker si blocca su alcuni browser.
 // Ogni punto passa dal filtro One Euro: niente tremolio da fermo, niente ritardo nei colpi.
-import { createPoseFilter, IMAGE_FILTER, WORLD_FILTER } from '../../lib/poseFilter.js';
+// Lo scheletro disegnato ha un filtro suo, più leggero (display): lo leviga il disegnatore a 60 Hz.
+import { createImageFilter, createPoseFilter, DISPLAY_FILTER, IMAGE_FILTER, WORLD_FILTER } from '../../lib/poseFilter.js';
 
 const VERSION = '0.10.18';
 const MODELS = {
@@ -12,7 +13,7 @@ const MODELS = {
   lite: 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task',
 };
 let vision, files, detector, model = null, timings = [], lastTime = -1, noUpgrade = false, fullBytes = null;
-const imageFilter = createPoseFilter(IMAGE_FILTER), worldFilter = createPoseFilter(WORLD_FILTER);
+const imageFilter = createPoseFilter(IMAGE_FILTER), worldFilter = createPoseFilter(WORLD_FILTER), displayFilter = createImageFilter(DISPLAY_FILTER);
 
 async function load(next, buffer) {
   const created = await vision.PoseLandmarker.createFromOptions(files, {
@@ -60,8 +61,9 @@ self.onmessage = async ({ data }) => {
       const raw = result.landmarks[0] || [], rawWorld = result.worldLandmarks?.[0] || [];
       // world = coordinate 3D stimate in metri (origine tra le anche): servono al giudice delle combo
       const points = raw.length ? imageFilter.apply(raw, data.time) : (imageFilter.reset(), raw);
+      const display = raw.length ? displayFilter.apply(raw, data.time, data.aspect) : (displayFilter.reset(), raw);
       const world = rawWorld.length ? worldFilter.apply(rawWorld, data.time) : (worldFilter.reset(), rawWorld);
-      self.postMessage({ type: 'pose', points, world, time: data.time, aspect: data.aspect, ms: Math.round(ms) });
+      self.postMessage({ type: 'pose', points, world, display, time: data.time, aspect: data.aspect, ms: Math.round(ms) });
       // col full il telefono non sta dietro a un jab → torna al lite (e l'app lo ricorda)
       timings.push(ms); if (timings.length > 20) timings.shift();
       if (model === 'full' && timings.length >= 20 && [...timings].sort((a, b) => a - b)[10] > 55) {
