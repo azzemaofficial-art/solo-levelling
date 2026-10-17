@@ -8,6 +8,7 @@ import { coachFeedback, createComboJudge, describeGesture, needsFeet, teachSampl
 import { forgetRep, learnFromRep, loadTemplates, saveTemplates } from '../../lib/mmaTemplates';
 import { encodeClip, readChatId, sendClips } from '../../lib/mmaClips';
 import MmaCameraSetup from './MmaCameraSetup';
+import MmaBagStep, { readBagMode, saveBagMode, useMmaBag } from './MmaBag';
 
 const MmaTeach = lazy(() => import('./MmaTeach'));
 import { MOVES, comboKeys } from '../data/mmaMoves';
@@ -113,6 +114,8 @@ export default function MmaComboTrainer({ combo, onClose, onLearned }) {
   const [teachOpen, setTeachOpen] = useState(false);
   const [label, setLabel] = useState(null); // ultimo colpo letto, mostrato sulla camera
   const [reported, setReported] = useState(false);
+  const [bagOn, setBagOn] = useState(readBagMode); // al sacco: bersagli sul sacco e colpi a segno
+  const bag = useMmaBag({ stance, moves, labels: moves.map((id) => MOVES[id].num) });
   const judgeRef = useRef(createComboJudge({ stance, templates }));
   const templatesRef = useRef(templates); templatesRef.current = templates;
   // nuovi esempi tuoi (da una combo riuscita, o tolti dopo "Il coach ha sbagliato"): salvati e subito in uso
@@ -135,23 +138,27 @@ export default function MmaComboTrainer({ combo, onClose, onLearned }) {
     const judge = judgeRef.current;
     const t0 = repRef.current.start;
     // vale anche un colpo partito un attimo prima del "via"
-    const res = judge.judgeRep(moves, { since: t0 - 700 });
+    // al sacco: i colpi del motore si abbinano ai contatti (a segno, e il braccio giusto)
+    const scored = bag.score(judge, t0 - 700);
+    const res = scored?.result || judge.judgeRep(moves, { since: t0 - 700 });
     const frames = judge.frames().filter((f) => f.t >= t0 - 200);
     const marks = res.moves.flatMap((mv) => (mv.gesture && mv.issues.length ? [{ t: mv.gesture.peakT ?? mv.gesture.start, joint: MOVE_JOINT(mv.id, judge.lead, judge.rear), text: `${MOVES[mv.id].name}: ${mv.issues[0].text}` }] : []));
     const rep = Date.now();
-    const entry = { ...res, rep, frames, marks, feedback: coachFeedback(res, moveNames), seen: judge.gestures().filter((g) => g.start >= t0 - 700).map((g) => g.move || describeGesture(g)) };
+    const onBag = scored?.bag ? ` A segno ${scored.bag.hits} su ${scored.bag.total}.` : '';
+    const entry = { ...res, rep, frames, marks, bag: scored?.bag || null, feedback: coachFeedback(res, moveNames) + onBag, seen: judge.gestures().filter((g) => g.start >= t0 - 700).map((g) => g.move || describeGesture(g)) };
     // combo riuscita: i colpi riconosciuti diventano tuoi esempi in più (il coach impara mentre ti alleni)
     applyTemplates(learnFromRep(templatesRef.current, res, { rep, sample: teachSample }));
     setCurrent(entry); setReported(false);
     setResults((prev) => [...prev, entry]);
     setPhase('result');
     say(entry.feedback, voice);
-  }, [moves, moveNames, voice, applyTemplates]);
+  }, [moves, moveNames, voice, applyTemplates, bag]);
 
   // fotogrammi dalla camera
-  const onFrame = useCallback((points, t, aspect, world) => {
+  const onFrame = useCallback((points, t, aspect, world, extra) => {
     const judge = judgeRef.current;
     const ph = phaseRef.current;
+    bag.frame(points, t, aspect, extra, ph);
     if (ph === 'calibrate') {
       // tollerante: guardia in 3D, mano dietro coperta ok, la barra non si azzera per un fotogramma
       const read = readPose(points, world, { aspect, needFeet: feet });
@@ -159,9 +166,10 @@ export default function MmaComboTrainer({ combo, onClose, onLearned }) {
       setFraming(read.hint); setCalib(progress);
       const now = performance.now();
       if (!read.ok && (read.hint !== hintRef.current.text ? now - hintRef.current.at > 2500 : now - hintRef.current.at > 7000)) { hintRef.current = { text: read.hint, at: now }; say(read.hint, voice); }
-      if (read.ok && world?.length) judge.calibrate(world, points, aspect);
+      if (read.ok && world?.length) { judge.calibrate(world, points, aspect); bag.calibPoint(points); }
       if (readyRef.current.done && judge.isCalibrated()) {
         readyRef.current.reset();
+        bag.arm(() => judge.engine?.order?.());
         setPhase('demo');
         say(`Guarda la combo: ${combo.name}.`, voice);
         later(() => { setPhase('countdown'); setCount(3); say('Tre. Due. Uno. Via!', voice); }, Math.max(3200, moves.length * 1100));
@@ -188,13 +196,15 @@ export default function MmaComboTrainer({ combo, onClose, onLearned }) {
       repRef.current.lastLive = t;
       const r = judge.judgeRep(moves, { since: repRef.current.start - 700 });
       setLive(r.moves.map((mv) => mv.status));
+      bag.setLive(r.moves.map((mv) => mv.status));
       const needed = r.moves.filter((mv) => mv.status !== 'guided').length;
       const done = r.moves.filter((mv) => mv.status === 'ok' || mv.status === 'partial').length;
       const quietFor = t - Math.max(repRef.current.lastActive, repRef.current.start);
       if ((done >= needed && judge.idle() && quietFor > 600) || t - repRef.current.start > 2600 + moves.length * 1100) finishRep();
     }
-  }, [feet, combo.name, moves, voice, finishRep]);
-  const camera = useMmaCamera(onFrame, { minInterval: 33, canSwap: () => phaseRef.current !== 'go' });
+  }, [feet, combo.name, moves, voice, finishRep, bag]);
+  const camera = useMmaCamera(onFrame, { minInterval: 33, canSwap: () => phaseRef.current !== 'go', overlay: bagOn ? bag.overlay : undefined });
+  bag.setCamera(camera);
 
   // countdown → via
   useEffect(() => {
@@ -204,12 +214,13 @@ export default function MmaComboTrainer({ combo, onClose, onLearned }) {
       repRef.current = { start: performance.now(), lastActive: 0, lastLive: 0 };
       setLabel(null);
       setLive(moves.map(() => 'missing'));
+      bag.startRep();
       setPhase('go');
       return undefined;
     }
     const id = setTimeout(() => setCount((c) => c - 1), 700);
     return () => clearTimeout(id);
-  }, [phase, count, moves]);
+  }, [phase, count, moves, bag]);
 
   // dopo il risultato: prossima ripetizione o riassunto
   useEffect(() => {
@@ -230,13 +241,19 @@ export default function MmaComboTrainer({ combo, onClose, onLearned }) {
     try { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; window.speechSynthesis?.speak(u); } catch { /* voce */ }
     judgeRef.current = createComboJudge({ stance, templates }); readyRef.current.reset();
     setCalib(0); setResults([]); setCurrent(null);
-    setPhase('calibrate');
-    say(feet ? 'Mettiti a due o tre metri, corpo intero in inquadratura, mani in guardia.' : 'Mettiti a un metro e mezzo, busto e braccia in inquadratura, mani in guardia.', voice);
+    bag.reset();
+    if (bagOn) { setPhase('bag'); say('Tocca il sacco sullo schermo.', voice); }
+    else calibrate();
     camera.start(facing);
   };
-  const close = () => { camera.stop(); window.speechSynthesis?.cancel(); onClose(); };
+  const calibrate = () => {
+    setPhase('calibrate');
+    say(bagOn && bag.ready() ? 'Mettiti in guardia accanto al sacco, corpo intero in inquadratura.' : feet ? 'Mettiti a due o tre metri, corpo intero in inquadratura, mani in guardia.' : 'Mettiti a un metro e mezzo, busto e braccia in inquadratura, mani in guardia.', voice);
+  };
+  const close = () => { bag.close(); camera.stop(); window.speechSynthesis?.cancel(); onClose(); };
   const mirrored = facing === 'user';
   const avg = results.length ? Math.round(results.reduce((s, r) => s + r.total, 0) / results.length) : 0;
+  const bagHits = results.some((r) => r.bag) ? results.reduce((s, r) => ({ hits: s.hits + (r.bag?.hits || 0), total: s.total + (r.bag?.total || 0) }), { hits: 0, total: 0 }) : null;
   const topIssue = (() => {
     const tally = {};
     results.forEach((r) => r.moves.forEach((mv) => mv.issues.forEach((it) => { tally[it.text] = (tally[it.text] || 0) + 1; })));
@@ -253,15 +270,18 @@ export default function MmaComboTrainer({ combo, onClose, onLearned }) {
     {phase === 'setup' ? <section className="mma-train-setup">
       <div className="mma-train-ghost"><GhostDemo combo={combo} speed={0.6} /></div>
       <h3>Dove mettere il telefono</h3>
-      <MmaCameraSetup stance={stance} />
+      <MmaCameraSetup stance={stance} bag={bagOn} />
       <ol>
-        <li>Telefono in verticale, fermo, all’altezza del petto, {feet ? 'a 2–3 metri: servono anche i piedi' : 'a 2 metri'}.</li>
+        {bagOn
+          ? <li>Telefono fermo all’altezza del petto, a 2,5–3 metri, di lato dalla parte del braccio avanti: devono entrare <b>tutto il sacco</b>, catena compresa, e tutto il tuo corpo.</li>
+          : <li>Telefono in verticale, fermo, all’altezza del petto, {feet ? 'a 2–3 metri: servono anche i piedi' : 'a 2 metri'}.</li>}
         <li><b>Non colpire verso il telefono</b>: il pugno che arriva dritto alla camera non si vede.</li>
         <li>Buona luce davanti a te, niente controluce.</li>
       </ol>
       <button className={`mma-teach-banner ${templates ? 'done' : ''}`} onClick={() => setTeachOpen(true)}><GraduationCap size={22} /><span><b>{templates ? `Il coach conosce ${new Set(templates.items.map((it) => it.move)).size} tuoi colpi` : 'Prima insegnami i tuoi colpi'}</b><small>{templates ? 'Rifalli se cambi posto o angolo della camera.' : '2 minuti: 3 volte ogni colpo. Poi riconosco te, non un atleta medio.'}</small></span></button>
       {guided.length > 0 && <p className="mma-train-note">{guided.map((id) => MOVES[id].name).join(' e ')}: solo su materassina e con istruttore. Il coach non li giudica, esegui il gesto lento.</p>}
       <div className="mma-train-reps" role="radiogroup" aria-label="Ripetizioni">{[4, 6, 10].map((n) => <button key={n} role="radio" aria-checked={reps === n} className={reps === n ? 'active' : ''} onClick={() => setReps(n)}>{n} ripetizioni</button>)}</div>
+      <div className="mma-train-reps" role="radiogroup" aria-label="Dove colpisci">{[[false, 'Colpi a vuoto'], [true, 'Al sacco']].map(([on, txt]) => <button key={txt} role="radio" aria-checked={bagOn === on} className={bagOn === on ? 'active' : ''} onClick={() => { setBagOn(on); saveBagMode(on); }}>{txt}</button>)}</div>
       <div className="mma-train-reps"><button className={facing === 'user' ? 'active' : ''} onClick={() => setFacing('user')}>Camera frontale</button><button className={facing === 'environment' ? 'active' : ''} onClick={() => setFacing('environment')}>Camera posteriore</button></div>
       {templates
         ? <button className="mma-combo-done" onClick={startCamera}><Video size={19} /> Avvia la camera</button>
@@ -271,12 +291,13 @@ export default function MmaComboTrainer({ combo, onClose, onLearned }) {
         </>}
       <p className="mma-train-note">Il video resta sul telefono: niente registrazioni né invii. Il coach vede la posa in 3D stimato: ordine dei colpi, guardia, distensione, rotazione e ritorno. Non misura potenza né impatto.</p>
     </section> : <>
-      <div className="mma-train-stage">
+      <div className="mma-train-stage" onClick={phase === 'bag' && bag.step !== 'ready' ? (e) => bag.tap(e.clientX, e.clientY) : undefined}>
         <video ref={camera.videoRef} autoPlay muted playsInline style={{ transform: mirrored ? 'scaleX(-1)' : undefined }} onClick={() => camera.videoRef.current?.play()} />
         <canvas ref={camera.canvasRef} style={{ transform: mirrored ? 'scaleX(-1)' : undefined }} />
         {camera.status !== 'ready' && camera.status !== 'error' && <div className="mma-train-overlay">{camera.status === 'permission' ? 'Consenti l’uso della fotocamera…' : 'Carico il riconoscimento del corpo…'}</div>}
         {camera.status === 'error' && <div className="mma-train-overlay error">{camera.error}<button onClick={startCamera}>Riprova</button></div>}
         {phase === 'calibrate' && camera.status === 'ready' && <div className="mma-train-calib"><strong>{framing || 'Mettiti in guardia'}</strong><div role="progressbar" aria-valuenow={Math.round(calib * 100)} aria-valuemin={0} aria-valuemax={100}><i style={{ width: `${calib * 100}%` }} /></div></div>}
+        {phase === 'bag' && camera.status === 'ready' && <MmaBagStep bag={bag} onDone={calibrate} onSkip={() => { setBagOn(false); bag.reset(); calibrate(); }} />}
         {phase === 'demo' && <div className="mma-train-demo"><GhostDemo combo={combo} speed={0.7} /><span>Guarda la combo…</span></div>}
         {phase === 'countdown' && <div className="mma-train-count" key={count}>{count || 'VIA!'}</div>}
         {phase === 'go' && <div className="mma-train-go">VAI!</div>}
@@ -286,7 +307,8 @@ export default function MmaComboTrainer({ combo, onClose, onLearned }) {
 
       <div className="mma-train-moves">{moves.map((id, i) => {
         const st = phase === 'result' && current ? current.moves[i].status : live[i];
-        return <span key={`${id}-${i}`} className={`st-${st || 'missing'}`}><b>{MOVES[id].num}</b>{MOVES[id].name}{phase === 'result' && current && current.moves[i].status !== 'guided' && <em>{current.moves[i].score}</em>}</span>;
+        const hit = phase === 'result' && current ? current.bag?.hit[i] : phase === 'go' && bag.liveHit(i);
+        return <span key={`${id}-${i}`} className={`st-${st || 'missing'}${hit ? ' hit' : ''}`}><b>{MOVES[id].num}</b>{MOVES[id].name}{phase === 'result' && current && current.moves[i].status !== 'guided' && <em>{current.moves[i].score}</em>}</span>;
       })}</div>
 
       {phase === 'result' && current && <section className="mma-train-feedback">
@@ -303,6 +325,7 @@ export default function MmaComboTrainer({ combo, onClose, onLearned }) {
         <small>FINE SERIE</small>
         <h3>Media {avg}/100</h3>
         <div className="mma-train-bars">{results.map((r, i) => <i key={i} style={{ height: `${Math.max(8, r.total)}%` }} className={`grade-${r.grade}`} title={`${i + 1}: ${r.total}`} />)}</div>
+        {bagHits && <p>Colpi a segno sul sacco: <b>{bagHits.hits} su {bagHits.total}</b>.</p>}
         {topIssue && <p>Da sistemare più spesso: <b>{topIssue}</b>.</p>}
         <p className="mma-train-note">Salvato nel diario allenamenti.{avg >= 80 ? ' Combo segnata come imparata.' : ''}</p>
         <div className="mma-train-actions"><button onClick={() => { setResults([]); setPhase('countdown'); setCount(3); }}><RotateCcw size={16} /> Un’altra serie</button><button onClick={close}><Check size={16} /> Fine</button></div>

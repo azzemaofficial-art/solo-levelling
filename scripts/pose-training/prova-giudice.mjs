@@ -5,14 +5,18 @@
 import { createComboJudge } from '../../lib/mmaComboJudge.js';
 import { createPoseFilter, createImageFilter, DISPLAY_FILTER, IMAGE_FILTER, WORLD_FILTER } from '../../lib/poseFilter.js';
 import { available, loadV7 } from './dati.mjs';
+import { schedule } from './misura.mjs';
 
 if (!available()) { console.log('Mancano i dati privati in tests/fixtures/private/ (vedi README).'); process.exit(0); }
-const { v7 } = loadV7();
+const ds = loadV7(), { v7 } = ds;
 const ARM = { jab: 'lead', hook: 'lead', uppercut: 'lead', cross: 'rear', rearHook: 'rear', rearUppercut: 'rear' };
 
-export function judge(makeFilter) {
+// sched: quali fotogrammi legge il telefono e con che tempo ([{ i, t }], da misura.mjs → schedule);
+// senza, tutti i fotogrammi col loro tempo vero
+export function judge(makeFilter, sched = null) {
   const imgF = makeFilter(), wF = createPoseFilter(WORLD_FILTER), j = createComboJudge({ stance: v7.stance }), gs = [];
-  v7.frames.forEach(([t, p, w], i) => {
+  (sched || v7.frames.map((f, i) => ({ i, t: f[0] }))).forEach(({ i: fi, t }, i) => {
+    const [, p, w] = v7.frames[fi];
     const points = Array.from({ length: 33 }, () => ({ x: 0.5, y: 0.5, visibility: 0 }));
     const world = Array.from({ length: 33 }, () => ({ x: 0, y: 0, z: 0, visibility: 0 }));
     v7.j.forEach((jj, k) => {
@@ -43,3 +47,11 @@ export function judge(makeFilter) {
 console.log('filtro del giudice (IMAGE_FILTER)'.padEnd(34), judge(() => createPoseFilter(IMAGE_FILTER)));
 console.log('filtro del disegno (DISPLAY_FILTER)'.padEnd(34), judge(() => createImageFilter(DISPLAY_FILTER)));
 console.log('nessun filtro'.padEnd(34), judge(() => ({ apply: (p) => p })));
+
+// 17/10/2026: la catena del telefono cambia l'input del giudice (stesso filtro IMAGE_FILTER):
+// prima si leggeva un fotogramma quando lo schermo si aggiornava, col tempo del rAF; ora si legge
+// l'ultimo fotogramma appena il modello è libero, col tempo vero del fotogramma.
+for (const inf of [33, 40, 45]) {
+  console.log(`telefono, modello ${inf} ms · prima`.padEnd(34), judge(() => createPoseFilter(IMAGE_FILTER), schedule(ds, 'raf', { inf })));
+  console.log(`telefono, modello ${inf} ms · dopo`.padEnd(34), judge(() => createPoseFilter(IMAGE_FILTER), schedule(ds, 'subito', { inf })));
+}
