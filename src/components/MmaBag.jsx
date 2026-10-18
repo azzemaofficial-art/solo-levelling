@@ -27,7 +27,7 @@ export function useMmaBag({ stance, moves, labels }) {
   const [step, setStep] = useState('tap'); // tap → check → ready
   const [res, setRes] = useState(null);
   const s = useRef(null);
-  if (!s.current) s.current = { cam: null, points: null, calib: [], bag: null, zones: null, targets: [], det: null, mode: 'off', phase: '', hits: {}, flashes: [], live: [], usable: false };
+  if (!s.current) s.current = { cam: null, points: null, calib: [], bag: null, zones: null, targets: [], det: null, mode: 'off', phase: '', hits: {}, flashes: [], live: [], usable: false, trace: [] };
   const cfg = useRef({}); cfg.current = { stance, moves, labels };
   const api = useMemo(() => {
     const st = s.current;
@@ -43,7 +43,7 @@ export function useMmaBag({ stance, moves, labels }) {
     };
     return {
       setCamera: (camera) => { st.cam = camera; },
-      reset: () => { st.bag = null; st.det = null; st.mode = 'off'; st.calib = []; st.targets = []; st.hits = {}; setRes(null); setStep('tap'); st.cam?.setRoi?.(null); },
+      reset: () => { st.bag = null; st.det = null; st.mode = 'off'; st.calib = []; st.targets = []; st.hits = {}; st.trace = []; setRes(null); setStep('tap'); st.cam?.setRoi?.(null); },
       // tocco sullo schermo → punto dell'immagine → analisi del fotogramma
       tap: (clientX, clientY) => {
         const p = st.cam?.toImagePoint?.(clientX, clientY);
@@ -62,6 +62,9 @@ export function useMmaBag({ stance, moves, labels }) {
         st.phase = phase;
         if (!st.det || !points) return;
         const fresh = st.det.push(points, t, { thumb: extra?.roiThumb || null, aspect: aspect || 1 });
+        // registro: movimento del sacco di questo fotogramma (t, spostamento, velocità, tremolio, visibile, impulso)
+        const mo = st.det.motion?.();
+        if (mo && mo.t === t) { st.trace.push([t, mo.pos, mo.vel, mo.e ?? null, mo.usable ? 1 : 0, mo.impulse?.z || 0]); if (st.trace.length > 600) st.trace.shift(); }
         if (phase === 'go' && st.det.state().usable) st.usable = true;
         for (const c of fresh) {
           st.flashes.push({ x: c.x, y: c.y, S: c.S, t: performance.now() });
@@ -80,7 +83,7 @@ export function useMmaBag({ stance, moves, labels }) {
         st.targets = bagTargets(st.bag, zones, ids, { labels: lab, stance: stc });
         st.det = createBagContacts({ bag: st.bag, zones, roi, order });
         st.cam?.setRoi?.(roi);
-        st.mode = 'live'; st.calib = [];
+        st.mode = 'live'; st.calib = []; st.trace = [];
       },
       startRep: () => { st.hits = {}; st.live = []; st.usable = false; },
       setLive: (statuses) => { st.live = statuses; },
@@ -96,7 +99,7 @@ export function useMmaBag({ stance, moves, labels }) {
         sc.hit.forEach((h, i) => { if (h) hits[i] = st.hits[i] ?? now; });
         st.hits = hits;
         // sacco mai visto bene e nessun contatto: non si dice "0 a segno"
-        return { result, bag: st.usable || contacts.length ? sc : null };
+        return { result, bag: st.usable || contacts.length ? sc : null, gestures: m.gestures };
       },
       overlay: (ctx, W, H, points, now, info) => {
         if (!st.bag || st.mode === 'off') return;
@@ -107,6 +110,11 @@ export function useMmaBag({ stance, moves, labels }) {
         }, now);
       },
       close: () => { st.cam?.setRoi?.(null); },
+      // registro degli allenamenti (solo lettura): sacco, zone, contatti e movimento dal momento since
+      snapshot: (since = -Infinity) => (st.bag ? {
+        box: st.bag.box, axis: st.bag.axis, width: st.bag.width, zones: st.zones,
+        contacts: st.det ? st.det.contacts(since) : [], motion: st.trace.filter((m) => m[0] >= since),
+      } : null),
     };
   }, []);
   api.step = step; api.res = res;

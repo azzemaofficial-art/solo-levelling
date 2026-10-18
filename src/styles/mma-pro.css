@@ -102,7 +102,8 @@
 .mma-train-score b{font:800 30px/1 var(--font-display)}
 .mma-train-score small{font:800 9px/1 var(--font-label);letter-spacing:.08em}
 .grade-perfect{color:#7ee0b0}.grade-good{color:#ffd184}.grade-redo{color:#ff9b9b}
-.mma-train-moves{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none}
+/* flex:none: nella colonna che scorre una riga con overflow si schiacciava a altezza 0 (colpi invisibili dopo il 👎, visto in prova il 18/10) */
+.mma-train-moves{flex:none;display:flex;gap:6px;overflow-x:auto;scrollbar-width:none}
 .mma-train-moves::-webkit-scrollbar{display:none}
 .mma-train-moves span{flex:none;display:flex;flex-direction:column;gap:2px;min-width:70px;padding:8px 10px;border:1px solid #ffffff1c;border-radius:10px;background:#111c26;color:#9fb4bc;font:600 11px/1.2 var(--font-body);transition:background-color .2s ease,border-color .2s ease,transform .2s ease}
 .mma-train-moves b{font:700 15px/1 var(--font-display);color:#6de2d3}
@@ -209,3 +210,22 @@
 .mma-teach-warn{margin:0 0 12px;padding:12px;border:1px solid #ffb38a77;border-radius:12px;background:#3a2018;color:#ffe2cf;font-size:13px;line-height:1.5}
 .mma-teach-warn .mma-cam-setup{margin-top:10px}
 @media(prefers-reduced-motion:reduce){.mma-teach-go{animation:none}.mma-teach-meter i{transition:none}}
+/* ── Registro degli allenamenti: «Ha capito?» e colpi letti male (lib/mmaTrain.js) ── */
+.mma-train-vote{display:flex;align-items:center;gap:8px}
+.mma-train-vote>span{flex:1;color:#9ff3e6;font:700 13px/1.2 var(--font-label);letter-spacing:.04em}
+.mma-train-vote button{display:flex;align-items:center;justify-content:center;gap:6px;min-width:72px;min-height:44px;padding:0 14px;border:1px solid #ffffff22;border-radius:12px;background:#16222e;color:#dff;font:700 12px/1.1 var(--font-label);cursor:pointer;transition:background-color .2s ease,border-color .2s ease}
+.mma-train-vote button.up[aria-pressed=true]{border-color:#7ee0b0;background:#133a2c;color:#d8ffe9}
+.mma-train-vote button.down[aria-pressed=true]{border-color:#ff8a7a;background:#3a1a1d;color:#ffd9d4}
+.mma-train-votes{display:grid;gap:6px}
+.mma-train-votes .mma-train-vote>span{color:#dcebef;font:600 13px/1.35 var(--font-body,inherit);letter-spacing:0;overflow-wrap:anywhere}
+.mma-train-votes .mma-train-vote>span b{margin-right:6px;color:#6de2d3;font:800 13px/1 var(--font-label)}
+.mma-train-votes .mma-train-vote button{min-width:48px;padding:0 12px}
+.mma-train-moves span.pick{cursor:pointer;border-style:dashed}
+.mma-train-moves span.wrong{border:1px solid #ff8a7a;background:#3a1a1d;color:#ffd9d4;box-shadow:0 0 0 2px #ff8a7a44;transform:none}
+.mma-train-moves span.wrong::after{content:'letto male';font:800 9px/1 var(--font-label);letter-spacing:.06em;color:#ff9b9b}
+.mma-train-log{display:flex;align-items:center;gap:8px;width:100%;margin:10px 0 4px;padding:8px 2px;border:0;background:none;color:#9fb3c2;font-size:12px;line-height:1.4;text-align:left;cursor:pointer}
+.mma-train-log i{flex:none;width:8px;height:8px;border-radius:50%;background:#56656f}
+.mma-train-log.on i{background:#7ee0b0;box-shadow:0 0 8px #7ee0b099}
+.mma-train-log span{flex:1}
+.mma-train-log b{flex:none;font:700 11px/1 var(--font-label);color:#6de2d3;letter-spacing:.04em}
+@media(prefers-reduced-motion:reduce){.mma-train-vote button{transition:none}}

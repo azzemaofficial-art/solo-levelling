@@ -1,12 +1,13 @@
 import React, { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { ArrowLeft, Check, Flag, GraduationCap, Pause, Play, RotateCcw, Video, Volume2, VolumeX, X } from 'lucide-react';
+import { ArrowLeft, Check, GraduationCap, Pause, Play, RotateCcw, ThumbsDown, ThumbsUp, Video, Volume2, VolumeX, X } from 'lucide-react';
 import useMmaCamera from '../hooks/useMmaCamera';
 import MmaFigure, { useSkeletonPlayer } from './MmaFigure';
 import { createReadiness, readPose } from '../../lib/mmaReadiness';
 import { coachFeedback, createComboJudge, describeGesture, needsFeet, teachSample, EXPECT } from '../../lib/mmaComboJudge';
 import { forgetRep, learnFromRep, loadTemplates, saveTemplates } from '../../lib/mmaTemplates';
 import { encodeClip, readChatId, sendClips } from '../../lib/mmaClips';
+import { NO_VOTE, buildTrainClip, castVote, createTrainPending, fitClip, readTrainLog, saveTrainLog, toggleWrong, trainSender, withVote } from '../../lib/mmaTrain';
 import MmaCameraSetup from './MmaCameraSetup';
 import MmaBagStep, { readBagMode, saveBagMode, useMmaBag } from './MmaBag';
 
@@ -115,6 +116,10 @@ export default function MmaComboTrainer({ combo, onClose, onLearned }) {
   const [label, setLabel] = useState(null); // ultimo colpo letto, mostrato sulla camera
   const [reported, setReported] = useState(false);
   const [bagOn, setBagOn] = useState(readBagMode); // al sacco: bersagli sul sacco e colpi a segno
+  // registro degli allenamenti: ogni ripetizione (solo scheletro) + il tuo giudizio, per migliorare il coach
+  const [trainOn, setTrainOn] = useState(readTrainLog);
+  const [vote, setVote] = useState(NO_VOTE); // 👍/👎 sull'ultima ripetizione e colpi letti male
+  const [votes, setVotes] = useState({}); // giudizi della serie (rep → voto): si vota anche dal riassunto
   const bag = useMmaBag({ stance, moves, labels: moves.map((id) => MOVES[id].num) });
   const judgeRef = useRef(createComboJudge({ stance, templates }));
   const templatesRef = useRef(templates); templatesRef.current = templates;
@@ -128,9 +133,15 @@ export default function MmaComboTrainer({ combo, onClose, onLearned }) {
   const onLearnedRef = useRef(onLearned); onLearnedRef.current = onLearned;
   const phaseRef = useRef(phase); phaseRef.current = phase;
   const repRef = useRef({ start: 0, lastActive: 0, lastLive: 0 });
+  const trainOnRef = useRef(trainOn); trainOnRef.current = trainOn;
+  const facingRef = useRef(facing); facingRef.current = facing;
+  const cameraRef = useRef(null);
+  const logRef = useRef({ session: 0, n: 0, calib: [], aspect: null }); // serie, n° ripetizione, guardia, formato immagine
+  const pendingRef = useRef(null);
+  if (!pendingRef.current) pendingRef.current = createTrainPending({ send: trainSender.send });
   const timers = useRef([]);
   const later = (fn, ms) => { const id = setTimeout(fn, ms); timers.current.push(id); return id; };
-  useEffect(() => () => { timers.current.forEach(clearTimeout); window.speechSynthesis?.cancel(); }, []);
+  useEffect(() => () => { timers.current.forEach(clearTimeout); window.speechSynthesis?.cancel(); pendingRef.current?.flush(); }, []);
   useEffect(() => { try { localStorage.setItem('shadow_monarch_coach_voice', voice ? '1' : '0'); } catch { /* storage */ } }, [voice]);
 
   const finishRep = useCallback(() => {
@@ -148,11 +159,24 @@ export default function MmaComboTrainer({ combo, onClose, onLearned }) {
     const entry = { ...res, rep, frames, marks, bag: scored?.bag || null, feedback: coachFeedback(res, moveNames) + onBag, seen: judge.gestures().filter((g) => g.start >= t0 - 700).map((g) => g.move || describeGesture(g)) };
     // combo riuscita: i colpi riconosciuti diventano tuoi esempi in più (il coach impara mentre ti alleni)
     applyTemplates(learnFromRep(templatesRef.current, res, { rep, sample: teachSample }));
-    setCurrent(entry); setReported(false);
+    // registro: la ripetizione resta in sospeso finché arriva il tuo giudizio (lib/mmaTrain.js)
+    if (trainOnRef.current) {
+      const log = logRef.current, cam = cameraRef.current;
+      log.n += 1;
+      // la clip resta anche nella ripetizione: se non fai in tempo a votare, voti dal riassunto
+      pendingRef.current.hold(entry.train = buildTrainClip({
+        frames, from: t0 - 200, go: t0, calib: log.calib, aspect: log.aspect, rep, session: log.session, n: log.n,
+        combo, moves, stance, templates: Boolean(templatesRef.current), result: res,
+        gestures: scored?.gestures || judge.gestures().filter((g) => g.start >= t0 - 700),
+        bag: scored ? bag.snapshot(t0 - 700) : null, bagScore: scored?.bag || null,
+        phone: { model: cam?.profile?.model || null, cam: facingRef.current, stats: cam?.getStats?.() },
+      }));
+    }
+    setCurrent(entry); setReported(false); setVote(NO_VOTE);
     setResults((prev) => [...prev, entry]);
     setPhase('result');
     say(entry.feedback, voice);
-  }, [moves, moveNames, voice, applyTemplates, bag]);
+  }, [moves, moveNames, voice, applyTemplates, bag, combo, stance]);
 
   // fotogrammi dalla camera
   const onFrame = useCallback((points, t, aspect, world, extra) => {
@@ -166,7 +190,11 @@ export default function MmaComboTrainer({ combo, onClose, onLearned }) {
       setFraming(read.hint); setCalib(progress);
       const now = performance.now();
       if (!read.ok && (read.hint !== hintRef.current.text ? now - hintRef.current.at > 2500 : now - hintRef.current.at > 7000)) { hintRef.current = { text: read.hint, at: now }; say(read.hint, voice); }
-      if (read.ok && world?.length) { judge.calibrate(world, points, aspect); bag.calibPoint(points); }
+      if (read.ok && world?.length) {
+        judge.calibrate(world, points, aspect); bag.calibPoint(points);
+        // registro: la tua guardia (ultimi 16 fotogrammi) serve a rigiocare le ripetizioni come in app
+        const cal = logRef.current.calib; cal.push({ t, world, points }); if (cal.length > 16) cal.shift();
+      }
       if (readyRef.current.done && judge.isCalibrated()) {
         readyRef.current.reset();
         bag.arm(() => judge.engine?.order?.());
@@ -177,6 +205,7 @@ export default function MmaComboTrainer({ combo, onClose, onLearned }) {
       return;
     }
     if (ph !== 'go' || !world?.length) return;
+    logRef.current.aspect = aspect;
     if (!readPose(points, world, { aspect }).visible) {
       judge.abort();
       if (t - repRef.current.start > 2600 + moves.length * 1100) finishRep();
@@ -204,7 +233,7 @@ export default function MmaComboTrainer({ combo, onClose, onLearned }) {
     }
   }, [feet, combo.name, moves, voice, finishRep, bag]);
   const camera = useMmaCamera(onFrame, { minInterval: 33, canSwap: () => phaseRef.current !== 'go', overlay: bagOn ? bag.overlay : undefined });
-  bag.setCamera(camera);
+  bag.setCamera(camera); cameraRef.current = camera;
 
   // countdown → via
   useEffect(() => {
@@ -221,6 +250,9 @@ export default function MmaComboTrainer({ combo, onClose, onLearned }) {
     const id = setTimeout(() => setCount((c) => c - 1), 700);
     return () => clearTimeout(id);
   }, [phase, count, moves, bag]);
+
+  // registro: uscendo dal risultato (ripetizione dopo, riassunto) la clip in sospeso parte
+  useEffect(() => { if (phase !== 'result') pendingRef.current.flush(); }, [phase]);
 
   // dopo il risultato: prossima ripetizione o riassunto
   useEffect(() => {
@@ -240,8 +272,10 @@ export default function MmaComboTrainer({ combo, onClose, onLearned }) {
   const startCamera = () => {
     try { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; window.speechSynthesis?.speak(u); } catch { /* voce */ }
     judgeRef.current = createComboJudge({ stance, templates }); readyRef.current.reset();
-    setCalib(0); setResults([]); setCurrent(null);
+    setCalib(0); setResults([]); setCurrent(null); setVotes({});
     bag.reset();
+    logRef.current = { session: Date.now(), n: 0, calib: [], aspect: null };
+    if (trainOn) trainSender.retry(); // clip rimaste in coda dalla volta scorsa (rete assente)
     if (bagOn) { setPhase('bag'); say('Tocca il sacco sullo schermo.', voice); }
     else calibrate();
     camera.start(facing);
@@ -250,7 +284,31 @@ export default function MmaComboTrainer({ combo, onClose, onLearned }) {
     setPhase('calibrate');
     say(bagOn && bag.ready() ? 'Mettiti in guardia accanto al sacco, corpo intero in inquadratura.' : feet ? 'Mettiti a due o tre metri, corpo intero in inquadratura, mani in guardia.' : 'Mettiti a un metro e mezzo, busto e braccia in inquadratura, mani in guardia.', voice);
   };
-  const close = () => { bag.close(); camera.stop(); window.speechSynthesis?.cancel(); onClose(); };
+  const close = () => { pendingRef.current.flush(); bag.close(); camera.stop(); window.speechSynthesis?.cancel(); onClose(); };
+  // «Ha capito?»: 👍 / 👎. Il 👎 fa anche quello che faceva «Il coach ha sbagliato»: pausa, tolgo gli
+  // esempi presi da questa ripetizione, mando lo scheletro della ripetizione (una volta sola).
+  const voteRep = (ok) => {
+    if (!current || vote.ok === ok) return;
+    const v = castVote(vote, ok);
+    setVote(v); pendingRef.current.vote(v); setVotes((p) => ({ ...p, [current.rep]: v }));
+    if (!ok && !reported) {
+      setReported(true); setPaused(true);
+      applyTemplates(forgetRep(templatesRef.current, current.rep));
+      sendClips([encodeClip(current.frames, { combo: combo.id, expected: moves, seen: current.seen, total: current.total, stance, templates: Boolean(templates), model: camera.profile?.model || null, engine: 7, kind: 'rep' })], { chatId: readChatId(), kind: 'rep' });
+    }
+  };
+  // dopo il 👎: tocchi i colpi che ho letto male (si evidenziano)
+  const markWrong = (i) => { const v = toggleWrong(vote, i); if (v === vote) return; setVote(v); pendingRef.current.vote(v); setVotes((p) => ({ ...p, [current.rep]: v })); };
+  // dal riassunto: sei lontano dal telefono mentre ti alleni, quindi voti a fine serie. La clip riparte
+  // col giudizio (l'analisi tiene l'ultima della ripetizione); il 👎 toglie gli esempi presi da lì.
+  const voteLater = (r, ok) => {
+    const old = votes[r.rep] || NO_VOTE;
+    if (!r.train || old.ok === ok) return;
+    const v = castVote(old, ok);
+    setVotes((p) => ({ ...p, [r.rep]: v }));
+    trainSender.send([fitClip(withVote(r.train, v))]);
+    if (!ok) applyTemplates(forgetRep(templatesRef.current, r.rep));
+  };
   const mirrored = facing === 'user';
   const avg = results.length ? Math.round(results.reduce((s, r) => s + r.total, 0) / results.length) : 0;
   const bagHits = results.some((r) => r.bag) ? results.reduce((s, r) => ({ hits: s.hits + (r.bag?.hits || 0), total: s.total + (r.bag?.total || 0) }), { hits: 0, total: 0 }) : null;
@@ -289,7 +347,10 @@ export default function MmaComboTrainer({ combo, onClose, onLearned }) {
           <button className="mma-combo-done" onClick={() => setTeachOpen(true)}><GraduationCap size={19} /> Prima insegna i tuoi colpi (2 min)</button>
           <button className="mma-train-skip" onClick={startCamera}><Video size={16} /> Avvia senza insegnare · meno preciso</button>
         </>}
-      <p className="mma-train-note">Il video resta sul telefono: niente registrazioni né invii. Il coach vede la posa in 3D stimato: ordine dei colpi, guardia, distensione, rotazione e ritorno. Non misura potenza né impatto.</p>
+      <button className={`mma-train-log ${trainOn ? 'on' : ''}`} role="switch" aria-checked={trainOn} onClick={() => { const on = !trainOn; setTrainOn(on); saveTrainLog(on); }}>
+        <i aria-hidden="true" /><span>{trainOn ? 'Registro solo lo scheletro, niente video, per migliorare il coach' : 'Registro spento: non mando niente'}</span><b>{trainOn ? 'Spegni' : 'Accendi'}</b>
+      </button>
+      <p className="mma-train-note">Il video resta sul telefono: non viene mai registrato né inviato.{trainOn ? ' Partono solo i punti dello scheletro di ogni ripetizione, con il tuo «Ha capito?».' : ''} Il coach vede la posa in 3D stimato: ordine dei colpi, guardia, distensione, rotazione e ritorno. Non misura potenza né impatto.</p>
     </section> : <>
       <div className="mma-train-stage" onClick={phase === 'bag' && bag.step !== 'ready' ? (e) => bag.tap(e.clientX, e.clientY) : undefined}>
         <video ref={camera.videoRef} autoPlay muted playsInline style={{ transform: mirrored ? 'scaleX(-1)' : undefined }} onClick={() => camera.videoRef.current?.play()} />
@@ -308,15 +369,24 @@ export default function MmaComboTrainer({ combo, onClose, onLearned }) {
       <div className="mma-train-moves">{moves.map((id, i) => {
         const st = phase === 'result' && current ? current.moves[i].status : live[i];
         const hit = phase === 'result' && current ? current.bag?.hit[i] : phase === 'go' && bag.liveHit(i);
-        return <span key={`${id}-${i}`} className={`st-${st || 'missing'}${hit ? ' hit' : ''}`}><b>{MOVES[id].num}</b>{MOVES[id].name}{phase === 'result' && current && current.moves[i].status !== 'guided' && <em>{current.moves[i].score}</em>}</span>;
+        // dopo il 👎 (registro acceso) i colpi si toccano: quelli letti male si evidenziano
+        const pick = phase === 'result' && current && trainOn && vote.ok === false && current.moves[i].status !== 'guided';
+        const wrong = pick && vote.wrong.includes(i);
+        const tap = pick ? { role: 'button', tabIndex: 0, 'aria-pressed': wrong, 'aria-label': `${MOVES[id].name}: ${wrong ? 'segnato come letto male' : 'tocca se l’ho letto male'}`, onClick: () => markWrong(i), onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); markWrong(i); } } } : {};
+        return <span key={`${id}-${i}`} className={`st-${st || 'missing'}${hit ? ' hit' : ''}${pick ? ' pick' : ''}${wrong ? ' wrong' : ''}`} {...tap}><b>{MOVES[id].num}</b>{MOVES[id].name}{phase === 'result' && current && current.moves[i].status !== 'guided' && <em>{current.moves[i].score}</em>}</span>;
       })}</div>
 
       {phase === 'result' && current && <section className="mma-train-feedback">
         <p>{current.feedback}</p>
+        <div className="mma-train-vote" role="group" aria-label="Il coach ha capito questa ripetizione?">
+          <span>Ha capito?</span>
+          <button className="up" aria-pressed={vote.ok === true} onClick={() => voteRep(true)}><ThumbsUp size={16} /> Sì</button>
+          <button className="down" aria-pressed={vote.ok === false} onClick={() => voteRep(false)}><ThumbsDown size={16} /> No</button>
+        </div>
+        {vote.ok === false && trainOn && <p className="mma-train-note">Tocca i colpi che ho letto male{vote.wrong.length ? ` (${vote.wrong.length} segnat${vote.wrong.length === 1 ? 'o' : 'i'})` : ''}. Poi premi Continua.</p>}
         <div className="mma-train-actions">
           <button onClick={() => setReplay(current)}><RotateCcw size={16} /> Rivedi al rallentatore</button>
           <button onClick={() => setPaused((v) => !v)}>{paused ? <><Play size={16} /> Continua</> : <><Pause size={16} /> Pausa</>}</button>
-          <button disabled={reported} onClick={() => { setReported(true); setPaused(true); applyTemplates(forgetRep(templatesRef.current, current.rep)); sendClips([encodeClip(current.frames, { combo: combo.id, expected: moves, seen: current.seen, total: current.total, stance, templates: Boolean(templates), model: camera.profile?.model || null, engine: 6, kind: 'rep' })], { chatId: readChatId(), kind: 'rep' }); }}>{reported ? <><Check size={16} /> Inviata</> : <><Flag size={16} /> Il coach ha sbagliato</>}</button>
         </div>
         {reported && <p className="mma-train-note">Grazie: ho mandato i punti dello scheletro di questa ripetizione (niente video). Mi servono per correggere il riconoscimento.</p>}
       </section>}
@@ -327,8 +397,16 @@ export default function MmaComboTrainer({ combo, onClose, onLearned }) {
         <div className="mma-train-bars">{results.map((r, i) => <i key={i} style={{ height: `${Math.max(8, r.total)}%` }} className={`grade-${r.grade}`} title={`${i + 1}: ${r.total}`} />)}</div>
         {bagHits && <p>Colpi a segno sul sacco: <b>{bagHits.hits} su {bagHits.total}</b>.</p>}
         {topIssue && <p>Da sistemare più spesso: <b>{topIssue}</b>.</p>}
+        {trainOn && results.some((r) => r.train) && <div className="mma-train-votes" role="group" aria-label="Il coach ha capito le ripetizioni?">
+          <p className="mma-train-note">Ha capito? Vota le ripetizioni che non hai votato prima. Accanto al numero c’è quello che ho visto.</p>
+          {results.map((r, i) => r.train && <div key={r.rep} className="mma-train-vote">
+            <span><b>{i + 1}</b> {r.seen.length ? r.seen.join(' · ') : 'nessun colpo'}</span>
+            <button className="up" aria-label={`Ripetizione ${i + 1}: ha capito`} aria-pressed={votes[r.rep]?.ok === true} onClick={() => voteLater(r, true)}><ThumbsUp size={16} /></button>
+            <button className="down" aria-label={`Ripetizione ${i + 1}: non ha capito`} aria-pressed={votes[r.rep]?.ok === false} onClick={() => voteLater(r, false)}><ThumbsDown size={16} /></button>
+          </div>)}
+        </div>}
         <p className="mma-train-note">Salvato nel diario allenamenti.{avg >= 80 ? ' Combo segnata come imparata.' : ''}</p>
-        <div className="mma-train-actions"><button onClick={() => { setResults([]); setPhase('countdown'); setCount(3); }}><RotateCcw size={16} /> Un’altra serie</button><button onClick={close}><Check size={16} /> Fine</button></div>
+        <div className="mma-train-actions"><button onClick={() => { setResults([]); setVotes({}); setPhase('countdown'); setCount(3); }}><RotateCcw size={16} /> Un’altra serie</button><button onClick={close}><Check size={16} /> Fine</button></div>
       </section>}
     </>}
 

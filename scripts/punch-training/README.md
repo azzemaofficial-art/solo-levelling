@@ -57,6 +57,7 @@ lo **cancella**. Uno alla volta: MediaPipe occupa tutto il processore.
 | `allena-colpo.py` | prova un modellino "è un pugno di questo braccio?" (non è entrato nell'app, vedi sotto) |
 | `esporta.py` | addestra il modellino finale e scrive i pesi in `lib/mmaPunchWeights.js` |
 | `clip-vere.mjs` | controllo sulle clip vere di Emanuele (solo in locale) |
+| `allenamenti-veri.mjs` | il registro degli allenamenti veri (ripetizioni col giudizio di Emanuele): riepilogo e rigioco nel motore di adesso |
 
 ```bash
 node scripts/punch-training/banco.mjs 0          # senza tuoi esempi
@@ -72,6 +73,36 @@ node scripts/punch-training/clip-vere.mjs
 ```
 
 `OMP_NUM_THREADS=1`: con il Mac carico i calcoli "a più fili" girano a vuoto e diventano lentissimi.
+
+## Il registro degli allenamenti veri
+
+Nel coach con camera (combo), con il registro acceso (riga «● Registro solo lo scheletro…» nel
+setup, acceso di default), ogni ripetizione diventa un esempio **etichettato**: lo scheletro (13 punti,
+niente video), cosa ha capito il coach (stato e voto di ogni colpo, gesti visti con braccio e tempi),
+la guardia della calibrazione, il telefono (modello, risultati al secondo) e, al sacco, il rettangolo
+del sacco, i contatti e il movimento del sacco a ogni fotogramma. Dopo ogni ripetizione l'app chiede
+**«Ha capito?»**: 👍 sì, 👎 no; dopo il 👎 si toccano i colpi letti male. Il 👎 fa anche quello che
+faceva «Il coach ha sbagliato».
+
+- Logica: `lib/mmaTrain.js` (clip, giudizio, coda offline: al massimo 20 clip o ~1,5 MB sul telefono).
+- Server: `api/nvidia/visual.js` con `poseClip` kind `train` → lista `mma_train:<chatId>` (ultime 800,
+  180 giorni; regole in `lib/mmaClipStore.js`). Una clip pesa ~30–45 mila caratteri a vuoto, fino a
+  ~80 mila in una ripetizione lunga al sacco (limite 150 mila: oltre si toglie prima il 3D).
+
+```bash
+# chiavi di Upstash dall'API di Vercel (mai stamparle), poi:
+KV_REST_API_URL=… KV_REST_API_TOKEN=… node scripts/punch-training/allenamenti-veri.mjs <chatId>
+# di nuovo, su un file già scaricato:
+node scripts/punch-training/allenamenti-veri.mjs --file tests/fixtures/private/mma-train-2026-10-18.json
+```
+
+Salva le clip in `tests/fixtures/private/mma-train-<data>.json` e stampa: ripetizioni per giudizio,
+accordo tra coach ed Emanuele (ripetizioni con 👍 sulle giudicate; colpi non segnati sui colpi
+giudicati), colpi letti male per tipo e braccio, al sacco i colpi a segno e i contatti rispetto ai colpi
+del coach. Poi **rigioca** ogni clip nel motore di adesso (con la guardia salvata, come in app): i 👍
+devono restare uguali, i colpi segnati col 👎 sono quelli da far cambiare. Il rigioco non ha i "tuoi
+esempi" di «Insegna i colpi»: se la clip li aveva (`templates: true`) il nome del colpo, e a volte lo
+stato, possono differire da quello visto in app.
 
 ## Il modellino dei pugni
 

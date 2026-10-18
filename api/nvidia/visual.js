@@ -2,6 +2,7 @@ export const config = { maxDuration: 60 }; // pipeline 2 coach vision + cervello
 import { guardApi } from '../../lib/apiGuard.js';
 import { maestroContext } from '../../lib/martialKnowledge.js';
 import { pickSecrets, secretOfTheDay, formatSecretsForPrompt } from '../../lib/coachSecrets.js';
+import { planPoseClip } from '../../lib/mmaClipStore.js';
 
 // NVIDIA NIM visual live coach — Llama Vision 90B primary, Groq fallback
 // Discipline: muaythai, boxing, kickboxing, bjj, wrestling, karate, mma, kravmaga, general, fitness
@@ -2134,26 +2135,23 @@ export default async function handler(req, res) {
   };
 
   // ── CLIP DI MOVIMENTO MMA (solo punti dello scheletro, niente immagini) ─────
-  // Insegnamento dei colpi e ripetizioni segnalate "il coach ha sbagliato":
-  // servono a tarare il riconoscimento su movimenti veri. Lista mma_clips:<chatId>.
+  // Insegnamento dei colpi e ripetizioni segnalate "il coach ha sbagliato": lista mma_clips:<chatId>
+  // (ultime 150, 120 giorni). Registro degli allenamenti (kind train, ogni ripetizione col giudizio
+  // di Emanuele): lista mma_train:<chatId> (ultime 800, 180 giorni). Regole in lib/mmaClipStore.js.
   if (req.body?.poseClip) {
     const chatId = resolveChatId(req.body?.chatId);
     if (!chatId) return res.status(400).json({ ok: false, error: 'chatId mancante' });
-    const kind = ['teach', 'rep', 'session'].includes(req.body.poseClip.kind) ? req.body.poseClip.kind : 'rep';
-    const items = (Array.isArray(req.body.poseClip.items) ? req.body.poseClip.items : []).slice(0, 8)
-      .map((it) => JSON.stringify({ ...it, kind, ts: new Date().toISOString() }))
-      .filter((raw) => raw.length <= 150000);
-    if (!items.length) return res.status(400).json({ ok: false, error: 'clip vuota o troppo grande' });
+    const plan = planPoseClip(req.body.poseClip, chatId);
+    if (plan.error) return res.status(400).json({ ok: false, error: plan.error });
     const url = process.env.KV_REST_API_URL, token = process.env.KV_REST_API_TOKEN;
     if (!url || !token) return res.status(503).json({ ok: false, error: 'archivio non configurato' });
-    const key = `mma_clips:${chatId}`;
     try {
       const r = await fetch(`${url}/pipeline`, {
         method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify([...items.map((raw) => ['RPUSH', key, raw]), ['LTRIM', key, '-150', '-1'], ['EXPIRE', key, String(120 * 86400)]]),
+        body: JSON.stringify(plan.commands),
       });
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      return res.status(200).json({ ok: true, stored: items.length });
+      return res.status(200).json({ ok: true, stored: plan.items.length });
     } catch (e) {
       return res.status(502).json({ ok: false, error: String(e.message || e).slice(0, 80) });
     }
