@@ -464,7 +464,74 @@ export const mealRecipes = {
     ingredients: ['Udon freschi 300 g', 'Petto di pollo 150 g', 'Spinaci 80 g', 'Miso 15 g, soia, zenzero', 'Cipollotto'],
     steps: ['Porta a bollore 500 ml d’acqua con zenzero; cuoci il pollo a fette 8 minuti.', 'Aggiungi udon e spinaci per 2–3 minuti; a fuoco spento sciogli il miso.', 'In ciotola con tanto cipollotto. Leggero da digerire prima della partita.'],
   },
+  // ── Menu v7 (20/10/2026): più pesce, gamberi e frutta secca, sempre in piatti orientali ──
+  'Yaki udon ai gamberi: udon 300 g, gamberi 200 g, verdure saltate, cipollotto, soia, mirin e sesamo': {
+    title: 'Yaki udon ai gamberi', tags: ['orientale', 'fit porn', 'pesce', 'cipollotto'],
+    time: '15 min', kcal: 700, protein: 51, fiber: 8, fv: 170, cost: 5.55,
+    ingredients: ['Udon freschi 300 g', 'Gamberi sgusciati 200 g (vanno bene surgelati)', 'Verdure saltate 150 g: cavolo, carote, peperoni', 'Cipollotto 20 g', 'Soia iposodica 15 ml, mirin 10 ml, olio di sesamo 5 g, sesamo 3 g'],
+    steps: ['Scongela i gamberi in acqua fredda e asciugali bene.', 'Padella rovente con l’olio di sesamo: verdure 3 minuti, poi i gamberi 2 minuti finché diventano rosa.', 'Aggiungi gli udon con soia e mirin e salta 2 minuti; cipollotto e sesamo sopra. Da mangiare entro le 18:45.'],
+  },
+  'Udon in brodo con gamberi: udon 300 g, gamberi 200 g, spinaci, brodo al miso, cipollotto': {
+    title: 'Udon in brodo con gamberi', tags: ['orientale', 'pesce', 'cipollotto'],
+    time: '15 min', kcal: 615, protein: 51, fiber: 7, fv: 100, cost: 5.38,
+    ingredients: ['Udon freschi 300 g', 'Gamberi sgusciati 200 g (vanno bene surgelati)', 'Spinaci 80 g', 'Miso 15 g, soia, zenzero', 'Cipollotto'],
+    steps: ['Porta a bollore 500 ml d’acqua con zenzero.', 'Aggiungi udon, gamberi e spinaci per 3 minuti: i gamberi sono pronti quando diventano rosa.', 'A fuoco spento sciogli il miso; in ciotola con tanto cipollotto. Leggero da digerire prima della partita.'],
+  },
+  'Gamberi al limone cinese: gamberi 250 g glassati al limone e miele, riso 75 g, verdure saltate': {
+    title: 'Gamberi al limone cinese', tags: ['orientale', 'fit porn', 'pesce'],
+    time: '20 min', kcal: 662, protein: 53, fiber: 5, fv: 180, cost: 4.61,
+    ingredients: ['Gamberi sgusciati 250 g (vanno bene surgelati)', 'Amido di mais 10 g', 'Salsa: succo e scorza di 1 limone, miele 12 g, un goccio d’acqua', 'Riso 75 g', 'Verdure saltate 150 g, olio 7 g'],
+    steps: ['Cuoci il riso. Asciuga i gamberi e passali nell’amido.', 'Padella con l’olio: gamberi 2 minuti per lato, poi versa limone e miele e fai glassare 1 minuto.', 'Servi su riso e verdure saltate, con scorza di limone sopra.'],
+  },
+  'Tataki di salmone: salmone 140 g in crosta di sesamo, soba 55 g, edamame 80 g, cetriolo, salsa soia e limone': {
+    title: 'Tataki di salmone e soba', tags: ['orientale', 'fit porn', 'pesce', 'legumi'],
+    time: '20 min', kcal: 638, protein: 48, fiber: 9, fv: 110, cost: 4.54,
+    ingredients: ['Salmone 140 g (idoneo al consumo poco cotto, o congelato 96 ore a −18 °C)', 'Sesamo 6 g', 'Soba (spaghetti di grano saraceno) 55 g', 'Edamame 80 g, cetriolo', 'Soia iposodica 15 ml, limone'],
+    steps: ['Cuoci le soba, sciacquale fredde e condiscile con soia e limone.', 'Passa il salmone nel sesamo e scottalo in padella rovente 1 minuto per lato: dentro resta rosa.', 'Taglia a fette spesse e servi su soba, edamame e cetriolo.'],
+  },
+  'Ebi teriyaki don: riso 60 g, gamberi 200 g glassati teriyaki, edamame 60 g, verdure, cipollotto e sesamo': {
+    title: 'Ebi teriyaki don', tags: ['orientale', 'fit porn', 'pesce', 'legumi', 'cipollotto'],
+    time: '15 min', kcal: 571, protein: 51, fiber: 7, fv: 135, cost: 4.17,
+    ingredients: ['Riso 60 g', 'Gamberi sgusciati 200 g (vanno bene surgelati)', 'Edamame 60 g', 'Verdure 120 g: cetriolo, carote, cavolo', 'Teriyaki: soia iposodica 15 ml, mirin 10 ml, miele 8 g; cipollotto 15 g, sesamo 3 g'],
+    steps: ['Cuoci il riso (si prepara anche la sera prima).', 'Gamberi in padella calda 2 minuti; versa soia, mirin e miele e fai glassare 1 minuto.', 'Ciotola: riso, gamberi lucidi, edamame e verdure; cipollotto e sesamo sopra.'],
+  },
+  'Onigiri al salmone: riso 50 g, salmone cotto 70 g, yogurt greco, alga nori': {
+    title: 'Onigiri al salmone', tags: ['orientale', 'fit porn', 'pesce'],
+    time: '15 min', kcal: 330, protein: 19, fiber: 1, fv: 5, cost: 1.76,
+    ingredients: ['Riso 50 g', 'Salmone 70 g cotto e sbriciolato', 'Yogurt greco 15 g', 'Alga nori, cipollotto'],
+    steps: ['Cuoci il riso e lascialo intiepidire.', 'Mescola il salmone sbriciolato con yogurt e cipollotto.', 'Forma due triangoli di riso col ripieno dentro e avvolgili nella nori.'],
+  },
+  'Skyr con noci: skyr 170 g, noci 15 g, miele e un frutto': {
+    title: 'Skyr con noci e frutta',
+    time: '1 min', kcal: 302, protein: 21, fiber: 5, fv: 150, cost: 1.43,
+    ingredients: ['Skyr 170 g', 'Noci 15 g (una manciata piccola)', 'Miele 5 g', 'Una mela o un altro frutto'],
+    steps: ['Skyr con il miele.', 'Noci spezzettate e frutto a fette sopra.', 'Proteine e grassi buoni prima della pizza della sera.'],
+  },
 
+  'Crêpe proteiche cacao e banana: farina d’avena 40 g, 1 uovo, albume 100 g, latte, cacao, banana, crema di skyr 100 g': {
+    title: 'Crêpe proteiche cacao e banana', tags: ['dolce', 'fit porn'],
+    time: '15 min', kcal: 491, protein: 39, fiber: 8, fv: 100, cost: 1.77,
+    ingredients: ['Farina d’avena 40 g', '1 uovo e albume 100 g', 'Latte 100 ml, cacao amaro 5 g', 'Banana 100 g', 'Crema: skyr 100 g con miele 5 g'],
+    steps: ['Frulla avena, uovo, albume, latte e cacao: impasto liscio e liquido.', 'Padella antiaderente calda, un mestolo alla volta: 1 minuto per lato (vengono 3 crêpe).', 'Spalma la crema di skyr, banana a rondelle, arrotola.'],
+  },
+  'Pancake soufflé giapponesi: 2 uova, albume 60 g, farina 30 g, panna di skyr 150 g, frutti di bosco e banana': {
+    title: 'Pancake soufflé giapponesi', tags: ['dolce', 'fit porn'],
+    time: '20 min', kcal: 510, protein: 43, fiber: 7, fv: 160, cost: 2.61,
+    ingredients: ['2 uova + albume 60 g', 'Farina 30 g, latte 30 ml', 'Skyr 150 g montato con miele 8 g', 'Frutti di bosco 100 g', 'Banana 60 g'],
+    steps: ['Tuorli con farina e latte; a parte monta gli albumi a neve ferma e uniscili piano.', 'Padella a fuoco basso col coperchio: 3 mucchietti alti, 4 minuti per lato.', 'Sopra la panna di skyr, frutti di bosco e banana.'],
+  },
+  'Budino di skyr al cacao con noci: skyr 200 g, cacao, miele, fondente 10 g, noci 10 g': {
+    title: 'Budino di skyr al cacao con noci', tags: ['dolce'],
+    time: '5 min', kcal: 303, protein: 26, fiber: 4, fv: 0, cost: 1.52,
+    ingredients: ['Skyr 200 g', 'Cacao amaro 8 g', 'Miele 10 g', 'Fondente 85% 10 g', 'Noci 10 g'],
+    steps: ['Mescola skyr, cacao e miele finché diventa una crema da budino.', '10 minuti in frigo (o in freezer se hai fretta).', 'Sopra fondente grattugiato e noci tritate.'],
+  },
+  'Frozen yogurt bark: skyr 170 g congelato a lastra con frutti di bosco, banana, noci 15 g e miele': {
+    title: 'Frozen yogurt bark', tags: ['dolce', 'fit porn'],
+    time: '5 min + 2 ore in freezer', kcal: 328, protein: 23, fiber: 7, fv: 150, cost: 2.05,
+    ingredients: ['Skyr 170 g', 'Miele 8 g', 'Frutti di bosco 100 g', 'Banana 50 g a rondelle', 'Noci 15 g tritate'],
+    steps: ['Mescola skyr e miele e stendilo su carta forno, spesso 1 cm.', 'Sopra frutti di bosco, banana e noci, premendo leggermente.', 'In freezer almeno 2 ore (anche dal sabato), poi spezzalo a pezzi come una tavoletta.'],
+  },
   // ── Pre e dopo calcio (partita 21:30–23:00) ──
   'Pre-calcio: banana e 2 gallette con miele': {
     title: 'Pre-calcio veloce', time: '2 min', kcal: 200, protein: 3, fiber: 4, fv: 120, cost: 0.44,

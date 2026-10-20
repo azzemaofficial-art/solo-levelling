@@ -157,6 +157,19 @@ export const RECIPES = {
   l_butadon: [['riso', 90], ['lonza', 150], ['cipolla', 80], ['uovo', 55], ['soia', 15], ['mirin', 15], ['cipollotto', 15], ['verdure', 100]],
   d_yakitori: [['pollo', 180], ['cipollotto', 60], ['soia', 15], ['mirin', 10], ['miele', 8], ['riso', 75], ['verdure', 120], ['sesamo', 3], ['olio', 5]],
   s_skyrPlain: [['skyr', 170], ['mela', 150]],
+  // v7 (20/10/2026): più pesce, gamberi e frutta secca, solo in piatti orientali (niente kimchi: è piccante)
+  d_salmonTataki: [['salmone', 140], ['sesamo', 6], ['soba', 55], ['edamame', 80], ['verdure', 100], ['soia', 15], ['limone', 10]],
+  p_yakiUdon: [['udon', 300], ['gamberi', 200], ['verdure', 150], ['cipollotto', 20], ['soia', 15], ['mirin', 10], ['olioSesamo', 5], ['sesamo', 3]],
+  d_lemonShrimp: [['gamberi', 250], ['amido', 10], ['limone', 30], ['miele', 12], ['riso', 75], ['verdure', 150], ['olio', 7]],
+  p_udonShrimp: [['udon', 300], ['gamberi', 200], ['spinaci', 80], ['miso', 15], ['cipollotto', 20]],
+  l_ebiDon: [['riso', 60], ['gamberi', 200], ['edamame', 60], ['verdure', 120], ['soia', 15], ['miele', 8], ['mirin', 10], ['sesamo', 3], ['cipollotto', 15]],
+  b_crepe: [['avena', 40], ['uovo', 55], ['albume', 100], ['latte', 100], ['cacao', 5], ['banana', 100], ['skyr', 100], ['miele', 5]],
+  b_souffle: [['uovo', 110], ['albume', 60], ['farina', 30], ['latte', 30], ['skyr', 150], ['bosco', 100], ['banana', 60], ['miele', 8]],
+  // skyr e yogurt solo dentro una ricetta: da soli non gli piacciono (20/10)
+  s_puddingNoci: [['skyr', 200], ['cacao', 8], ['miele', 10], ['fondente', 10], ['noci', 10]],
+  s_skyrBark: [['skyr', 170], ['miele', 8], ['bosco', 100], ['banana', 50], ['noci', 15]],
+  s_onigiriSalmon: [['riso', 50], ['salmone', 70], ['greco', 15], ['cipollotto', 5]],
+  s_skyrNoci: [['skyr', 170], ['noci', 15], ['miele', 5], ['mela', 150]],
   mcd: [['mcd', 1], ['mela', 150]], pizza: [['pizza', 1]], drinks2: [['drinks2', 1]],
 };
 

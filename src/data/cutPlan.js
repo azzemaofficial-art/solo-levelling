@@ -122,6 +122,18 @@ const M = {
   d_chirashi: ['Chirashi di salmone crudo: riso 80 g, salmone 140 g a fette, avocado 30 g, edamame, cetriolo, carote, soia e sesamo', 'salmon-chirashi'],
   d_salmonTeri: ['Salmone teriyaki: salmone 160 g glassato, riso 70 g, zucchine e pak choi, cipollotto e sesamo', 'salmon-teriyaki'],
   d_tataki: ['Tataki di tonno: tonno fresco 160 g in crosta di sesamo, soba 70 g, edamame, cetriolo, salsa soia e lime', 'tuna-tataki-soba'],
+  // v7 (20/10/2026): più pesce, gamberi e frutta secca, sempre in piatti orientali. Foto ancora da fare.
+  p_yakiUdon: ['Yaki udon ai gamberi: udon 300 g, gamberi 200 g, verdure saltate, cipollotto, soia, mirin e sesamo', null],
+  p_udonShrimp: ['Udon in brodo con gamberi: udon 300 g, gamberi 200 g, spinaci, brodo al miso, cipollotto', null],
+  d_lemonShrimp: ['Gamberi al limone cinese: gamberi 250 g glassati al limone e miele, riso 75 g, verdure saltate', null],
+  d_salmonTataki: ['Tataki di salmone: salmone 140 g in crosta di sesamo, soba 55 g, edamame 80 g, cetriolo, salsa soia e limone', null],
+  l_ebiDon: ['Ebi teriyaki don: riso 60 g, gamberi 200 g glassati teriyaki, edamame 60 g, verdure, cipollotto e sesamo', null],
+  b_crepe: ['Crêpe proteiche cacao e banana: farina d’avena 40 g, 1 uovo, albume 100 g, latte, cacao, banana, crema di skyr 100 g', null],
+  b_souffle: ['Pancake soufflé giapponesi: 2 uova, albume 60 g, farina 30 g, panna di skyr 150 g, frutti di bosco e banana', null],
+  s_puddingNoci: ['Budino di skyr al cacao con noci: skyr 200 g, cacao, miele, fondente 10 g, noci 10 g', null],
+  s_skyrBark: ['Frozen yogurt bark: skyr 170 g congelato a lastra con frutti di bosco, banana, noci 15 g e miele', null],
+  s_onigiriSalmon: ['Onigiri al salmone: riso 50 g, salmone cotto 70 g, yogurt greco, alga nori', null],
+  s_skyrNoci: ['Skyr con noci: skyr 170 g, noci 15 g, miele e un frutto', null],
 };
 
 // Etichette dei pasti, nell'ordine della giornata (calcio lunedì e giovedì 21:30–23:00, uscita il venerdì)
@@ -142,6 +154,8 @@ const LABELS = [
 // carne rossa ≤ 3 (cavallo compreso), affettati ≤ 2, legumi almeno 3 giorni, patate dolci al massimo una volta e
 // solo a patatine, pollo al forno al massimo una volta, almeno 7 piatti fit porn; ogni piatto sotto i 4 €.
 // Lunedì: pollo e riso fisso, ogni settimana in una versione diversa. Domenica: pranzo dalla mamma.
+// 20/10/2026 (v7, scelto con Emanuele): settimane 4 (da giovedì), 5 e 6 ritoccate a mano: gamberi in piatti
+// orientali (ebi teriyaki don), tataki di salmone, onigiri al salmone, noci negli spuntini; skyr solo dentro ricette. Verifica: node scripts/menu/controlla-calendario.mjs
 const WEEKS = [
   // settimana 1
   [
@@ -178,30 +192,30 @@ const WEEKS = [
     ['b_bagel', 'cracker', 'piadine', 'mon_thai', 'pre_banana', 'post_banana'],
     ['bananaBread', 'l_butadon', 'edamame', 'd_cantonese'],
     ['piadina', 'l_peanutBowl', 'skyrSalato', 'mcd'],
-    ['yogurtBowl', 'l_crispyBun', 's_pudding', 'p_gnocchi', 'pre_toast', 'post_yogurt'],
-    ['b_toastPB', 'l_coldPasta', 's_yogurtNoci', 'd_bulgogiTacos', 'drinks2'],
-    ['b_gocciole', 'cavallo', 's_onigiri', 'd_loaded'],
-    ['b_gocciole', 'mamma', 's_skyrPlain', 'pizza'],
+    ['yogurtBowl', 'l_crispyBun', 's_puddingNoci', 'p_gnocchi', 'pre_toast', 'post_yogurt'],
+    ['b_toastPB', 'l_coldPasta', 's_yogurtNoci', 'd_salmonTataki', 'drinks2'],
+    ['b_gocciole', 'cavallo', 's_onigiriSalmon', 'd_loaded'],
+    ['b_gocciole', 'mamma', 's_skyrBark', 'pizza'],
   ],
   // settimana 5
   [
     ['b_jianbing', 'cracker', 'piadine', 'mon_lemon', 'pre_banana', 'post_toast'],
     ['waffle', 'l_burrito', 'yogurtCacao', 'd_salmonTeri'],
-    ['oatsCheesecake', 'l_katsu', 'bresaola', 'mcd'],
-    ['b_mango', 'l_kimbap', 'fiocchi', 'p_pasta', 'pre_toast', 'post_banana'],
-    ['b_omelette', 'pastaTonno', 's_skyrFruit', 'd_smash', 'drinks2'],
+    ['b_crepe', 'l_katsu', 'bresaola', 'mcd'],
+    ['b_souffle', 'l_kimbap', 'fiocchi', 'p_yakiUdon', 'pre_toast', 'post_banana'],
+    ['b_omelette', 'l_ebiDon', 's_skyrFruit', 'd_smash', 'drinks2'],
     ['b_gocciole', 'cavallo', 's_skyrFruit', 'd_ramen'],
     ['b_gocciole', 'mamma', 's_skyrPlain', 'pizza'],
   ],
   // settimana 6
   [
     ['b_tamago', 'cracker', 'piadine', 'mon_teri', 'pre_banana', 'post_yogurt'],
-    ['b_porridge', 'farro', 's_yogurtNoci', 'd_lemonChicken'],
+    ['b_porridge', 'farro', 's_yogurtNoci', 'd_lemonShrimp'],
     ['b_choco', 'l_oyakodon', 'edamame', 'mcd'],
-    ['toast', 'l_poke', 'skyrSalato', 'p_udon', 'pre_toast', 'post_toast'],
+    ['toast', 'l_poke', 'skyrSalato', 'p_udonShrimp', 'pre_toast', 'post_toast'],
     ['b_pancake', 'wrapSmash', 's_pudding', 'd_okonomiyaki', 'drinks2'],
-    ['b_gocciole', 'cavallo', 's_pudding', 'd_tataki'],
-    ['b_gocciole', 'mamma', 's_skyrPlain', 'pizza'],
+    ['b_gocciole', 'cavallo', 's_yogurtNoci', 'd_tataki'],
+    ['b_gocciole', 'mamma', 's_skyrNoci', 'pizza'],
   ],
 ];
 

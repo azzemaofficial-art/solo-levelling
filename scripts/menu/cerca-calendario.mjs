@@ -11,21 +11,22 @@ export const TARGET = [2750, 2250, 2300, 2750, 2200, 2350, 2750];
 export const PMIN = [155, 150, 141, 155, 150, 150, 136];
 export const SWEET = new Set(['d_smash', 'd_loaded', 'd_fishChips']);
 // salmone (lo ama, anche crudo): almeno una volta a settimana
-export const SALMON = new Set(['l_poke', 'd_chirashi', 'd_salmonTeri', 'b_bagel']);
+export const SALMON = new Set(['l_poke', 'd_chirashi', 'd_salmonTeri', 'b_bagel', 'd_salmonTataki', 's_onigiriSalmon']);
 export const FORNO = new Set(['polloCroccante', 'l_katsu', 'l_crispyBun']);
 export const FITPORN = new Set(['waffle', 'b_pancake', 'b_choco', 'oatsCheesecake', 'bananaBread', 'b_tamago', 'b_jianbing', 'b_mango',
   'l_crispyBun', 'l_burrito', 'wrapSmash', 'l_katsu', 'l_oyakodon', 'l_kimbap', 'l_bulgogi', 'l_butadon', 'l_peanutBowl', 'l_tunaDon',
   'd_teriyaki', 'd_bibimbap', 'd_ramen', 'd_padthai', 'd_bulgogiTacos', 'd_loaded', 'd_smash', 'd_meatballs', 'd_cantonese', 'd_okonomiyaki',
-  'd_curryJap', 'd_fishTacos', 'd_fishChips', 'd_lemonChicken', 'd_yakitori', 's_pudding', 's_onigiri', 'mon_kor', 'mon_teri', 'l_poke', 'd_chirashi', 'd_salmonTeri', 'd_tataki', 'b_bagel']);
+  'd_curryJap', 'd_fishTacos', 'd_fishChips', 'd_lemonChicken', 'd_yakitori', 's_pudding', 's_onigiri', 'mon_kor', 'mon_teri', 'l_poke', 'd_chirashi', 'd_salmonTeri', 'd_tataki', 'b_bagel',
+  'd_salmonTataki', 'p_yakiUdon', 'd_lemonShrimp', 'l_ebiDon', 's_onigiriSalmon', 'b_crepe', 'b_souffle', 's_skyrBark']);
 // colazioni dolci (almeno 3 su 5 nei giorni feriali: "non solo salate")
-export const DOLCE = new Set(['oatsCheesecake', 'b_choco', 'waffle', 'b_pancake', 'b_toastPB', 'yogurtBowl', 'b_mango', 'b_porridge', 'bananaBread']);
+export const DOLCE = new Set(['oatsCheesecake', 'b_choco', 'waffle', 'b_pancake', 'b_toastPB', 'yogurtBowl', 'b_mango', 'b_porridge', 'bananaBread', 'b_crepe', 'b_souffle']);
 export const POOLS = {
-  B: ['oatsCheesecake', 'b_choco', 'waffle', 'b_pancake', 'b_toastPB', 'yogurtBowl', 'b_mango', 'b_porridge', 'bananaBread', 'toast', 'piadina', 'b_omelette', 'b_tamago', 'b_jianbing', 'b_bagel'],
-  L: ['riceBowl', 'pastaTonno', 'wrapSmash', 'farro', 'l_beefNoodles', 'l_crispyBun', 'l_coldPasta', 'l_burrito', 'l_butadon', 'l_katsu', 'l_oyakodon', 'l_kimbap', 'l_bulgogi', 'l_peanutBowl', 'l_tunaDon', 'l_poke'],
-  S: ['skyrSalato', 'bresaola', 's_pudding', 'fiocchi', 'edamame', 'yogurtCacao', 's_yogurtNoci', 's_onigiri', 's_skyrFruit'],
+  B: ['oatsCheesecake', 'b_choco', 'waffle', 'b_pancake', 'b_toastPB', 'yogurtBowl', 'b_mango', 'b_porridge', 'bananaBread', 'toast', 'piadina', 'b_omelette', 'b_tamago', 'b_jianbing', 'b_bagel', 'b_crepe', 'b_souffle'],
+  L: ['riceBowl', 'pastaTonno', 'wrapSmash', 'farro', 'l_beefNoodles', 'l_crispyBun', 'l_coldPasta', 'l_burrito', 'l_butadon', 'l_katsu', 'l_oyakodon', 'l_kimbap', 'l_bulgogi', 'l_peanutBowl', 'l_tunaDon', 'l_poke', 'l_ebiDon'],
+  S: ['skyrSalato', 'bresaola', 's_pudding', 'fiocchi', 'edamame', 'yogurtCacao', 's_yogurtNoci', 's_onigiri', 's_skyrFruit', 's_onigiriSalmon', 's_puddingNoci', 's_skyrBark'],
   D: ['d_teriyaki', 'd_bulgogiTacos', 'd_ramen', 'd_curryJap', 'd_beefBroccoli', 'd_bibimbap', 'd_padthai', 'd_meatballs', 'tacosFit', 'polloCroccante',
-    'd_okonomiyaki', 'd_cantonese', 'd_smash', 'd_loaded', 'd_fishTacos', 'd_fishChips', 'd_lemonChicken', 'd_yakitori', 'd_salmonTeri', 'd_chirashi', 'd_tataki'],
-  P: ['p_gnocchi', 'p_pasta', 'p_udon'],
+    'd_okonomiyaki', 'd_cantonese', 'd_smash', 'd_loaded', 'd_fishTacos', 'd_fishChips', 'd_lemonChicken', 'd_yakitori', 'd_salmonTeri', 'd_chirashi', 'd_tataki', 'd_salmonTataki', 'd_lemonShrimp'],
+  P: ['p_gnocchi', 'p_pasta', 'p_udon', 'p_yakiUdon', 'p_udonShrimp'],
   MON: ['mon_kor', 'mon_ginger', 'mon_lemon', 'mon_teri', 'mon_mex', 'mon_thai'],
   FRI: ['s_skyrFruit', 's_pudding', 's_yogurtNoci'],
 };
