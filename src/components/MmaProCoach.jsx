@@ -7,7 +7,7 @@ import { mmaCoaching } from '../data/mmaCoaching';
 import { mmaRoundPlans } from '../data/mmaPath';
 import useMmaCamera from '../hooks/useMmaCamera';
 import { createReadiness, observerPose, readPose } from '../../lib/mmaReadiness.js';
-import { createComboJudge, rateGesture } from '../../lib/mmaComboJudge.js';
+import { createComboJudge, rateGesture, visibleGestures } from '../../lib/mmaComboJudge.js';
 import { loadTemplates } from '../../lib/mmaTemplates.js';
 import MmaCameraSetup from './MmaCameraSetup';
 
@@ -58,7 +58,8 @@ export default function MmaProCoach({ lesson, onClose }) {
     const rate = rateGesture(g);
     if (!rate) { if (g.kind === 'unclear') setStrike((prev) => ({ name: 'Colpo poco chiaro', score: null, tip: 'più deciso e completo', n: (prev?.n || 0) + 1 })); return; }
     if (rate.id === 'jab' || rate.id === 'cross') observerRef.current.recordPunch(rate.id, at);
-    const name = MOVES[rate.id]?.name || rate.id, tip = rate.issues[0]?.text;
+    // gamba avanti distesa: teep o calcio in cambio di guardia non si distinguono da una camera sola
+    const name = g.limb === 'leg' && g.typeSure === false ? 'Calcio con la gamba avanti' : MOVES[rate.id]?.name || rate.id, tip = rate.issues[0]?.text;
     setStrike(prev => ({ name, score: rate.score, tip, n: (prev?.n || 0) + 1 }));
     const now = performance.now();
     if (tip && now - tipRef.current.at > 3500) { tipRef.current.at = now; speak(`${name}: ${tip}.`); }
@@ -100,7 +101,9 @@ export default function MmaProCoach({ lesson, onClose }) {
         const text = late.length === 2 ? 'Mani su!' : late[0] === 'L' ? 'Mano sinistra su!' : late[0] === 'R' ? 'Mano destra su!' : '';
         setGuardAlert((prev) => (prev === text ? prev : text));
         if (text && now - G.at > 3500) { G.at = now; tipRef.current.at = now; speak(text, true); }
-        if (info.gestures > seenRef.current) { judge.gestures().slice(seenRef.current).forEach(g => handleStrike(g, at)); seenRef.current = info.gestures; }
+        // durante un calcio si aspetta che finisca: le braccia che bilanciano non sono pugni (visibleGestures)
+        const kicking = info.activeKeys.some((k) => k.endsWith('Leg'));
+        if (info.gestures > seenRef.current && !kicking) { visibleGestures([], judge.gestures().slice(seenRef.current)).forEach(g => handleStrike(g, at)); seenRef.current = info.gestures; }
       }
     } else if (!read.visible) judge?.abort();
     if (!working) setGuardAlert((prev) => (prev ? '' : prev));

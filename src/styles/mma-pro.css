@@ -114,6 +114,8 @@
 .mma-train-moves .st-guided{border-style:dashed}
 .mma-train-feedback,.mma-train-summary{display:grid;gap:10px;padding:14px 16px;border-radius:14px;background:#111c26;border-left:3px solid #6de2d3}
 .mma-train-feedback p,.mma-train-summary p{margin:0;color:#dcebef;font-size:15px;line-height:1.55}
+.mma-train-feedback .mma-train-secret{padding-left:10px;border-left:2px solid #ffc86b;color:#c9dde2;font-size:13px;line-height:1.55}
+.mma-train-secret b{display:block;margin-bottom:2px;color:#ffc86b;font-size:12px;font-weight:700}
 .mma-train-summary small{color:#6de2d3;font:700 10px/1 var(--font-label);letter-spacing:.14em}
 .mma-train-summary h3{margin:0;font:800 26px/1 var(--font-display)}
 .mma-train-bars{display:flex;align-items:flex-end;gap:4px;height:70px}

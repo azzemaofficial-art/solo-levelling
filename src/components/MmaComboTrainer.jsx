@@ -4,7 +4,7 @@ import { ArrowLeft, Check, GraduationCap, Pause, Play, RotateCcw, ThumbsDown, Th
 import useMmaCamera from '../hooks/useMmaCamera';
 import MmaFigure, { useSkeletonPlayer } from './MmaFigure';
 import { createReadiness, readPose } from '../../lib/mmaReadiness';
-import { coachFeedback, createComboJudge, describeGesture, needsFeet, teachSample, EXPECT } from '../../lib/mmaComboJudge';
+import { coachFeedback, createComboJudge, describeGesture, masterSecret, needsFeet, teachSample, visibleGestures, EXPECT } from '../../lib/mmaComboJudge';
 import { forgetRep, learnFromRep, loadTemplates, saveTemplates } from '../../lib/mmaTemplates';
 import { encodeClip, readChatId, sendClips } from '../../lib/mmaClips';
 import { NO_VOTE, buildTrainClip, castVote, createTrainPending, fitClip, readTrainLog, saveTrainLog, toggleWrong, trainSender, withVote } from '../../lib/mmaTrain';
@@ -19,6 +19,8 @@ import { localDateKey, logWorkout } from '../utils/trainingLog';
 // ti guarda eseguirla colpo per colpo (MediaPipe sul telefono, niente upload) e ti
 // corregge a voce, con replay al rallentatore. Logica di giudizio: lib/mmaComboJudge.js.
 
+// quanto dura una frase detta dal telefono (italiano, velocità 1: circa 0,4 s a parola) + respiro
+const speakMs = (text) => String(text).split(/\s+/).length * 400 + 1500;
 const say = (text, on) => {
   if (!on || !window.speechSynthesis) return;
   try {
@@ -138,6 +140,7 @@ export default function MmaComboTrainer({ combo, onClose, onLearned }) {
   const cameraRef = useRef(null);
   const logRef = useRef({ session: 0, n: 0, calib: [], aspect: null }); // serie, n° ripetizione, guardia, formato immagine
   const pendingRef = useRef(null);
+  const secretsRef = useRef([]); // segreti già spiegati in questa serie (lib/mmaComboJudge.js masterSecret)
   if (!pendingRef.current) pendingRef.current = createTrainPending({ send: trainSender.send });
   const timers = useRef([]);
   const later = (fn, ms) => { const id = setTimeout(fn, ms); timers.current.push(id); return id; };
@@ -156,7 +159,8 @@ export default function MmaComboTrainer({ combo, onClose, onLearned }) {
     const marks = res.moves.flatMap((mv) => (mv.gesture && mv.issues.length ? [{ t: mv.gesture.peakT ?? mv.gesture.start, joint: MOVE_JOINT(mv.id, judge.lead, judge.rear), text: `${MOVES[mv.id].name}: ${mv.issues[0].text}` }] : []));
     const rep = Date.now();
     const onBag = scored?.bag ? ` A segno ${scored.bag.hits} su ${scored.bag.total}.` : '';
-    const entry = { ...res, rep, frames, marks, bag: scored?.bag || null, feedback: coachFeedback(res, moveNames) + onBag, seen: judge.gestures().filter((g) => g.start >= t0 - 700).map((g) => g.move || describeGesture(g)) };
+    const entry = { ...res, rep, frames, marks, bag: scored?.bag || null, feedback: coachFeedback(res, moveNames) + onBag, secret: masterSecret(res, { skip: secretsRef.current }), seen: visibleGestures(moves, judge.gestures().filter((g) => g.start >= t0 - 700)).map((g) => g.move || describeGesture(g)) };
+    if (entry.secret) secretsRef.current = [...secretsRef.current, entry.secret.key];
     // combo riuscita: i colpi riconosciuti diventano tuoi esempi in più (il coach impara mentre ti alleni)
     applyTemplates(learnFromRep(templatesRef.current, res, { rep, sample: teachSample }));
     // registro: la ripetizione resta in sospeso finché arriva il tuo giudizio (lib/mmaTrain.js)
@@ -175,7 +179,8 @@ export default function MmaComboTrainer({ combo, onClose, onLearned }) {
     setCurrent(entry); setReported(false); setVote(NO_VOTE);
     setResults((prev) => [...prev, entry]);
     setPhase('result');
-    say(entry.feedback, voice);
+    // il segreto del maestro si legge e si ascolta (la prossima ripetizione aspetta che finisca di parlare)
+    say(entry.secret ? `${entry.feedback} Il segreto. ${entry.secret.text}` : entry.feedback, voice);
   }, [moves, moveNames, voice, applyTemplates, bag, combo, stance]);
 
   // fotogrammi dalla camera
@@ -217,8 +222,12 @@ export default function MmaComboTrainer({ combo, onClose, onLearned }) {
     if (info.activeKeys.length) repRef.current.lastActive = t;
     if (info.gestures > before) {
       const g = judge.gestures().at(-1);
+      // si scrive solo ciò che conta per la combo (stesso filtro del riassunto: niente passi o braccia del calcio)
+      const shown = visibleGestures(moves, judge.gestures().filter((x) => x.start >= repRef.current.start - 700));
+      // durante un calcio il braccio che bilancia si chiude prima del calcio: non si scrive (sparirebbe dopo)
+      const kicking = g.limb === 'arm' && info.activeKeys.some((k) => k.endsWith('Leg')) && moves.some((id) => ['kick', 'teep'].includes(EXPECT[id]?.kind));
       // colpo di braccio senza tipo deciso: si dice quale braccio (è quello che conta nella combo)
-      if (g.kind !== 'drop') setLabel({ text: g.move ? MOVES[g.move]?.name || describeGesture(g) : g.kind === 'strike' ? `Braccio ${g.side === 'lead' ? 'avanti' : 'dietro'}` : describeGesture(g), unclear: g.kind === 'unclear', n: t });
+      if (shown.includes(g) && !kicking) setLabel({ text: g.move ? MOVES[g.move]?.name || describeGesture(g) : g.kind === 'strike' ? `Braccio ${g.side === 'lead' ? 'avanti' : 'dietro'}` : describeGesture(g), unclear: g.kind === 'unclear', n: t });
     }
     // colpi che si accendono in diretta (ricalcolo leggero ogni 150 ms)
     if (t - repRef.current.lastLive > 150) {
@@ -265,14 +274,14 @@ export default function MmaComboTrainer({ combo, onClose, onLearned }) {
         if (avg >= 80) onLearnedRef.current?.();
         say(`Fine serie. Media ${avg} su cento. ${avg >= 85 ? 'Combo imparata!' : avg >= 65 ? 'Buon lavoro, ancora qualche ripetizione e ci sei.' : 'Rifalla più lenta, un colpo alla volta.'}`, voice);
       } else { setPhase('countdown'); setCount(3); say('Ancora. Tre. Due. Uno. Via!', voice); }
-    }, 5200);
+    }, current?.secret ? Math.max(5200, speakMs(`${current.feedback} Il segreto. ${current.secret.text}`)) : 5200);
     return () => clearTimeout(id);
-  }, [phase, paused, replay, results, reps, combo.name, voice]);
+  }, [phase, paused, replay, results, reps, combo.name, voice, current]);
 
   const startCamera = () => {
     try { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; window.speechSynthesis?.speak(u); } catch { /* voce */ }
     judgeRef.current = createComboJudge({ stance, templates }); readyRef.current.reset();
-    setCalib(0); setResults([]); setCurrent(null); setVotes({});
+    setCalib(0); setResults([]); setCurrent(null); setVotes({}); secretsRef.current = [];
     bag.reset();
     logRef.current = { session: Date.now(), n: 0, calib: [], aspect: null };
     if (trainOn) trainSender.retry(); // clip rimaste in coda dalla volta scorsa (rete assente)
@@ -378,6 +387,7 @@ export default function MmaComboTrainer({ combo, onClose, onLearned }) {
 
       {phase === 'result' && current && <section className="mma-train-feedback">
         <p>{current.feedback}</p>
+        {current.secret && <p className="mma-train-secret"><b>Il segreto · {MOVES[current.secret.id]?.name}</b>{current.secret.text}</p>}
         <div className="mma-train-vote" role="group" aria-label="Il coach ha capito questa ripetizione?">
           <span>Ha capito?</span>
           <button className="up" aria-pressed={vote.ok === true} onClick={() => voteRep(true)}><ThumbsUp size={16} /> Sì</button>
@@ -406,7 +416,7 @@ export default function MmaComboTrainer({ combo, onClose, onLearned }) {
           </div>)}
         </div>}
         <p className="mma-train-note">Salvato nel diario allenamenti.{avg >= 80 ? ' Combo segnata come imparata.' : ''}</p>
-        <div className="mma-train-actions"><button onClick={() => { setResults([]); setVotes({}); setPhase('countdown'); setCount(3); }}><RotateCcw size={16} /> Un’altra serie</button><button onClick={close}><Check size={16} /> Fine</button></div>
+        <div className="mma-train-actions"><button onClick={() => { setResults([]); setVotes({}); secretsRef.current = []; setPhase('countdown'); setCount(3); }}><RotateCcw size={16} /> Un’altra serie</button><button onClick={close}><Check size={16} /> Fine</button></div>
       </section>}
     </>}
 

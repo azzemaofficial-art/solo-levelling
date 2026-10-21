@@ -126,3 +126,29 @@ Tarato sulle clip vere: guardia ferma < 0,10, jab 0,19–0,31, diretto 0,44–0,
 **Posizione** (`MmaCameraSetup.jsx`): telefono davanti ma a circa 45° dal lato del braccio avanti, a 2–3 m; colpi verso un bersaglio davanti, non verso il telefono.
 
 **Risultati sulle ripetizioni vere**, simulando la chiusura della ripetizione come nel coach e senza esempi: 0→100, 0→84, 6→100. La quarta (rotazioni forti e scambi di lato) resta difficile.
+
+## Gambe in 2D, gesti mostrati e segreto del maestro (21 ottobre 2026)
+
+Nella prova del 20/10 tutte le 1-2 avevano 👎: il coach vedeva calci, ginocchiate e schivate mai fatte (il piede dietro che ruota nel diretto) e non vedeva il calcio basso.
+
+**Gambe** (`lib/mmaLegs.js`, in 2D come le braccia; il 3D delle gambe aveva profondità invertita e lati scambiati):
+- riferimento: il piede d'appoggio nell'immagine (telefono fermo), che segue lentamente quando il piede è fermo e basso;
+- continuità delle etichette: se le due caviglie (e ginocchia) "si scambiano" da un fotogramma all'altro, si scambiano indietro;
+- calcio riconosciuto dalla forma, non dallo spostamento (un passo sposta il piede quanto un calcio): stinco ≥ 55° dalla verticale, coscia ≥ 20°, caviglia veloce, distanza ≥ 0,7 busti; può atterrare avanti;
+- ginocchiata (gamba dietro) / check (gamba avanti): coscia ≥ 40°, ginocchio salito, la gamba torna dov'era;
+- altezza dalla coscia: basso < 60°, corpo < 115°, alto oltre;
+- calcio con la gamba avanti: teep o calcio non si distinguono da una camera (`typeSure: false`), vale come quello chiesto.
+
+**Gesti mostrati** (`visibleGestures`, usato dal giudice, dall'etichetta in diretta e dall'elenco a fine serie): solo gli arti della combo (in una 1-2 niente gambe); niente mano che scende, braccia nel clinch o nella schivata; le braccia che partono durante un calcio (fino a 0,4 s dopo il picco) sono bilanciamento, non pugni. Nell'etichetta in diretta e nel Pro Coach si aspetta la fine del calcio prima di scrivere un colpo di braccio.
+
+**Correzioni**: nel calcio conta la mano dell'altro lato (il braccio del lato che calcia scende a bilanciare, è giusto). Sotto la correzione, una volta per serie per errore, il **segreto del maestro** (`masterSecret`): il perché della correzione (catena del corpo), prima per tecnica, lato e altezza.
+
+**Clip**: 17 articolazioni (talloni e punte 29–32) per misurare in futuro la rotazione del piede dietro; la calibrazione salva il suo elenco (`cal.j`). Le clip a 13 restano leggibili.
+
+**Banco** `node scripts/punch-training/gambe.mjs [--dettagli]` (ripetizioni vere private + BoxingVI): pulite 1→8 su 16; gambe in più 33→0; calci 4/4 (gamba e altezza giuste); BoxingVI 46→0,3 gesti di gamba inventati al minuto. Il banco dei pugni non cambia.
+
+**Provato e scartato**: rotazione del bacino dalla linea anche/spalle nell'immagine. Distingue diretto e jab solo in 2 video BoxingVI su 5 (AUC 0,85–0,95 contro ≈ 0,5) e in 1 serie su 3 delle ripetizioni vere: nessuna correzione "ruota l'anca" finché la misura non è affidabile.
+
+**Revisione** (stesso giorno): un gesto di gamba con la gamba che sparisce si chiude (prima restava acceso e bloccava la fine della ripetizione); nessun gesto oltre 1,8 s; dopo una pausa (VIA, buco, fuori inquadratura) i nomi delle gambe si rileggono dagli appoggi; un braccio "poco chiaro" non vale come calcio.
+
+**Limiti**: soglie del calcio tarate su 4 calci bassi veri; calci al corpo/alti, teep, ginocchiata e check provati solo sull'atleta sintetico.

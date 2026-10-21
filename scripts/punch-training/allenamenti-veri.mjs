@@ -101,7 +101,7 @@ export function replayClip(c, { punchNet } = {}) {
   const aspect = c.aspect || 0.75;
   const j = createComboJudge({ stance: c.stance, punchNet });
   if (c.cal?.w?.length) {
-    for (const f of decode({ j: c.j, t: c.cal.w.map((_, i) => i * 33), w: c.cal.w, p: c.cal.p || [] })) j.calibrate(f.world, f.points, aspect);
+    for (const f of decode({ j: c.cal.j || c.j, t: c.cal.w.map((_, i) => i * 33), w: c.cal.w, p: c.cal.p || [] })) j.calibrate(f.world, f.points, aspect);
   }
   let i = 0;
   while (!j.isCalibrated() && i < fr.length) { j.calibrate(fr[i].world, fr[i].points, aspect); i += 1; }
