@@ -152,3 +152,74 @@ Nella prova del 20/10 tutte le 1-2 avevano 👎: il coach vedeva calci, ginocchi
 **Revisione** (stesso giorno): un gesto di gamba con la gamba che sparisce si chiude (prima restava acceso e bloccava la fine della ripetizione); nessun gesto oltre 1,8 s; dopo una pausa (VIA, buco, fuori inquadratura) i nomi delle gambe si rileggono dagli appoggi; un braccio "poco chiaro" non vale come calcio.
 
 **Limiti**: soglie del calcio tarate su 4 calci bassi veri; calci al corpo/alti, teep, ginocchiata e check provati solo sull'atleta sintetico.
+
+## Percorso dei segreti: insegna → verifica → promuovi (21 ottobre 2026)
+
+`lib/mmaSecretPath.js` (logica pura, `tests/mmaSecretPath.test.js`):
+1. **Insegna**: un segreto alla volta (`masterSecret`, che ora porta anche l'errore da verificare `issue` e la correzione corta `cue`), sullo schermo e a voce.
+2. **Verifica**: nelle 3 ripetizioni dopo si guarda lo stesso colpo; senza l'errore in 2 → «Segreto applicato!» e il segreto è imparato; altrimenti «lo riprendiamo più avanti». Una ripetizione in cui quel colpo non c'è (o non è visto) non conta.
+3. **Promuovi**: i segreti imparati (salvati sul telefono, chiave `shadow_monarch_mma_secret_path_v1`, così entra nel backup automatico) danno il grado: Prime armi (0), Allievo (2), Combattente (4), Agonista (7), Campione (10). Ogni grado sblocca una mossa segreta con il suo segreto e la combo per allenarla: gancio al fegato (`3b-3`), teep (`teep-1-2`), switch kick (`sw-2`), calcio alla testa (`1-2-hk`).
+
+Grado e mosse segrete compaiono a fine serie. Sulle 16 ripetizioni vere del 20-21/10 il percorso insegna la guardia e il ritorno della mano, li verifica (2 prove pulite) e arriva ad Allievo. Limite: "applicato" non è "padroneggiato": se l'errore torna, torna la correzione corta, ma il segreto resta imparato.
+
+## Laboratorio riflessi, percorso del combattente e allenamento di oggi (21 ottobre 2026)
+
+Obiettivo di Emanuele: un coach che lo guidi dalle prime armi fino a poter fare un primo incontro di MMA dilettanti.
+
+**Laboratorio riflessi** (`lib/mmaReflex.js`, `src/components/MmaReflexLab.jsx`, chiave `shadow_monarch_mma_reflex_v1`).
+- Come si svolge:
+  - stai fermo in guardia; dopo un'attesa casuale di 1,2–3,2 s lo schermo si colora con un segno;
+  - rispondi col colpo giusto oppure resti fermo (✋).
+- La partenza si misura per ogni punto del corpo: polsi, ginocchia, caviglie, testa e bacino, in "busti".
+  - Il rumore da fermo si misura 600–150 ms prima del segnale.
+  - Soglia alta: max(0,06; 2,5 × rumore) per 2 fotogrammi di fila. Poi si torna indietro fino alla soglia bassa e si interpola.
+- Il segnale è il rAF in cui il colore appare davvero. Se il telefono dà `captureTime`, si toglie il ritardo della camera (`camLagMs` in `useMmaCamera`).
+- Validato su dati sintetici con tremolio da telefono, errore mediano della partenza:
+  - jab: +16 ms (contro +80 del motore dei colpi);
+  - diretto: +9 ms;
+  - calcio basso: +26 ms;
+  - schiva e diretto: +19 ms.
+- Sulle clip vere le partenze anticipate (passi, rimbalzi) erano frequenti, per questo l'attesa riparte se ti muovi.
+- 6 esercizi in ordine, sbloccati uno alla volta. Superato = almeno 8 prove valide, 80% giuste, al massimo 1 partenza anticipata.
+
+**Percorso del combattente** (`lib/mmaFighterPath.js`, `src/components/MmaToday.jsx`): le 4 tappe dell'Accademia diventano prove misurate.
+- Fonti dei dati: lezioni (`done` dell'Accademia), voto medio della combo con la camera (`shadow_monarch_mma_combo_scores_v1`, scritto da `MmaComboTrainer` a fine serie), segreti imparati, esercizi riflessi superati, sedute a round del Coach Studio.
+  - Un round conta solo se dura davvero quanto deve: minuti attivi ≥ 85%, anche in media per round.
+- Le prove di palestra si spuntano a mano (`shadow_monarch_mma_fighter_v1`): lotta, sparring con istruttore, certificato medico, ok dell'istruttore.
+- Tappa 4 = «Pronto per il primo incontro».
+
+**Allenamento di oggi** (`planToday`), in 20, 40 o 60 minuti, in quest'ordine:
+1. riscaldamento guidato a voce;
+2. riflessi, da riposati e solo se non fatti ieri;
+3. tecnica (lezione della tappa);
+4. combo con la camera: prima la mossa segreta sbloccata, poi quella più vicina a 80;
+5. «Round di shadow» (nuova lezione `rounds`): 3×2, 3×3 o 4×3 minuti a seconda della tappa;
+6. defaticamento con respiro 5-5.
+
+Ogni blocco si spunta da solo leggendo i dati veri. Nel Coach Studio la pausa tra i round ora guida il respiro 5-5.
+
+**Ricerca usata** (21/10/2026):
+- Reazione semplice a una luce: 231 ms in media, 218 ms a 18–24 anni (Frontiers Hum Neurosci 2015, https://www.frontiersin.org/journals/human-neuroscience/articles/10.3389/fnhum.2015.00131/full).
+- Telefoni e tablet aggiungono 57–70 ms, con poca variazione (https://www.biorxiv.org/content/10.1101/639351.full.pdf). Per questo ti confronti solo con te stesso.
+- 45 combattenti MMA: reazione 266 ms più 115 ms di movimento (https://pmc.ncbi.nlm.nih.gov/articles/PMC6994193/).
+- Allenamento dei riflessi: migliora la reazione (SMD −0,82) con circa 10 minuti, 1–3 volte a settimana, da riposati (https://www.frontiersin.org/journals/psychology/articles/10.3389/fpsyg.2025.1697425/full).
+- Gli esperti battono i principianti nel leggere attacchi veri, non nei test generici (https://pmc.ncbi.nlm.nih.gov/articles/PMC9650920/). Per questo gli esercizi usano colpi veri come risposta.
+- Recupero dopo sforzo: respiro 5 s dentro / 5 s fuori, battito 155 contro 165 del respiro a scatola (https://acikerisim.bartin.edu.tr/entities/publication/c1eb6ff2-232a-42a5-bd2d-81bb0555175c/full).
+- Primo incontro circa 2,4–2,7 anni dopo l'inizio; dilettanti con circa 3,9 sedute di combattimento a settimana (Barley & Harms 2021).
+- Dilettanti IMMAF: 3 round da 3 minuti con 1 minuto di pausa (https://immaf.org/wp-content/uploads/2025/11/MMA-UNIFIED-RULES-FOR-AMATEUR-JUNIOR-SENIOR-January-2021.pdf).
+- Italia: per l'MMA con colpi alla testa serve il certificato agonistico completo (visita sportiva, neurologo, otorino con esame dell'udito, EEG, oculista; Federkombat 2025).
+- Medici di bordo ring (ARP): niente sparring per 30, 60 o 90 giorni dopo uno stop per colpi, un KO o un KO con perdita di coscienza; guantoni da sparring 12–22 oz (https://combatsportslaw.com/wp-content/uploads/2014/01/arp-medical-recommendations-to-improve-boxing-safety.pdf).
+- Il caschetto riduce i tagli, non le commozioni (https://lida.sport-iat.de/ta/Record/4093047?lng=en).
+
+**Dopo la revisione** (stessa sera):
+- Prove «app»: valgono solo le sedute del Coach Studio viste davvero dalla camera (`mode: 'camera'` e `enough`). Non bastano la spunta a mano «Segna pratica completata» né un timer senza camera.
+- Una tappa superata resta superata (`reached` in `shadow_monarch_mma_fighter_v1`), perché il diario del Coach Studio tiene solo le ultime 80 sedute.
+- Le scelte del giorno (esercizio di riflessi, lezione, combo, tappa) si fissano alla prima apertura (`freezeToday`). Così un blocco superato si spunta, invece di diventare subito il successivo. I round si spuntano solo se tutti finiti e lunghi davvero.
+- Riflessi: il ritardo della camera si toglie anche dal controllo «partito prima» (prima un anticipo poteva valere come record).
+- Segreti: con una ripetizione pulita il maestro insegna lo stesso un segreto nuovo (`teachNextSecret`), ma solo tra quelli che la camera sa verificare: altezza dei colpi, distensione, ritorno, guardia, guardia nei calci. Un atleta che non sbaglia mai arriva comunque a Campione (provato con un test che simula 20 giri di combo pulite).
+- Salvataggi rovinati (voti, storico riflessi) vengono ripuliti e non bloccano più la pagina. La prova dei riflessi si chiude anche se esci dall'inquadratura dopo il segnale.
+
+**Limiti onesti**
+- La reazione misurata contiene il ritardo della camera, se il telefono non lo dichiara.
+- Lotta, prese e sparring non si vedono con una camera: per questo le prove di palestra si spuntano a mano.
+- La validazione della partenza è sintetica. Il ciclo completo con una persona vera va provato sul telefono.

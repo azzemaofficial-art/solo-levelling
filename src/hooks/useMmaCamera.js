@@ -162,6 +162,9 @@ export default function useMmaCamera(onFrame, { minInterval = 80, canSwap, overl
         const cb = (now, meta) => {
           if (!current() || r.vfcVideo !== video || polling) return;
           r.vfc = video.requestVideoFrameCallback(cb); lastVfcAt = performance.now();
+          // ritardo interno della camera (scatto → video), se il telefono lo dichiara: serve ai riflessi
+          const lag = meta?.presentationTime - meta?.captureTime;
+          if (Number.isFinite(lag) && lag > 0 && lag < 500) stats.camLag = stats.camLag == null ? lag : stats.camLag + (lag - stats.camLag) * 0.1;
           capture(frameTime(now, meta));
         };
         r.vfcVideo = video; r.vfc = video.requestVideoFrameCallback(cb); lastVfcAt = performance.now();
@@ -276,7 +279,7 @@ export default function useMmaCamera(onFrame, { minInterval = 80, canSwap, overl
   // numeri per le prove sul telefono: risultati/s, attesa del risultato, ritardo dell'immagine
   const getStats = useCallback(() => {
     const s = statsRef.current, secs = (performance.now() - (s.since ?? 0)) / 1000;
-    return { resultsPerSec: secs > 0 ? s.results / secs : 0, waitMs: Math.round(s.wait || 0), imageDelayMs: Math.round(s.delay || 0), synced: Boolean(s.synced) };
+    return { resultsPerSec: secs > 0 ? s.results / secs : 0, waitMs: Math.round(s.wait || 0), imageDelayMs: Math.round(s.delay || 0), synced: Boolean(s.synced), camLagMs: s.camLag != null ? Math.round(s.camLag) : null };
   }, []);
   return { videoRef, canvasRef, start, stop, status, error, profile, toImagePoint, setRoi, grabFrame, getStats };
 }

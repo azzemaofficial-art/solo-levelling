@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useState } from 'react';
+import React, { Suspense, lazy, useEffect, useState } from 'react';
 import { ArrowRight, Check, GraduationCap } from 'lucide-react';
 import { loadTemplates } from '../../lib/mmaTemplates';
 import MmaComboPlayer from './MmaComboPlayer';
@@ -15,8 +15,9 @@ const unlockVoice = () => {
 };
 
 // Libreria di tutte le combo MMA, divise per categoria; ognuna si apre nel player
-// dove il coach la insegna colpo per colpo.
-export default function MmaComboLibrary() {
+// dove il coach la insegna colpo per colpo. `request` ({ id, n }) la apre da fuori (l'allenamento di oggi);
+// `onClosed` avvisa chi deve rileggere i voti quando il player si chiude.
+export default function MmaComboLibrary({ request, onClosed }) {
   const [category, setCategory] = useState('boxing');
   const [openId, setOpenId] = useState(null);
   const [learned, setLearned] = useState(readLearned);
@@ -24,6 +25,11 @@ export default function MmaComboLibrary() {
   const [taught, setTaught] = useState(() => loadTemplates(readStance()));
   const list = COMBOS.filter((combo) => combo.category === category);
   const open = COMBOS.find((combo) => combo.id === openId);
+  useEffect(() => {
+    const combo = request && COMBOS.find((c) => c.id === request.id);
+    if (!combo) return;
+    unlockVoice(); setCategory(combo.category); setOpenId(combo.id);
+  }, [request]);
   const toggleLearned = (id) => setLearned((prev) => {
     const next = { ...prev };
     if (next[id]) delete next[id]; else next[id] = new Date().toISOString();
@@ -32,7 +38,7 @@ export default function MmaComboLibrary() {
   });
 
   return <section className="cut-section mma-combos">
-    {open && <MmaComboPlayer combo={open} learned={Boolean(learned[open.id])} onLearned={() => toggleLearned(open.id)} onClose={() => setOpenId(null)} />}
+    {open && <MmaComboPlayer combo={open} learned={Boolean(learned[open.id])} onLearned={() => toggleLearned(open.id)} onClose={() => { setOpenId(null); onClosed?.(); }} />}
     <div className="cut-section-title mma-section-title"><span>COMBO MMA · IL COACH TE LE INSEGNA</span><span>{Object.keys(learned).filter((id) => COMBOS.some((c) => c.id === id)).length}/{COMBOS.length}</span></div>
     {teachOpen && <Suspense fallback={null}><MmaTeach onClose={() => { setTeachOpen(false); setTaught(loadTemplates(readStance())); }} /></Suspense>}
     <button className={`mma-teach-banner ${taught ? 'done' : ''}`} onClick={() => { unlockVoice(); setTeachOpen(true); }}><GraduationCap size={22} /><span><b>{taught ? `Il coach conosce ${new Set(taught.items.map((it) => it.move)).size} tuoi colpi` : 'Insegna i tuoi colpi al coach'}</b><small>{taught ? 'Rifallo se cambi posto o angolo della camera.' : '2 minuti con la camera: poi riconosce te, i tuoi colpi e il tuo angolo.'}</small></span><ArrowRight size={17} /></button>

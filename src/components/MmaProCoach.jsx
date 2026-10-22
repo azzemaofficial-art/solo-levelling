@@ -207,7 +207,7 @@ export default function MmaProCoach({ lesson, onClose }) {
     if (spokenPhase.current === key) return;
     spokenPhase.current = key;
     if (clock.phase === 'work') speak(`Round ${clock.round}. ${mmaRoundPlans[lesson.id]?.[clock.round - 1] || lesson.focus}`, true);
-    if (clock.phase === 'rest') speak('Recupera un minuto. Respira e rilassa le spalle.', true);
+    if (clock.phase === 'rest') speak('Recupera un minuto. Respira lento: cinque secondi dentro dal naso, cinque fuori. Spalle rilassate.', true);
     if (clock.phase === 'countdown') speak('Cinque secondi. Trova la guardia.', true);
     if (clock.phase === 'warmup') speak(warmupCues[0], true);
   }, [clock.phase, clock.round, view, paused, speak, lesson]);
@@ -246,9 +246,9 @@ export default function MmaProCoach({ lesson, onClose }) {
     const next = { ...report, selfCheck: nextChecks, effort: nextEffort };
     setReport(next); setSaved(next.activeMs >= 15000 ? saveMmaReport(next) : null);
   };
-  const punchLesson = ['jab','cross','one-two','defense','tactics'].includes(lesson.id);
+  const punchLesson = ['jab','cross','one-two','defense','tactics','rounds'].includes(lesson.id);
   const canResume = mode !== 'camera' || (camera.status === 'ready' && signal.pose.visible && performance.now() - lastFrame.current < 2000);
-  const prior = report ? (readMmaStore().history || []).find(item => item.id !== report.id && item.lessonId === lesson.id && item.version === report.version && item.dose === report.dose && item.stance === report.stance && item.enough) : null;
+  const prior = report ? (readMmaStore().history || []).find(item => item.id !== report.id && item.lessonId === lesson.id && item.version === report.version && item.dose === report.dose && item.rounds === report.rounds && item.stance === report.stance && item.enough) : null;
   const readyCamera = camera.status === 'ready';
   const activeCue = paused || (mode === 'camera' && guardAlert ? `${guardAlert} Pugni sopra la linea delle spalle, vicino al viso.` : null) || (mode === 'guided' ? 'Segui la consegna del round, al tuo ritmo.' : !signal.pose.visible ? MMA_CUES.framing : teaching.guidedOnly || ['kick'].includes(lesson.id) ? 'Esegui con controllo. Questa tecnica richiede una verifica umana.' : MMA_CUES[signal.cue]);
   const phaseLabel = { warmup: 'RISCALDAMENTO', countdown: 'PREPARATI', work: `ROUND ${clock.round}`, rest: `RECUPERO / POI ROUND ${clock.round}`, done: 'COMPLETATO' }[clock.phase];

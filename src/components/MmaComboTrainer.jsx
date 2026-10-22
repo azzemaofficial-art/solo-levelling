@@ -4,9 +4,12 @@ import { ArrowLeft, Check, GraduationCap, Pause, Play, RotateCcw, ThumbsDown, Th
 import useMmaCamera from '../hooks/useMmaCamera';
 import MmaFigure, { useSkeletonPlayer } from './MmaFigure';
 import { createReadiness, readPose } from '../../lib/mmaReadiness';
-import { coachFeedback, createComboJudge, describeGesture, masterSecret, needsFeet, teachSample, visibleGestures, EXPECT } from '../../lib/mmaComboJudge';
+import { coachFeedback, createComboJudge, describeGesture, masterSecret, needsFeet, teachNextSecret, teachSample, visibleGestures, EXPECT } from '../../lib/mmaComboJudge';
 import { forgetRep, learnFromRep, loadTemplates, saveTemplates } from '../../lib/mmaTemplates';
 import { encodeClip, readChatId, sendClips } from '../../lib/mmaClips';
+import { checkRep, loadPath, rankOf, savePath, skipKeys, startSecret, unlockedMoves } from '../../lib/mmaSecretPath';
+import { COMBOS } from '../data/mmaCombos';
+import { recordComboScore } from '../../lib/mmaFighterPath';
 import { NO_VOTE, buildTrainClip, castVote, createTrainPending, fitClip, readTrainLog, saveTrainLog, toggleWrong, trainSender, withVote } from '../../lib/mmaTrain';
 import MmaCameraSetup from './MmaCameraSetup';
 import MmaBagStep, { readBagMode, saveBagMode, useMmaBag } from './MmaBag';
@@ -141,6 +144,9 @@ export default function MmaComboTrainer({ combo, onClose, onLearned }) {
   const logRef = useRef({ session: 0, n: 0, calib: [], aspect: null }); // serie, n° ripetizione, guardia, formato immagine
   const pendingRef = useRef(null);
   const secretsRef = useRef([]); // segreti già spiegati in questa serie (lib/mmaComboJudge.js masterSecret)
+  // percorso dei segreti: insegna → verifica → promuovi (lib/mmaSecretPath.js), salvato sul telefono
+  const pathRef = useRef(null);
+  if (!pathRef.current) pathRef.current = loadPath();
   if (!pendingRef.current) pendingRef.current = createTrainPending({ send: trainSender.send });
   const timers = useRef([]);
   const later = (fn, ms) => { const id = setTimeout(fn, ms); timers.current.push(id); return id; };
@@ -159,8 +165,21 @@ export default function MmaComboTrainer({ combo, onClose, onLearned }) {
     const marks = res.moves.flatMap((mv) => (mv.gesture && mv.issues.length ? [{ t: mv.gesture.peakT ?? mv.gesture.start, joint: MOVE_JOINT(mv.id, judge.lead, judge.rear), text: `${MOVES[mv.id].name}: ${mv.issues[0].text}` }] : []));
     const rep = Date.now();
     const onBag = scored?.bag ? ` A segno ${scored.bag.hits} su ${scored.bag.total}.` : '';
-    const entry = { ...res, rep, frames, marks, bag: scored?.bag || null, feedback: coachFeedback(res, moveNames) + onBag, secret: masterSecret(res, { skip: secretsRef.current }), seen: visibleGestures(moves, judge.gestures().filter((g) => g.start >= t0 - 700)).map((g) => g.move || describeGesture(g)) };
+    // 1. il segreto in prova: applicato in questa ripetizione? 2. poi, se non ce n'è uno in prova, il prossimo da insegnare
+    const check = checkRep(pathRef.current, res);
+    // 2b. ripetizione pulita e nessun segreto appena chiuso: il maestro ne insegna uno nuovo
+    const skip = [...secretsRef.current, ...skipKeys(check.path)];
+    const secret = check.path.pending ? null : masterSecret(res, { skip }) || (check.event ? null : teachNextSecret(res, { skip }));
+    pathRef.current = startSecret(check.path, secret);
+    if (check.event?.type === 'applied') savePath(pathRef.current);
+    const path = check.event, unlocked = path?.unlocked?.[0];
+    const praise = path?.type === 'applied'
+      ? `Segreto applicato!${path.promoted ? ` Sei salito di grado: ${path.promoted.name}.` : ''}${unlocked ? ` Mossa segreta sbloccata: ${MOVES[unlocked.id]?.name}.` : ''} `
+      : path?.type === 'retry' ? 'Quel segreto non è ancora entrato: lo riprendiamo più avanti. ' : '';
+    const entry = { ...res, rep, frames, marks, bag: scored?.bag || null, feedback: coachFeedback(res, moveNames) + onBag, secret, path, seen: visibleGestures(moves, judge.gestures().filter((g) => g.start >= t0 - 700)).map((g) => g.move || describeGesture(g)) };
     if (entry.secret) secretsRef.current = [...secretsRef.current, entry.secret.key];
+    // il segreto del maestro si legge e si ascolta (la prossima ripetizione aspetta che finisca di parlare)
+    entry.speech = `${praise}${entry.feedback}${entry.secret ? `${entry.secret.fresh ? ' Pulita: ecco un segreto nuovo.' : ' Il segreto.'} ${entry.secret.text}` : ''}`;
     // combo riuscita: i colpi riconosciuti diventano tuoi esempi in più (il coach impara mentre ti alleni)
     applyTemplates(learnFromRep(templatesRef.current, res, { rep, sample: teachSample }));
     // registro: la ripetizione resta in sospeso finché arriva il tuo giudizio (lib/mmaTrain.js)
@@ -179,8 +198,7 @@ export default function MmaComboTrainer({ combo, onClose, onLearned }) {
     setCurrent(entry); setReported(false); setVote(NO_VOTE);
     setResults((prev) => [...prev, entry]);
     setPhase('result');
-    // il segreto del maestro si legge e si ascolta (la prossima ripetizione aspetta che finisca di parlare)
-    say(entry.secret ? `${entry.feedback} Il segreto. ${entry.secret.text}` : entry.feedback, voice);
+    say(entry.speech, voice);
   }, [moves, moveNames, voice, applyTemplates, bag, combo, stance]);
 
   // fotogrammi dalla camera
@@ -270,11 +288,12 @@ export default function MmaComboTrainer({ combo, onClose, onLearned }) {
       if (results.length >= reps) {
         setPhase('summary');
         const avg = Math.round(results.reduce((s, r) => s + r.total, 0) / results.length);
+        recordComboScore(combo.id, avg); // per le prove del percorso del combattente
         logWorkout({ date: localDateKey(), kind: 'mma', title: `Combo ${combo.name} · con camera`, minutes: Math.max(3, Math.round(results.length * 0.6)), note: `media ${avg}/100` });
         if (avg >= 80) onLearnedRef.current?.();
         say(`Fine serie. Media ${avg} su cento. ${avg >= 85 ? 'Combo imparata!' : avg >= 65 ? 'Buon lavoro, ancora qualche ripetizione e ci sei.' : 'Rifalla più lenta, un colpo alla volta.'}`, voice);
       } else { setPhase('countdown'); setCount(3); say('Ancora. Tre. Due. Uno. Via!', voice); }
-    }, current?.secret ? Math.max(5200, speakMs(`${current.feedback} Il segreto. ${current.secret.text}`)) : 5200);
+    }, current?.speech ? Math.max(5200, speakMs(current.speech)) : 5200);
     return () => clearTimeout(id);
   }, [phase, paused, replay, results, reps, combo.name, voice, current]);
 
@@ -387,7 +406,9 @@ export default function MmaComboTrainer({ combo, onClose, onLearned }) {
 
       {phase === 'result' && current && <section className="mma-train-feedback">
         <p>{current.feedback}</p>
-        {current.secret && <p className="mma-train-secret"><b>Il segreto · {MOVES[current.secret.id]?.name}</b>{current.secret.text}</p>}
+        {current.path?.type === 'applied' && <p className="mma-train-applied"><b>✓ Segreto applicato · {MOVES[current.path.id]?.name}</b>{current.path.promoted ? ` Nuovo grado: ${current.path.promoted.name}.` : ''}{current.path.unlocked?.[0] ? ` Mossa segreta sbloccata: ${MOVES[current.path.unlocked[0].id]?.name}.` : ''}</p>}
+        {current.path?.type === 'retry' && <p className="mma-train-note">Il segreto su {MOVES[current.path.id]?.name} non è ancora entrato: lo riprendiamo più avanti.</p>}
+        {current.secret && <p className="mma-train-secret"><b>{current.secret.fresh ? 'Segreto nuovo' : 'Il segreto'} · {MOVES[current.secret.id]?.name}</b>{current.secret.text}</p>}
         <div className="mma-train-vote" role="group" aria-label="Il coach ha capito questa ripetizione?">
           <span>Ha capito?</span>
           <button className="up" aria-pressed={vote.ok === true} onClick={() => voteRep(true)}><ThumbsUp size={16} /> Sì</button>
@@ -407,6 +428,13 @@ export default function MmaComboTrainer({ combo, onClose, onLearned }) {
         <div className="mma-train-bars">{results.map((r, i) => <i key={i} style={{ height: `${Math.max(8, r.total)}%` }} className={`grade-${r.grade}`} title={`${i + 1}: ${r.total}`} />)}</div>
         {bagHits && <p>Colpi a segno sul sacco: <b>{bagHits.hits} su {bagHits.total}</b>.</p>}
         {topIssue && <p>Da sistemare più spesso: <b>{topIssue}</b>.</p>}
+        {(() => {
+          const rank = rankOf(pathRef.current), open = unlockedMoves(pathRef.current);
+          return <div className="mma-train-path">
+            <p>Grado: <b>{rank.name}</b> · segreti imparati <b>{rank.learned}</b>{rank.next ? ` · prossimo grado (${rank.next.name}) a ${rank.next.min}` : ''}{pathRef.current.pending ? ` · in prova: ${MOVES[pathRef.current.pending.id]?.name}` : ''}</p>
+            {open.map((m) => <p key={m.id} className="mma-train-secret"><b>Mossa segreta · {MOVES[m.id]?.name}</b>{m.text} Allenala nella combo «{COMBOS.find((c) => c.id === m.combo)?.name || m.combo}».</p>)}
+          </div>;
+        })()}
         {trainOn && results.some((r) => r.train) && <div className="mma-train-votes" role="group" aria-label="Il coach ha capito le ripetizioni?">
           <p className="mma-train-note">Ha capito? Vota le ripetizioni che non hai votato prima. Accanto al numero c’è quello che ho visto.</p>
           {results.map((r, i) => r.train && <div key={r.rep} className="mma-train-vote">
