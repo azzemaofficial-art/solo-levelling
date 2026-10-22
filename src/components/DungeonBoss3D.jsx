@@ -6,17 +6,43 @@ import * as THREE from 'three';
 
 const IS_MOBILE = typeof window !== 'undefined' ? window.matchMedia('(max-width: 768px)').matches : false;
 
+// I modelli 3D non vanno più dentro ogni deploy Vercel (limite 10 GB Hobby): li serve jsDelivr dal repo GitHub,
+// fissati a un commit. Modello nuovo in public/models → commit + push → aggiorna MODELS_COMMIT.
+const MODELS_COMMIT = '155a3fa62dd49850d09b75186741550dbc818514';
+const model = (path) => `https://cdn.jsdelivr.net/gh/azzemaofficial-art/solo-levelling@${MODELS_COMMIT}/public${path}`;
+
+// Se un modello remoto non arriva, sparisce solo quel pezzo di scena: il resto del dungeon continua.
+class ModelBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { failed: false };
+  }
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  componentDidCatch(error) {
+    // eslint-disable-next-line no-console
+    console.warn('[DungeonBoss3D] modello 3D non caricato', error?.message || error);
+  }
+
+  render() {
+    return this.state.failed ? null : this.props.children;
+  }
+}
+
 const FLOOR_PROFILES = {
-  1: { biome: 'Ironfang Gate - Orc Sentinel', modelPath: '/models/orc-warrior.glb', floor: '#141922', wall: '#11141d', arch: '#2d3240', crystal: '#b7e2ff', emissive: '#1a6fff', dust: '#c6d8ff', mist: '#7f9ad3', fog: '#07090d', haze: 'rgba(59,130,246,0.14)', targetSize: 2.6, baseZ: -1.65, groundY: 0.03, yawBias: -1.5708 },
-  2: { biome: 'Ember Bastion - Orc Executor', modelPath: '/models/floor2-orc-sword.glb', floor: '#1a1615', wall: '#19110f', arch: '#45312a', crystal: '#ffd2aa', emissive: '#ff7c2f', dust: '#ffd1b8', mist: '#cf9473', fog: '#120b0a', haze: 'rgba(251,146,60,0.18)', targetSize: 2.7, baseZ: -1.6, groundY: 0.03, yawBias: -1.5708 },
-  3: { biome: 'Frozen Crypt - Bone Marshal', modelPath: '/models/floor3-skeleton.glb', floor: '#0f1625', wall: '#0e1220', arch: '#2a3b60', crystal: '#d9f2ff', emissive: '#4fa8ff', dust: '#d2e9ff', mist: '#8fb0db', fog: '#080d1b', haze: 'rgba(96,165,250,0.18)', targetSize: 2.55, baseZ: -1.62, groundY: 0.02, yawBias: -1.5708 },
-  4: { biome: 'Venom Nest - Widow Matriarch', modelPath: '/models/floor4-spider.glb', floor: '#11180f', wall: '#0f140f', arch: '#2a3a29', crystal: '#c5ffd2', emissive: '#31c56b', dust: '#cbf7d4', mist: '#7bc292', fog: '#081009', haze: 'rgba(16,185,129,0.16)', targetSize: 2.15, baseZ: -2.02, groundY: 0.015, yawBias: -1.5708, playNativeAnim: false },
-  5: { biome: 'Infernal Hunt - Shadow Wolf', modelPath: '/models/custom/floor5-shadow-wolf.glb', floor: '#1b100f', wall: '#1f120f', arch: '#4c2a25', crystal: '#ffc3a5', emissive: '#ff4b2f', dust: '#ffccb9', mist: '#cf7d68', fog: '#150906', haze: 'rgba(239,68,68,0.24)', targetSize: 2.35, minScale: 0.35, baseZ: -2.12, groundY: 0.02, yawBias: -1.5708, playNativeAnim: false },
-  6: { biome: 'Stone Core - Colossus Golem', modelPath: '/models/floor6-golem.glb', floor: '#171716', wall: '#1a1a18', arch: '#3d3b36', crystal: '#d7f0ff', emissive: '#2f7eff', dust: '#ced6df', mist: '#8b96a5', fog: '#0e0f10', haze: 'rgba(148,163,184,0.16)', targetSize: 2.45, baseZ: -2.08, groundY: 0.02, yawBias: -1.5708, playNativeAnim: false },
-  7: { biome: 'Dragon Abyss - Prime Wyrm', modelPath: '/models/custom/floor7-dragon-prime.glb', floor: '#11101a', wall: '#120f1e', arch: '#2f2a4b', crystal: '#d8d0ff', emissive: '#6d6dff', dust: '#dbd5ff', mist: '#9394d9', fog: '#090814', haze: 'rgba(129,140,248,0.2)', targetSize: 3.75, baseZ: -2.2, groundY: 0.015, yawBias: -1.5708 },
-  8: { biome: 'Knight Sanctum - Abyss Knight', modelPath: '/models/custom/floor8-demon-knight-v2.glb', floor: '#15111a', wall: '#130f18', arch: '#3b2a46', crystal: '#f0dcff', emissive: '#a855f7', dust: '#ead4ff', mist: '#a58bc5', fog: '#0c0912', haze: 'rgba(168,85,247,0.22)', targetSize: 3.1, baseZ: -1.85, groundY: 0.03, yawBias: -1.5708 },
-  9: { biome: 'Eldritch Maw - Demonic Horror', modelPath: '/models/custom/floor9-demonic-creature.glb', floor: '#10151a', wall: '#0e1117', arch: '#23404a', crystal: '#aff7ff', emissive: '#14b8a6', dust: '#c4f4ff', mist: '#6cb5bf', fog: '#070d11', haze: 'rgba(20,184,166,0.2)', targetSize: 3.35, baseZ: -1.95, groundY: 0.015, yawBias: -1.5708 },
-  10: { biome: 'Cosmic Vault - Astral Dragon', modelPath: '/models/custom/floor10-astral-dragon.glb', floor: '#0c1020', wall: '#090f23', arch: '#203266', crystal: '#d5ddff', emissive: '#4f7cff', dust: '#d0ddff', mist: '#7787cc', fog: '#040813', haze: 'rgba(79,124,255,0.22)', targetSize: 2.85, baseZ: -1.7, groundY: 0.03, yawBias: -1.5708 }
+  1: { biome: 'Ironfang Gate - Orc Sentinel', modelPath: model('/models/orc-warrior.glb'), floor: '#141922', wall: '#11141d', arch: '#2d3240', crystal: '#b7e2ff', emissive: '#1a6fff', dust: '#c6d8ff', mist: '#7f9ad3', fog: '#07090d', haze: 'rgba(59,130,246,0.14)', targetSize: 2.6, baseZ: -1.65, groundY: 0.03, yawBias: -1.5708 },
+  2: { biome: 'Ember Bastion - Orc Executor', modelPath: model('/models/floor2-orc-sword.glb'), floor: '#1a1615', wall: '#19110f', arch: '#45312a', crystal: '#ffd2aa', emissive: '#ff7c2f', dust: '#ffd1b8', mist: '#cf9473', fog: '#120b0a', haze: 'rgba(251,146,60,0.18)', targetSize: 2.7, baseZ: -1.6, groundY: 0.03, yawBias: -1.5708 },
+  3: { biome: 'Frozen Crypt - Bone Marshal', modelPath: model('/models/floor3-skeleton.glb'), floor: '#0f1625', wall: '#0e1220', arch: '#2a3b60', crystal: '#d9f2ff', emissive: '#4fa8ff', dust: '#d2e9ff', mist: '#8fb0db', fog: '#080d1b', haze: 'rgba(96,165,250,0.18)', targetSize: 2.55, baseZ: -1.62, groundY: 0.02, yawBias: -1.5708 },
+  4: { biome: 'Venom Nest - Widow Matriarch', modelPath: model('/models/floor4-spider.glb'), floor: '#11180f', wall: '#0f140f', arch: '#2a3a29', crystal: '#c5ffd2', emissive: '#31c56b', dust: '#cbf7d4', mist: '#7bc292', fog: '#081009', haze: 'rgba(16,185,129,0.16)', targetSize: 2.15, baseZ: -2.02, groundY: 0.015, yawBias: -1.5708, playNativeAnim: false },
+  5: { biome: 'Infernal Hunt - Shadow Wolf', modelPath: model('/models/custom/floor5-shadow-wolf.glb'), floor: '#1b100f', wall: '#1f120f', arch: '#4c2a25', crystal: '#ffc3a5', emissive: '#ff4b2f', dust: '#ffccb9', mist: '#cf7d68', fog: '#150906', haze: 'rgba(239,68,68,0.24)', targetSize: 2.35, minScale: 0.35, baseZ: -2.12, groundY: 0.02, yawBias: -1.5708, playNativeAnim: false },
+  6: { biome: 'Stone Core - Colossus Golem', modelPath: model('/models/floor6-golem.glb'), floor: '#171716', wall: '#1a1a18', arch: '#3d3b36', crystal: '#d7f0ff', emissive: '#2f7eff', dust: '#ced6df', mist: '#8b96a5', fog: '#0e0f10', haze: 'rgba(148,163,184,0.16)', targetSize: 2.45, baseZ: -2.08, groundY: 0.02, yawBias: -1.5708, playNativeAnim: false },
+  7: { biome: 'Dragon Abyss - Prime Wyrm', modelPath: model('/models/custom/floor7-dragon-prime.glb'), floor: '#11101a', wall: '#120f1e', arch: '#2f2a4b', crystal: '#d8d0ff', emissive: '#6d6dff', dust: '#dbd5ff', mist: '#9394d9', fog: '#090814', haze: 'rgba(129,140,248,0.2)', targetSize: 3.75, baseZ: -2.2, groundY: 0.015, yawBias: -1.5708 },
+  8: { biome: 'Knight Sanctum - Abyss Knight', modelPath: model('/models/custom/floor8-demon-knight-v2.glb'), floor: '#15111a', wall: '#130f18', arch: '#3b2a46', crystal: '#f0dcff', emissive: '#a855f7', dust: '#ead4ff', mist: '#a58bc5', fog: '#0c0912', haze: 'rgba(168,85,247,0.22)', targetSize: 3.1, baseZ: -1.85, groundY: 0.03, yawBias: -1.5708 },
+  9: { biome: 'Eldritch Maw - Demonic Horror', modelPath: model('/models/custom/floor9-demonic-creature.glb'), floor: '#10151a', wall: '#0e1117', arch: '#23404a', crystal: '#aff7ff', emissive: '#14b8a6', dust: '#c4f4ff', mist: '#6cb5bf', fog: '#070d11', haze: 'rgba(20,184,166,0.2)', targetSize: 3.35, baseZ: -1.95, groundY: 0.015, yawBias: -1.5708 },
+  10: { biome: 'Cosmic Vault - Astral Dragon', modelPath: model('/models/custom/floor10-astral-dragon.glb'), floor: '#0c1020', wall: '#090f23', arch: '#203266', crystal: '#d5ddff', emissive: '#4f7cff', dust: '#d0ddff', mist: '#7787cc', fog: '#040813', haze: 'rgba(79,124,255,0.22)', targetSize: 2.85, baseZ: -1.7, groundY: 0.03, yawBias: -1.5708 }
 };
 
 const getProfile = (floor) => {
@@ -56,19 +82,19 @@ const getRenderableBox = (root) => {
 };
 
 const SETPIECE_MODELS = {
-  gate: '/models/setpieces/arcane-gate.glb',
-  throne: '/models/setpieces/dark-throne-statue.glb',
-  dragon: '/models/setpieces/dragon-statue.glb',
-  staff: '/models/setpieces/magic-staff.glb',
-  crystal: '/models/setpieces/magical-crystal.glb',
-  pillar: '/models/setpieces/mystical-pillar.glb',
-  club: '/models/props/wooden-club.glb',
-  hunterNinja: '/models/hunters/armored-ninja.glb',
-  hunterDarkKnight: '/models/hunters/dark-knight.glb',
-  hunterArmoredKnight: '/models/hunters/fantasy-armored-knight.glb',
-  hunterMage: '/models/hunters/fantasy-mage.glb',
-  hunterSwordswoman: '/models/hunters/fantasy-swordswoman.glb',
-  hunterMedievalKnight: '/models/hunters/medieval-knight.glb'
+  gate: model('/models/setpieces/arcane-gate.glb'),
+  throne: model('/models/setpieces/dark-throne-statue.glb'),
+  dragon: model('/models/setpieces/dragon-statue.glb'),
+  staff: model('/models/setpieces/magic-staff.glb'),
+  crystal: model('/models/setpieces/magical-crystal.glb'),
+  pillar: model('/models/setpieces/mystical-pillar.glb'),
+  club: model('/models/props/wooden-club.glb'),
+  hunterNinja: model('/models/hunters/armored-ninja.glb'),
+  hunterDarkKnight: model('/models/hunters/dark-knight.glb'),
+  hunterArmoredKnight: model('/models/hunters/fantasy-armored-knight.glb'),
+  hunterMage: model('/models/hunters/fantasy-mage.glb'),
+  hunterSwordswoman: model('/models/hunters/fantasy-swordswoman.glb'),
+  hunterMedievalKnight: model('/models/hunters/medieval-knight.glb')
 };
 
 // Player squad representation: these are allies, not dungeon enemies.
@@ -1073,21 +1099,25 @@ const DungeonBoss3D = ({
         <pointLight position={[4.8, 2.4, -6.8]} intensity={0.42} color={profile.emissive} />
         <SetpieceKeyLights floor={floor} profile={profile} />
         <DungeonEnvironment profile={profile} floor={floor} enraged={enraged} />
-        <Suspense fallback={null}>
-          <DungeonSetpieces floor={floor} profile={profile} enraged={enraged} />
-        </Suspense>
-        <Suspense fallback={null}>
-          <HunterCombatSquad
-            tier={hunterTier}
-            avatarStage={hunterAvatarStage}
-            level={hunterLevel}
-            skillPower={hunterSkillPower}
-            playerAttackTick={hitTick}
-            formSkillTick={formSkillTick}
-            enemyAttackTick={enemyAttackTick}
-            isDefeated={isDefeated}
-          />
-        </Suspense>
+        <ModelBoundary key={`setpieces-${floor}`}>
+          <Suspense fallback={null}>
+            <DungeonSetpieces floor={floor} profile={profile} enraged={enraged} />
+          </Suspense>
+        </ModelBoundary>
+        <ModelBoundary key={`hunters-${hunterTier}`}>
+          <Suspense fallback={null}>
+            <HunterCombatSquad
+              tier={hunterTier}
+              avatarStage={hunterAvatarStage}
+              level={hunterLevel}
+              skillPower={hunterSkillPower}
+              playerAttackTick={hitTick}
+              formSkillTick={formSkillTick}
+              enemyAttackTick={enemyAttackTick}
+              isDefeated={isDefeated}
+            />
+          </Suspense>
+        </ModelBoundary>
         <HunterMagicFx
           tier={hunterTier}
           attackTick={hitTick}
@@ -1104,26 +1134,28 @@ const DungeonBoss3D = ({
         <CrystalLights profile={profile} enraged={enraged} />
         <LevelUpBurst tick={levelUpTick} />
         <pointLight position={[1.5, 1.2, -1.5]} intensity={enraged ? 0.8 : 0.2} color={enraged ? '#ef4444' : profile.emissive} />
-        <Suspense
-          fallback={
-            <Html center>
-              <p className="text-[10px] uppercase tracking-widest text-red-300">Evocazione...</p>
-            </Html>
-          }
-        >
-          <OrcModel
-            key={`${floor}-${enemyKey}-${profile.modelPath}`}
-            profile={profile}
-            rage={rage}
-            hitTick={hitTick}
-            enemyAttackTick={enemyAttackTick}
-            manualMoveTick={manualMoveTick}
-            manualMoveType={manualMoveType}
-            spawnTick={spawnTick}
-            defeated={isDefeated}
-            onPointerDown={onModelClick}
-          />
-        </Suspense>
+        <ModelBoundary key={`boss-${floor}-${enemyKey}`}>
+          <Suspense
+            fallback={
+              <Html center>
+                <p className="text-[10px] uppercase tracking-widest text-red-300">Evocazione...</p>
+              </Html>
+            }
+          >
+            <OrcModel
+              key={`${floor}-${enemyKey}-${profile.modelPath}`}
+              profile={profile}
+              rage={rage}
+              hitTick={hitTick}
+              enemyAttackTick={enemyAttackTick}
+              manualMoveTick={manualMoveTick}
+              manualMoveType={manualMoveType}
+              spawnTick={spawnTick}
+              defeated={isDefeated}
+              onPointerDown={onModelClick}
+            />
+          </Suspense>
+        </ModelBoundary>
         <OrbitControls
           enabled
           enableZoom
