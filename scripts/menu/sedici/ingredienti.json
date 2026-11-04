@@ -1,0 +1,1458 @@
+{
+"merluzzo surgelato": [
+78,
+17,
+0.7,
+0,
+0
+],
+"platessa surgelata": [
+80,
+16,
+1.5,
+0,
+0
+],
+"calamari surgelati": [
+68,
+12.6,
+1,
+1,
+0
+],
+"cozze sgusciate surgelate": [
+84,
+11.7,
+2.2,
+3.7,
+0
+],
+"tonno al naturale sgocciolato": [
+103,
+23.5,
+0.8,
+0,
+0
+],
+"tonno crudo abbattuto": [
+109,
+24.4,
+1,
+0,
+0
+],
+"salmone crudo abbattuto": [
+208,
+20,
+13,
+0,
+0
+],
+"filetti di orata abbattuti": [
+110,
+20,
+3.5,
+0,
+0
+],
+"filetti di sgombro": [
+170,
+17.2,
+11,
+0,
+0
+],
+"surimi": [
+99,
+8,
+0.9,
+15,
+0.5
+],
+"noodle di riso": [
+360,
+6,
+0.6,
+82,
+1.6
+],
+"calamarata (pasta)": [
+355,
+12,
+1.5,
+71,
+3
+],
+"panino (baguette)": [
+270,
+9,
+1.5,
+55,
+3
+],
+"panino da burger": [
+270,
+9,
+4,
+49,
+2.5
+],
+"pane rustico": [
+270,
+9,
+1.5,
+55,
+3
+],
+"panko": [
+370,
+12,
+4,
+72,
+3
+],
+"farina di ceci": [
+360,
+21,
+6.5,
+58,
+11
+],
+"farina di riso": [
+360,
+6,
+1.4,
+80,
+2.4
+],
+"amido di mais": [
+360,
+0.3,
+0,
+88,
+0.9
+],
+"olio di semi": [
+884,
+0,
+100,
+0,
+0
+],
+"olio extravergine": [
+884,
+0,
+100,
+0,
+0
+],
+"maionese light": [
+300,
+0.5,
+30,
+6,
+0
+],
+"yogurt greco 0%": [
+57,
+10,
+0.4,
+4,
+0
+],
+"uovo": [
+143,
+12.6,
+9.5,
+0.7,
+0
+],
+"sottiletta light": [
+240,
+18,
+14,
+6,
+0
+],
+"miso": [
+198,
+12,
+6,
+26,
+5
+],
+"mirin": [
+240,
+0.3,
+0,
+43,
+0
+],
+"salsa di pesce (nuoc mam)": [
+35,
+5,
+0,
+4,
+0
+],
+"salsa di ostriche": [
+110,
+2,
+0.3,
+22,
+0.3
+],
+"zucchero": [
+392,
+0,
+0,
+100,
+0
+],
+"pomodori pelati": [
+25,
+1.2,
+0.2,
+4,
+1.3
+],
+"pomodorini": [
+20,
+1,
+0.2,
+3.9,
+1.2
+],
+"pomodoro": [
+18,
+0.9,
+0.2,
+3.9,
+1.2
+],
+"peperone": [
+30,
+1,
+0.3,
+6,
+2.1
+],
+"lattuga": [
+15,
+1.3,
+0.2,
+2.9,
+1.3
+],
+"rucola": [
+25,
+2.6,
+0.7,
+3.7,
+1.6
+],
+"finocchio": [
+30,
+1,
+0.2,
+7,
+3.1
+],
+"germogli di soia": [
+30,
+3,
+0.2,
+6,
+1.8
+],
+"avocado": [
+160,
+2,
+15,
+9,
+7
+],
+"mais dolce": [
+86,
+3.2,
+1.2,
+19,
+2
+],
+"patate dolci": [
+86,
+1.6,
+0.1,
+20,
+3
+],
+"alga nori": [
+300,
+35,
+3,
+40,
+30
+],
+"arachidi": [
+567,
+26,
+49,
+16,
+8.5
+],
+"olive": [
+150,
+1,
+15,
+4,
+3
+],
+"capperi": [
+30,
+2,
+0.9,
+5,
+3
+],
+"pomodori secchi sott'olio": [
+190,
+5,
+12,
+20,
+5
+],
+"aneto": [
+43,
+3.5,
+1,
+7,
+2
+],
+"coriandolo": [
+23,
+2,
+0.5,
+3.7,
+2.8
+],
+"prezzemolo": [
+36,
+3,
+0.8,
+6,
+3.3
+],
+"basilico": [
+23,
+3,
+0.6,
+2.7,
+1.6
+],
+"curcuma": [
+310,
+10,
+3,
+67,
+22
+],
+"zenzero": [
+80,
+1.8,
+0.8,
+18,
+2
+],
+"cetriolini sottaceto": [
+15,
+0.5,
+0.2,
+3,
+1
+],
+"latte di cocco light": [
+73,
+0.7,
+7,
+2,
+0
+],
+"paprika dolce": [
+280,
+14,
+13,
+54,
+35
+],
+"petto di pollo": [
+110,
+23,
+1.5,
+0,
+0
+],
+"fesa di tacchino a fette": [
+107,
+23.5,
+1.2,
+0,
+0
+],
+"macinato di tacchino": [
+140,
+21,
+6,
+0,
+0
+],
+"macinato di manzo magro": [
+130,
+21.5,
+5,
+0,
+0
+],
+"scamone di manzo": [
+120,
+22,
+3.5,
+0,
+0
+],
+"lonza di maiale": [
+130,
+22,
+4.5,
+0,
+0
+],
+"macinato di maiale magro": [
+150,
+20,
+7.5,
+0,
+0
+],
+"speck a cubetti": [
+300,
+28,
+20,
+1,
+0
+],
+"fagioli neri secchi": [
+340,
+21.5,
+1.4,
+62,
+15.5
+],
+"fagioli neri in scatola sgocciolati": [
+100,
+7,
+0.5,
+14,
+7
+],
+"lenticchie secche": [
+330,
+24,
+1,
+55,
+11
+],
+"lenticchie nere secche": [
+330,
+24,
+1.5,
+55,
+11
+],
+"ceci secchi": [
+360,
+20,
+6,
+60,
+14
+],
+"riso basmati": [
+350,
+7.5,
+0.7,
+79,
+1
+],
+"riso jasmine": [
+350,
+7,
+0.6,
+80,
+1
+],
+"riso per sushi": [
+350,
+6.5,
+0.6,
+79,
+1
+],
+"riso carnaroli": [
+350,
+7,
+0.6,
+79,
+1
+],
+"pasta corta di semola": [
+355,
+12,
+1.5,
+72,
+3
+],
+"cannelloni secchi": [
+355,
+12,
+1.5,
+72,
+3
+],
+"noodle all'uovo secchi": [
+370,
+13,
+3,
+72,
+3
+],
+"spaghetti di riso": [
+360,
+6,
+0.5,
+82,
+1.5
+],
+"tagliatelle di riso": [
+360,
+6,
+0.5,
+82,
+1.5
+],
+"farina 00": [
+340,
+10.5,
+1,
+75,
+2.2
+],
+"pangrattato": [
+360,
+12,
+3,
+70,
+4
+],
+"pane di semola": [
+270,
+9,
+1.5,
+55,
+3
+],
+"pita": [
+270,
+9,
+1.2,
+55,
+2.5
+],
+"tortillas di mais": [
+220,
+5.7,
+2.5,
+45,
+5
+],
+"patate": [
+80,
+2,
+0.1,
+17,
+1.8
+],
+"pasta fillo": [
+300,
+7,
+4.5,
+55,
+2
+],
+"uovo intero": [
+143,
+12.5,
+10,
+0.7,
+0
+],
+"albume": [
+48,
+10.5,
+0.1,
+0.7,
+0
+],
+"skyr": [
+62,
+11,
+0.2,
+4,
+0
+],
+"latte scremato": [
+34,
+3.4,
+0.2,
+5,
+0
+],
+"panna da cucina light": [
+150,
+2.5,
+15,
+4,
+0
+],
+"mozzarella light": [
+165,
+20,
+9,
+2,
+0
+],
+"parmigiano": [
+400,
+33,
+28,
+0,
+0
+],
+"feta": [
+265,
+15,
+21,
+1,
+0
+],
+"cheddar": [
+400,
+24,
+33,
+1,
+0
+],
+"emmental": [
+370,
+27,
+28,
+0.5,
+0
+],
+"ricotta vaccina": [
+130,
+10,
+8,
+4,
+0
+],
+"prosciutto cotto magro": [
+110,
+19,
+3,
+1,
+0
+],
+"olio EVO": [
+900,
+0,
+100,
+0,
+0
+],
+"olio di sesamo": [
+900,
+0,
+100,
+0,
+0
+],
+"burro": [
+720,
+0.8,
+82,
+0.6,
+0
+],
+"passata di pomodoro": [
+30,
+1.5,
+0.2,
+5,
+1
+],
+"polpa di pomodoro": [
+25,
+1.3,
+0.2,
+4,
+1
+],
+"pomodori": [
+20,
+1,
+0.2,
+3.5,
+1.2
+],
+"cipolla": [
+40,
+1.1,
+0.1,
+9,
+1.5
+],
+"cipolla rossa": [
+40,
+1.1,
+0.1,
+9,
+1.5
+],
+"peperone rosso": [
+30,
+1,
+0.3,
+6,
+2
+],
+"carota": [
+38,
+1,
+0.2,
+8,
+2.8
+],
+"zucchina": [
+18,
+1.3,
+0.3,
+3,
+1
+],
+"funghi champignon": [
+22,
+3,
+0.3,
+3,
+1
+],
+"cavolo cappuccio": [
+25,
+1.3,
+0.1,
+6,
+2.5
+],
+"pak choi": [
+14,
+1.5,
+0.2,
+2,
+1
+],
+"broccoli": [
+34,
+2.8,
+0.4,
+7,
+2.6
+],
+"spinaci": [
+25,
+3,
+0.4,
+3.5,
+2.2
+],
+"fagiolini": [
+31,
+1.8,
+0.2,
+7,
+3
+],
+"cipollotto": [
+30,
+1.8,
+0.2,
+6,
+2.5
+],
+"insalata": [
+15,
+1.3,
+0.2,
+2.5,
+1.5
+],
+"cetriolo": [
+15,
+0.7,
+0.1,
+3,
+0.5
+],
+"piselli surgelati": [
+78,
+5.5,
+0.4,
+13,
+5
+],
+"edamame surgelati": [
+140,
+12,
+6,
+9,
+5
+],
+"mais in scatola": [
+90,
+3,
+1,
+16,
+2.5
+],
+"ananas": [
+50,
+0.5,
+0.1,
+13,
+1.4
+],
+"arancia": [
+47,
+0.9,
+0.1,
+12,
+2.4
+],
+"succo di limone": [
+25,
+0.4,
+0.2,
+7,
+0.3
+],
+"succo di lime": [
+25,
+0.4,
+0.1,
+8,
+0.3
+],
+"aglio": [
+150,
+6,
+0.5,
+33,
+2
+],
+"zenzero fresco": [
+80,
+1.8,
+0.7,
+18,
+2
+],
+"salsa di soia": [
+65,
+7,
+0,
+6,
+0
+],
+"salsa hoisin": [
+220,
+3,
+3.5,
+44,
+2
+],
+"kecap manis (soia dolce)": [
+300,
+3,
+0,
+70,
+0
+],
+"miele": [
+304,
+0.3,
+0,
+82,
+0
+],
+"zucchero di canna": [
+380,
+0,
+0,
+98,
+0
+],
+"zucchero a velo": [
+390,
+0,
+0,
+100,
+0
+],
+"ketchup": [
+110,
+1.5,
+0.2,
+25,
+0.3
+],
+"aceto di vino": [
+20,
+0,
+0,
+1,
+0
+],
+"aceto di riso": [
+20,
+0,
+0,
+1,
+0
+],
+"vino bianco": [
+80,
+0.1,
+0,
+2,
+0
+],
+"birra chiara": [
+43,
+0.4,
+0,
+3.5,
+0
+],
+"sake": [
+110,
+0.5,
+0,
+5,
+0
+],
+"maizena": [
+360,
+0.3,
+0,
+88,
+1
+],
+"brodo di pollo": [
+5,
+0.7,
+0.2,
+0.3,
+0
+],
+"chunjang (pasta coreana di fagioli neri)": [
+200,
+12,
+3,
+30,
+4
+],
+"nuoc mam": [
+35,
+5,
+0,
+4,
+0
+],
+"semi di sesamo": [
+570,
+18,
+50,
+23,
+12
+],
+"mandorle": [
+600,
+21,
+50,
+20,
+12
+],
+"uvetta": [
+300,
+3,
+0.5,
+72,
+4
+],
+"tahina": [
+590,
+17,
+53,
+20,
+9
+],
+"senape": [
+70,
+5,
+4,
+5,
+3
+],
+"cacao amaro": [
+300,
+20,
+11,
+12,
+30
+],
+"zafferano": [
+310,
+11,
+6,
+65,
+4
+],
+"Whey al cioccolato (chocowafer)": [
+380,
+78,
+5,
+8,
+0
+],
+"Farina 00": [
+350,
+11,
+1,
+73,
+2.2
+],
+"Farina di riso glutinoso (mochiko, negozio asiatico)": [
+360,
+6.5,
+0.6,
+80,
+1
+],
+"Fiocchi d'avena": [
+370,
+13,
+7,
+59,
+10
+],
+"Amido di mais": [
+350,
+0,
+0,
+88,
+0.9
+],
+"Lievito": [
+200,
+10,
+1,
+40,
+5
+],
+"Cannella": [
+247,
+4,
+1.2,
+81,
+53
+],
+"Uova intere (sgusciate)": [
+127,
+12.4,
+9,
+0.7,
+0
+],
+"Albume in brick": [
+48,
+11,
+0.2,
+0.7,
+0
+],
+"Skyr bianco": [
+63,
+11,
+0.2,
+4,
+0
+],
+"Yogurt greco 0%": [
+65,
+10,
+1,
+4,
+0
+],
+"Latte scremato": [
+34,
+3.4,
+0.1,
+5,
+0
+],
+"Latte parzialmente scremato": [
+46,
+3.3,
+1.6,
+5,
+0
+],
+"Formaggio spalmabile light": [
+155,
+7,
+12,
+5,
+0
+],
+"Burro": [
+717,
+0.9,
+81,
+0.1,
+0
+],
+"Olio d'oliva": [
+900,
+0,
+100,
+0,
+0
+],
+"Olio di sesamo": [
+884,
+0,
+100,
+0,
+0
+],
+"Zucchero": [
+390,
+0,
+0,
+100,
+0
+],
+"Miele": [
+304,
+0.3,
+0,
+82,
+0
+],
+"Sciroppo d'acero": [
+260,
+0,
+0,
+67,
+0
+],
+"Cacao amaro": [
+230,
+20,
+14,
+58,
+33
+],
+"Cioccolato fondente": [
+600,
+10,
+46,
+30,
+11
+],
+"Purea di mela senza zuccheri": [
+50,
+0.2,
+0.1,
+13,
+1
+],
+"Frutti di bosco (anche surgelati)": [
+50,
+1,
+0.4,
+11,
+5
+],
+"Banana": [
+89,
+1.1,
+0.3,
+23,
+2.6
+],
+"Noci": [
+680,
+15,
+65,
+14,
+6.7
+],
+"Arachidi": [
+600,
+26,
+49,
+16,
+8.5
+],
+"Burro d'arachidi": [
+600,
+25,
+50,
+20,
+6
+],
+"Biscotti digestive": [
+470,
+7,
+20,
+64,
+3.5
+],
+"Tahina": [
+595,
+17,
+54,
+21,
+9
+],
+"Ceci cotti": [
+130,
+7,
+2,
+20,
+6
+],
+"Pane pita": [
+275,
+9,
+1.2,
+55,
+2.2
+],
+"Tortilla di frumento": [
+300,
+8,
+7,
+50,
+3
+],
+"Panino morbido tipo burger (o English muffin)": [
+270,
+9,
+4,
+49,
+2.5
+],
+"Pane": [
+270,
+9,
+1.5,
+55,
+3
+],
+"Macinato di tacchino": [
+110,
+21,
+2.5,
+0,
+0
+],
+"Fesa di tacchino a fette": [
+100,
+21,
+1.5,
+1,
+0
+],
+"Petto di pollo": [
+110,
+23.3,
+1.5,
+0,
+0
+],
+"Cheddar": [
+400,
+25,
+33,
+1,
+0
+],
+"Feta": [
+265,
+14,
+21,
+4,
+0
+],
+"Pomodori pelati": [
+25,
+1.3,
+0.2,
+4,
+1.3
+],
+"Pomodori maturi": [
+18,
+0.9,
+0.2,
+3.9,
+1.2
+],
+"Peperoni dolci": [
+31,
+1,
+0.3,
+6,
+2.1
+],
+"Cipolla": [
+40,
+1,
+0.1,
+9,
+1.7
+],
+"Cipollotto": [
+32,
+1.8,
+0.2,
+7,
+2.6
+],
+"Paprika dolce": [
+282,
+14,
+13,
+54,
+35
+],
+"Cumino": [
+375,
+18,
+22,
+44,
+10
+],
+"Avocado": [
+160,
+2,
+15,
+9,
+7
+],
+"Porro e carota tritati": [
+25,
+1.5,
+0.3,
+4,
+2
+],
+"Salsa di soia": [
+60,
+8,
+0,
+6,
+0.8
+],
+"sardine fresche": [
+129,
+21,
+4.5,
+0,
+0
+],
+"gamberi surgelati sgusciati": [
+71,
+13.6,
+0.6,
+1,
+0
+],
+"polpo bollito": [
+82,
+14.9,
+1,
+2,
+0
+],
+"alici fresche": [
+96,
+16.8,
+2.6,
+0,
+0
+],
+"fagioli cannellini in scatola sgocciolati": [
+110,
+7,
+0.5,
+19,
+5
+],
+"fagioli cannellini secchi": [
+333,
+23,
+1.5,
+60,
+15
+],
+"Riso soffiato": [
+380,
+7,
+1,
+82,
+2
+],
+"Nocciole": [
+650,
+15,
+61,
+10,
+10
+],
+"Gelatina in fogli": [
+340,
+85,
+0,
+0,
+0
+],
+"Cono per gelato (cialda)": [
+390,
+8,
+3,
+80,
+3
+]
+}

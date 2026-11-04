@@ -37,8 +37,7 @@ export function useCutProfile() {
 const bmr = ({ sex, age, heightCm, startWeightKg }) =>
   10 * startWeightKg + 6.25 * heightCm - 5 * age + (sex === 'f' ? -161 : 5);
 
-export const dayTargetFor = (profile, dayIndex) => {
-  const base = dayTargets[dayIndex];
+export const dayTargetFor = (profile, dayIndex, base = dayTargets[dayIndex]) => {
   if (!profile?.age || !profile?.heightCm) return base;
   const ratio = bmr(profile) / bmr({ ...basePlanProfile, sex: 'm' });
   return Math.round((base * ratio) / 50) * 50;

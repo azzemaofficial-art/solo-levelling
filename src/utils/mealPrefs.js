@@ -8,6 +8,7 @@
 // Le preferenze stanno nel piano salvato sul telefono (CUT_PLAN_KEY → mealPrefs).
 import { dayTargets, swapGroup, swapPools } from '../data/cutPlan.js';
 import { mealRecipes } from '../data/mealRecipes.js';
+import { menu16Dishes, menu16Weeks } from '../data/menu16.js';
 
 // proteine minime del giorno (come i test del piano): 140 col McDonald’s, 135 la domenica
 export const MIN_PROTEIN = [150, 150, 140, 150, 150, 150, 135];
@@ -114,3 +115,55 @@ export function togglePref(prefs = {}, id, value) {
   if (next[id] === value) delete next[id]; else next[id] = value;
   return next;
 }
+
+// ── Settimane 7–16 (src/data/menu16.js, generato da scripts/menu/sedici/genera.py) ──
+// Ogni piatto ha una famiglia (pesce col pesce, legumi coi legumi, carne rossa con carne rossa) e dosi
+// già adattate alla fase: cambiarlo lascia vere da sole le regole della settimana, senza ricalcoli.
+const BY_MEAL = Object.fromEntries(menu16Dishes.map((d) => [d.meal, d]));
+const dishOf = (id, phase) => menu16Dishes.find((d) => d.id === id && d.phase === phase);
+export const recipeFor = (meal) => BY_MEAL[meal] || mealRecipes[meal] || null;
+export const pickKey = (week, day, label) => `${week}-${day}-${label}`;
+
+// le alternative si confrontano sempre col piatto del piano: la lista non cambia dopo una scelta
+export function alternativesFor(slot, prefs = {}) {
+  if (!slot.family) return [];
+  const ref = dishOf(slot.plannedId || slot.id, slot.phase);
+  return menu16Dishes
+    .filter((d) => d.family === slot.family && d.phase === slot.phase && d.id !== ref.id && prefs[d.id] !== 'down'
+      && Math.abs(d.kcal - ref.kcal) <= 60 && d.protein >= ref.protein - 8)
+    .sort((a, b) => (prefs[b.id] === 'up') - (prefs[a.id] === 'up') || b.protein - a.protein);
+}
+
+// Settimane 7–16 con le scelte (saved.mealPicks) e i 👎 applicati.
+export function applyMenu16(prefs = {}, picks = {}) {
+  return menu16Weeks.map((week, w) => {
+    const used = new Set(week.flatMap((d) => d.slots.map((s) => s.id)));
+    return week.map((d, day) => ({
+      ...d,
+      slots: d.slots.map((s) => {
+        if (!s.family) return s;
+        const picked = picks[pickKey(w + 6, day, s.label)];
+        const chosen = picked && prefs[picked] !== 'down' ? dishOf(picked, s.phase) : null;
+        if (!chosen && prefs[s.id] !== 'down') return s;
+        const alt = chosen || alternativesFor(s, prefs).find((a) => !used.has(a.id));
+        if (!alt) return s;
+        used.add(alt.id);
+        return { ...s, id: alt.id, plannedId: s.id, meal: alt.meal, image: alt.image, swappedFrom: s.meal, swapReason: chosen ? 'scelta' : 'gusto' };
+      }),
+    }));
+  });
+}
+
+const dishesOf = (week) => week.flatMap((d) => d.slots.map((s) => BY_MEAL[s.meal]).filter((x) => x?.dose));
+
+// shortcut: somma per nome esatto, sinonimi come «cipolla» e «cipolla rossa» restano separati; basta per fare la spesa
+export function weekShopping(week, people = 1) {
+  const total = new Map();
+  dishesOf(week).forEach((d) => d.dose.forEach(([name, g]) => {
+    const key = name.toLowerCase();
+    total.set(key, (total.get(key) || 0) + g * people);
+  }));
+  return [...total].sort((a, b) => b[1] - a[1]);
+}
+
+export const weekPrep = (week) => [...new Map(dishesOf(week).filter((d) => d.prepMin > 0).map((d) => [d.id, d])).values()];

@@ -1,7 +1,7 @@
 import { mealRecipes } from './mealRecipes.js';
 
 export const profile = {
-  name: 'Emanuele', age: 23, heightCm: 185, startWeightKg: 86.45,
+  name: 'Emanuele', age: 23, heightCm: 187, startWeightKg: 86.45,
   targetWeightKg: 83, startWaistCm: 92, footballDays: [1, 4],
 };
 
@@ -15,13 +15,13 @@ export const nutritionRules = [
   'Proteine: circa 155–170 g al giorno, distribuite tra i pasti. Verdura e frutta: almeno 400 g; fibra: almeno 25 g.',
   'Pesa al mattino 3–4 volte a settimana e guarda la media. Se dopo 3 settimane peso e vita non scendono, riduci di circa 100–150 kcal o aumenta il movimento quotidiano.',
   'Nei giorni di calcio (21:30–23:00) i carboidrati vanno soprattutto nella cena delle 18:45 e nello spuntino pre-partita; dopo, shake di proteine e qualcosa di leggero. Non compensare pizza, McDonald’s o cocktail saltando i pasti.',
-  'Proteine in polvere (le tue, gusto chocowafer) solo dove servono: lo shake dopo il calcio e un misurino nel latte del weekend con le Gocciole. Negli altri pasti le proteine arrivano da skyr, albumi, yogurt, carne e pesce.',
+  'Proteine in polvere (le tue, gusto cioccolato-wafer): nello shake dopo il calcio e dopo i pesi e, dalla settimana 7, dentro colazioni e spuntini dolci. Mai nei piatti salati. Creatina 3–5 g a fine allenamento.',
   'Le calorie dell’Apple Watch negli sport a scatti come il calcio sono sovrastimate: per capire se mangi abbastanza guarda la media del peso della settimana, non il numero dell’orologio.',
   'Alcol: dopo l’allenamento riduce del 24–37% la costruzione del muscolo e peggiora il sonno. Il venerdì massimo 2 cocktail, con un bicchiere d’acqua in mezzo.',
   'Cucina asiatica: salsa di soia iposodica (20–40% di sale in meno), misurata col cucchiaio. Zenzero, aglio, cipollotto e aceto di riso danno sapore senza sale.',
   'Longevità: fibre almeno 25 g al giorno e frutta e verdura almeno 400 g sono le abitudini più legate a una vita lunga. Ogni giorno del piano le rispetta; il totale delle fibre è sopra i pasti.',
-  'Ogni settimana: pesce almeno 2 volte, carne rossa al massimo 3 (cavallo compreso), affettati il meno possibile, legumi almeno 3 giorni, una manciata di frutta secca quando puoi, integrale dove non rovina il piatto (prima della partita meglio bianco: meno fibre, digestione più facile).',
-  'Per il pesce crudo scegli un esercizio affidabile che gestisca correttamente la sicurezza del prodotto.',
+  'Ogni settimana: pesce almeno 3 volte (martedì e venerdì sempre, dalla settimana 7), tonno al massimo 1, carne rossa al massimo 3 (cavallo compreso), affettati il meno possibile, legumi almeno 3 giorni, una manciata di frutta secca quando puoi, integrale dove non rovina il piatto (prima della partita meglio bianco: meno fibre, digestione più facile).',
+  'Pesce crudo fatto in casa: solo abbattuto o surgelato almeno 96 ore a -18 °C in un freezer a 3 stelle o più. Fuori casa scegli un esercizio affidabile.',
   'Tieni l’acqua a portata di mano durante il lavoro. Parti da circa 2 litri al giorno e bevi di più quando sudi durante il calcio.',
   'Prova ad avvicinarti a 8 ore di sonno quando aggiungi sprint e pesi: la qualità delle sedute dipende dal recupero.',
 ];
@@ -283,7 +283,7 @@ export const trainingDays = [
     ['Footwork e guardia', '3 × 2 min'], ['Jab–cross al sacco, tecnica', '3 × 2 min'], ['Mobilità anche e caviglie', '6 min'],
   ] },
   { day: 'Giovedì', short: 'Calcio', type: 'football', duration: '60 min', detail: 'Seduta fissa. Nessun lavoro pesante per le gambe prima.' },
-  { day: 'Venerdì', short: 'Scarico', type: 'recovery', duration: '20 min', detail: 'Camminata facile, mobilità o riposo completo.' },
+  { day: 'Venerdì', short: 'Allenamento', type: 'strength', duration: '40–50 min', detail: 'Recupera qui la seduta saltata in settimana: Forza A o B, quella che manca, come scritta nel suo giorno. Se le hai già fatte tutte: tecnica al sacco o mobilità. Creatina a fine seduta.' },
   { day: 'Sabato', short: 'Velocità + Forza B', type: 'strength', duration: '40–50 min', detail: 'Sprint brevi prima dei pesi; interrompi se la velocità cala o senti dolore.', exercises: [
     ['Riscaldamento dinamico + 3 progressioni', '8–10 min'], ['Accelerazioni 10–20 m', '4–6 rip., recupero 90–120 s'],
     ['Goblet squat', '3 × 8–12'], ['Stacco rumeno manubri', '3 × 8–12'], ['Affondi indietro', '2 × 8 / lato'],
@@ -297,6 +297,7 @@ export const phases = [
   { weeks: '3–4', name: 'Base', detail: 'Passa alle serie indicate. Lascia 2–3 ripetizioni di margine. Sabato 4 accelerazioni brevi, recupero completo.' },
   { weeks: '5–8', name: 'Costruzione', detail: 'Aumenta reps o carico quando completi tutte le serie con tecnica buona. Sabato 4–6 accelerazioni; una settimana più leggera se la fatica sale.' },
   { weeks: '9–12', name: 'Consolidamento', detail: 'Mantieni 2 sedute di forza e 2 di calcio. Sprint di qualità, poche ripetizioni. Ultima settimana più facile e confronta peso medio, vita, piegamenti, trazioni.' },
+  { weeks: '13–16', name: 'Rifinitura', detail: 'Dal 28/12 si mangia meno: tieni i carichi e, se recuperi male, togli una serie invece di peso. Niente cedimento, sprint pochi e di qualità, calcio sempre. A fine percorso confronta peso medio, vita e foto.' },
 ];
 
 export const evidence = [
