@@ -90,7 +90,7 @@ for r in R.values():
         DISHES.append({'id': r['id'], 'phase': ph, 'meal': testo(r['titolo'], items), 'title': r['titolo'], 'cuisine': r['cucina'], 'why': r['perche_food_porn'],
             'time': f'{we} min nel weekend, {wk} min quel giorno' if we else f'{wk} min', 'prepMin': we, 'freezer': bool(r.get('congelabile')),
             'kcal': m['kcal'], 'protein': m['p'], 'fat': m['f'], 'carbs': m['c'], 'fiber': m['fib'], 'fv': m['fv'], 'cost': r['costo_euro'],
-            'family': famiglia(r), 'whey': is_sweet(r), 'image': f"/recipes/{r['id']}.jpg", 'dose': items, 'steps': r['passi'] + (['Conservazione: ' + r['come_conservare']] if r.get('come_conservare') else [])})
+            'family': famiglia(r), 'whey': is_sweet(r), 'image': f"/recipes/{r['id']}.webp", 'dose': items, 'steps': r['passi'] + (['Conservazione: ' + r['come_conservare']] if r.get('come_conservare') else [])})
 
 # il testo del pasto è la chiave della ricetta: se i primi ingredienti non cambiano tra le fasi, va distinto
 visti = collections.defaultdict(set)
@@ -203,7 +203,7 @@ for i, wk in enumerate(W):
         if d == 0 and n == 14: note = 'Supercut, dal 28/12: meno cereali e condimenti, stesse proteine. Gli sgarri restano ancora per questa settimana.'
         if d == 0 and n == 15: note = 'Ultime due settimane: niente McDonald’s, pizza, cocktail e Gocciole.'
         if d in (0, 3) and note is None: note = 'Calcio alle 21:30: i carboidrati stanno nella cena delle 18:45 e nel pre-partita. Creatina a fine partita, nello shake.'
-        days.append({'day': DN[d], 'target': round(k / 50) * 50, 'note': note, 'slots': [{'id': m['id'], 'label': l, 'meal': next(x for x in DISHES if x['id'] == m['id'] and x['phase'] == m['phase'])['meal'] if not m['fisso'] else m['meal'], 'image': (f"/recipes/{m['id']}.jpg" if not m['fisso'] else m['image']), 'family': m.get('fam'), 'phase': m.get('phase')} for l, m in day]})
+        days.append({'day': DN[d], 'target': round(k / 50) * 50, 'note': note, 'slots': [{'id': m['id'], 'label': l, 'meal': next(x for x in DISHES if x['id'] == m['id'] and x['phase'] == m['phase'])['meal'] if not m['fisso'] else m['meal'], 'image': (f"/recipes/{m['id']}.webp" if not m['fisso'] else m['image']), 'family': m.get('fam'), 'phase': m.get('phase')} for l, m in day]})
         for _, m in day:
             if not m['fisso']: usati[m['id']] += 1
     meals = [m for day in wk for _, m in day]
