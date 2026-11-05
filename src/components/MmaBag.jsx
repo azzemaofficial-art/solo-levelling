@@ -1,5 +1,6 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { analyzeBag, bagScore, bagTargets, bagZones, createBagContacts, matchContacts, roiFor } from '../../lib/mmaBag';
+import { analyzeBag, bagFromBand, bagScore, bagTargets, bagZones, createBagContacts, findBand, matchContacts, roiFor } from '../../lib/mmaBag';
+import { TORSO_CM, readTorso, saveTorso, scaleCheck } from '../../lib/mmaMetrics';
 import { drawBag } from '../../lib/mmaBagDraw';
 import { judgeSequence } from '../../lib/mmaComboJudge';
 
@@ -10,6 +11,8 @@ import { judgeSequence } from '../../lib/mmaComboJudge';
 const KEY = 'shadow_monarch_mma_bag';
 export const readBagMode = () => { try { return localStorage.getItem(KEY) === '1'; } catch { return false; } };
 export const saveBagMode = (on) => { try { localStorage.setItem(KEY, on ? '1' : '0'); } catch { /* storage */ } };
+
+export const readTorsoInfo = () => { const cm = readTorso(); return cm ? { cm, source: 'salvata' } : { cm: TORSO_CM.fallback, source: 'stima' }; };
 
 // posa mediana della calibrazione: un fotogramma storto non sposta i bersagli
 function medianPose(list) {
@@ -48,7 +51,10 @@ export function useMmaBag({ stance, moves, labels }) {
       tap: (clientX, clientY) => {
         const p = st.cam?.toImagePoint?.(clientX, clientY);
         if (!p || p.x < 0 || p.x > 1 || p.y < 0 || p.y > 1) return;
-        const r = analyzeBag(st.cam?.grabFrame?.(256), p, { points: st.points });
+        // prima la fascia arancione, su un'immagine più grande: un pixel in più o in meno pesa meno sulla scala
+        const big = st.cam?.grabFrame?.(640);
+        const band = findBand(big, p, { points: st.points });
+        const r = band ? bagFromBand(band, big.width / big.height, p) : analyzeBag(st.cam?.grabFrame?.(256), p, { points: st.points });
         setRes(r);
         if (r.reason === 'input' || r.reason === 'person') { st.mode = 'off'; st.bag = null; setStep('tap'); return; }
         st.bag = r; st.mode = 'confirm'; setStep('check');
@@ -77,7 +83,11 @@ export function useMmaBag({ stance, moves, labels }) {
       arm: (order) => {
         if (!st.bag) return;
         const { stance: stc, moves: ids, labels: lab } = cfg.current;
-        const zones = bagZones(st.bag, medianPose(st.calib) || st.points, { stance: stc });
+        const pose = medianPose(st.calib) || st.points;
+        const zones = bagZones(st.bag, pose, { stance: stc });
+        // scala: il busto in cm dal sacco. Se il conto non torna resta la misura salvata (o la stima)
+        st.scale = scaleCheck(st.bag, pose, st.bag.imgAspect);
+        if (st.scale?.torsoCm) saveTorso(st.scale.torsoCm);
         const roi = roiFor(st.bag, zones);
         st.zones = zones;
         st.targets = bagTargets(st.bag, zones, ids, { labels: lab, stance: stc });
@@ -93,13 +103,15 @@ export function useMmaBag({ stance, moves, labels }) {
         if (!st.det) return null;
         const contacts = st.det.contacts(since);
         const m = matchContacts(judge.gestures().filter((g) => g.start >= since), contacts, { sideOf: judge.sideOf });
-        const result = judgeSequence(cfg.current.moves, m.gestures);
+        // al sacco il telefono è di lato: solo qui rotazione e distensione si possono giudicare
+        const seen = m.gestures.map((g) => ({ ...g, sideOn: true }));
+        const result = judgeSequence(cfg.current.moves, seen);
         const sc = bagScore(result, st.targets);
         const now = performance.now(), hits = {};
         sc.hit.forEach((h, i) => { if (h) hits[i] = st.hits[i] ?? now; });
         st.hits = hits;
         // sacco mai visto bene e nessun contatto: non si dice "0 a segno"
-        return { result, bag: st.usable || contacts.length ? sc : null, gestures: m.gestures };
+        return { result, bag: st.usable || contacts.length ? sc : null, gestures: seen };
       },
       overlay: (ctx, W, H, points, now, info) => {
         if (!st.bag || st.mode === 'off') return;
@@ -110,9 +122,13 @@ export function useMmaBag({ stance, moves, labels }) {
         }, now);
       },
       close: () => { st.cam?.setRoi?.(null); },
+      contacts: (since = -Infinity) => (st.det ? st.det.contacts(since) : []),
+      usable: () => st.usable,
+      // quanti cm è il tuo busto, e da dove viene: serve a passare da busti/s a km/h
+      torso: () => (st.scale?.torsoCm ? { cm: st.scale.torsoCm, source: 'sacco' } : readTorsoInfo()),
       // registro degli allenamenti (solo lettura): sacco, zone, contatti e movimento dal momento since
       snapshot: (since = -Infinity) => (st.bag ? {
-        box: st.bag.box, axis: st.bag.axis, width: st.bag.width, zones: st.zones,
+        box: st.bag.box, axis: st.bag.axis, width: st.bag.width, zones: st.zones, scale: st.scale || null,
         contacts: st.det ? st.det.contacts(since) : [], motion: st.trace.filter((m) => m[0] >= since),
       } : null),
     };
@@ -127,8 +143,8 @@ export default function MmaBagStep({ bag, onDone, onSkip }) {
   if (step === 'ready') return null;
   return <div className="mma-bag-step" onClick={(e) => e.stopPropagation()}>
     {step === 'tap'
-      ? <><strong>{res?.hint || 'Tocca il sacco sullo schermo'}</strong><small>Ne trovo il contorno e ci metto sopra i bersagli della combo.</small></>
-      : <><strong>{res?.ok ? 'È questo il sacco?' : res?.hint}</strong><small>Se il contorno è sbagliato tocca un altro punto del sacco.</small></>}
+      ? <><strong>{res?.hint || 'Tocca la fascia arancione del sacco'}</strong><small>Da lì misuro il sacco (26 × 92 cm) e ci metto sopra i bersagli.</small></>
+      : <><strong>{res?.ok ? 'È questo il sacco?' : res?.hint}</strong><small>{res?.realCm ? 'Misurato dalla fascia arancione: questa è anche la scala della velocità.' : 'Fascia arancione non trovata: se il contorno è sbagliato tocca un altro punto. La velocità sarà una stima.'}</small></>}
     <div className="mma-bag-actions">
       {step === 'check' && <button className="primary" onClick={() => { bag.accept(); onDone(); }}>{res?.ok ? 'Va bene' : 'Usa comunque'}</button>}
       {step === 'check' && <button onClick={bag.retap}>Ritocca</button>}

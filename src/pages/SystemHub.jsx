@@ -1316,12 +1316,12 @@ const SystemHub = ({ systemLogs, setSystemLogs, dailyGoal, setDailyGoal, hydrati
     ? ((bodyStart - Number(bodyWeight || bodyStart)) / (bodyStart - bodyTarget)) * 100
     : ((Number(bodyWeight || bodyStart) - bodyStart) / (bodyTarget - bodyStart)) * 100));
   const weekPlan = [
-    { day: 'Lun', full: 'Lunedì', label: 'Pesi A', type: 'strength', duration: '40 min', intensity: 'ALTA', kcal: 2700 },
-    { day: 'Mar', full: 'Martedì', label: 'Tom Holland + addome', type: 'conditioning', duration: '25–30 min', intensity: 'MOLTO ALTA', kcal: 2700 },
-    { day: 'Mer', full: 'Mercoledì', label: 'Mobilità + recupero', type: 'recovery', duration: '20–30 min', intensity: 'BASSA', kcal: 2550 },
-    { day: 'Gio', full: 'Giovedì', label: 'Pesi B', type: 'strength', duration: '40 min', intensity: 'ALTA', kcal: 2700 },
-    { day: 'Ven', full: 'Venerdì', label: 'MMA', type: 'mma', duration: '60–90 min', intensity: 'ALTA', kcal: 3050 },
-    { day: 'Sab', full: 'Sabato', label: 'Tom Holland + addome', type: 'conditioning', duration: '25–30 min', intensity: 'MOLTO ALTA', kcal: 2700 },
+    { day: 'Lun', full: 'Lunedì', label: 'Calcio', type: 'conditioning', duration: '60 min', intensity: 'ALTA', kcal: 2700 },
+    { day: 'Mar', full: 'Martedì', label: 'Forza A', type: 'strength', duration: '42 min', intensity: 'ALTA', kcal: 2700 },
+    { day: 'Mer', full: 'Mercoledì', label: 'Sacco o recupero', type: 'recovery', duration: '20–30 min', intensity: 'BASSA', kcal: 2550 },
+    { day: 'Gio', full: 'Giovedì', label: 'Calcio', type: 'conditioning', duration: '60 min', intensity: 'ALTA', kcal: 2700 },
+    { day: 'Ven', full: 'Venerdì', label: 'Recupera la seduta saltata', type: 'recovery', duration: '45 min', intensity: 'MEDIA', kcal: 3050 },
+    { day: 'Sab', full: 'Sabato', label: 'Forza B', type: 'strength', duration: '40 min', intensity: 'ALTA', kcal: 2700 },
     { day: 'Dom', full: 'Domenica', label: 'Riposo completo', type: 'rest', duration: '—', intensity: '—', kcal: 1900 }
   ];
   const todayPlan = weekPlan[(new Date().getDay() + 6) % 7];

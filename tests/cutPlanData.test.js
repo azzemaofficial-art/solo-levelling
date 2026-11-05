@@ -127,3 +127,7 @@ test('piano: economico e comodo — ogni piatto sotto i 7 € (quasi tutti sotto
   assert.equal(new Set(mealWeeks.map((w) => slot(w[0], 'Cena').meal)).size, mealWeeks.length, 'il pollo e riso del lunedì cambia versione ogni settimana');
   assert.doesNotMatch(JSON.stringify(allMeals), /French toast|Pasta al pesto|Salmone 180 g, riso 80 g crudo, broccoli/);
 });
+
+test('versione leggera: ogni giorno con esercizi ne ha almeno uno', () => {
+  for (const d of trainingDays) if (d.exercises) assert.ok(d.exercises.some((e) => e[2]?.light), `${d.day}: lista vuota in versione leggera`);
+});

@@ -3,7 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createComboJudge } from '../lib/mmaComboJudge.js';
-import { CUES, DRILLS, REFLEX, REFLEX_KEY, addSession, drillStats, emptyHistory, loadHistory, onsetOf, effectorTracks, passed, planTrials, saveHistory, scoreTrial, summarize, unlockedDrills } from '../lib/mmaReflex.js';
+import { BAG_DRILLS, unlockedBagDrills, CUES, DRILLS, REFLEX, REFLEX_KEY, addSession, drillStats, emptyHistory, loadHistory, onsetOf, effectorTracks, passed, planTrials, saveHistory, scoreTrial, summarize, unlockedDrills } from '../lib/mmaReflex.js';
 import { synthSequence, calibrateJudge, realistic } from './helpers/synthFighter.js';
 
 const CUE_AT = 1000;
@@ -186,4 +186,33 @@ test('riflessi: i punti del corpo si leggono in busti, rispetto al bacino', () =
   const tr = effectorTracks([f], { lead: 'L' });
   assert.equal(tr.leadWrist.length, 1);
   assert.ok(Math.abs(tr.head[0].xy[1]) > 0.8, 'la testa sta circa un busto sopra il bacino');
+});
+
+test('riflessi al sacco: il contatto vero dà colpo a segno e tempo d’impatto, tolto il ritardo della camera', () => {
+  const judge = calibrateJudge(createComboJudge());
+  const frames = synthSequence(['cross'], { fps: 30, lead: CUE_AT + 300 });
+  for (const f of frames) judge.push(f.world, f.t, f.points, 1);
+  const args = { cue: 'cross', cueAt: CUE_AT, frames: judge.frames(), gestures: judge.gestures(), aspect: 1, lead: judge.lead };
+  // senza sacco i campi non esistono: «0 a segno» sarebbe un'invenzione
+  assert.equal(scoreTrial(args).hit, undefined);
+  const hit = scoreTrial({ ...args, contacts: [{ limb: 'arm', t: CUE_AT + 520 }], lagMs: 60 });
+  assert.deepEqual([hit.hit, hit.impact], [true, 460]);
+  // un contatto prima del segnale o una gamba non contano
+  const miss = scoreTrial({ ...args, contacts: [{ limb: 'arm', t: CUE_AT - 50 }, { limb: 'leg', t: CUE_AT + 500 }] });
+  assert.deepEqual([miss.hit, miss.impact], [false, null]);
+});
+
+test('al sacco: il primo esercizio è aperto, gli altri si aprono superando quello prima', () => {
+  assert.deepEqual(unlockedBagDrills(emptyHistory()), [BAG_DRILLS[0].id]);
+});
+
+test('schiva e rispondi: la velocità è del pugno, non della testa', () => {
+  const r = trial('slipCross', ['slip', 'cross'], 280), jab = trial('cross', ['cross'], 280);
+  assert.equal(r.status, 'ok');
+  assert.ok(r.speed > jab.speed * 0.5, `dopo la schivata ${r.speed}, diretto da solo ${jab.speed} busti/s`);
+});
+
+test('calcio: nessuna velocità, i km/h e i gradi sono tarati sui pugni', () => {
+  const r = trial('lowKick', ['lowKick'], 280);
+  if (r.status === 'ok') assert.equal(r.speed, null);
 });

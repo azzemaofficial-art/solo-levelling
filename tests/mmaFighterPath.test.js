@@ -85,7 +85,7 @@ test('percorso: fino al primo incontro; i round "in forma" devono essere recenti
   const all = {
     ...stage0(),
     comboScores: clean([...levelIds(1, 6), '1-2', ...levelIds(2, 6), ...levelIds(3, 4)]),
-    secret: learned(10), reflex: reflexWith(['puro', 'nonAbboccare', 'manoGamba', 'lati', 'schiva', 'leggi']),
+    secret: learned(10), reflex: reflexWith(['puro', 'nonAbboccare', 'manoGamba', 'lati', 'schiva', 'leggi', 'saccoLampo']), speed: { best: {}, sessions: [{ at: 1, byMove: { cross: { n: 6, median: 9 } } }] },
     sessions: [...baseLessons(), roundsSession(4, 180, NOW - 5 * DAY)],
     gym: Object.fromEntries(GATES.flat().filter((g) => g.how === 'palestra').map((g) => [g.id, NOW])),
   };

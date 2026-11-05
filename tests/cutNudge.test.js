@@ -61,7 +61,8 @@ test('briefing: giorno di riposo senza kcal note', () => {
 });
 
 test('pre-allenamento: esercizi nei giorni di forza, niente nei giorni di riposo', () => {
-  assert.match(trainingText('2026-10-03'), /Goblet squat/);
+  assert.match(trainingText('2026-10-03'), /Affondo bulgaro/);
+  assert.match(trainingText('2026-10-03'), /Stretching finale gambe/);
   assert.equal(trainingText('2026-09-27'), null);
 });
 

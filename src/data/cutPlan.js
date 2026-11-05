@@ -23,7 +23,7 @@ export const nutritionRules = [
   'Ogni settimana: pesce almeno 3 volte (martedì e venerdì sempre, dalla settimana 7), tonno al massimo 1, carne rossa al massimo 3 (cavallo compreso), affettati il meno possibile, legumi almeno 3 giorni, una manciata di frutta secca quando puoi, integrale dove non rovina il piatto (prima della partita meglio bianco: meno fibre, digestione più facile).',
   'Pesce crudo fatto in casa: solo abbattuto o surgelato almeno 96 ore a -18 °C in un freezer a 3 stelle o più. Fuori casa scegli un esercizio affidabile.',
   'Tieni l’acqua a portata di mano durante il lavoro. Parti da circa 2 litri al giorno e bevi di più quando sudi durante il calcio.',
-  'Prova ad avvicinarti a 8 ore di sonno quando aggiungi sprint e pesi: la qualità delle sedute dipende dal recupero.',
+  'Prova ad avvicinarti a 8 ore di sonno quando aggiungi salti e pesi: la qualità delle sedute dipende dal recupero.',
 ];
 
 // Pasti del menu: id → [testo esatto (= chiave della ricetta in mealRecipes.js), foto in /public/recipes].
@@ -224,8 +224,8 @@ const NOTES = [
   '',
   'McDonald’s la sera: è già contato. A colazione, pranzo e merenda tante proteine, perché il panino ne ha poche.',
   'Calcio 21:30–23:00: la cena vera è alle 18:45 (carboidrati e proteine, pochi grassi), spuntino alle 20:45, dopo la partita shake e qualcosa di leggero.',
-  'Esci? Massimo 2 cocktail, contati nel piano: cena prima, mai a stomaco vuoto, e un bicchiere d’acqua in mezzo. Gin tonic o vodka soda ≈ 100–190 kcal; mojito, piña colada e drink con succhi o panna ≈ 250–400. Domani ci sono sprint e pesi.',
-  'Sabato di sprint e forza: latte con le proteine, 8 Gocciole e un frutto; pranzo fisso pasta bianca e cavallo.',
+  'Esci? Massimo 2 cocktail, contati nel piano: cena prima, mai a stomaco vuoto, e un bicchiere d’acqua in mezzo. Gin tonic o vodka soda ≈ 100–190 kcal; mojito, piña colada e drink con succhi o panna ≈ 250–400. Domani ci sono salti e pesi.',
+  'Sabato di forza: latte con le proteine, 8 Gocciole e un frutto; pranzo fisso pasta bianca e cavallo.',
   'Pranzo dalla mamma: un piatto di primo, un secondo con verdure, niente bis. La pizza della sera è già prevista: niente compensazioni.',
 ];
 
@@ -273,37 +273,80 @@ export const recipes = [
   { title: 'Crispy chicken wrap', tag: 'Fit porn • 20 min', image: '/recipes/crispy-wrap.jpg', ingredients: 'Pollo 180 g, piadina integrale, cornflakes non zuccherati 25 g, yogurt, paprika, insalata.', steps: 'Impana il pollo nei cornflakes e cuoci in forno o friggitrice ad aria. Chiudi nella piadina con yogurt e insalata.' },
 ];
 
+// Ogni esercizio: [nome, dose, { block, cue, light }]. block = gruppo mostrato sopra l'esercizio,
+// cue = tecnica in una riga, light = resta nella versione leggera. Il video sta in exerciseVideos.js (stesso nome).
+// Sedute pensate per manubri fino a 20 kg, senza panca, con superserie per stare sotto i 45 minuti.
+const WARM = 'Riscaldamento', POWER = 'Esplosività', STRETCH = 'Stretching finale', PRE = 'I tuoi 9 minuti prima di entrare in campo';
+const footballWarm = ['Marcia e oscillazioni gambe', '2 min', { block: PRE, light: true, cue: 'Marcia o corsetta leggera, poi slanci avanti e di lato tenendoti a un palo.' }];
+const footballMobility = ['World’s greatest stretch e affondo laterale', '3 + 4 / lato', { block: PRE, light: true, cue: 'Apri anche e caviglie senza fretta: due minuti in tutto.' }];
+
 export const trainingDays = [
-  { day: 'Lunedì', short: 'Calcio', type: 'football', duration: '60 min', detail: 'Seduta fissa. Dopo: cena con carboidrati e proteine.' },
-  { day: 'Martedì', short: 'Forza A', type: 'strength', duration: '30–40 min', detail: 'Parte alta + core. Gambe leggere dopo il calcio.', exercises: [
-    ['Piegamenti o distensioni manubri su panca', '3 × 8–12'], ['Trazioni assistite o negative controllate', '3 × 2–5'],
-    ['Rematore manubrio', '3 × 10–12 / lato'], ['Affondi indietro leggeri', '2 × 8 / lato'], ['Spinte spalle manubri', '2 × 8–12'], ['Plank', '2 × 30–45 s'],
+  { day: 'Lunedì', short: 'Calcio', type: 'football', duration: '≈ 70 min', detail: 'Focus accelerazione. Dopo: cammina 3–5 minuti, bevi, cena con carboidrati e proteine, doccia calda, a letto entro le 23:30.', focus: 'guarda sopra la spalla prima di ricevere, poi primo tocco in avanti.', exercises: [
+    footballWarm, footballMobility,
+    ['A-march e A-skip', '2 × 10 m', { block: PRE, cue: 'Ginocchio alto e piede che spinge il terreno sotto di te. Anche sul posto.' }],
+    ['Pogo e salto in lungo', 'pogo 2 × 10 · salto 2 × 3', { block: PRE, cue: 'Pogo: caviglie rigide, tocco rapido. Salto: atterra fermo e riparti da capo.' }],
+    ['Scatti brevi', '2 da 10 m all’85–90%', { block: PRE, cue: 'Busto inclinato nei primi passi, spinta potente. Torna camminando.' }],
   ] },
-  { day: 'Mercoledì', short: 'Bag / recupero', type: 'optional', duration: '15–25 min', detail: 'Opzionale: tecnica al sacco, senza sparring, o camminata e mobilità. Se stanco, riposo.' , exercises: [
-    ['Footwork e guardia', '3 × 2 min'], ['Jab–cross al sacco, tecnica', '3 × 2 min'], ['Mobilità anche e caviglie', '6 min'],
+  { day: 'Martedì', short: 'Forza A', type: 'strength', duration: '≈ 42 min', detail: 'Parte alta e potenza del pugno. Niente gambe pesanti: ieri hai giocato.', exercises: [
+    ['Riscaldamento parte alta', '6 min', { block: WARM, light: true, cue: 'Segui il video, poi 1 serie leggera di piegamenti e 1 di rematore.' }],
+    ['Piegamenti esplosivi', '3 × 4, recupero 40 s', { block: POWER, cue: 'Scendi controllato, spingi più veloce che puoi. Se rallenti, fermati.' }],
+    ['Rotazione esplosiva con elastico', '3 × 5 / lato', { block: POWER, cue: 'Elastico alla sbarra o al supporto del sacco: parte da piede e anca, le braccia seguono.' }],
+    ['Distensioni a terra manubri', '3 × 8–15', { block: 'Superserie 1', light: true, cue: 'Gomiti a 45°, tricipite a terra un attimo, poi spingi senza rimbalzare.' }],
+    ['Trazioni', '3 × 3–8', { block: 'Superserie 1', light: true, cue: 'Scapole giù prima di tirare, petto verso la sbarra. Meno di 3? Negative da 4 secondi.' }],
+    ['Rematore a un braccio', '3 × 10–15 / lato', { block: 'Superserie 2', cue: 'Schiena piatta, gomito verso l’anca, giù lento fino in fondo.' }],
+    ['Alzate laterali', '3 × 12–20', { block: 'Superserie 2', cue: 'Braccia quasi dritte, fino all’altezza delle spalle, senza slancio.' }],
+    ['Estensioni tricipiti sopra la testa', '2 × 10–15', { block: 'Superserie 3', cue: 'Gomiti vicini alla testa, scendi dietro il collo finché senti tirare.' }],
+    ['Curl bicipiti', '2 × 10–15', { block: 'Superserie 3', cue: 'Gomiti fermi ai fianchi: su in 1 secondo, giù in 2–3.' }],
+    ['Rullo addominale', '2 × 6–12', { block: 'Superserie 4', cue: 'In ginocchio, bacino in dentro: avanti solo finché la schiena non si inarca.' }],
+    ['Copenhagen', '1–2 × 6–8 / lato', { block: 'Superserie 4', cue: 'Ginocchio (o piede, più difficile) sul divano, fianco alto. Protegge l’inguine.' }],
+    ['Stretching finale parte alta', '5 min', { block: STRETCH, light: true, cue: 'Ti rilassa e tiene la mobilità. Non toglie i dolori: gli studi lo escludono.' }],
   ] },
-  { day: 'Giovedì', short: 'Calcio', type: 'football', duration: '60 min', detail: 'Seduta fissa. Nessun lavoro pesante per le gambe prima.' },
-  { day: 'Venerdì', short: 'Allenamento', type: 'strength', duration: '40–50 min', detail: 'Recupera qui la seduta saltata in settimana: Forza A o B, quella che manca, come scritta nel suo giorno. Se le hai già fatte tutte: tecnica al sacco o mobilità. Creatina a fine seduta.' },
-  { day: 'Sabato', short: 'Velocità + Forza B', type: 'strength', duration: '40–50 min', detail: 'Sprint brevi prima dei pesi; interrompi se la velocità cala o senti dolore.', exercises: [
-    ['Riscaldamento dinamico + 3 progressioni', '8–10 min'], ['Accelerazioni 10–20 m', '4–6 rip., recupero 90–120 s'],
-    ['Goblet squat', '3 × 8–12'], ['Stacco rumeno manubri', '3 × 8–12'], ['Affondi indietro', '2 × 8 / lato'],
-    ['Distensioni manubri su panca', '2 × 8–12'], ['Rematore manubri', '2 × 10–12'],
+  { day: 'Mercoledì', short: 'Bag / recupero', type: 'optional', duration: '15–25 min', detail: 'Opzionale: tecnica al sacco, senza sparring, o camminata e mobilità. Se stanco, riposo.', exercises: [
+    ['Footwork e guardia', '3 × 2 min', { light: true }], ['Jab–cross al sacco, tecnica', '3 × 2 min'], ['Mobilità anche e caviglie', '6 min', { light: true }],
+  ] },
+  { day: 'Giovedì', short: 'Calcio', type: 'football', duration: '≈ 70 min', detail: 'Focus cambio di direzione. Dopo: cammina 3–5 minuti, bevi, cena con carboidrati e proteine, doccia calda, a letto entro le 23:30.', focus: 'frena in 2–3 passi, pianta il piede esterno e riparti; primo controllo semplice col piede debole.', exercises: [
+    footballWarm, footballMobility,
+    ['Bound laterale e pogo', 'bound 2 × 4 / lato · pogo 1 × 10', { block: PRE, cue: 'Salta di lato e atterra fermo su una gamba, due secondi di equilibrio.' }],
+    ['Frenate e ripartenze', '3 frenate al 70% · 2 ripartenze all’85%', { block: PRE, cue: 'Abbassa il bacino e frena in 2–3 passi, poi riparti di lato.' }],
+  ] },
+  { day: 'Venerdì', short: 'Allenamento', type: 'strength', duration: '≈ 45 min', detail: 'Recupera qui la seduta saltata in settimana: Forza A o B, quella che manca, come scritta nel suo giorno. Se le hai già fatte tutte: tecnica al sacco o mobilità. Creatina a fine seduta.' },
+  { day: 'Sabato', short: 'Forza B', type: 'strength', duration: '≈ 40 min', detail: 'Gambe e potenza per colpire forte. Niente sprint: li fai già al calcio, qui contano salti e forza.', exercises: [
+    ['Riscaldamento gambe', '6 min', { block: WARM, light: true, cue: 'Segui il video, poi 1 serie leggera di affondo bulgaro.' }],
+    ['Salto verticale', '3 × 4, recupero 40 s', { block: POWER, cue: 'Scendi veloce, salta al massimo, atterra morbido con le ginocchia in linea coi piedi.' }],
+    ['Salto in lungo', '3 × 3', { block: POWER, cue: 'Slancia le braccia, atterra fermo, torna indietro camminando.' }],
+    ['Affondo bulgaro', '3 × 8–12 / lato', { block: 'Superserie 1', light: true, cue: 'Piede dietro sulla sedia, scendi in 3 secondi. Una gamba alla volta: 20 kg bastano a lungo.' }],
+    ['Piegamenti piedi rialzati', '3 × 8–20', { block: 'Superserie 1', light: true, cue: 'Piedi sulla sedia, corpo dritto. Troppo facili? Scendi in 4 secondi.' }],
+    ['Stacco rumeno manubri', '3 × 10–15', { block: 'Superserie 2', cue: 'Spingi il sedere indietro, schiena piatta, scendi in 3 secondi finché tirano i femorali.' }],
+    ['Trazioni presa inversa', '3 × 3–8', { block: 'Superserie 2', cue: 'Palmi verso di te, scapole giù, mento sopra la sbarra. Poche? Negative da 4 secondi.' }],
+    ['Spinte spalle manubri', '2 × 8–12', { block: 'Superserie 3', cue: 'In piedi, addome stretto, sopra la testa senza inarcare la schiena.' }],
+    ['Polpacci su gradino', '2 × 12–20 / lato', { block: 'Superserie 3', cue: 'Una gamba: giù lento fino allo stiramento, 1 secondo fermo, su.' }],
+    ['Nordic curl', '1–2 × 4–6', { block: 'Femorali', cue: 'Piedi bloccati sotto il divano, scendi più lento che puoi, risali con le mani. Gambe rigide lunedì? Fanne meno.' }],
+    ['Stretching finale gambe', '5 min', { block: STRETCH, light: true, cue: 'Ti rilassa e tiene la mobilità. Non toglie i dolori: gli studi lo escludono.' }],
   ] },
   { day: 'Domenica', short: 'Riposo', type: 'recovery', duration: '—', detail: 'Passeggiata facile se ti va. Preparati per il calcio del lunedì.' },
 ];
 
 export const phases = [
-  { weeks: '1–2', name: 'Rientro', detail: '2 serie per esercizio, tecnica pulita, lascia 3–4 ripetizioni di margine. Sabato 3–4 accelerazioni al 70–80% o solo tecnica se indolenzito.' },
-  { weeks: '3–4', name: 'Base', detail: 'Passa alle serie indicate. Lascia 2–3 ripetizioni di margine. Sabato 4 accelerazioni brevi, recupero completo.' },
-  { weeks: '5–8', name: 'Costruzione', detail: 'Aumenta reps o carico quando completi tutte le serie con tecnica buona. Sabato 4–6 accelerazioni; una settimana più leggera se la fatica sale.' },
-  { weeks: '9–12', name: 'Consolidamento', detail: 'Mantieni 2 sedute di forza e 2 di calcio. Sprint di qualità, poche ripetizioni. Ultima settimana più facile e confronta peso medio, vita, piegamenti, trazioni.' },
-  { weeks: '13–16', name: 'Rifinitura', detail: 'Dal 28/12 si mangia meno: tieni i carichi e, se recuperi male, togli una serie invece di peso. Niente cedimento, sprint pochi e di qualità, calcio sempre. A fine percorso confronta peso medio, vita e foto.' },
+  { weeks: '1–7', name: 'Ingresso', detail: 'Le sedute nuove partono da qui. 2 giri per superserie e 2–3 ripetizioni di margine: impari gli esercizi. Calcio: 1 scatto, pogo 1 × 8, salto 1 × 3, bound 1 × 4.' },
+  { weeks: '8–10', name: 'Costruzione', detail: 'Tutti i giri, 1–2 ripetizioni di margine. Quando arrivi in cima alle ripetizioni in ogni serie, aumenta il carico o rallenta la discesa. Calcio: dose piena, 20–25 salti.' },
+  { weeks: '11', name: 'Scarico', detail: '2 giri e 3 ripetizioni di margine: una settimana più facile per assorbire il lavoro. Salti e scatti a metà.' },
+  { weeks: '12–13', name: 'Spinta', detail: 'Tutti i giri. Sull’ultima serie di ogni esercizio arriva a 0–1 di margine, mai su esplosivi e Nordic. Confronta circonferenze, trazioni e piegamenti.' },
+  { weeks: '14–16', name: 'Rifinitura', detail: 'Dal 28/12 si mangia meno: tieni i carichi e, se recuperi male, togli un giro invece di peso. 1–2 ripetizioni di margine. A fine percorso confronta peso medio, vita e foto.' },
 ];
 
 export const evidence = [
   { label: 'Alimentazione varia, frutta, verdura e fibra', url: 'https://www.who.int/news-room/fact-sheets/detail/healthy-diet' },
   { label: 'Proteine e preservazione della massa magra nel cut', url: 'https://pubmed.ncbi.nlm.nih.gov/25014731/' },
-  { label: 'Deficit moderato e allenamento di forza', url: 'https://pubmed.ncbi.nlm.nih.gov/34623696/' },
+  { label: 'Deficit e muscolo: circa −500 kcal al giorno annullano la crescita della massa magra (Murphy & Koehler 2022)', url: 'https://pubmed.ncbi.nlm.nih.gov/34623696/' },
+  { label: 'Superserie antagoniste: −37% di tempo, stesso volume (Zhang 2025)', url: 'https://pmc.ncbi.nlm.nih.gov/articles/PMC12011898/' },
+  { label: 'Allenarsi con poco tempo: minimo 4 serie per gruppo a settimana (Iversen 2021)', url: 'https://pubmed.ncbi.nlm.nih.gov/34125411/' },
+  { label: 'Più vicino al cedimento, più ipertrofia (Robinson 2024)', url: 'https://pubmed.ncbi.nlm.nih.gov/38970765/' },
+  { label: 'Forza e potenza delle gambe e impatto del pugno in pugili d’élite (Loturco 2016)', url: 'https://pubmed.ncbi.nlm.nih.gov/26110348/' },
+  { label: 'Salti nei calciatori: 1 seduta a settimana da 120, poi 60 per mantenere (2024)', url: 'https://pubmed.ncbi.nlm.nih.gov/38489585/' },
+  { label: 'Giocare e basta non migliora lo sprint breve', url: 'https://pmc.ncbi.nlm.nih.gov/articles/PMC8124057/' },
+  { label: 'Nordic: rischio di infortuni ai femorali dimezzato (van Dyk 2019)', url: 'https://pubmed.ncbi.nlm.nih.gov/30808663/' },
+  { label: 'Copenhagen: problemi all’inguine 13,5% contro 21,3% (Harøy 2019)', url: 'https://researchprofiles.ku.dk/da/publications/the-adductor-strengthening-programme-prevents-groin-problems-amon/' },
+  { label: 'Recupero: nessun metodo migliora quello fisico, freddo e massaggio solo la sensazione (2022)', url: 'https://pubmed.ncbi.nlm.nih.gov/35961644/' },
   { label: 'Forza almeno 2 giorni a settimana', url: 'https://www.acsm.org/wp-content/uploads/2026/03/Resistance-Training-Position-Stand-infographic.pdf' },
   { label: 'Video esercizi NHS', url: 'https://www.nhs.uk/live-well/exercise/strength-and-flex-exercise-plan-how-to-videos/' },
   { label: 'Alcol e salute', url: 'https://www.who.int/en/news-room/fact-sheets/detail/alcohol' },

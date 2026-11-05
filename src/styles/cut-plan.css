@@ -481,6 +481,13 @@
 .cut-steps li{padding-left:4px;margin-bottom:8px}
 .cut-steps li::marker{color:var(--lime);font-weight:700}
 
+/* ── Blocchi della seduta e carichi ── */
+.cut-block-title{margin:14px 0 2px;color:var(--lime);font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+.cut-block-title:first-child{margin-top:0}
+.cut-exercise .cut-exercise-cue{display:block;margin-top:4px;color:var(--t3);font-size:12px;line-height:1.4}
+.cut-lift{display:block;width:100%;margin-top:8px;padding:8px 10px;border:1px solid color-mix(in srgb,var(--lime) 25%,transparent);border-radius:6px;background:transparent;color:inherit;font-size:16px}
+.cut-lift::placeholder{color:var(--t4)}
+
 /* ── Video per esercizio ── */
 .cut-exercise{align-items:flex-start}
 .cut-exercise .cut-exercise-main{flex:1;min-width:0}

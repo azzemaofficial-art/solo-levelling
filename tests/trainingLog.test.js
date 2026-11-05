@@ -56,5 +56,5 @@ test('telegram ✅: la sessione finisce nel diario con fonte telegram', () => {
   const [entry] = log.readTrainingLog();
   assert.equal(entry.title, 'Forza A');
   assert.equal(entry.source, 'telegram');
-  assert.equal(entry.minutes, 35);
+  assert.equal(entry.minutes, 42);
 });

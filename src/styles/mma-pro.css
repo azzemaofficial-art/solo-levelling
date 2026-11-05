@@ -331,3 +331,41 @@
 .mma-guided-actions button{min-height:50px;display:flex;align-items:center;justify-content:center;gap:8px;border:1px solid #6de2d333;border-radius:9px;background:#13252c;color:#dcefe9;font:700 13px var(--font-label)}
 @media (prefers-reduced-motion:reduce){.mma-guided-breath,.mma-guided-bar span{transition:none}}
 .mma-guided header>span{display:flex;gap:8px}
+
+/* Pannello velocità in alto (05/11/2026): finestra del Sistema + fotogramma d'impatto. Il colore lo decide il grado. */
+.mma-hud{--rk:#6de2d3;position:absolute;top:8px;left:8px;right:8px;z-index:4;overflow:hidden;pointer-events:none;display:flex;align-items:center;gap:12px;padding:8px 18px 8px 12px;color:#eef7ff;background:linear-gradient(100deg,#050b18f5 0 58%,#050b18b0);border-left:3px solid var(--rk);clip-path:polygon(0 0,100% 0,100% calc(100% - 16px),calc(100% - 16px) 100%,0 100%)}
+.mma-hud.idle{flex-direction:column;align-items:flex-start;gap:3px}
+.mma-hud.idle span{font:700 12px/1.25 var(--font-label)}
+.mma-hud small{color:#9fb6c9;font:700 9px/1.15 var(--font-label);letter-spacing:.04em}
+.rank-E{--rk:#8a98ad}.rank-D{--rk:#6de2d3}.rank-C{--rk:#5cb8ff}.rank-B{--rk:#9b7bff}.rank-A{--rk:#ff5fa2}.rank-S{--rk:#ffc86b}
+.mma-hud-burst{position:absolute;inset:-90% -30%;background:repeating-conic-gradient(from 3deg at 24% 50%,transparent 0 5deg,var(--rk) 5deg 6deg,transparent 6deg 13deg);-webkit-mask-image:radial-gradient(circle at 24% 50%,transparent 12%,#000 34%,transparent 72%);mask-image:radial-gradient(circle at 24% 50%,transparent 12%,#000 34%,transparent 72%);opacity:0;animation:mma-hud-burst .46s ease-out both}
+@keyframes mma-hud-burst{0%{opacity:.95;transform:scale(.72)}100%{opacity:0;transform:scale(1.22)}}
+.mma-hud-main{position:relative;flex:none;display:flex;align-items:flex-end;gap:5px;animation:mma-hud-slam .2s cubic-bezier(.2,1.5,.4,1) both}
+@keyframes mma-hud-slam{0%{opacity:0;transform:translateX(-18px) scale(1.5)}100%{opacity:1;transform:none}}
+.mma-hud-main b{font:900 56px/.86 var(--font-display);font-variant-numeric:tabular-nums;transform:skewX(-11deg);text-shadow:3px 0 0 #ff2e8a70,-3px 0 0 #1fe3ff70}
+.rank-S .mma-hud-main b{color:#fff0c9;text-shadow:3px 0 0 #ff9d2e90,-3px 0 0 #ffe66d90,0 0 22px #ffc86b}
+.mma-hud-side{position:relative;flex:1;min-width:0;display:grid;gap:5px}
+.mma-hud-top{display:flex;align-items:baseline;justify-content:space-between;gap:6px}
+.mma-hud-top em{overflow:hidden;font:800 12px/1 var(--font-label);font-style:normal;white-space:nowrap;text-overflow:ellipsis;color:var(--rk)}
+.mma-hud-top strong{flex:none;color:#ffe66d;font:900 9px/1 var(--font-label);letter-spacing:.06em}
+.mma-hud-top strong.drop{color:#ff9b9b}
+.mma-hud-ladder{display:flex;gap:3px}
+.mma-hud-ladder i{flex:1;height:15px;transform:skewX(-14deg);background:#ffffff14;color:#ffffff66;font:800 10px/15px var(--font-display);font-style:normal;text-align:center}
+.mma-hud-ladder i.avg{box-shadow:inset 0 0 0 1px var(--rk);color:#eef7ff}
+.mma-hud-ladder i.on{background:var(--rk);color:#050b18;box-shadow:0 0 12px var(--rk)}
+.mma-hud dl{display:grid;grid-template-columns:repeat(4,auto);justify-content:space-between;gap:4px;margin:0}
+.mma-hud dl div{min-width:0}
+.mma-hud dt{color:#9fb6c9;font:700 8px/1 var(--font-label);white-space:nowrap}
+.mma-hud dd{margin:2px 0 0;font:800 14px/1 var(--font-display);font-variant-numeric:tabular-nums;white-space:nowrap}
+.mma-hud dd u{margin-left:1px;color:#9fb6c9;font:700 9px/1 var(--font-label);text-decoration:none}
+.mma-hud .weak dd{color:#ff9b9b}
+/* il pannello occupa la testa dello schermo: quel che stava lì scende */
+.mma-train-stage .mma-live-label{top:30%}
+.mma-pro-camera .mma-live-label{top:96px}
+.mma-pro-camera:has(.mma-hud) .mma-pro-tracking{top:auto;bottom:8px}
+@media(max-width:400px){.mma-hud{gap:8px;padding:8px 10px}.mma-hud-main{flex-direction:column;align-items:flex-start;gap:3px}.mma-hud-main b{font-size:40px}.mma-hud-main small{white-space:nowrap}.mma-hud-main small br{display:none}.mma-hud dl{gap:2px}.mma-hud dt{font-size:7px}.mma-hud dd{font-size:12px}.mma-hud dd u{font-size:8px}}
+@media(max-width:340px){.mma-hud dd{font-size:11px}}
+.mma-train-stage .mma-train-score{top:auto;bottom:12px}
+.mma-train-numbers{display:grid;gap:4px;margin:0;padding:0;list-style:none;font-size:13px;color:#c9dde2}
+.mma-train-numbers b{color:#6de2d3}
+@media (prefers-reduced-motion:reduce){.mma-hud-burst{display:none}.mma-hud-main{animation:none}}

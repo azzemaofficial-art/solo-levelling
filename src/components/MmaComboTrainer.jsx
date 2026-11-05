@@ -4,7 +4,7 @@ import { ArrowLeft, Check, GraduationCap, Pause, Play, RotateCcw, ThumbsDown, Th
 import useMmaCamera from '../hooks/useMmaCamera';
 import MmaFigure, { useSkeletonPlayer } from './MmaFigure';
 import { createReadiness, readPose } from '../../lib/mmaReadiness';
-import { coachFeedback, createComboJudge, describeGesture, masterSecret, needsFeet, teachNextSecret, teachSample, visibleGestures, EXPECT } from '../../lib/mmaComboJudge';
+import { coachFeedback, createComboJudge, describeGesture, identifyMove, masterSecret, needsFeet, rateGesture, strikeIdFor, teachNextSecret, teachSample, visibleGestures, EXPECT } from '../../lib/mmaComboJudge';
 import { forgetRep, learnFromRep, loadTemplates, saveTemplates } from '../../lib/mmaTemplates';
 import { encodeClip, readChatId, sendClips } from '../../lib/mmaClips';
 import { checkRep, loadPath, rankOf, savePath, skipKeys, startSecret, unlockedMoves } from '../../lib/mmaSecretPath';
@@ -13,6 +13,8 @@ import { recordComboScore } from '../../lib/mmaFighterPath';
 import { NO_VOTE, buildTrainClip, castVote, createTrainPending, fitClip, readTrainLog, saveTrainLog, toggleWrong, trainSender, withVote } from '../../lib/mmaTrain';
 import MmaCameraSetup from './MmaCameraSetup';
 import MmaBagStep, { readBagMode, saveBagMode, useMmaBag } from './MmaBag';
+import MmaStrikeHud from './MmaStrikeHud';
+import { createStrikeMeter, rankOf as speedRank, readSpeed, saveSpeed, toKmh } from '../../lib/mmaMetrics';
 
 const MmaTeach = lazy(() => import('./MmaTeach'));
 import { MOVES, comboKeys } from '../data/mmaMoves';
@@ -119,6 +121,10 @@ export default function MmaComboTrainer({ combo, onClose, onLearned }) {
   const [templates, setTemplates] = useState(() => loadTemplates(stance));
   const [teachOpen, setTeachOpen] = useState(false);
   const [label, setLabel] = useState(null); // ultimo colpo letto, mostrato sulla camera
+  const [hit, setHit] = useState(null);     // ultimo colpo misurato (pannello in alto)
+  const [torso, setTorso] = useState(null); // scala: quanti cm è il tuo busto e da dove viene
+  const [speedLog, setSpeedLog] = useState(null); // velocità della serie, per il riassunto
+  const meterRef = useRef(null);
   const [reported, setReported] = useState(false);
   const [bagOn, setBagOn] = useState(readBagMode); // al sacco: bersagli sul sacco e colpi a segno
   // registro degli allenamenti: ogni ripetizione (solo scheletro) + il tuo giudizio, per migliorare il coach
@@ -221,6 +227,9 @@ export default function MmaComboTrainer({ combo, onClose, onLearned }) {
       if (readyRef.current.done && judge.isCalibrated()) {
         readyRef.current.reset();
         bag.arm(() => judge.engine?.order?.());
+        const scale = bag.torso();
+        setTorso(scale); setHit(null);
+        meterRef.current = createStrikeMeter({ torsoCm: scale.cm, records: readSpeed() });
         setPhase('demo');
         say(`Guarda la combo: ${combo.name}.`, voice);
         later(() => { setPhase('countdown'); setCount(3); say('Tre. Due. Uno. Via!', voice); }, Math.max(3200, moves.length * 1100));
@@ -245,6 +254,10 @@ export default function MmaComboTrainer({ combo, onClose, onLearned }) {
       // durante un calcio il braccio che bilancia si chiude prima del calcio: non si scrive (sparirebbe dopo)
       const kicking = g.limb === 'arm' && info.activeKeys.some((k) => k.endsWith('Leg')) && moves.some((id) => ['kick', 'teep'].includes(EXPECT[id]?.kind));
       // colpo di braccio senza tipo deciso: si dice quale braccio (è quello che conta nella combo)
+      if (shown.includes(g) && !kicking && rateGesture(g)) {
+        const hitNow = meterRef.current?.add(g, strikeIdFor(g, moves));
+        if (hitNow) setHit(hitNow);
+      }
       if (shown.includes(g) && !kicking) setLabel({ text: g.move ? MOVES[g.move]?.name || describeGesture(g) : g.kind === 'strike' ? `Braccio ${g.side === 'lead' ? 'avanti' : 'dietro'}` : describeGesture(g), unclear: g.kind === 'unclear', n: t });
     }
     // colpi che si accendono in diretta (ricalcolo leggero ogni 150 ms)
@@ -287,6 +300,10 @@ export default function MmaComboTrainer({ combo, onClose, onLearned }) {
     const id = setTimeout(() => {
       if (results.length >= reps) {
         setPhase('summary');
+        // la velocità della serie entra nei record; quella dopo riparte da zero
+        const session = meterRef.current?.session();
+        saveSpeed(session); setSpeedLog(session);
+        if (torso) meterRef.current = createStrikeMeter({ torsoCm: torso.cm, records: readSpeed() });
         const avg = Math.round(results.reduce((s, r) => s + r.total, 0) / results.length);
         recordComboScore(combo.id, avg); // per le prove del percorso del combattente
         logWorkout({ date: localDateKey(), kind: 'mma', title: `Combo ${combo.name} · con camera`, minutes: Math.max(3, Math.round(results.length * 0.6)), note: `media ${avg}/100` });
@@ -295,7 +312,7 @@ export default function MmaComboTrainer({ combo, onClose, onLearned }) {
       } else { setPhase('countdown'); setCount(3); say('Ancora. Tre. Due. Uno. Via!', voice); }
     }, current?.speech ? Math.max(5200, speakMs(current.speech)) : 5200);
     return () => clearTimeout(id);
-  }, [phase, paused, replay, results, reps, combo.name, voice, current]);
+  }, [phase, paused, replay, results, reps, combo.name, voice, current, torso]);
 
   const startCamera = () => {
     try { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; window.speechSynthesis?.speak(u); } catch { /* voce */ }
@@ -312,7 +329,7 @@ export default function MmaComboTrainer({ combo, onClose, onLearned }) {
     setPhase('calibrate');
     say(bagOn && bag.ready() ? 'Mettiti in guardia accanto al sacco, corpo intero in inquadratura.' : feet ? 'Mettiti a due o tre metri, corpo intero in inquadratura, mani in guardia.' : 'Mettiti a un metro e mezzo, busto e braccia in inquadratura, mani in guardia.', voice);
   };
-  const close = () => { pendingRef.current.flush(); bag.close(); camera.stop(); window.speechSynthesis?.cancel(); onClose(); };
+  const close = () => { saveSpeed(meterRef.current?.session()); pendingRef.current.flush(); bag.close(); camera.stop(); window.speechSynthesis?.cancel(); onClose(); };
   // «Ha capito?»: 👍 / 👎. Il 👎 fa anche quello che faceva «Il coach ha sbagliato»: pausa, tolgo gli
   // esempi presi da questa ripetizione, mando lo scheletro della ripetizione (una volta sola).
   const voteRep = (ok) => {
@@ -389,6 +406,7 @@ export default function MmaComboTrainer({ combo, onClose, onLearned }) {
         {phase === 'bag' && camera.status === 'ready' && <MmaBagStep bag={bag} onDone={calibrate} onSkip={() => { setBagOn(false); bag.reset(); calibrate(); }} />}
         {phase === 'demo' && <div className="mma-train-demo"><GhostDemo combo={combo} speed={0.7} /><span>Guarda la combo…</span></div>}
         {phase === 'countdown' && <div className="mma-train-count" key={count}>{count || 'VIA!'}</div>}
+        {['go', 'result', 'countdown'].includes(phase) && torso && <MmaStrikeHud hit={hit} source={torso.source} sideOn={bagOn && bag.ready()} />}
         {phase === 'go' && <div className="mma-train-go">VAI!</div>}
         {phase === 'go' && label && <div key={label.n} className={`mma-live-label ${label.unclear ? 'unclear' : ''}`}>{label.unclear ? '?' : label.text}</div>}
         {phase === 'result' && current && <div className={`mma-train-score grade-${current.grade}`}><b>{current.total}</b><small>{current.grade === 'perfect' ? 'PERFETTA' : current.grade === 'good' ? 'BUONA' : 'RIPROVA'}</small></div>}
@@ -406,6 +424,7 @@ export default function MmaComboTrainer({ combo, onClose, onLearned }) {
 
       {phase === 'result' && current && <section className="mma-train-feedback">
         <p>{current.feedback}</p>
+        {torso && current.moves.some((mv) => mv.gesture?.speed) && <ul className="mma-train-numbers">{current.moves.map((mv, i) => (mv.gesture?.speed ? <li key={i}><b>{MOVES[mv.id]?.name}</b> circa {Math.round(toKmh(mv.gesture.speed, torso.cm))} km/h{mv.gesture.impactMs != null ? ` · ${mv.gesture.impactMs} ms` : ''}{mv.gesture.rotation != null ? ` · rotazione ${Math.round(mv.gesture.rotation)}°` : ''}</li> : null))}</ul>}
         {current.path?.type === 'applied' && <p className="mma-train-applied"><b>✓ Segreto applicato · {MOVES[current.path.id]?.name}</b>{current.path.promoted ? ` Nuovo grado: ${current.path.promoted.name}.` : ''}{current.path.unlocked?.[0] ? ` Mossa segreta sbloccata: ${MOVES[current.path.unlocked[0].id]?.name}.` : ''}</p>}
         {current.path?.type === 'retry' && <p className="mma-train-note">Il segreto su {MOVES[current.path.id]?.name} non è ancora entrato: lo riprendiamo più avanti.</p>}
         {current.secret && <p className="mma-train-secret"><b>{current.secret.fresh ? 'Segreto nuovo' : 'Il segreto'} · {MOVES[current.secret.id]?.name}</b>{current.secret.text}</p>}
@@ -428,6 +447,10 @@ export default function MmaComboTrainer({ combo, onClose, onLearned }) {
         <div className="mma-train-bars">{results.map((r, i) => <i key={i} style={{ height: `${Math.max(8, r.total)}%` }} className={`grade-${r.grade}`} title={`${i + 1}: ${r.total}`} />)}</div>
         {bagHits && <p>Colpi a segno sul sacco: <b>{bagHits.hits} su {bagHits.total}</b>.</p>}
         {topIssue && <p>Da sistemare più spesso: <b>{topIssue}</b>.</p>}
+        {torso && speedLog && <>
+          <ul className="mma-train-numbers">{Object.entries(speedLog.byMove).map(([id, m]) => <li key={id}><b>{MOVES[id]?.name || id}</b> mediana circa {Math.round(toKmh(m.median, torso.cm))} km/h · grado {speedRank(id, m.median)} · {m.n} colpi</li>)}</ul>
+          <p className="mma-train-note">Gradi: confronto con 944 colpi di atleti ripresi allo stesso modo (S = più veloce del 90%). Il singolo colpo balla di circa il 27%: conta la mediana. A 30 fotogrammi al secondo la camera legge più basso dei sensori degli studi.</p>
+        </>}
         {(() => {
           const rank = rankOf(pathRef.current), open = unlockedMoves(pathRef.current);
           return <div className="mma-train-path">

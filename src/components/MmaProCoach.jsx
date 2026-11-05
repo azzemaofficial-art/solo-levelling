@@ -7,7 +7,10 @@ import { mmaCoaching } from '../data/mmaCoaching';
 import { mmaRoundPlans } from '../data/mmaPath';
 import useMmaCamera from '../hooks/useMmaCamera';
 import { createReadiness, observerPose, readPose } from '../../lib/mmaReadiness.js';
-import { createComboJudge, rateGesture, visibleGestures } from '../../lib/mmaComboJudge.js';
+import { createComboJudge, rateGesture, strikeIdFor, visibleGestures } from '../../lib/mmaComboJudge.js';
+import MmaStrikeHud from './MmaStrikeHud';
+import { readTorsoInfo } from './MmaBag';
+import { createStrikeMeter, readSpeed, saveSpeed } from '../../lib/mmaMetrics.js';
 import { loadTemplates } from '../../lib/mmaTemplates.js';
 import MmaCameraSetup from './MmaCameraSetup';
 
@@ -31,6 +34,8 @@ export default function MmaProCoach({ lesson, onClose }) {
   const [paused, setPaused] = useState(''), [report, setReport] = useState(null), [saved, setSaved] = useState(true);
   const [checks, setChecks] = useState([]), [effort, setEffort] = useState(null), [exitPrompt, setExitPrompt] = useState(false);
   const [facing, setFacing] = useState('user');
+  const [hit, setHit] = useState(null), [scaleSource, setScaleSource] = useState('stima');
+  const meterRef = useRef(null);
   const [strike, setStrike] = useState(null), [teachOpen, setTeachOpen] = useState(false), [guardAlert, setGuardAlert] = useState('');
   const guardRef = useRef({ L: null, R: null, at: 0 }), lowGuardTold = useRef(false);
   const judgeRef = useRef(null), readinessRef = useRef(createReadiness()), seenRef = useRef(0), tipRef = useRef({ at: 0, clean: 0 }), hintRef = useRef({ text: '', at: 0 });
@@ -58,8 +63,10 @@ export default function MmaProCoach({ lesson, onClose }) {
     const rate = rateGesture(g);
     if (!rate) { if (g.kind === 'unclear') setStrike((prev) => ({ name: 'Colpo poco chiaro', score: null, tip: 'più deciso e completo', n: (prev?.n || 0) + 1 })); return; }
     if (rate.id === 'jab' || rate.id === 'cross') observerRef.current.recordPunch(rate.id, at);
+    const known = strikeIdFor(g), measured = meterRef.current?.add(g, known);
+    if (measured) setHit(measured);
     // gamba avanti distesa: teep o calcio in cambio di guardia non si distinguono da una camera sola
-    const name = g.limb === 'leg' && g.typeSure === false ? 'Calcio con la gamba avanti' : MOVES[rate.id]?.name || rate.id, tip = rate.issues[0]?.text;
+    const name = g.limb === 'leg' && g.typeSure === false ? 'Calcio con la gamba avanti' : !known && g.limb === 'arm' ? `Braccio ${g.side === 'lead' ? 'avanti' : 'dietro'}` : MOVES[rate.id]?.name || rate.id, first = rate.issues[0], tip = first && (first.measure ? `${first.text} (${first.measure})` : first.text);
     setStrike(prev => ({ name, score: rate.score, tip, n: (prev?.n || 0) + 1 }));
     const now = performance.now();
     if (tip && now - tipRef.current.at > 3500) { tipRef.current.at = now; speak(`${name}: ${tip}.`); }
@@ -129,7 +136,7 @@ export default function MmaProCoach({ lesson, onClose }) {
     }
   }, [speak, handleStrike, lesson.id]);
   const camera = useMmaCamera(receiveFrame, { minInterval: 33, canSwap: () => live.current.view !== 'session' || clockRef.current.phase !== 'work' || Boolean(live.current.paused) });
-  const close = useCallback(() => { camera.stop(); window.speechSynthesis?.cancel(); onCloseRef.current(); }, [camera.stop]);
+  const close = useCallback(() => { saveSpeed(meterRef.current?.session()); camera.stop(); window.speechSynthesis?.cancel(); onCloseRef.current(); }, [camera.stop]);
   const requestExit = useCallback(() => {
     if (live.current.view === 'session') { setPaused('Sessione in pausa.'); setExitPrompt(true); }
     else close();
@@ -221,6 +228,9 @@ export default function MmaProCoach({ lesson, onClose }) {
   });
   const freshTracking = () => {
     observerRef.current = createMmaObserver({ lessonId: lesson.id, lead: stance === 'southpaw' ? 'R' : 'L', external: true });
+    saveSpeed(meterRef.current?.session());
+    const scale = readTorsoInfo();
+    meterRef.current = createStrikeMeter({ torsoCm: scale.cm, records: readSpeed() }); setScaleSource(scale.source); setHit(null);
     judgeRef.current = createComboJudge({ stance, templates: loadTemplates(stance) }); readinessRef.current.reset(); guardRef.current = { L: null, R: null, at: 0 }; setGuardAlert(''); seenRef.current = 0; autoStartRef.current = false;
     setSignal(emptySignal); setStrike(null);
   };
@@ -266,7 +276,7 @@ export default function MmaProCoach({ lesson, onClose }) {
         <button className="mma-pro-primary" onClick={close}>Torna al percorso <ArrowRight size={17} /></button>
       </div> : <div className="mma-pro-workspace">
         <section className="mma-pro-visual">
-          {mode === 'camera' && view !== 'setup' ? <div className="mma-pro-camera"><video ref={camera.videoRef} autoPlay muted playsInline style={{ transform: facing === 'user' ? 'scaleX(-1)' : undefined }} onClick={() => camera.videoRef.current?.play()} /><canvas ref={camera.canvasRef} style={{ transform: facing === 'user' ? 'scaleX(-1)' : undefined }} />{view === 'session' && strike && <div key={strike.n} className={`mma-live-label ${strike.score == null ? 'unclear' : strike.tip ? 'fix' : ''}`}>{strike.score == null ? '?' : strike.name}</div>}{view === 'session' && guardAlert && <div className="mma-guard-alert">{guardAlert}</div>}<div className={`mma-pro-tracking ${readyCamera && signal.pose.visible ? 'good' : ''}`}><i />{camera.status === 'permission' ? 'Attendo il permesso camera' : camera.status === 'loading' ? 'Carico il riconoscimento…' : !readyCamera ? 'Camera non disponibile' : signal.pose.full ? 'Corpo intero visibile' : signal.pose.visible ? 'Busto visibile · piedi fuori quadro' : 'Cerca un’inquadratura completa'}{readyCamera && camera.profile && <em className="mma-pro-precision">{camera.profile.model === 'full' ? '3D · precisione alta' : '3D · standard'}</em>}</div>{view === 'calibrate' && <div className="mma-pro-calibration"><Focus size={30} /><strong>{signal.calibrated ? 'Ti vedo. Si parte!' : signal.hint || 'Mettiti in guardia davanti al telefono.'}</strong><p>{signal.calibrated ? 'La sessione parte da sola.' : 'Telefono fermo all’altezza del petto, tu a 2 metri, di tre quarti. Parto da solo quando ti vedo in guardia.'}</p><div role="progressbar" aria-label="Preparazione inquadratura" aria-valuenow={Math.round(signal.calibration * 100)} aria-valuemin={0} aria-valuemax={100}><i style={{ width: `${signal.calibration * 100}%` }} /></div></div>}</div> : <MmaTechnique kind={teaching.demo} steps={teaching.steps} stance={stance} compact={view === 'session'} />}
+          {mode === 'camera' && view !== 'setup' ? <div className="mma-pro-camera">{view === 'session' && <MmaStrikeHud hit={hit} source={scaleSource} />}<video ref={camera.videoRef} autoPlay muted playsInline style={{ transform: facing === 'user' ? 'scaleX(-1)' : undefined }} onClick={() => camera.videoRef.current?.play()} /><canvas ref={camera.canvasRef} style={{ transform: facing === 'user' ? 'scaleX(-1)' : undefined }} />{view === 'session' && strike && <div key={strike.n} className={`mma-live-label ${strike.score == null ? 'unclear' : strike.tip ? 'fix' : ''}`}>{strike.score == null ? '?' : strike.name}</div>}{view === 'session' && guardAlert && <div className="mma-guard-alert">{guardAlert}</div>}<div className={`mma-pro-tracking ${readyCamera && signal.pose.visible ? 'good' : ''}`}><i />{camera.status === 'permission' ? 'Attendo il permesso camera' : camera.status === 'loading' ? 'Carico il riconoscimento…' : !readyCamera ? 'Camera non disponibile' : signal.pose.full ? 'Corpo intero visibile' : signal.pose.visible ? 'Busto visibile · piedi fuori quadro' : 'Cerca un’inquadratura completa'}{readyCamera && camera.profile && <em className="mma-pro-precision">{camera.profile.model === 'full' ? '3D · precisione alta' : '3D · standard'}</em>}</div>{view === 'calibrate' && <div className="mma-pro-calibration"><Focus size={30} /><strong>{signal.calibrated ? 'Ti vedo. Si parte!' : signal.hint || 'Mettiti in guardia davanti al telefono.'}</strong><p>{signal.calibrated ? 'La sessione parte da sola.' : 'Telefono fermo all’altezza del petto, tu a 2 metri, di tre quarti. Parto da solo quando ti vedo in guardia.'}</p><div role="progressbar" aria-label="Preparazione inquadratura" aria-valuenow={Math.round(signal.calibration * 100)} aria-valuemin={0} aria-valuemax={100}><i style={{ width: `${signal.calibration * 100}%` }} /></div></div>}</div> : <MmaTechnique kind={teaching.demo} steps={teaching.steps} stance={stance} compact={view === 'session'} />}
           {view === 'session' && <div className={`mma-pro-correction ${paused ? 'paused' : ''}`} role="status"><small>{paused ? 'PAUSA' : mode === 'guided' ? 'FOCUS' : 'IL COACH OSSERVA'}</small><strong>{activeCue}</strong>{mode === 'camera' && punchLesson && <span>{signal.stats.jab || 0} jab · {signal.stats.cross || 0} cross{lesson.id === 'one-two' ? ` · ${signal.stats.combos || 0} sequenze 1–2` : ''}</span>}{mode === 'camera' && strike && <div className={`mma-pro-strike ${strike.tip ? 'fix' : 'clean'}`} key={strike.n} aria-live="polite"><b>{strike.name}</b><i>{strike.score}</i><small>{strike.tip || 'pulito'}</small></div>}</div>}
           {view !== 'session' && <div className="mma-pro-observation"><ShieldCheck size={18} /><div><strong>Cosa osserviamo</strong><p>{teaching.measured}</p></div></div>}
         </section>

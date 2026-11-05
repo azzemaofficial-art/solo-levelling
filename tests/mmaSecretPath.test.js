@@ -85,12 +85,15 @@ test('percorso: si salvano solo i segreti imparati; un salvataggio rovinato non 
 });
 
 // ripetizione pulita: ogni colpo visto, giusto e senza correzioni
-const cleanRep = (ids) => ({ moves: ids.map((id) => ({ id, status: 'ok', gesture: { id }, issues: [], expected: EXPECT[id] })) });
+const cleanRep = (ids, seen = { sideOn: true }) => ({ moves: ids.map((id) => ({ id, status: 'ok', gesture: { id, ...seen }, issues: [], expected: EXPECT[id] })) });
 
 test('percorso: ripetizione pulita → il maestro insegna un segreto nuovo che la camera sa verificare', () => {
   const s = teachNextSecret(cleanRep(['jab', 'cross']));
   assert.deepEqual([s.key, s.id, s.issue, s.fresh], ['extend', 'jab', 'extend', true]);
   assert.equal(teachNextSecret(cleanRep(['jab', 'lowKick'])).key, 'level:lowKick'); // prima l'altezza
+  // senza sacco e senza i tuoi esempi la distensione non si misura: non si insegna
+  assert.equal(teachNextSecret(cleanRep(['jab'], {})).key, 'return');
+  assert.equal(teachNextSecret(cleanRep(['jab'], { reachRatio: 1 })).key, 'extend');
   assert.equal(teachNextSecret(cleanRep(['jab']), { skip: ['extend', 'return', 'guard'] }), null);
   // con un errore no: lì parla il segreto dell'errore
   const withError = cleanRep(['jab', 'cross']);
@@ -100,17 +103,19 @@ test('percorso: ripetizione pulita → il maestro insegna un segreto nuovo che l
   for (const id of ['hook', 'rearHook', 'cross']) assert.ok(!['rotate', 'elbow'].includes(teachNextSecret(cleanRep([id]))?.key));
 });
 
-test('percorso: chi lavora sempre pulito arriva lo stesso a Campione (10 segreti)', () => {
-  let path = emptyPath();
-  for (let lap = 0; lap < 20 && rankOf(path).learned < 10; lap += 1) {
-    for (const c of COMBOS) {
-      const res = cleanRep(c.moves);
-      const check = checkRep(path, res);
-      const skip = skipKeys(check.path);
-      const secret = check.path.pending ? null : masterSecret(res, { skip }) || (check.event ? null : teachNextSecret(res, { skip }));
-      path = startSecret(check.path, secret);
+test('percorso: chi lavora sempre pulito arriva lo stesso a Campione (10 segreti), al sacco e senza', () => {
+  for (const seen of [{ sideOn: true }, { peakElbowGap: 0.1 }]) {
+    let path = emptyPath();
+    for (let lap = 0; lap < 20 && rankOf(path).learned < 10; lap += 1) {
+      for (const c of COMBOS) {
+        const res = cleanRep(c.moves, seen);
+        const check = checkRep(path, res);
+        const skip = skipKeys(check.path);
+        const secret = check.path.pending ? null : masterSecret(res, { skip }) || (check.event ? null : teachNextSecret(res, { skip }));
+        path = startSecret(check.path, secret);
+      }
     }
+    assert.ok(rankOf(path).learned >= 10, `segreti imparati ${rankOf(path).learned}`);
+    assert.equal(rankOf(path).name, 'Campione');
   }
-  assert.ok(rankOf(path).learned >= 10, `segreti imparati ${rankOf(path).learned}`);
-  assert.equal(rankOf(path).name, 'Campione');
 });
