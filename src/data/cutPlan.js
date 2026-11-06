@@ -281,11 +281,12 @@ const footballWarm = ['Marcia e oscillazioni gambe', '2 min', { block: PRE, ligh
 const footballMobility = ['World’s greatest stretch e affondo laterale', '3 + 4 / lato', { block: PRE, light: true, cue: 'Apri anche e caviglie senza fretta: due minuti in tutto.' }];
 
 export const trainingDays = [
-  { day: 'Lunedì', short: 'Calcio', type: 'football', duration: '≈ 70 min', detail: 'Focus accelerazione. Dopo: cammina 3–5 minuti, bevi, cena con carboidrati e proteine, doccia calda, a letto entro le 23:30.', focus: 'guarda sopra la spalla prima di ricevere, poi primo tocco in avanti.', exercises: [
+  { day: 'Lunedì', short: 'Calcio', type: 'football', duration: '≈ 80 min', detail: 'Focus accelerazione. Dopo: cammina 3–5 minuti, bevi, cena con carboidrati e proteine, doccia calda, a letto entro le 23:30.', focus: 'guarda sopra la spalla prima di ricevere, poi primo tocco in avanti.', exercises: [
     footballWarm, footballMobility,
     ['A-march e A-skip', '2 × 10 m', { block: PRE, cue: 'Ginocchio alto e piede che spinge il terreno sotto di te. Anche sul posto.' }],
     ['Pogo e salto in lungo', 'pogo 2 × 10 · salto 2 × 3', { block: PRE, cue: 'Pogo: caviglie rigide, tocco rapido. Salto: atterra fermo e riparti da capo.' }],
     ['Scatti brevi', '2 da 10 m all’85–90%', { block: PRE, cue: 'Busto inclinato nei primi passi, spinta potente. Torna camminando.' }],
+    ['Scatti lanciati', '3 da 20 m al 95%, 15 m di avvio', { block: PRE, cue: 'Prendi velocità in 15 m, poi 20 m quasi al massimo, busto alto. Torna camminando e aspetta 3 minuti. Se senti tirare dietro la coscia, fermati.' }],
   ] },
   { day: 'Martedì', short: 'Forza A', type: 'strength', duration: '≈ 42 min', detail: 'Parte alta e potenza del pugno. Niente gambe pesanti: ieri hai giocato.', exercises: [
     ['Riscaldamento parte alta', '6 min', { block: WARM, light: true, cue: 'Segui il video, poi 1 serie leggera di piegamenti e 1 di rematore.' }],
@@ -301,7 +302,7 @@ export const trainingDays = [
     ['Copenhagen', '1–2 × 6–8 / lato', { block: 'Superserie 4', cue: 'Ginocchio (o piede, più difficile) sul divano, fianco alto. Protegge l’inguine.' }],
     ['Stretching finale parte alta', '5 min', { block: STRETCH, light: true, cue: 'Ti rilassa e tiene la mobilità. Non toglie i dolori: gli studi lo escludono.' }],
   ] },
-  { day: 'Mercoledì', short: 'Bag / recupero', type: 'optional', duration: '15–25 min', detail: 'Opzionale: tecnica al sacco, senza sparring, o camminata e mobilità. Se stanco, riposo.', exercises: [
+  { day: 'Mercoledì', short: 'Bag / recupero', type: 'optional', duration: '15–25 min', detail: 'Opzionale: tecnica al sacco, senza sparring, o mobilità in casa. Se stanco, riposo.', exercises: [
     ['Footwork e guardia', '3 × 2 min', { light: true }], ['Jab–cross al sacco, tecnica', '3 × 2 min'], ['Mobilità anche e caviglie', '6 min', { light: true }],
   ] },
   { day: 'Giovedì', short: 'Calcio', type: 'football', duration: '≈ 70 min', detail: 'Focus cambio di direzione. Dopo: cammina 3–5 minuti, bevi, cena con carboidrati e proteine, doccia calda, a letto entro le 23:30.', focus: 'frena in 2–3 passi, pianta il piede esterno e riparti; primo controllo semplice col piede debole.', exercises: [
@@ -310,11 +311,10 @@ export const trainingDays = [
     ['Frenate e ripartenze', '3 frenate al 70% · 2 ripartenze all’85%', { block: PRE, cue: 'Abbassa il bacino e frena in 2–3 passi, poi riparti di lato.' }],
   ] },
   { day: 'Venerdì', short: 'Allenamento', type: 'strength', duration: '≈ 45 min', detail: 'Recupera qui la seduta saltata in settimana: Forza A o B, quella che manca, come scritta nel suo giorno. Se le hai già fatte tutte: tecnica al sacco o mobilità. Creatina a fine seduta.' },
-  { day: 'Sabato', short: 'Forza B', type: 'strength', duration: '≈ 40 min', detail: 'Gambe e potenza per colpire forte. Niente sprint: li fai già al calcio, qui contano salti e forza.', exercises: [
+  { day: 'Sabato', short: 'Forza B', type: 'strength', duration: '≈ 40 min', detail: 'Gambe e potenza per colpire forte. Tutto in casa: scatti e corsa li fai lunedì e giovedì, qui contano salti e forza.', exercises: [
     ['Riscaldamento gambe', '6 min', { block: WARM, light: true, cue: 'Segui il video, poi 1 serie leggera di affondo bulgaro.' }],
-    ['Salto verticale', '3 × 4, recupero 40 s', { block: POWER, cue: 'Scendi veloce, salta al massimo, atterra morbido con le ginocchia in linea coi piedi.' }],
-    ['Salto in lungo', '3 × 3', { block: POWER, cue: 'Slancia le braccia, atterra fermo, torna indietro camminando.' }],
-    ['Affondo bulgaro', '3 × 8–12 / lato', { block: 'Superserie 1', light: true, cue: 'Piede dietro sulla sedia, scendi in 3 secondi. Una gamba alla volta: 20 kg bastano a lungo.' }],
+    ['Salto verticale', '4 × 4, recupero 40 s', { block: POWER, cue: 'Scendi veloce, salta al massimo, atterra morbido con le ginocchia in linea coi piedi.' }],
+    ['Affondo bulgaro', '4 × 6–10 / lato', { block: 'Superserie 1', light: true, cue: 'Piede dietro sulla sedia, scendi in 3 secondi. Fai 10 con 20 kg? Aggiungi uno zaino con libri sulle spalle: per scattare servono gambe forti.' }],
     ['Piegamenti piedi rialzati', '3 × 8–20', { block: 'Superserie 1', light: true, cue: 'Piedi sulla sedia, corpo dritto. Troppo facili? Scendi in 4 secondi.' }],
     ['Stacco rumeno manubri', '3 × 10–15', { block: 'Superserie 2', cue: 'Spingi il sedere indietro, schiena piatta, scendi in 3 secondi finché tirano i femorali.' }],
     ['Trazioni presa inversa', '3 × 3–8', { block: 'Superserie 2', cue: 'Palmi verso di te, scapole giù, mento sopra la sbarra. Poche? Negative da 4 secondi.' }],
@@ -323,11 +323,11 @@ export const trainingDays = [
     ['Nordic curl', '1–2 × 4–6', { block: 'Femorali', cue: 'Piedi bloccati sotto il divano, scendi più lento che puoi, risali con le mani. Gambe rigide lunedì? Fanne meno.' }],
     ['Stretching finale gambe', '5 min', { block: STRETCH, light: true, cue: 'Ti rilassa e tiene la mobilità. Non toglie i dolori: gli studi lo escludono.' }],
   ] },
-  { day: 'Domenica', short: 'Riposo', type: 'recovery', duration: '—', detail: 'Passeggiata facile se ti va. Preparati per il calcio del lunedì.' },
+  { day: 'Domenica', short: 'Riposo', type: 'recovery', duration: '—', detail: 'Riposo vero. Preparati per il calcio del lunedì.' },
 ];
 
 export const phases = [
-  { weeks: '1–7', name: 'Ingresso', detail: 'Le sedute nuove partono da qui. 2 giri per superserie e 2–3 ripetizioni di margine: impari gli esercizi. Calcio: 1 scatto, pogo 1 × 8, salto 1 × 3, bound 1 × 4.' },
+  { weeks: '1–7', name: 'Ingresso', detail: 'Le sedute nuove partono da qui. 2 giri per superserie e 2–3 ripetizioni di margine: impari gli esercizi. Calcio: 1 scatto breve, 1 lanciato all’85%, pogo 1 × 8, salto 1 × 3, bound 1 × 4.' },
   { weeks: '8–10', name: 'Costruzione', detail: 'Tutti i giri, 1–2 ripetizioni di margine. Quando arrivi in cima alle ripetizioni in ogni serie, aumenta il carico o rallenta la discesa. Calcio: dose piena, 20–25 salti.' },
   { weeks: '11', name: 'Scarico', detail: '2 giri e 3 ripetizioni di margine: una settimana più facile per assorbire il lavoro. Salti e scatti a metà.' },
   { weeks: '12–13', name: 'Spinta', detail: 'Tutti i giri. Sull’ultima serie di ogni esercizio arriva a 0–1 di margine, mai su esplosivi e Nordic. Confronta circonferenze, trazioni e piegamenti.' },
@@ -343,6 +343,8 @@ export const evidence = [
   { label: 'Più vicino al cedimento, più ipertrofia (Robinson 2024)', url: 'https://pubmed.ncbi.nlm.nih.gov/38970765/' },
   { label: 'Forza e potenza delle gambe e impatto del pugno in pugili d’élite (Loturco 2016)', url: 'https://pubmed.ncbi.nlm.nih.gov/26110348/' },
   { label: 'Salti nei calciatori: 1 seduta a settimana da 120, poi 60 per mantenere (2024)', url: 'https://pubmed.ncbi.nlm.nih.gov/38489585/' },
+  { label: 'Scatti oltre il 95% in allenamento: meno infortuni che fermandosi all’85% (Malone 2017, osservazionale)', url: 'https://pubmed.ncbi.nlm.nih.gov/27554923/' },
+  { label: 'Sprint contro Nordic: fascicoli del femorale più lunghi con lo sprint (Mendiguchia 2020)', url: 'https://pubmed.ncbi.nlm.nih.gov/32045411/' },
   { label: 'Giocare e basta non migliora lo sprint breve', url: 'https://pmc.ncbi.nlm.nih.gov/articles/PMC8124057/' },
   { label: 'Nordic: rischio di infortuni ai femorali dimezzato (van Dyk 2019)', url: 'https://pubmed.ncbi.nlm.nih.gov/30808663/' },
   { label: 'Copenhagen: problemi all’inguine 13,5% contro 21,3% (Harøy 2019)', url: 'https://researchprofiles.ku.dk/da/publications/the-adductor-strengthening-programme-prevents-groin-problems-amon/' },

@@ -70,3 +70,13 @@ test('briefing: combo del giorno, diversa tra due giorni consecutivi', () => {
   assert.match(morningText({}, '2026-09-29'), /Combo del giorno/);
   assert.notEqual(comboOfDay('2026-09-29').id, comboOfDay('2026-09-30').id);
 });
+
+test('piano massa: i promemoria parlano delle sue sedute, mai del calcio', () => {
+  const massa = { plan: 'massa' };
+  // 2026-11-05 è giovedì: per Emanuele calcio, per il piano massa la seduta di forza
+  assert.match(trainingText('2026-11-05'), /Calcio/);
+  assert.match(trainingText('2026-11-05', massa), /Forza C/);
+  assert.doesNotMatch(trainingText('2026-11-05', massa), /Calcio/);
+  assert.match(morningText(massa, '2026-11-05'), /Forza C/);
+  assert.equal(trainingText('2026-11-09', massa), null, 'lunedì riposa');
+});

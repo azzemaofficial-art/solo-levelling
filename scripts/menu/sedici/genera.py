@@ -228,3 +228,124 @@ out += 'export const menu16Weeks = ' + json.dumps(weeks, ensure_ascii=False) + '
 out += 'export const menu16Dishes = ' + json.dumps(DISHES, ensure_ascii=False, separators=(',', ':')).replace('},{"id"', '},\n{"id"') + ';\n'
 open(f'{ROOT}/src/data/menu16.js', 'w').write(out)
 print('scritto', round(len(out) / 1024), 'KB')
+
+# ── Dose «massa»: stesse ricette e stessi giorni del calendario, per chi mette massa ──
+# Salgono solo le fonti di carboidrati e poco i grassi; le proteine restano. Spezie e condimenti non si toccano.
+MASSA = {'colazione': 600, 'spuntino': 300, 'piatto': 850, 'pesce': 850, 'pollo-riso-lun': 950, 'cena-calcio': 950}
+K_MASSA = 2.2  # oltre, il piatto cambia natura: meglio il pane a parte
+MENO_PROTEINE = .65  # le ricette sono pensate per un taglio: per la massa bastano 1,6-2,2 g/kg (Morton 2018)
+UOVA = re.compile(r'uov|albume', re.I)
+OBIETTIVO_PESI, OBIETTIVO_RIPOSO = 3200, 3000
+
+def scala_massa(items, k):
+    out = []
+    for n, g in items:
+        v = U.get(n)
+        if v and v[0] >= 60 and g >= 15 and not UOVA.search(n):
+            if v[1] * 4 / v[0] >= .5: g = max(15, round(g * MENO_PROTEINE / 5) * 5)
+            elif v[3] * 4 / v[0] >= .5: g = max(5, round(g * (min(k, 1.5) if 'patat' in n.lower() else k) / 5) * 5)  # patate: oltre è troppo volume, il resto lo fa il pane
+            elif v[2] * 9 / v[0] >= .6: g = round(g * min(k, 1.3))
+        out.append([n, g])
+    return out
+
+def adatta_massa(items, target, side):
+    lo, hi = .8, K_MASSA
+    for _ in range(14):
+        k = (lo + hi) / 2
+        if macro(scala_massa(items, k))['kcal'] > target: hi = k
+        else: lo = k
+    it = scala_massa(items, lo)
+    manca = target - macro(it)['kcal']
+    if manca > 30:  # shortcut: il contorno è sempre lo stesso per tipo di piatto, basta per arrivare alle calorie
+        g = round(manca / U[side][0] * 100 / 10) * 10
+        if g: it = it + [[side, g]]
+    return it
+
+SIDE = {'colazione': 'Banana', 'spuntino': 'Banana', 'piatto': 'pane rustico', 'pesce': 'pane rustico', 'pollo-riso-lun': 'pane rustico', 'cena-calcio': 'pane rustico'}
+MASSA_DISHES, A_FIT = [], {}
+for r in R.values():
+    t = tipo(r); items = adatta_massa(r['porzione_g'], MASSA[t], SIDE[t]); m = macro(items)
+    if abs(m['kcal'] - MASSA[t]) > TOLL: SCARTATI.append((r['id'], 'a', m['kcal'])); continue
+    base = next(x for x in DISHES if x['id'] == r['id'])
+    A_FIT[r['id']] = {'id': r['id'], 'nome': r['titolo'], 'porz': items, **m, 'r': r}
+    MASSA_DISHES.append({**base, 'phase': 'a', 'meal': testo(r['titolo'], items), 'kcal': m['kcal'], 'protein': m['p'], 'fat': m['f'], 'carbs': m['c'], 'fiber': m['fib'], 'fv': m['fv'], 'dose': items})
+
+# Pasti fissi con le sue dosi: nome, testo, kcal, proteine, fibre, frutta e verdura, ingredienti, passi. Valori stimati come quelli sopra.
+FISSI_MASSA = {
+ 'a_piadina': ('2 piadine col tacchino', '2 piadine col tacchino: 2 piadine, fesa di tacchino 120 g, mozzarella light 80 g, insalata e pomodoro', 850, 50, 7, 80, ['2 piadine', 'Fesa di tacchino 120 g', 'Mozzarella light 80 g', 'Insalata e pomodoro'], ['Scalda le piadine in padella, farcisci e chiudi.']),
+ 'a_gocciole': ('Latte e 6 Gocciole', 'Latte e 6 Gocciole: latte parzialmente scremato 300 ml con proteine 25 g, 6 Gocciole e un frutto', 600, 34, 6, 160, ['Latte parzialmente scremato 300 ml', 'Whey 25 g', '6 Gocciole', '1 frutto'], ['Sciogli le proteine nel latte freddo, poi Gocciole e frutto.']),
+ 'a_cavallo': ('Pasta e cavallo, dose massa', 'Pasta bianca 150 g cruda con olio EVO 15 g + carne di cavallo 150 g + verdure', 960, 55, 8, 200, ['Pasta 150 g', 'Olio EVO 15 g', 'Carne di cavallo 150 g', 'Verdure 200 g'], ['Cuoci la pasta, scotta la carne e condisci con olio a crudo.']),
+ 'a_mamma': ('Dalla mamma, dose massa', 'Pranzo dalla mamma: un piatto abbondante di primo, un secondo con verdure e pane', 1100, 50, 8, 200, ['Primo abbondante', 'Secondo di carne o pesce', 'Verdure', 'Pane'], ['Goditelo: oggi il bis di primo è previsto.']),
+ 'a_shake': ('Shake, banana e creatina', 'Shake di whey 25 g con latte parzialmente scremato 300 ml + banana + creatina 3–5 g a fine allenamento', 340, 29, 3, 120, ['Whey 25 g', 'Latte parzialmente scremato 300 ml', '1 banana', 'Creatina monoidrata 3–5 g'], ['Frulla o agita, poi mangia la banana.']),
+}
+for fid, (title, meal, kc, p, fib, fv, ing, steps) in FISSI_MASSA.items():
+    MASSA_DISHES.append({'id': fid, 'phase': None, 'meal': meal, 'title': title, 'time': '5 min', 'kcal': kc, 'protein': p, 'fiber': fib, 'fv': fv, 'family': None, 'image': None, 'ingredients': ing, 'steps': steps})
+
+# Lo spuntino in più che fa la differenza: 3 scelte equivalenti, si cambiano tra loro come le altre alternative
+EXTRA = {
+ 'extra-yogurt-avena': ('Coppa di yogurt greco, avena e banana', [['Yogurt greco 0%', 150], ["Fiocchi d'avena", 60], ['Banana', 120], ['miele', 15]], ['Mescola yogurt e avena, taglia la banana sopra, finisci col miele.']),
+ 'extra-panino-tacchino': ('Panino al tacchino e un frutto', [['pane rustico', 110], ['fesa di tacchino a fette', 50], ['mandorle', 10], ['Banana', 100]], ['Farcisci il pane col tacchino; mandorle e banana a parte.']),
+ 'extra-latte-mandorle': ('Latte, mandorle e avena', [['Latte parzialmente scremato', 300], ['mandorle', 25], ["Fiocchi d'avena", 40], ['Banana', 100]], ['Avena nel latte per 5 minuti, mandorle e banana sopra.']),
+}
+for eid, (title, items, steps) in EXTRA.items():
+    m = macro(items)
+    A_FIT[eid] = {'id': eid, 'nome': title, 'porz': items, **m, 'r': None}
+    MASSA_DISHES.append({'id': eid, 'phase': 'a', 'meal': testo(title, items), 'title': title, 'cuisine': None, 'why': 'Calorie facili da mangiare, senza appesantire i piatti.', 'time': '5 min', 'prepMin': 0, 'freezer': False, 'kcal': m['kcal'], 'protein': m['p'], 'fat': m['f'], 'carbs': m['c'], 'fiber': m['fib'], 'fv': m['fv'], 'cost': 2, 'family': 'extra', 'whey': False, 'image': None, 'dose': items, 'steps': steps})
+EXTRA_IDS = list(EXTRA)
+
+visti_a = {x['meal'] for x in DISHES}
+for x in MASSA_DISHES:
+    if x['meal'] in visti_a: x['meal'] += ' · dosi massa'
+    visti_a.add(x['meal'])
+
+MAP_FISSI = {'f_piadina1': 'a_piadina', 'f_gocciole4': 'a_gocciole', 'cavallo': 'a_cavallo', 'f_cavallo_s': 'a_cavallo', 'mamma': 'a_mamma', 'f_mamma_s': 'a_mamma'}
+TOGLI = re.compile(r'^(pre_|post_|f_post_s|drinks2|f_shake$|f_contorno)')
+PESI = (1, 3, 5)  # martedì, giovedì, sabato
+BY_FIT = lambda i: next((x for x in MASSA_DISHES if x['id'] == i and x['phase'] == 'a'), None)
+FIX_A = {x['id']: x for x in MASSA_DISHES if x['phase'] is None}
+massa_weeks = []; tot_a = []
+for i, wk in enumerate(W):
+    days = []
+    for d, day in enumerate(wk):
+        slots = []
+        for label, m in day:
+            label = label.split(' · ')[0]
+            if m['fisso']:
+                if TOGLI.match(m['id']): continue
+                fid = MAP_FISSI.get(m['id'], m['id'])
+                if fid in FIX_A:
+                    x = FIX_A[fid]; slots.append({'id': fid, 'label': label, 'meal': x['meal'], 'image': None, 'kcal': x['kcal'], 'p': x['protein'], 'fib': x['fiber'], 'fv': x['fv'], 'family': None, 'phase': None})
+                else: slots.append({'id': m['id'], 'label': label, 'meal': m['meal'], 'image': m['image'], 'kcal': m['kcal'], 'p': m['p'], 'fib': m['fib'], 'fv': m['fv'], 'family': None, 'phase': None})
+            else:
+                x = BY_FIT(m['id'])
+                if not x: raise SystemExit(f"ricetta senza dose massa nel calendario: {m['id']}")
+                slots.append({'id': x['id'], 'label': label, 'meal': x['meal'], 'image': x['image'], 'kcal': x['kcal'], 'p': x['protein'], 'fib': x['fiber'], 'fv': x['fv'], 'family': x['family'], 'phase': 'a'})
+        if d in PESI:
+            x = FIX_A['a_shake']; slots.append({'id': 'a_shake', 'label': 'Dopo i pesi', 'meal': x['meal'], 'image': None, 'kcal': x['kcal'], 'p': x['protein'], 'fib': x['fiber'], 'fv': x['fv'], 'family': None, 'phase': None})
+        obiettivo = OBIETTIVO_PESI if d in PESI else OBIETTIVO_RIPOSO
+        for n in range(2):  # lo spuntino in più entra solo se avvicina il giorno all'obiettivo
+            x = BY_FIT(EXTRA_IDS[(i + d + n) % len(EXTRA_IDS)]); now = sum(s['kcal'] for s in slots)
+            if abs(now + x['kcal'] - obiettivo) >= abs(now - obiettivo): break
+            slots.append({'id': x['id'], 'label': 'Extra massa' + (' 2' if n else ''), 'meal': x['meal'], 'image': None, 'kcal': x['kcal'], 'p': x['protein'], 'fib': x['fiber'], 'fv': x['fv'], 'family': 'extra', 'phase': 'a'})
+        fib = sum(s['fib'] for s in slots); fv = sum(s['fv'] for s in slots)
+        if fib < 25 or fv < 400:
+            c = 'f_contorno' if fib + 8 >= 25 and fv + 350 >= 400 else 'f_contorno2'; o = fx(c)
+            slots.append({'id': c, 'label': 'Contorno', 'meal': o['meal'], 'image': None, 'kcal': o['kcal'], 'p': o['p'], 'fib': o['fib'], 'fv': o['fv'], 'family': None, 'phase': None})
+        k = sum(s['kcal'] for s in slots); p = sum(s['p'] for s in slots); f = sum(s['fib'] for s in slots); v = sum(s['fv'] for s in slots)
+        tot_a.append((i, d, k, p, f, v, sum((BY_FIT(s['id']) or {}).get('fat', 0) for s in slots)))
+        days.append({'day': DN[d], 'target': round(k / 50) * 50, 'note': 'Giorno di pesi: i carboidrati prima e lo shake subito dopo.' if d in PESI else None,
+                     'slots': [{k2: s[k2] for k2 in ('id', 'label', 'meal', 'image', 'family', 'phase')} for s in slots]})
+    massa_weeks.append(days)
+
+assert not [x for x in SCARTATI if x[1] == 'a'], 'ricetta senza dose massa'
+assert len({x['meal'] for x in MASSA_DISHES}) == len(MASSA_DISHES), 'due piatti massa con lo stesso testo'
+ks = [t[2] for t in tot_a]; ps = [t[3] for t in tot_a]
+print('massa: kcal media', round(sum(ks) / len(ks)), 'min', min(ks), 'max', max(ks), '| proteine media', round(sum(ps) / len(ps)), 'min', min(ps), 'max', max(ps), '| fib<25', sum(t[4] < 25 for t in tot_a), 'fv<400', sum(t[5] < 400 for t in tot_a), '| testi con suffisso', sum(' · dosi massa' in x['meal'] for x in MASSA_DISHES))
+big = sorted((x for x in MASSA_DISHES if x.get('dose')), key=lambda x: -max(g for _, g in x['dose']))[:6]
+print('dosi piu grandi', [(x['id'][:18], *max(x['dose'], key=lambda d: d[1])) for x in big])
+print('con pane a parte', sum(any(n == 'pane rustico' for n, _ in x['dose']) for x in MASSA_DISHES if x.get('dose') and x['family'] != 'extra'), 'con banana', sum(any(n == 'Banana' for n, _ in x['dose']) for x in MASSA_DISHES if x.get('dose') and x['family'] != 'extra'))
+out = '// Generato da scripts/menu/sedici/genera.py: non modificare a mano.\n// Le stesse ricette di menu16.js con le dosi per mettere massa. kcal e proteine sono stime.\n'
+out += 'export const massaWeeks = ' + json.dumps(massa_weeks, ensure_ascii=False) + ';\n'
+out += 'export const massaDishes = ' + json.dumps(MASSA_DISHES, ensure_ascii=False, separators=(',', ':')).replace('},{"id"', '},\n{"id"') + ';\n'
+open(f'{ROOT}/src/data/menuMassa.js', 'w').write(out)
+print('scritto massa', round(len(out) / 1024), 'KB')

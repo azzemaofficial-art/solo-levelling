@@ -14,6 +14,7 @@ export const exerciseVideos = {
   'A-march e A-skip': [V('bISzKMBflPM', 'Parisi Speed School')],
   'Pogo e salto in lungo': [pogo, V('Uh4AraiUD64', 'Parisi Speed School', 'Salto in lungo')],
   'Scatti brevi': [V('u_lE_VMnYfU', 'Parisi Speed School', 'Spinta iniziale')],
+  'Scatti lanciati': [V('kFLwmd0yzOU', 'Matt Tometz', 'Scatti lanciati')],
   'Bound laterale e pogo': [V('QI8ipVFtbHY', 'Parisi Speed School', 'Bound'), pogo],
   'Frenate e ripartenze': [V('1pW4o51MusI', 'Parisi Speed School', 'Frenata')],
   // Forza A
@@ -32,7 +33,6 @@ export const exerciseVideos = {
   // Forza B
   'Riscaldamento gambe': [V('QLkLKfL_7F0', 'Tom Peto Training', 'Routine 5 min')],
   'Salto verticale': [V('wEHNn6RJd14', 'Depth Training and Physiotherapy')],
-  'Salto in lungo': [V('Uh4AraiUD64', 'Parisi Speed School')],
   'Affondo bulgaro': [V('fSyiHxm1Igw', 'Squat University')],
   'Piegamenti piedi rialzati': [V('QBlYp-EwHlo', 'PureGym')],
   'Stacco rumeno manubri': [V('aa57T45iFSE', 'NASM'), V('FQKfr1YDhEk', 'ScottHermanFitness', 'Spiegato')],

@@ -1,7 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ArrowRight, BookOpen, Check, ChevronLeft, ChevronRight, PlayCircle, Plus, RotateCcw, Shuffle, ThumbsDown, ThumbsUp, Utensils } from 'lucide-react';
 import ProtocolIcon from '../components/ProtocolIcon';
-import { dayNames, evidence, mealWeeks, nutritionRules, phases, recipes, swapGroup, swapPools, trainingDays } from '../data/cutPlan';
+import { dayNames, evidence, mealWeeks, nutritionRules, phases as mainPhases, recipes, swapGroup, swapPools, trainingDays as mainDays } from '../data/cutPlan';
+import { massaDishes, massaWeeks } from '../data/menuMassa';
+import { massaEvidence, massaPhaseOf, massaPhases, massaRules, massaTrainingDays, massaWeekIndex, massaWeeksSince } from '../data/massaPlan';
 import { alternativesFor, applyMealPrefs, applyMenu16, pickKey, recipeFor, togglePref, weekPrep, weekShopping } from '../utils/mealPrefs';
 import { menu16Dishes, menu16Weeks } from '../data/menu16';
 import MealAlternatives from '../components/MealAlternatives';
@@ -12,7 +14,7 @@ import { dateOfWeekday, durationMinutes, kindForSession, logWorkout, unlogWorkou
 import TrainingLog, { TrainingWeekDots, useTrainingLog } from '../components/TrainingLog';
 import MmaAcademy from '../components/MmaAcademy';
 import FuelTracker from '../components/FuelTracker';
-import { fuelTargets, readFuelGoal, usesFixedMenu } from '../utils/fuelPlan';
+import { fuelTargets, readFuelGoal, usesFixedMenu, usesMassPlan } from '../utils/fuelPlan';
 import { summonChase } from '../components/DragonSky';
 import CountUp from '../components/CountUp';
 import WeightTrend from '../components/WeightTrend';
@@ -20,7 +22,7 @@ import '../styles/cut-plan.css';
 
 const KEY = CUT_PLAN_KEY;
 // piatti su cui si può mettere 👍 / 👎 (i pasti fissi no): src/utils/mealPrefs.js
-const NEW_DISHES = menu16Dishes.filter((dish) => dish.family);
+const NEW_DISHES = [...menu16Dishes, ...massaDishes].filter((dish) => dish.family);
 const SWAPPABLE = new Set([...Object.values(swapPools).flat().map((dish) => dish.id), ...NEW_DISHES.map((dish) => dish.id)]);
 const DISH_TITLE = { ...Object.fromEntries(Object.values(swapPools).flat().map((dish) => [dish.id, recipeFor(dish.meal)?.title || dish.meal])), ...Object.fromEntries(NEW_DISHES.map((dish) => [dish.id, dish.title])) };
 const OLD_WEEKS = mealWeeks.length;
@@ -56,16 +58,29 @@ const XP = CUT_XP;
 export default function CutPlan({ view = 'today', onNavigate, systemLogs = [], onGainXp, onFoodEvent, onFuelTargets }) {
   const [profile, saveProfile] = useCutProfile();
   // il menu fisso è il piano di Emanuele; chiunque altro (es. Alessandro) conta le calorie da sé
-  const [fixedMenu] = useState(() => { try { return usesFixedMenu(localStorage.getItem('shadow_monarch_tg_chat_id')); } catch { return false; } });
+  const [massPlan] = useState(() => { try { return usesMassPlan(localStorage.getItem('shadow_monarch_tg_chat_id')); } catch { return false; } });
+  const [fixedMenu] = useState(() => { try { return massPlan || usesFixedMenu(localStorage.getItem('shadow_monarch_tg_chat_id')); } catch { return false; } });
+  const trainingDays = massPlan ? massaTrainingDays : mainDays;
+  // il carattere del manga si scarica solo per lui
+  useEffect(() => {
+    if (!massPlan || document.getElementById('manga-font')) return;
+    const link = Object.assign(document.createElement('link'), { id: 'manga-font', rel: 'stylesheet', href: 'https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Zen+Kaku+Gothic+New:wght@500;700;900&display=swap' });
+    document.head.appendChild(link);
+  }, [massPlan]);
+  const phases = massPlan ? massaPhases : mainPhases;
+  const oldWeeks = massPlan ? 0 : OLD_WEEKS;
+  const totalWeeks = massPlan ? massaWeeks.length : TOTAL_WEEKS;
+  // le dosi massa sono già sue: niente riproporzione sul metabolismo
+  const dayTarget = (index, base) => (massPlan ? base : dayTargetFor(profile, index, base));
   const trainingLog = useTrainingLog();
   const [profileForm, setProfileForm] = useState(() => emptyProfileForm(profile));
   const [profileError, setProfileError] = useState('');
   const [saved, setSaved] = useState(readSaved);
-  const [week, setWeek] = useState(() => Math.min(TOTAL_WEEKS - 1, Math.max(0, Number(readSaved().week || 0))));
+  const [week, setWeek] = useState(() => (massPlan ? massaWeekIndex() : Math.min(TOTAL_WEEKS - 1, Math.max(0, Number(readSaved().week || 0)))));
   // foto delle ricette nuove non ancora caricate: al loro posto un’icona
   // 👍 / 👎 sui piatti: salvati nel piano; un 👎 sostituisce quel piatto in tutte le settimane
   const mealPrefs = saved.mealPrefs || {};
-  const plannedWeeks = useMemo(() => [...applyMealPrefs(mealWeeks, saved.mealPrefs || {}), ...applyMenu16(saved.mealPrefs || {}, saved.mealPicks || {})], [saved.mealPrefs, saved.mealPicks]);
+  const plannedWeeks = useMemo(() => (massPlan ? applyMenu16(saved.mealPrefs || {}, saved.mealPicks || {}, massaWeeks, 0) : [...applyMealPrefs(mealWeeks, saved.mealPrefs || {}), ...applyMenu16(saved.mealPrefs || {}, saved.mealPicks || {})]), [massPlan, saved.mealPrefs, saved.mealPicks]);
   const people = saved.people || 1;
   const [altSlot, setAltSlot] = useState(null);
   const setMealPick = (slot, id) => {
@@ -76,7 +91,7 @@ export default function CutPlan({ view = 'today', onNavigate, systemLogs = [], o
   const setMealPref = (id, value) => setSaved((prev) => ({ ...prev, mealPrefs: togglePref(prev.mealPrefs, id, value) }));
   const [missingImages, setMissingImages] = useState({});
   const imageMissing = (src) => setMissingImages((prev) => (prev[src] ? prev : { ...prev, [src]: true }));
-  const [trainingWeek, setTrainingWeek] = useState(() => Math.min(TRAINING_WEEKS - 1, Math.max(0, Number(readSaved().trainingWeek || 0))));
+  const [trainingWeek, setTrainingWeek] = useState(() => Math.min(TRAINING_WEEKS - 1, massPlan ? massaWeeksSince() : Math.max(0, Number(readSaved().trainingWeek || 0))));
   const [day, setDay] = useState(getMondayIndex);
   const [light, setLight] = useState(false);
   const [weight, setWeight] = useState('');
@@ -101,7 +116,7 @@ export default function CutPlan({ view = 'today', onNavigate, systemLogs = [], o
   const sessionDoneDate = saved.completed?.[`${trainingWeek}-${getMondayIndex()}`] ? getLocalDateKey() : null;
   const fuelGoal = readFuelGoal(profile);
   const fuel = fixedMenu ? null : fuelTargets({ sex: profile?.sex, age: profile?.age, heightCm: profile?.heightCm, weightKg: [...(saved.progress || [])].reverse().find((e) => e.weight)?.weight || profile?.currentWeightKg || profile?.startWeightKg, activity: profile?.activity, goal: fuelGoal });
-  const targetFor = (index) => (fuel ? fuel.kcal : dayTargetFor(profile, index, plannedWeeks[week][index].target));
+  const targetFor = (index) => (fuel ? fuel.kcal : dayTarget(index, plannedWeeks[week][index].target));
   const kcalTargetsKey = [0, 1, 2, 3, 4, 5, 6].map(targetFor).join(',');
   // Spunte arrivate da Telegram (utils/cutSync): rileggi lo stato salvato.
   useEffect(() => {
@@ -116,7 +131,7 @@ export default function CutPlan({ view = 'today', onNavigate, systemLogs = [], o
     const timer = setTimeout(() => {
       fetch('/api/telegram/remind', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chat_id: chatId, creatineDate: saved.creatineDate || null, sessionDoneDate, lastWeighDate, kcalTargets: kcalTargetsKey.split(',').map(Number), client: clientInfo() }),
+        body: JSON.stringify({ chat_id: chatId, plan: massPlan ? 'massa' : null, creatineDate: saved.creatineDate || null, sessionDoneDate, lastWeighDate, kcalTargets: kcalTargetsKey.split(',').map(Number), client: clientInfo() }),
       }).catch(() => { /* offline: si riallinea al prossimo cambio */ });
     }, 1500);
     return () => clearTimeout(timer);
@@ -145,7 +160,7 @@ export default function CutPlan({ view = 'today', onNavigate, systemLogs = [], o
   const likedIds = Object.keys(mealPrefs).filter((id) => mealPrefs[id] === 'up' && SWAPPABLE.has(id));
   const dislikedIds = Object.keys(mealPrefs).filter((id) => mealPrefs[id] === 'down' && SWAPPABLE.has(id));
   const todayTraining = trainingDays[today];
-  const currentPhase = phases[trainingWeek < 7 ? 0 : trainingWeek < 10 ? 1 : trainingWeek === 10 ? 2 : trainingWeek < 13 ? 3 : 4];
+  const currentPhase = massPlan ? massaPhaseOf(trainingWeek) : phases[trainingWeek < 7 ? 0 : trainingWeek < 10 ? 1 : trainingWeek === 10 ? 2 : trainingWeek < 13 ? 3 : 4];
   const completed = saved.completed || {};
   const progress = saved.progress || [];
   const latest = progress[progress.length - 1];
@@ -200,8 +215,8 @@ export default function CutPlan({ view = 'today', onNavigate, systemLogs = [], o
     saveProfile({ ...(profile || {}), ...next });
   };
   const setProfileField = (field) => (event) => setProfileForm((prev) => ({ ...prev, [field]: event.target.value }));
-  const kcalRange = [0, 1, 2, 3, 4, 5, 6].map((index) => dayTargetFor(profile, index, plannedWeeks[week][index].target));
-  const rules = nutritionRules.map((rule, index) => {
+  const kcalRange = [0, 1, 2, 3, 4, 5, 6].map((index) => dayTarget(index, plannedWeeks[week][index].target));
+  const rules = massPlan ? massaRules : nutritionRules.map((rule, index) => {
     if (index === 0 && fuel) return `Il tuo obiettivo: circa ${fuel.kcal.toLocaleString('it-IT')} kcal e ${fuel.protein} g di proteine al giorno (${fuelGoal === 'bulk' ? 'bulk' : 'cut'}). Conta la media della settimana, non il singolo giorno.`;
     if (index === 0) return `Partenza indicativa: ${Math.min(...kcalRange).toLocaleString('it-IT')}–${Math.max(...kcalRange).toLocaleString('it-IT')} kcal in base alla giornata. Le porzioni sono una guida, non un obbligo matematico.`;
     if (index === 1 && profile) return rule.replace(/circa \d+–\d+ g al giorno/, `circa ${Math.round(profile.startWeightKg * 1.8 / 5) * 5}–${Math.round(profile.startWeightKg * 2 / 5) * 5} g al giorno`);
@@ -215,14 +230,18 @@ export default function CutPlan({ view = 'today', onNavigate, systemLogs = [], o
     if (!creatineTaken) rewardOnce(`creatine-${todayKey}`, XP.creatine, 'Creatina presa');
   };
 
-  return <main className={`cut-page cut-view-${view}`}>
-    <header className="cut-topline"><span>SHADOW / 01</span><span>PROTOCOLLO {fixedMenu || fuelGoal === 'cut' ? 'CUT' : 'BULK'}</span></header>
+  return <main className={`cut-page cut-view-${view}${massPlan ? ' manga' : ''}`}>
+    <header className="cut-topline"><span>SHADOW / 01</span><span>PROTOCOLLO {massPlan ? 'MASSA' : fixedMenu || fuelGoal === 'cut' ? 'CUT' : 'BULK'}</span></header>
     {view === 'today' && <>
-      <section className="cut-hero">
+      {massPlan ? <section className="manga-hero">
+        <img className="manga-art" src={currentPhase.art} alt="" />
+        <span className="manga-sfx" aria-hidden="true">ゴゴゴ</span>
+        <div><span className="manga-chapter">第{trainingWeek + 1}話 · Capitolo {trainingWeek + 1}</span><h1>{currentPhase.name}</h1><p>Oggi circa {targetFor(today).toLocaleString('it-IT')} kcal. Si sale piano: 0,2–0,3 kg a settimana, muscolo prima del grasso.</p></div>
+      </section> : <section className="cut-hero">
         <div className="cut-hero-copy"><span className="cut-kicker">IL TUO PERCORSO • {TRAINING_WEEKS} SETTIMANE</span><h1>Il prossimo<br /><em>livello.</em></h1><p>{!fixedMenu ? (fuel ? `${fuelGoal === 'bulk' ? 'Bulk' : 'Cut'}: circa ${fuel.kcal.toLocaleString('it-IT')} kcal e ${fuel.protein} g di proteine al giorno. ` : '') : profile ? `Da ${formatKg(profile.startWeightKg)} kg verso ${formatKg(profile.targetWeightKg)} kg. ` : ''}Forza, velocità e continuità. Una giornata alla volta.</p></div>
         <img src="/avatar8.png" alt="" className="cut-hero-art" /><button type="button" className="cut-hero-summon" onClick={summonChase} aria-label="Evoca il drago" />
         <div className="cut-hero-line" />
-      </section>
+      </section>}
       <section className="cut-status">
         <div><small>OBIETTIVO</small><strong>{profile ? <><CountUp value={profile.targetWeightKg} decimals={2} /> <span>kg</span></> : '—'}</strong></div><div><small>OGGI</small><strong><CountUp value={targetFor(today)} /> <span>kcal*</span></strong></div><div><small>FASE</small><strong>{currentPhase.name}</strong></div>
       </section>
@@ -245,31 +264,31 @@ export default function CutPlan({ view = 'today', onNavigate, systemLogs = [], o
 
     {view === 'food' && !fixedMenu && <FuelTracker profile={profile} saveProfile={saveProfile} weightKg={latestWeight} systemLogs={systemLogs} onLogFood={onFoodEvent} onUndoFood={onFoodEvent} onTargets={onFuelTargets} />}
     {view === 'food' && fixedMenu && <>
-      <section className="cut-page-head"><span className="cut-kicker">{TOTAL_WEEKS * 7} GIORNI • {TOTAL_WEEKS} SETTIMANE</span><h1>Mangia bene.<br /><em>Con gusto.</em></h1><p>Cucina da tutto il mondo, pesce almeno 3 volte a settimana, dolci con la tua whey al cioccolato-wafer e alternative per ogni piatto. McDonald’s, pizza e cocktail restano fino alla settimana 14. Dal 28/12 il supercut: meno cereali e condimenti, stesse proteine.</p></section>
-      <div className="cut-week-picker"><button aria-label="Settimana precedente" onClick={() => setWeek((n) => Math.max(0, n - 1))}><ChevronLeft size={20} /></button><span>SETTIMANA <strong>{week + 1}</strong> / {TOTAL_WEEKS}</span><button aria-label="Settimana successiva" onClick={() => setWeek((n) => Math.min(TOTAL_WEEKS - 1, n + 1))}><ChevronRight size={20} /></button></div>
+      {massPlan ? <section className="cut-page-head"><span className="cut-kicker">{totalWeeks * 7} GIORNI • {totalWeeks} SETTIMANE</span><h1>Mangia.<br /><em>Cresci.</em></h1><p>Gli stessi piatti di Emanuele negli stessi giorni, con le dosi per mettere massa. Un piatto non ti piace? Cambialo tra le alternative: calorie e proteine restano in regola.</p></section> : <section className="cut-page-head"><span className="cut-kicker">{TOTAL_WEEKS * 7} GIORNI • {TOTAL_WEEKS} SETTIMANE</span><h1>Mangia bene.<br /><em>Con gusto.</em></h1><p>Cucina da tutto il mondo, pesce almeno 3 volte a settimana, dolci con la tua whey al cioccolato-wafer e alternative per ogni piatto. McDonald’s, pizza e cocktail restano fino alla settimana 14. Dal 28/12 il supercut: meno cereali e condimenti, stesse proteine.</p></section>}
+      <div className="cut-week-picker"><button aria-label="Settimana precedente" onClick={() => setWeek((n) => Math.max(0, n - 1))}><ChevronLeft size={20} /></button><span>SETTIMANA <strong>{week + 1}</strong> / {totalWeeks}</span><button aria-label="Settimana successiva" onClick={() => setWeek((n) => Math.min(totalWeeks - 1, n + 1))}><ChevronRight size={20} /></button></div>
       <div className="cut-day-strip">{dayNames.map((name, index) => <button key={name} className={day === index ? 'active' : ''} onClick={() => setDay(index)}>{name.slice(0, 3)}</button>)}</div>
-      <section className="cut-meal-head"><span>{selectedMeal.day}</span><strong>obiettivo ≈ {dayTargetFor(profile, day, selectedMeal.target).toLocaleString('it-IT')} kcal</strong></section>
-      <div className="cut-plan-totals"><span><small>NEL PIANO</small><b>≈ {planTotals.kcal.toLocaleString('it-IT')} kcal</b></span><span className={planTotals.protein < 140 ? 'low' : ''}><small>PROTEINE</small><b>≈ {planTotals.protein} g</b></span><span className={planTotals.fiber < 25 ? 'low' : ''}><small>FIBRE</small><b>≈ {planTotals.fiber} g</b></span></div>
-      {planTotals.protein < 140 && <p className="cut-note">Proteine un po’ basse oggi: aggiungi uno shake con la tua whey al cioccolato-wafer (30 g ≈ +23 g).</p>}
+      <section className="cut-meal-head"><span>{selectedMeal.day}</span><strong>obiettivo ≈ {dayTarget(day, selectedMeal.target).toLocaleString('it-IT')} kcal</strong></section>
+      <div className="cut-plan-totals"><span><small>NEL PIANO</small><b>≈ {planTotals.kcal.toLocaleString('it-IT')} kcal</b></span><span className={planTotals.protein < (massPlan ? 122 : 140) ? 'low' : ''}><small>PROTEINE</small><b>≈ {planTotals.protein} g</b></span><span className={planTotals.fiber < 25 ? 'low' : ''}><small>FIBRE</small><b>≈ {planTotals.fiber} g</b></span></div>
+      {!massPlan && planTotals.protein < 140 && <p className="cut-note">Proteine un po’ basse oggi: aggiungi uno shake con la tua whey al cioccolato-wafer (30 g ≈ +23 g).</p>}
 
-      {selectedMeal.slots.map((slot, index) => { const { id, label, meal, swappedFrom, swapReason } = slot; const recipe = recipeFor(meal); const canRate = Boolean(week < OLD_WEEKS ? swapGroup(day, index) : slot.family); const alternatives = alternativesFor(slot, mealPrefs); return <div className={`cut-meal-row cut-meal-${index}`} key={label}><button type="button" className="cut-meal" onClick={() => openMeal(label, meal, id)} aria-label={`Ricetta: ${recipe?.title || label}`}>{slotImage(label) ? <img className="cut-meal-image" src={slotImage(label)} alt="" loading="lazy" onError={() => imageMissing(slotImage(label))} /> : <span className="cut-meal-image cut-meal-icon" aria-hidden="true"><ProtocolIcon name={/calcio/i.test(label) ? 'football' : 'food'} size={34} /></span>}<div className="cut-meal-copy"><span>0{index + 1} / {label}</span><p>{meal}</p>{swappedFrom && <small className="cut-meal-swap">{swapReason === 'scelta' ? `Scelto da te al posto di ${recipeFor(swappedFrom)?.title || swappedFrom}` : swapReason === 'gusto' ? `👎 al posto di ${recipeFor(swappedFrom)?.title || swappedFrom}` : `al posto di ${recipeFor(swappedFrom)?.title || swappedFrom}: tiene la settimana in equilibrio`}</small>}{recipe && <em className="cut-meal-macros">≈ {recipe.kcal} kcal · {recipe.protein} g proteine{recipe.tags?.includes('sera prima') ? ' · 🌙 sera prima' : ''} · <b>Ricetta</b></em>}</div><ArrowRight size={16} className="cut-meal-go" /></button>{canRate && thumbs(id)}{alternatives.length > 0 && <button type="button" className="cut-alt-open" onClick={() => setAltSlot(slot)}><Shuffle size={13} aria-hidden="true" /> {alternatives.length} alternative con gli stessi valori</button>}</div>; })}
+      {selectedMeal.slots.map((slot, index) => { const { id, label, meal, swappedFrom, swapReason } = slot; const recipe = recipeFor(meal); const canRate = Boolean(week < oldWeeks ? swapGroup(day, index) : slot.family); const alternatives = alternativesFor(slot, mealPrefs); return <div className={`cut-meal-row cut-meal-${index}`} key={label}><button type="button" className="cut-meal" onClick={() => openMeal(label, meal, id)} aria-label={`Ricetta: ${recipe?.title || label}`}>{slotImage(label) ? <img className="cut-meal-image" src={slotImage(label)} alt="" loading="lazy" onError={() => imageMissing(slotImage(label))} /> : <span className="cut-meal-image cut-meal-icon" aria-hidden="true"><ProtocolIcon name={/calcio/i.test(label) ? 'football' : 'food'} size={34} /></span>}<div className="cut-meal-copy"><span>0{index + 1} / {label}</span><p>{meal}</p>{swappedFrom && <small className="cut-meal-swap">{swapReason === 'scelta' ? `Scelto da te al posto di ${recipeFor(swappedFrom)?.title || swappedFrom}` : swapReason === 'gusto' ? `👎 al posto di ${recipeFor(swappedFrom)?.title || swappedFrom}` : `al posto di ${recipeFor(swappedFrom)?.title || swappedFrom}: tiene la settimana in equilibrio`}</small>}{recipe && <em className="cut-meal-macros">≈ {recipe.kcal} kcal · {recipe.protein} g proteine{recipe.tags?.includes('sera prima') ? ' · 🌙 sera prima' : ''} · <b>Ricetta</b></em>}</div><ArrowRight size={16} className="cut-meal-go" /></button>{canRate && thumbs(id)}{alternatives.length > 0 && <button type="button" className="cut-alt-open" onClick={() => setAltSlot(slot)}><Shuffle size={13} aria-hidden="true" /> {alternatives.length} alternative con gli stessi valori</button>}</div>; })}
       {selectedMeal.note && <p className="cut-note">{selectedMeal.note}</p>}
-      {week >= OLD_WEEKS && <section className="cut-section cut-week-tools">
+      {week >= oldWeeks && <section className="cut-section cut-week-tools">
         {peoplePicker}
         <details><summary>🛒 Spesa della settimana</summary><ul className="cut-shop">{weekShopping(plannedWeeks[week], people).map(([name, grams]) => <li key={name}><span>{name}</span><b>{grams >= 1000 ? `${(grams / 1000).toLocaleString('it-IT', { maximumFractionDigits: 1 })} kg` : `${Math.round(grams)} g`}</b></li>)}</ul><p className="cut-fine">Solo le ricette: piadine, pasti fissi e frutta a parte. Pollo, macinato e merluzzo costano meno comprati in blocco e congelati.</p></details>
         <details><summary>🍳 Il weekend prima: cosa preparare</summary><ul className="cut-shop">{weekPrep(plannedWeeks[week]).map((dish) => <li key={dish.id}><span>{dish.title}{dish.freezer ? ' · ❄️ si congela' : ''}</span><b>{dish.prepMin} min</b></li>)}</ul></details>
       </section>}
       <p className="cut-fine">Le calorie del giorno sono una stima. Quantità e prodotti reali possono cambiare molto il totale: usa il diario per calibrare le porzioni.</p>
       <button className="cut-primary" onClick={() => onNavigate('system')}>Registra ciò che hai mangiato <ArrowRight size={17} /></button>
-      <section className="cut-section"><div className="cut-section-title"><span>FIT PORN / RICETTE</span><BookOpen size={16} /></div><div className="cut-recipes">{recipes.filter((recipe) => mealPrefs[recipe.id] !== 'down').map((recipe) => <button className="cut-recipe" key={recipe.title} onClick={() => setSelectedRecipe(recipe)}>{missingImages[recipe.image] ? <i className="cut-recipe-icon" aria-hidden="true"><ProtocolIcon name="food" size={30} /></i> : <img src={recipe.image} alt="" onError={() => imageMissing(recipe.image)} />}<span><small>{recipe.tag}</small><b>{recipe.title}</b></span><ArrowRight size={17} /></button>)}</div></section>
+      {!massPlan && <section className="cut-section"><div className="cut-section-title"><span>FIT PORN / RICETTE</span><BookOpen size={16} /></div><div className="cut-recipes">{recipes.filter((recipe) => mealPrefs[recipe.id] !== 'down').map((recipe) => <button className="cut-recipe" key={recipe.title} onClick={() => setSelectedRecipe(recipe)}>{missingImages[recipe.image] ? <i className="cut-recipe-icon" aria-hidden="true"><ProtocolIcon name="food" size={30} /></i> : <img src={recipe.image} alt="" onError={() => imageMissing(recipe.image)} />}<span><small>{recipe.tag}</small><b>{recipe.title}</b></span><ArrowRight size={17} /></button>)}</div></section>}
       <section className="cut-section cut-tastes"><div className="cut-section-title"><span>I TUOI GUSTI</span><ThumbsUp size={16} /></div>{likedIds.length || dislikedIds.length ? <><p className="cut-fine">👍 non vengono mai tolti e sono i primi sostituti. 👎 escono da tutte le settimane: al loro posto entra un piatto simile che tiene calorie, proteine, fibre, pesce e legumi in regola. Tocca un piatto per togliere il pollice.</p>{[[likedIds, 'up', '👍 Ti piacciono'], [dislikedIds, 'down', '👎 Non ti piacciono']].map(([ids, value, title]) => ids.length > 0 && <div className="cut-taste-group" key={value}><small>{title} · {ids.length}</small><div>{ids.map((id) => <button type="button" key={id} className={`cut-taste ${value}`} onClick={() => setMealPref(id, value)} aria-label={`Togli il pollice da ${DISH_TITLE[id]}`}>{DISH_TITLE[id]} <span aria-hidden="true">×</span></button>)}</div></div>)}</> : <p className="cut-fine">Metti 👍 o 👎 sui piatti del menu: li ricordo qui. Un 👎 sostituisce quel piatto in tutte le settimane con uno simile, senza uscire dalla dieta.</p>}</section>
       <section className="cut-section"><div className="cut-section-title"><span>COME USARE IL PIANO</span></div>{rules.map((rule) => <p className="cut-rule" key={rule}>{rule}</p>)}</section>
     </>}
 
     {view === 'program' && <>
-      <section className="cut-page-head"><span className="cut-kicker">CALCIO • FORZA • VELOCITÀ</span><h1>Allenati<br /><em>con metodo.</em></h1><p>Il calcio resta fisso lunedì e giovedì. I carichi più impegnativi per le gambe arrivano sabato.</p></section>
+      {massPlan ? <section className="cut-page-head"><span className="cut-kicker">3 SEDUTE • ≈ 45 MIN</span><h1>Allenati<br /><em>per crescere.</em></h1><p>Martedì, giovedì e sabato, sempre tutto il corpo. Martedì e sabato con Emanuele, giovedì per conto tuo.</p></section> : <section className="cut-page-head"><span className="cut-kicker">CALCIO • FORZA • VELOCITÀ</span><h1>Allenati<br /><em>con metodo.</em></h1><p>Il calcio resta fisso lunedì e giovedì. I carichi più impegnativi per le gambe arrivano sabato.</p></section>}
       <div className="cut-week-picker"><button aria-label="Settimana precedente" onClick={() => setTrainingWeek((n) => Math.max(0, n - 1))}><ChevronLeft size={20} /></button><span>SETTIMANA <strong>{trainingWeek + 1}</strong> / {TRAINING_WEEKS}</span><button aria-label="Settimana successiva" onClick={() => setTrainingWeek((n) => Math.min(TRAINING_WEEKS - 1, n + 1))}><ChevronRight size={20} /></button></div>
-      <p className="cut-fine">Finché sei in deficit il muscolo cresce poco per tutti: se braccia e cosce non calano e le ripetizioni salgono, sta funzionando. Scrivi il carico sotto ogni esercizio, così vedi se avanzi.</p>
+      <p className="cut-fine">{massPlan ? 'Scrivi il carico sotto ogni esercizio: più ripetizioni o più peso con la stessa tecnica vuol dire che stai crescendo. Quando arrivi in cima alle ripetizioni in tutte le serie, aumenta.' : 'Finché sei in deficit il muscolo cresce poco per tutti: se braccia e cosce non calano e le ripetizioni salgono, sta funzionando. Scrivi il carico sotto ogni esercizio, così vedi se avanzi.'}</p>
       <p className="cut-note"><strong>{currentPhase.name}:</strong> {currentPhase.detail}</p>
       <div className="cut-phase-list">{phases.map((phase) => <details key={phase.weeks}><summary><span>SETTIMANE {phase.weeks}</span><b>{phase.name}</b></summary><p>{phase.detail}</p></details>)}</div>
       <div className="cut-day-strip">{dayNames.map((name, index) => <button key={name} className={day === index ? 'active' : ''} onClick={() => setDay(index)}>{name.slice(0, 3)}</button>)}</div>
@@ -305,7 +324,7 @@ export default function CutPlan({ view = 'today', onNavigate, systemLogs = [], o
       <form className="cut-form" onSubmit={saveMeasure}><label>Peso del mattino (kg)<input inputMode="decimal" value={weight} onChange={(e) => setWeight(e.target.value)} placeholder="es. 86,2" /></label><label>Girovita (cm)<input inputMode="decimal" value={waist} onChange={(e) => setWaist(e.target.value)} placeholder="es. 91" /></label><label>Piegamenti consecutivi<input inputMode="numeric" value={pushups} onChange={(e) => setPushups(e.target.value)} placeholder="es. 30" /></label><label>Trazioni consecutive<input inputMode="numeric" value={pullups} onChange={(e) => setPullups(e.target.value)} placeholder="es. 3" /></label><label>Carico di riferimento (kg per manubrio)<input inputMode="decimal" value={load} onChange={(e) => setLoad(e.target.value)} placeholder="es. 12" /></label><button className="cut-primary" type="submit">Salva misura <Plus size={17} />{!saved.xpAwarded?.[`measure-${todayKey}`] && <span className="cut-xp">+{XP.measure} XP</span>}</button></form>
       <section className="cut-section"><div className="cut-section-title"><span>STORICO MISURE</span></div>{progress.length ? [...progress].reverse().map((entry, index) => <div className="cut-history" key={`${entry.date}-${index}`}><span>{new Date(`${entry.date}T12:00:00`).toLocaleDateString('it-IT', { day: 'numeric', month: 'short' })}</span><b>{entry.weight ? `${round1(entry.weight)} kg` : entry.pushups ? `${entry.pushups} pieg.` : '—'}</b><b>{entry.waist ? `${round1(entry.waist)} cm` : entry.pullups ? `${entry.pullups} traz.` : entry.load ? `${round1(entry.load)} kg` : '—'}</b></div>) : <p className="cut-fine">La prima misura del mattino avvierà lo storico dei progressi.</p>}</section>
       <section className="cut-section"><div className="cut-section-title"><span>CHECK OGNI 4 SETTIMANE</span></div><p className="cut-rule">Segna anche quante trazioni e piegamenti consecutivi riesci a fare e i carichi usati. Se forza, energia o prestazioni calano troppo, alleggerisci l’allenamento e rivedi l’apporto energetico.</p><p className="cut-rule">Le stime di massa grassa della bilancia OKOK servono solo come riferimento: peso medio, girovita e prestazioni sono più utili per questo percorso.</p></section>
-      <section className="cut-section"><div className="cut-section-title"><span>FONTI DEL PROTOCOLLO</span></div>{evidence.map((source) => <a className="cut-source" href={source.url} key={source.url} target="_blank" rel="noreferrer">{source.label}<ArrowRight size={15} /></a>)}</section>
+      <section className="cut-section"><div className="cut-section-title"><span>FONTI DEL PROTOCOLLO</span></div>{(massPlan ? massaEvidence : evidence).map((source) => <a className="cut-source" href={source.url} key={source.url} target="_blank" rel="noreferrer">{source.label}<ArrowRight size={15} /></a>)}</section>
     </>}
     {altSlot && <MealAlternatives slot={altSlot} dishes={alternativesFor(altSlot, mealPrefs)} plannedTitle={recipeFor(altSlot.swappedFrom)?.title} missingImages={missingImages} onImageMissing={imageMissing} onPick={(id) => setMealPick(altSlot, id)} onReset={() => setMealPick(altSlot, null)} onOpen={(dish) => setSelectedRecipe({ ...dish, tag: `${altSlot.label} • ${dish.time}` })} onClose={() => setAltSlot(null)} />}
     {selectedRecipe && <div className="cut-modal-backdrop" onClick={() => setSelectedRecipe(null)}><div className="cut-modal" role="dialog" aria-modal="true" aria-labelledby="cut-recipe-title" onClick={(e) => e.stopPropagation()}><button className="cut-close" onClick={() => setSelectedRecipe(null)}>Chiudi</button>{selectedRecipe.image && !missingImages[selectedRecipe.image] && <img src={selectedRecipe.image} alt="" onError={() => imageMissing(selectedRecipe.image)} />}<small>{selectedRecipe.tag}</small><h2 id="cut-recipe-title">{selectedRecipe.title}</h2>{SWAPPABLE.has(selectedRecipe.id) && <>{thumbs(selectedRecipe.id, true)}{mealPrefs[selectedRecipe.id] === 'down' && <p className="cut-thumbs-note">Fatto: non comparirà più nel piano, al suo posto c’è un piatto simile. Premi di nuovo 👎 per riaverlo.</p>}{mealPrefs[selectedRecipe.id] === 'up' && <p className="cut-thumbs-note">Salvato: non lo tolgo mai, ed è tra i primi sostituti.</p>}</>}{selectedRecipe.kcal && <div className="cut-macro-chips"><span>≈ {selectedRecipe.kcal} kcal</span><span>{selectedRecipe.protein} g proteine</span>{selectedRecipe.fiber != null && <span>{selectedRecipe.fiber} g fibre</span>}{selectedRecipe.cost != null && <span>≈ {selectedRecipe.cost.toFixed(2).replace('.', ',')} € a porzione</span>}{selectedRecipe.tags?.includes('sera prima') && <span>🌙 si prepara la sera prima</span>}</div>}{selectedRecipe.why && <p className="cut-fine">{selectedRecipe.why}</p>}<h3>Ingredienti</h3>{selectedRecipe.dose ? <>{peoplePicker}<ul className="cut-ingredients">{selectedRecipe.dose.map((item) => <li key={item[0]}>{doseLine(item, people)}</li>)}</ul></> : Array.isArray(selectedRecipe.ingredients) ? <ul className="cut-ingredients">{selectedRecipe.ingredients.map((item) => <li key={item}>{item}</li>)}</ul> : <p>{selectedRecipe.ingredients}</p>}<h3>Preparazione</h3>{Array.isArray(selectedRecipe.steps) ? <ol className="cut-steps">{selectedRecipe.steps.map((step) => <li key={step}>{step}</li>)}</ol> : <p>{selectedRecipe.steps}</p>}{selectedRecipe.kcal && <p className="cut-fine">Valori stimati sulle quantità indicate: condimenti e marche li cambiano. Registra nel diario quello che mangi davvero.</p>}</div></div>}

@@ -16,6 +16,9 @@ const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
 
 // Il menu settimanale fisso è scritto per Emanuele: solo il suo telefono lo vede.
 export const usesFixedMenu = (chatId) => String(chatId || '') === EMANUELE_CHAT_ID;
+// Alessandro: stesso menu con le dosi per mettere massa (src/data/menuMassa.js) e le sue sedute (src/data/massaPlan.js)
+export const ALESSANDRO_CHAT_ID = '546598075';
+export const usesMassPlan = (chatId) => String(chatId || '') === ALESSANDRO_CHAT_ID;
 
 export function fuelTargets({ sex = 'm', age, heightCm, weightKg, activity = 'mid', goal = 'cut' } = {}) {
   if (!(weightKg > 0) || !(heightCm > 0) || !(age > 0)) return null;

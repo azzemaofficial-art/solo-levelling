@@ -186,7 +186,9 @@
 .cut-goal b{font-size:13px}
 .cut-goal-track{height:3px;background:#ffffff30}
 .cut-goal-track span{display:block;height:3px;background:var(--lime);transform-origin:left;transition:transform .5s ease}
-.cut-form{display:grid;gap:12px;padding:18px;background:var(--surface)}
+.cut-form{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;padding:18px;background:var(--surface)}
+.cut-form-row>label{min-width:0}
+.cut-form input{width:100%;min-width:0}
 .cut-form label{display:flex;flex-direction:column;gap:7px;color:var(--t2);font-size:11px}
 .cut-form input{padding:11px;border:1px solid #ffffff26;border-radius:3px;background:var(--surface-2);color:white;font:inherit;transition:border-color .2s ease,box-shadow .2s ease}
 .cut-form input::placeholder{color:var(--t4)}
@@ -671,3 +673,107 @@
 .cut-shop{display:grid;gap:4px;margin:8px 0 0;padding:0;list-style:none;font-size:12px}
 .cut-shop li{display:flex;justify-content:space-between;gap:12px;color:var(--t2)}
 .cut-shop b{flex:none;color:var(--t1,#fff);font-weight:600}
+
+/* ── Lato di Alessandro: un anime a tutto schermo (.manga, solo per lui) ──
+   Pagine nere, illustrazione in testa, vignette a inchiostro bianco, frasi nei fumetti. Ogni sezione prende il colore della sua illustrazione. L'Accademia MMA resta com'è. */
+.cut-page.manga:not(.cut-view-mma){
+  --ink:#09080f;--paper:#f6f1e3;--punch:#ff2d46;--glow:#ffb02e;--bleed:calc(-28px - env(safe-area-inset-top));
+  --lime:var(--glow);--grad:var(--glow);--accent-2:var(--punch);--accent-3:var(--glow);
+  --t1:var(--paper);--t2:#dcd6c8;--t3:#bdb7a9;--t4:#a09a8d;--surface:#15131f;--surface-2:#1f1c2c;--line:#f6f1e340;
+  --font-display:'Dela Gothic One','Syne',system-ui,sans-serif;--font-label:'Zen Kaku Gothic New',system-ui,sans-serif;--font-body:'Zen Kaku Gothic New',system-ui,sans-serif;
+  color:var(--paper);font-family:var(--font-body);font-weight:500;
+  background:radial-gradient(#ffffff0a 1px,transparent 1.3px) 0 0/6px 6px,var(--ink);
+}
+.cut-page.manga.cut-view-food{--glow:#ff9d3c;--art:url(/manga/cibo.webp)}
+.cut-page.manga.cut-view-program{--glow:#54c1ff;--art:url(/manga/programma.webp)}
+.cut-page.manga.cut-view-progress{--glow:#6ff2a2;--art:url(/manga/progressi.webp)}
+
+/* la scritta in alto sta sopra l'illustrazione */
+.manga:not(.cut-view-mma) .cut-topline{position:absolute;z-index:3;top:calc(18px + env(safe-area-inset-top));left:20px;right:20px;margin:0;color:var(--paper);font-weight:900;text-shadow:0 1px 8px #000}
+.manga:not(.cut-view-mma) .cut-topline span:first-child:before{background:var(--punch);box-shadow:none;animation:none}
+
+/* apertura di «Oggi»: la copertina della fase, a tutta pagina */
+.manga-hero{position:relative;isolation:isolate;display:flex;align-items:flex-end;min-height:min(150vw,640px);overflow:hidden;margin:var(--bleed) -20px 20px;padding:0 20px 14px;background:var(--ink)}
+.manga-art{position:absolute;z-index:-2;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 0;animation:manga-push 1.4s cubic-bezier(.16,1,.3,1) both}
+.manga-hero:after{content:'';position:absolute;z-index:-1;inset:0;background:linear-gradient(transparent 52%,#09080fd9 74%,var(--ink) 97%)}
+@keyframes manga-push{from{transform:scale(1.12)}to{transform:none}}
+.manga-chapter{display:inline-block;padding:4px 10px;transform:skewX(-10deg);background:var(--punch);color:#fff;font:900 12px/1.2 var(--font-label);letter-spacing:.04em}
+.manga-hero h1{margin:12px 0;color:#fff;font:400 clamp(42px,12.5vw,64px)/.98 var(--font-display);letter-spacing:-.01em;text-shadow:3px 3px 0 var(--punch)}
+.manga-sfx{position:absolute;right:12px;top:calc(62px + env(safe-area-inset-top));writing-mode:vertical-rl;color:var(--punch);font:400 44px/.95 var(--font-display);-webkit-text-stroke:1.5px #fff;transform:rotate(6deg)}
+
+/* il fumetto: le frasi che ti parlano */
+.manga-hero p,.manga:not(.cut-view-mma) .cut-note{position:relative;margin:0;padding:10px 13px;border:0;border-radius:18px;background:var(--paper);box-shadow:none;color:var(--ink);font-size:13px;font-weight:700}
+.manga-hero p:after,.manga:not(.cut-view-mma) .cut-note:after{content:'';position:absolute;left:26px;top:-9px;border:0 solid transparent;border-width:0 7px 10px 7px;border-bottom-color:var(--paper)}
+
+/* apertura delle altre sezioni */
+.manga:not(.cut-view-mma) .cut-page-head{display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-end;min-height:min(118vw,500px);margin:var(--bleed) -20px 14px;padding:0 20px 12px;background:linear-gradient(transparent 38%,#09080fd9 68%,var(--ink) 94%),var(--art) 50% 0/cover no-repeat}
+.manga:not(.cut-view-mma) .cut-page-head:before{display:none}
+.manga:not(.cut-view-mma) .cut-page-head h1{margin:10px 0 8px;color:#fff;font:400 clamp(34px,10.8vw,56px)/1.02 var(--font-display)}
+.manga:not(.cut-view-mma) h1 em{background:none;color:var(--glow);font-style:normal;-webkit-text-fill-color:currentColor}
+.manga:not(.cut-view-mma) .cut-page-head p{color:var(--paper);text-shadow:0 1px 6px #000}
+.manga:not(.cut-view-mma) .cut-kicker{display:inline-block;padding:3px 9px;transform:skewX(-10deg);background:var(--glow);-webkit-background-clip:border-box;background-clip:border-box;color:var(--ink);font-weight:900;-webkit-text-fill-color:currentColor}
+
+/* testi */
+.manga:not(.cut-view-mma) h2{color:var(--paper);font-family:var(--font-display);font-weight:400}
+.manga:not(.cut-view-mma) .cut-section-title{padding-bottom:5px;border-bottom:2px solid var(--paper);color:var(--paper);font-weight:900}
+.manga:not(.cut-view-mma) .cut-section-title button{color:var(--glow);font-weight:900}
+.manga:not(.cut-view-mma) .cut-block-title{margin:18px 0 8px;color:var(--glow);font:400 15px/1.2 var(--font-display)}
+.manga:not(.cut-view-mma) :is(.cut-plan-totals b,.cut-metrics b,.tlog-stats b){color:var(--paper);font-family:var(--font-display);font-weight:400}
+.manga:not(.cut-view-mma) .cut-status small{color:var(--glow);font-weight:900}
+.manga:not(.cut-view-mma) .cut-status strong{font-size:15px;line-height:1.15;white-space:normal;overflow-wrap:anywhere}
+.manga:not(.cut-view-mma) .cut-status strong span{font-family:var(--font-label)}
+
+/* vignette: inchiostro bianco su pagina nera */
+.manga:not(.cut-view-mma) :is(.cut-feature,.cut-plan-totals span,.cut-metrics>div,.cut-creatine,.cut-goal,.cut-profile,.cut-setup,.cut-phase-list details,.cut-week-tools details,.cut-history,.tlog-summary,.cut-status>*,.cut-form,.cut-brief,.tlog-stats>div,.cut-recipe,.cut-exercise){border:2px solid var(--paper);border-radius:0;background:var(--surface);box-shadow:none;color:var(--paper)}
+.manga:not(.cut-view-mma) :is(.cut-feature,.cut-creatine):after{display:none}
+.manga:not(.cut-view-mma) .cut-feature{transform:rotate(-.4deg);box-shadow:5px 5px 0 var(--punch)}
+.manga:not(.cut-view-mma) :is(.cut-feature-icon,.cut-creatine-icon){border-radius:0;background:var(--glow);box-shadow:none;color:var(--ink)}
+.manga:not(.cut-view-mma) :is(.cut-plan-totals span,.cut-status>*){padding:9px 8px;min-width:0}
+.manga:not(.cut-view-mma) :is(.cut-metrics>div,.cut-brief){padding:12px}
+.manga:not(.cut-view-mma) .cut-exercise{margin-bottom:10px;padding:12px 10px}
+.manga:not(.cut-view-mma) .cut-profile-form{border:0;background:none}
+.manga:not(.cut-view-mma) .tlog-day{border-color:var(--line);border-radius:0}
+.manga:not(.cut-view-mma) .cut-exercise-play{border:2px solid var(--paper);border-radius:0;background:var(--surface);box-shadow:none;color:var(--glow)}
+
+/* i piatti: la foto è la vignetta */
+.manga:not(.cut-view-mma) .cut-meal-row{position:relative;gap:0;margin-bottom:18px;border:2px solid var(--paper);background:var(--surface);animation:none}
+.manga:not(.cut-view-mma) .cut-meal{flex:1 1 100%;flex-direction:column;align-items:stretch;gap:0;padding:0}
+.manga:not(.cut-view-mma) .cut-meal>svg{display:none}
+.manga:not(.cut-view-mma) .cut-meal-image{width:100%;height:auto;aspect-ratio:16/9;border-bottom:2px solid var(--paper);border-radius:0;box-shadow:none;filter:saturate(1.15) contrast(1.05)}
+.manga:not(.cut-view-mma) .cut-meal-icon{display:grid;place-items:center;height:84px;aspect-ratio:auto;background:var(--surface-2);color:var(--glow)}
+.manga:not(.cut-view-mma) .cut-meal-copy{padding:12px}
+.manga:not(.cut-view-mma) .cut-meal-copy span{color:var(--glow);font-weight:900}
+.manga:not(.cut-view-mma) .cut-meal-row>.cut-thumbs{position:absolute;top:8px;right:8px;flex-direction:row}
+.manga:not(.cut-view-mma) .cut-thumbs button{border:2px solid var(--paper);border-radius:0;background:var(--ink);color:var(--paper)}
+.manga:not(.cut-view-mma) .cut-thumbs button.on.up{background:var(--glow);color:var(--ink)}
+.manga:not(.cut-view-mma) .cut-thumbs button.on.down{background:var(--punch);color:#fff}
+.manga:not(.cut-view-mma) .cut-alt-open{justify-content:center;margin:0;padding:0 8px;border:0;border-top:2px solid var(--paper);border-radius:0;background:none;color:var(--glow);font-weight:900}
+
+/* comandi */
+.manga:not(.cut-view-mma) :is(.cut-primary,.cut-actions button:first-child){border:2px solid var(--paper);border-radius:0;background:var(--punch);box-shadow:none;color:#fff;font:400 15px/1.2 var(--font-display)}
+.manga:not(.cut-view-mma) :is(.cut-primary,.cut-actions button:first-child):after{display:none}
+.manga:not(.cut-view-mma) :is(.cut-primary,.cut-actions button):active{transform:translate(2px,2px)}
+.manga:not(.cut-view-mma) .cut-primary.done{background:var(--glow);color:var(--ink)}
+.manga:not(.cut-view-mma) :is(.cut-secondary,.cut-toggle,.cut-actions button:not(:first-child),.cut-alt-reset,.cut-sex button,.cut-people button,.cut-day-strip button){border:2px solid var(--paper);border-radius:0;background:var(--surface);color:var(--paper);font-weight:900}
+.manga:not(.cut-view-mma) :is(.cut-sex button.active,.cut-people button.active,.cut-day-strip button.active){border-color:var(--glow);background:var(--glow);box-shadow:none;color:var(--ink)}
+.manga:not(.cut-view-mma) .cut-week-picker{border:0;border-bottom:2px solid var(--paper);color:var(--paper);font-weight:900}
+.manga:not(.cut-view-mma) .cut-week-picker strong{background:none;color:var(--glow);font-family:var(--font-display);font-weight:400;-webkit-text-fill-color:currentColor}
+.manga:not(.cut-view-mma) .cut-week-picker button{color:var(--paper)}
+.manga:not(.cut-view-mma) :is(a,button,input,summary):focus-visible{outline:3px solid var(--glow);outline-offset:2px}
+.manga:not(.cut-view-mma) .cut-creatine button{border:2px solid var(--paper);border-radius:0;background:var(--punch);color:#fff;font-family:var(--font-label);font-weight:900}
+.manga:not(.cut-view-mma) .cut-creatine.taken button{background:var(--glow);color:var(--ink)}
+.manga:not(.cut-view-mma) input{border:2px solid var(--paper);border-radius:0;background:var(--surface-2);color:var(--paper)}
+.manga:not(.cut-view-mma) input::placeholder{color:var(--t4)}
+.manga:not(.cut-view-mma) input:focus{border-color:var(--glow);box-shadow:none}
+
+/* finestre della ricetta e delle alternative */
+.manga:not(.cut-view-mma) .cut-modal{border:2px solid var(--paper);border-bottom:0;background:var(--surface);box-shadow:0 -6px 0 var(--punch)}
+.manga:not(.cut-view-mma) .cut-modal:before{display:none}
+.manga:not(.cut-view-mma) .cut-modal>img{border:2px solid var(--paper);border-radius:0}
+.manga:not(.cut-view-mma) .cut-macro-chips span{border:2px solid var(--glow);border-radius:0;background:none;color:var(--paper)}
+.manga:not(.cut-view-mma) .cut-alts li{border:2px solid var(--paper);border-radius:0;background:var(--surface-2)}
+.manga:not(.cut-view-mma) .cut-alts li.on{border-color:var(--glow)}
+.manga:not(.cut-view-mma) .cut-alt-choose :is(img,i){border-radius:0}
+.manga:not(.cut-view-mma) .cut-alt-recipe{border-left:2px solid var(--paper);color:var(--paper)}
+.manga:not(.cut-view-mma) :is(.cut-source,.cut-video-links a){border-bottom:1px solid var(--line);color:var(--paper)}
+@media (prefers-reduced-motion:reduce){.manga-art{animation:none}}
