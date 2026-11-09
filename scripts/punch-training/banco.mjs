@@ -23,7 +23,7 @@ import { available, hasStream, loadStream, PARTIAL_LABELS, MOVE_OF } from './dat
 const median = (a) => { const s = a.filter(Number.isFinite).sort((x, y) => x - y); return s.length ? s[Math.floor(s.length / 2)] : NaN; };
 
 // Calibrazione: 12 fotogrammi di fila, prima del primo pugno, con i polsi più fermi
-function calibStart(frames, t0) {
+export function calibStart(frames, t0) {
   let best = -1, bestMove = Infinity;
   for (let i = 0; i + 12 < frames.length && frames[i].t < t0 - 200; i += 1) {
     if (frames[i].t < t0 - 6000) continue;

@@ -4,13 +4,16 @@ import { MY_BAG, TORSO_CM, bestSeriesRank, createStrikeMeter, emptySpeed, punchM
 import { bagFromBand, findBand } from '../lib/mmaBag.js';
 import { coachFeedback, judgeSequence, rateGesture, strikeIdFor } from '../lib/mmaComboJudge.js';
 
-// Un diretto di profilo: spalle quasi sovrapposte, il pugno destro va verso destra e la spalla dietro lo segue
-const pose = ({ wrist = 0.4, rearSh = 0.46, leadSh = 0.5 }) => {
+// Un diretto di profilo: spalle quasi sovrapposte, il pugno destro va verso destra e la spalla dietro lo segue.
+// Di lato i piedi stanno alla stessa altezza nell'immagine (il piede avanti verso il bersaglio)
+const SIDE_FEET = [{ x: 0.62, y: 0.9 }, { x: 0.4, y: 0.91 }];
+const pose = ({ wrist = 0.4, rearSh = 0.46, leadSh = 0.5, feet = SIDE_FEET }) => {
   const p = Array.from({ length: 33 }, () => ({ x: 0.5, y: 0.5 }));
   p[11] = { x: leadSh, y: 0.3 }; p[12] = { x: rearSh, y: 0.3 };
   p[13] = { x: leadSh, y: 0.42 }; p[15] = { x: leadSh, y: 0.3 };
   p[14] = { x: (rearSh + wrist) / 2, y: 0.34 }; p[16] = { x: wrist, y: 0.3 };
   p[23] = { x: 0.5, y: 0.5 }; p[24] = { x: 0.5, y: 0.5 };
+  [p[27], p[28]] = feet;
   return p;
 };
 const cross = () => [0, 1, 2, 3, 4, 5, 6].map((i) => ({
@@ -33,6 +36,21 @@ test('rotazione: la spalla dietro che passa avanti dà gradi positivi; un jab fe
   const jab = cross().map((f, i) => ({ t: f.t, p: pose({ wrist: 0.4 + i * 0.05 }) }));
   const j = punchMetrics(jab, 'R', 1, { T: 0.2, leadS: 'L', peakT: jab[6].t });
   assert.ok(Math.abs(j.rotation) < 1);
+});
+
+test('rotazione: di fronte o in diagonale (piedi a profondità diverse) e senza piedi niente gradi', () => {
+  const withFeet = (feet) => cross().map((f, i) => ({ t: f.t, p: pose({ wrist: [0.4, 0.4, 0.42, 0.5, 0.6, 0.68, 0.7][i], rearSh: [0.46, 0.46, 0.47, 0.5, 0.53, 0.55, 0.56][i], feet }) }));
+  const peakT = 1000 + 6 * 33;
+  // telefono davanti: le spalle in guardia sembrano strette lo stesso, ma il piede dietro è più lontano e più in alto
+  const front = punchMetrics(withFeet([{ x: 0.52, y: 0.95 }, { x: 0.47, y: 0.84 }]), 'R', 1, { T: 0.2, leadS: 'L', peakT });
+  assert.equal(front.side, true);
+  assert.equal(front.rotation, null);
+  // caviglie fuori dall'inquadratura: la vista non si conferma
+  const hidden = punchMetrics(withFeet([{ x: 0.62, y: 1.1, visibility: 0.05 }, { x: 0.4, y: 1.1, visibility: 0.05 }]), 'R', 1, { T: 0.2, leadS: 'L', peakT });
+  assert.equal(hidden.rotation, null);
+  // piedi appena inclinati (15°): ancora di lato
+  const tilt = Math.tan(15 * Math.PI / 180) * 0.22;
+  assert.ok(punchMetrics(withFeet([{ x: 0.62, y: 0.9 }, { x: 0.4, y: 0.9 - tilt }]), 'R', 1, { T: 0.2, leadS: 'L', peakT }).rotation > 25);
 });
 
 test('di fronte al telefono rotazione e distensione non si inventano', () => {

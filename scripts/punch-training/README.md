@@ -58,6 +58,7 @@ lo **cancella**. Uno alla volta: MediaPipe occupa tutto il processore.
 | `esporta.py` | addestra il modellino finale e scrive i pesi in `lib/mmaPunchWeights.js` |
 | `clip-vere.mjs` | controllo sulle clip vere di Emanuele (solo in locale) |
 | `allenamenti-veri.mjs` | il registro degli allenamenti veri (ripetizioni col giudizio di Emanuele): riepilogo e rigioco nel motore di adesso |
+| `rotazione.mjs` | il banco della rotazione (09/11/2026): misure candidate sulla sequenza esatta del motore, tarate su B, D, F e verificate su C, E, G e sulle clip frontali di Emanuele (`--tutti` = una riga per atleta) |
 
 ```bash
 node scripts/punch-training/banco.mjs 0          # senza tuoi esempi
@@ -70,6 +71,7 @@ for a in B C D E F G; do OMP_NUM_THREADS=1 venv/bin/python -I scripts/punch-trai
 BOXINGVI_PESI=pesi node scripts/punch-training/banco.mjs 0
 node scripts/punch-training/tara.mjs E,G
 node scripts/punch-training/clip-vere.mjs
+node scripts/punch-training/rotazione.mjs        # rotazione: base contro candidate, vista frontale, consiglio a 12°
 ```
 
 `OMP_NUM_THREADS=1`: con il Mac carico i calcoli "a più fili" girano a vuoto e diventano lentissimi.
@@ -157,3 +159,7 @@ classificato). Il nome nell'allenamento libero non cambia.
   sul controllo (visti 73% → 71%). Il motore resta com'è. Tutti i fotogrammi o la catena del telefono
   danno gli stessi numeri.
 - Non letti (spazio su disco sotto i 23 GB): V1, V6, V8; V10 non si scarica (YouTube risponde 403).
+- **Rotazione dai tempi della catena, dalle anche, dallo stinco o dal 3D** (`rotazione.mjs`, 09/11/2026): a 25 fotogrammi
+  al secondo anca→spalla→pugno è rumore (presa ~20%, AUC 0,3–0,6, Lite e AlphaPose non concordano); anche, stinco e 3D
+  separano peggio delle spalle; la soglia personale (55% dei tuoi primi colpi) non batte i 12° fissi. Entrato solo il
+  controllo dei piedi (linea delle caviglie entro 20°): di fronte i gradi inventati passano da 27 a 1 colpo dietro su 38.
