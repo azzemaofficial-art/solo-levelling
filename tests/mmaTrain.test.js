@@ -27,6 +27,7 @@ function rep(moves, { seed = 7, tempo = 1, bag = false } = {}) {
     box: { x0: 0.6, x1: 0.78, y0: 0.1, y1: 0.75 }, axis: { xTop: 0.69, xBot: 0.7 }, width: 0.18, zones: { head: 0.22, body: 0.45, low: 0.66 },
     contacts: gestures.filter((g) => g.limb === 'arm').map((g) => ({ t: g.peakT + 20, S: g.S, limb: 'arm', zone: 'head', strength: 0.61, sure: true, by: 'stop+bag' })),
     motion: frames.map((f, i) => [f.t, Math.sin(i / 9) * 1.4, 0.21, 1.3, 1, 0]),
+    mic: 'on', sounds: gestures.filter((g) => g.limb === 'arm').map((g) => ({ t: g.peakT - 30.4, db: 31, a: 25, d: 19, ok: true })),
   } : null;
   const result = j.judgeRep(moves, { since: t0 - 700 });
   const clip = buildTrainClip({
@@ -69,6 +70,10 @@ test('registro: al sacco rettangolo, contatti e movimento per fotogramma; peso s
   assert.equal(clip.bag.motion.t.length, frames.length);
   assert.equal(clip.bag.motion.x[0], 0);
   assert.equal(clip.bag.motion.v[0], 21);
+  // microfono: solo tempi e livelli dei colpi sentiti, niente audio
+  assert.equal(clip.bag.mic, 'on');
+  assert.ok(clip.bag.sounds.length >= 2);
+  assert.ok(clip.bag.sounds.every((s) => Object.keys(s).join() === 't,db,a,d,ok' && Number.isInteger(s.t)));
   // ripetizione lunga (7 s a 30 al secondo): ~80.000 caratteri, il server ne accetta 150.000
   const chars = clipChars(clip);
   assert.ok(chars < 100000 && chars < TRAIN_MAX_CHARS, `${chars} caratteri`);
