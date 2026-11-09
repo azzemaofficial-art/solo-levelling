@@ -4,7 +4,7 @@ import { ArrowLeft, Check, GraduationCap, Pause, Play, RotateCcw, ThumbsDown, Th
 import useMmaCamera from '../hooks/useMmaCamera';
 import MmaFigure, { useSkeletonPlayer } from './MmaFigure';
 import { createReadiness, readPose } from '../../lib/mmaReadiness';
-import { coachFeedback, createComboJudge, describeGesture, identifyMove, masterSecret, needsFeet, rateGesture, strikeIdFor, teachNextSecret, teachSample, visibleGestures, EXPECT } from '../../lib/mmaComboJudge';
+import { coachFeedback, createComboJudge, describeGesture, identifyMove, masterSecret, needsFeet, restAdvice, restSpeech, rateGesture, strikeIdFor, teachNextSecret, teachSample, visibleGestures, EXPECT } from '../../lib/mmaComboJudge';
 import { forgetRep, learnFromRep, loadTemplates, saveTemplates } from '../../lib/mmaTemplates';
 import { encodeClip, readChatId, sendClips } from '../../lib/mmaClips';
 import { checkRep, loadPath, rankOf, savePath, skipKeys, startSecret, unlockedMoves } from '../../lib/mmaSecretPath';
@@ -115,6 +115,8 @@ export default function MmaComboTrainer({ combo, onClose, onLearned }) {
   const [framing, setFraming] = useState('');
   const [live, setLive] = useState([]);           // stato dei colpi durante l'esecuzione
   const [results, setResults] = useState([]);     // una voce per ripetizione
+  const [rest, setRest] = useState(null);         // consiglio del riposo (lib/mmaComboJudge.js restAdvice)
+  const focusRef = useRef(null);                  // l'obiettivo dato per la serie in corso
   const [current, setCurrent] = useState(null);   // ultimo risultato
   const [replay, setReplay] = useState(null);
   const [paused, setPaused] = useState(false);
@@ -308,7 +310,8 @@ export default function MmaComboTrainer({ combo, onClose, onLearned }) {
         recordComboScore(combo.id, avg); // per le prove del percorso del combattente
         logWorkout({ date: localDateKey(), kind: 'mma', title: `Combo ${combo.name} · con camera`, minutes: Math.max(3, Math.round(results.length * 0.6)), note: `media ${avg}/100` });
         if (avg >= 80) onLearnedRef.current?.();
-        say(`Fine serie. Media ${avg} su cento. ${avg >= 85 ? 'Combo imparata!' : avg >= 65 ? 'Buon lavoro, ancora qualche ripetizione e ci sei.' : 'Rifalla più lenta, un colpo alla volta.'}`, voice);
+        const adv = restAdvice(results, focusRef.current); setRest(adv);
+        say(`Fine serie. Media ${avg} su cento. ${avg >= 85 ? 'Combo imparata!' : avg >= 65 ? 'Buon lavoro, ancora qualche ripetizione e ci sei.' : 'Rifalla più lenta, un colpo alla volta.'} ${restSpeech(adv)}`, voice);
       } else { setPhase('countdown'); setCount(3); say('Ancora. Tre. Due. Uno. Via!', voice); }
     }, current?.speech ? Math.max(5200, speakMs(current.speech)) : 5200);
     return () => clearTimeout(id);
@@ -318,6 +321,7 @@ export default function MmaComboTrainer({ combo, onClose, onLearned }) {
     try { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; window.speechSynthesis?.speak(u); } catch { /* voce */ }
     judgeRef.current = createComboJudge({ stance, templates }); readyRef.current.reset();
     setCalib(0); setResults([]); setCurrent(null); setVotes({}); secretsRef.current = [];
+    focusRef.current = null; setRest(null);
     bag.reset();
     logRef.current = { session: Date.now(), n: 0, calib: [], aspect: null };
     if (trainOn) trainSender.retry(); // clip rimaste in coda dalla volta scorsa (rete assente)
@@ -357,11 +361,6 @@ export default function MmaComboTrainer({ combo, onClose, onLearned }) {
   const mirrored = facing === 'user';
   const avg = results.length ? Math.round(results.reduce((s, r) => s + r.total, 0) / results.length) : 0;
   const bagHits = results.some((r) => r.bag) ? results.reduce((s, r) => ({ hits: s.hits + (r.bag?.hits || 0), total: s.total + (r.bag?.total || 0) }), { hits: 0, total: 0 }) : null;
-  const topIssue = (() => {
-    const tally = {};
-    results.forEach((r) => r.moves.forEach((mv) => mv.issues.forEach((it) => { tally[it.text] = (tally[it.text] || 0) + 1; })));
-    return Object.entries(tally).sort((a, b) => b[1] - a[1])[0]?.[0];
-  })();
 
   return createPortal(<div className="mma-train" role="dialog" aria-modal="true" aria-label={`Allenamento con camera: ${combo.name}`}>
     <header className="mma-train-head">
@@ -446,7 +445,13 @@ export default function MmaComboTrainer({ combo, onClose, onLearned }) {
         <h3>Media {avg}/100</h3>
         <div className="mma-train-bars">{results.map((r, i) => <i key={i} style={{ height: `${Math.max(8, r.total)}%` }} className={`grade-${r.grade}`} title={`${i + 1}: ${r.total}`} />)}</div>
         {bagHits && <p>Colpi a segno sul sacco: <b>{bagHits.hits} su {bagHits.total}</b>.</p>}
-        {topIssue && <p>Da sistemare più spesso: <b>{topIssue}</b>.</p>}
+        {rest?.check && <p>Obiettivo di prima, <b>{rest.check.cue}</b>: da {rest.check.before} su {rest.check.beforeTotal} a {rest.check.now} su {rest.check.total} ripetizioni · <b>{rest.check.trend > 0 ? 'migliorato' : rest.check.trend < 0 ? 'peggiorato' : 'uguale'}</b>.</p>}
+        {rest?.focus && <div className="mma-train-path">
+          <p>Da sistemare: <b>{rest.focus.cue}</b> · in {rest.focus.n} ripetizioni su {rest.focus.total}{rest.focus.measure ? ` · l’ultima: ${rest.focus.measure}` : ''}.</p>
+          {rest.focus.why && <p>Perché: {rest.focus.why}</p>}
+          {rest.focus.drill && <p>Nel riposo, 60 secondi: {rest.focus.drill}</p>}
+          <p>Prossima serie, pensa solo a: <b>{rest.focus.cue}</b>.</p>
+        </div>}
         {torso && speedLog && <>
           <ul className="mma-train-numbers">{Object.entries(speedLog.byMove).map(([id, m]) => <li key={id}><b>{MOVES[id]?.name || id}</b> mediana circa {Math.round(toKmh(m.median, torso.cm))} km/h · grado {speedRank(id, m.median)} · {m.n} colpi</li>)}</ul>
           <p className="mma-train-note">Gradi: confronto con 944 colpi di atleti ripresi allo stesso modo (S = più veloce del 90%). Il singolo colpo balla di circa il 27%: conta la mediana. A 30 fotogrammi al secondo la camera legge più basso dei sensori degli studi.</p>
@@ -467,7 +472,7 @@ export default function MmaComboTrainer({ combo, onClose, onLearned }) {
           </div>)}
         </div>}
         <p className="mma-train-note">Salvato nel diario allenamenti.{avg >= 80 ? ' Combo segnata come imparata.' : ''}</p>
-        <div className="mma-train-actions"><button onClick={() => { setResults([]); setVotes({}); secretsRef.current = []; setPhase('countdown'); setCount(3); }}><RotateCcw size={16} /> Un’altra serie</button><button onClick={close}><Check size={16} /> Fine</button></div>
+        <div className="mma-train-actions"><button onClick={() => { focusRef.current = rest?.focus || null; if (rest?.focus) say(`Pensa solo a: ${rest.focus.cue}.`, voice); setResults([]); setVotes({}); secretsRef.current = []; setPhase('countdown'); setCount(3); }}><RotateCcw size={16} /> Un’altra serie</button><button onClick={close}><Check size={16} /> Fine</button></div>
       </section>}
     </>}
 
