@@ -325,7 +325,7 @@ export default function MmaComboTrainer({ combo, onClose, onLearned }) {
     bag.reset();
     logRef.current = { session: Date.now(), n: 0, calib: [], aspect: null };
     if (trainOn) trainSender.retry(); // clip rimaste in coda dalla volta scorsa (rete assente)
-    if (bagOn) { setPhase('bag'); say('Tocca il sacco sullo schermo.', voice); }
+    if (bagOn) { bag.listen(); setPhase('bag'); say('Tocca il sacco sullo schermo.', voice); }
     else calibrate();
     camera.start(facing);
   };
@@ -360,7 +360,11 @@ export default function MmaComboTrainer({ combo, onClose, onLearned }) {
   };
   const mirrored = facing === 'user';
   const avg = results.length ? Math.round(results.reduce((s, r) => s + r.total, 0) / results.length) : 0;
-  const bagHits = results.some((r) => r.bag) ? results.reduce((s, r) => ({ hits: s.hits + (r.bag?.hits || 0), total: s.total + (r.bag?.total || 0) }), { hits: 0, total: 0 }) : null;
+  const bagHits = results.some((r) => r.bag) ? results.reduce((s, r) => ({
+    hits: s.hits + (r.bag?.hits || 0), total: s.total + (r.bag?.total || 0),
+    zoneOk: s.zoneOk + (r.bag?.zoneOk || 0), zoneN: s.zoneN + (r.bag?.zoneN || 0),
+    heard: s.heard + (r.bag?.heard || 0), mic: s.mic || Boolean(r.bag?.mic),
+  }), { hits: 0, total: 0, zoneOk: 0, zoneN: 0, heard: 0, mic: false }) : null;
 
   return createPortal(<div className="mma-train" role="dialog" aria-modal="true" aria-label={`Allenamento con camera: ${combo.name}`}>
     <header className="mma-train-head">
@@ -395,6 +399,7 @@ export default function MmaComboTrainer({ combo, onClose, onLearned }) {
         <i aria-hidden="true" /><span>{trainOn ? 'Registro solo lo scheletro, niente video, per migliorare il coach' : 'Registro spento: non mando niente'}</span><b>{trainOn ? 'Spegni' : 'Accendi'}</b>
       </button>
       <p className="mma-train-note">Il video resta sul telefono: non viene mai registrato né inviato.{trainOn ? ' Partono solo i punti dello scheletro di ogni ripetizione, con il tuo «Ha capito?».' : ''} Il coach vede la posa in 3D stimato: ordine dei colpi, guardia, distensione, rotazione e ritorno. Non misura potenza né impatto.</p>
+      {bagOn && <p className="mma-train-note">Al sacco ascolto anche il microfono, per sentire quando il guanto tocca il sacco. Il suono resta sul telefono: non lo registro e non lo invio{trainOn ? ' (col registro acceso partono solo i momenti dei colpi sentiti)' : ''}. Se dici di no, conto i colpi solo con la camera.</p>}
     </section> : <>
       <div className="mma-train-stage" onClick={phase === 'bag' && bag.step !== 'ready' ? (e) => bag.tap(e.clientX, e.clientY) : undefined}>
         <video ref={camera.videoRef} autoPlay muted playsInline style={{ transform: mirrored ? 'scaleX(-1)' : undefined }} onClick={() => camera.videoRef.current?.play()} />
@@ -445,6 +450,8 @@ export default function MmaComboTrainer({ combo, onClose, onLearned }) {
         <h3>Media {avg}/100</h3>
         <div className="mma-train-bars">{results.map((r, i) => <i key={i} style={{ height: `${Math.max(8, r.total)}%` }} className={`grade-${r.grade}`} title={`${i + 1}: ${r.total}`} />)}</div>
         {bagHits && <p>Colpi a segno sul sacco: <b>{bagHits.hits} su {bagHits.total}</b>.</p>}
+        {bagHits?.zoneN > 0 && <p>Nella zona giusta del sacco (testa, corpo o basso): <b>{bagHits.zoneOk} su {bagHits.zoneN}</b>.</p>}
+        {bagHits?.mic && bagHits.hits > 0 && <p>Sentiti anche dal microfono: <b>{bagHits.heard} su {bagHits.hits}</b>.</p>}
         {rest?.check && <p>Obiettivo di prima, <b>{rest.check.cue}</b>: da {rest.check.before} su {rest.check.beforeTotal} a {rest.check.now} su {rest.check.total} ripetizioni · <b>{rest.check.trend > 0 ? 'migliorato' : rest.check.trend < 0 ? 'peggiorato' : 'uguale'}</b>.</p>}
         {rest?.focus && <div className="mma-train-path">
           <p>Da sistemare: <b>{rest.focus.cue}</b> · in {rest.focus.n} ripetizioni su {rest.focus.total}{rest.focus.measure ? ` · l’ultima: ${rest.focus.measure}` : ''}.</p>

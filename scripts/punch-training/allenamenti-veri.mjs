@@ -108,7 +108,8 @@ export function replayClip(c, { punchNet } = {}) {
   for (; i < fr.length; i += 1) j.push(fr[i].world, fr[i].t, fr[i].points, aspect);
   const since = (c.go ?? 200) - 700;
   let gestures = j.gestures().filter((g) => g.start >= since);
-  if (c.bag?.contacts?.length) gestures = matchContacts(gestures, c.bag.contacts, { sideOf: j.sideOf }).gestures;
+  const sounds = (c.bag?.sounds || []).filter((s) => s.ok).map((s) => s.t);
+  if (c.bag?.contacts?.length || sounds.length) gestures = matchContacts(gestures, c.bag.contacts || [], { sideOf: j.sideOf, sounds }).gestures;
   return { result: judgeSequence(c.expected, gestures), gestures };
 }
 

@@ -1,12 +1,14 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { analyzeBag, bagFromBand, bagScore, bagTargets, bagZones, createBagContacts, findBand, matchContacts, roiFor } from '../../lib/mmaBag';
 import { TORSO_CM, readTorso, saveTorso, scaleCheck } from '../../lib/mmaMetrics';
 import { drawBag } from '../../lib/mmaBagDraw';
 import { judgeSequence } from '../../lib/mmaComboJudge';
+import { openBagMic } from '../utils/bagMic';
 
 // Modalità «al sacco» del coach con camera: tocchi il sacco sullo schermo, il coach ne trova il
 // contorno, ci mette sopra i bersagli della combo (all'altezza del TUO viso/fegato/coscia) e conta
-// i colpi che arrivano davvero: pugno che si ferma sul bordo + sacco che si muove (lib/mmaBag.js).
+// i colpi che arrivano davvero: pugno che si ferma sul bordo + sacco che si muove (lib/mmaBag.js),
+// e lo schiocco del guanto sentito dal microfono (lib/mmaBagSound.js; l'audio resta sul telefono).
 
 const KEY = 'shadow_monarch_mma_bag';
 export const readBagMode = () => { try { return localStorage.getItem(KEY) === '1'; } catch { return false; } };
@@ -30,7 +32,7 @@ export function useMmaBag({ stance, moves, labels }) {
   const [step, setStep] = useState('tap'); // tap → check → ready
   const [res, setRes] = useState(null);
   const s = useRef(null);
-  if (!s.current) s.current = { cam: null, points: null, calib: [], bag: null, zones: null, targets: [], det: null, mode: 'off', phase: '', hits: {}, flashes: [], live: [], usable: false, trace: [] };
+  if (!s.current) s.current = { cam: null, points: null, calib: [], bag: null, zones: null, targets: [], det: null, mode: 'off', phase: '', hits: {}, flashes: [], live: [], usable: false, trace: [], mic: null };
   const cfg = useRef({}); cfg.current = { stance, moves, labels };
   const api = useMemo(() => {
     const st = s.current;
@@ -46,7 +48,9 @@ export function useMmaBag({ stance, moves, labels }) {
     };
     return {
       setCamera: (camera) => { st.cam = camera; },
-      reset: () => { st.bag = null; st.det = null; st.mode = 'off'; st.calib = []; st.targets = []; st.hits = {}; st.trace = []; setRes(null); setStep('tap'); st.cam?.setRoi?.(null); },
+      reset: () => { st.bag = null; st.det = null; st.mode = 'off'; st.calib = []; st.targets = []; st.hits = {}; st.trace = []; setRes(null); setStep('tap'); st.cam?.setRoi?.(null); st.mic?.stop(); st.mic = null; },
+      // microfono: solo al sacco, chiamato dentro il tocco di «Avvia la camera» (iOS)
+      listen: () => { if (!st.mic) st.mic = openBagMic(); },
       // tocco sullo schermo → punto dell'immagine → analisi del fotogramma
       tap: (clientX, clientY) => {
         const p = st.cam?.toImagePoint?.(clientX, clientY);
@@ -102,7 +106,8 @@ export function useMmaBag({ stance, moves, labels }) {
       score: (judge, since) => {
         if (!st.det) return null;
         const contacts = st.det.contacts(since);
-        const m = matchContacts(judge.gestures().filter((g) => g.start >= since), contacts, { sideOf: judge.sideOf });
+        const mic = st.mic?.status === 'on';
+        const m = matchContacts(judge.gestures().filter((g) => g.start >= since), contacts, { sideOf: judge.sideOf, sounds: mic ? st.mic.det.hits(since - 200).map((h) => h.t) : null });
         // al sacco il telefono è di lato: solo qui rotazione e distensione si possono giudicare
         const seen = m.gestures.map((g) => ({ ...g, sideOn: true }));
         const result = judgeSequence(cfg.current.moves, seen);
@@ -110,8 +115,8 @@ export function useMmaBag({ stance, moves, labels }) {
         const now = performance.now(), hits = {};
         sc.hit.forEach((h, i) => { if (h) hits[i] = st.hits[i] ?? now; });
         st.hits = hits;
-        // sacco mai visto bene e nessun contatto: non si dice "0 a segno"
-        return { result, bag: st.usable || contacts.length ? sc : null, gestures: seen };
+        // sacco mai visto bene, nessun contatto e niente sentito: non si dice "0 a segno"
+        return { result, bag: st.usable || contacts.length || sc.hits ? { ...sc, mic } : null, gestures: seen };
       },
       overlay: (ctx, W, H, points, now, info) => {
         if (!st.bag || st.mode === 'off') return;
@@ -121,7 +126,7 @@ export function useMmaBag({ stance, moves, labels }) {
           next: nextTarget(), hits: st.hits, flashes: st.flashes, offsetX: st.det?.state().offsetX || 0, mirrored: Boolean(info?.mirrored),
         }, now);
       },
-      close: () => { st.cam?.setRoi?.(null); },
+      close: () => { st.cam?.setRoi?.(null); st.mic?.stop(); st.mic = null; },
       contacts: (since = -Infinity) => (st.det ? st.det.contacts(since) : []),
       usable: () => st.usable,
       // quanti cm è il tuo busto, e da dove viene: serve a passare da busti/s a km/h
@@ -130,9 +135,12 @@ export function useMmaBag({ stance, moves, labels }) {
       snapshot: (since = -Infinity) => (st.bag ? {
         box: st.bag.box, axis: st.bag.axis, width: st.bag.width, zones: st.zones, scale: st.scale || null,
         contacts: st.det ? st.det.contacts(since) : [], motion: st.trace.filter((m) => m[0] >= since),
+        // microfono: solo tempi e livelli dei colpi sentiti (e dei quasi-colpi), mai l'audio
+        mic: st.mic?.status || null, sounds: st.mic ? st.mic.det.all(since - 200) : null,
       } : null),
     };
   }, []);
+  useEffect(() => api.close, [api]); // il microfono si spegne anche se il coach si chiude da fuori
   api.step = step; api.res = res;
   return api;
 }

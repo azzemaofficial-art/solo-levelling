@@ -438,7 +438,7 @@ test('abbinamento: il contatto corregge il braccio sbagliato del motore', () => 
   assert.ok(after.total > before.total, `${before.total} → ${after.total}`);
   assert.equal(after.moves[1].status, 'ok');
   const score = bagScore(after, bagTargets(BAG_OK, ZONES, ['jab', 'cross']));
-  assert.deepEqual(score, { hit: [true, true], hits: 2, total: 2 });
+  assert.deepEqual(score, { hit: [true, true], hits: 2, total: 2, zone: [null, null], zoneOk: 0, zoneN: 0, heard: 0 });
 });
 
 test('abbinamento: contatto "probabile" non cambia il braccio; contatto lontano nel tempo non vale', () => {
