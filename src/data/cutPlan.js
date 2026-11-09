@@ -276,17 +276,17 @@ export const recipes = [
 // Ogni esercizio: [nome, dose, { block, cue, light }]. block = gruppo mostrato sopra l'esercizio,
 // cue = tecnica in una riga, light = resta nella versione leggera. Il video sta in exerciseVideos.js (stesso nome).
 // Sedute pensate per manubri fino a 20 kg, senza panca, con superserie per stare sotto i 45 minuti.
-const WARM = 'Riscaldamento', POWER = 'Esplosività', STRETCH = 'Stretching finale', PRE = 'I tuoi 9 minuti prima di entrare in campo';
+const WARM = 'Riscaldamento', POWER = 'Esplosività', STRETCH = 'Stretching finale', PRE = 'I tuoi 10 minuti prima di entrare in campo';
 const footballWarm = ['Marcia e oscillazioni gambe', '2 min', { block: PRE, light: true, cue: 'Marcia o corsetta leggera, poi slanci avanti e di lato tenendoti a un palo.' }];
 const footballMobility = ['World’s greatest stretch e affondo laterale', '3 + 4 / lato', { block: PRE, light: true, cue: 'Apri anche e caviglie senza fretta: due minuti in tutto.' }];
 
 export const trainingDays = [
   { day: 'Lunedì', short: 'Calcio', type: 'football', duration: '≈ 80 min', detail: 'Focus accelerazione. Dopo: cammina 3–5 minuti, bevi, cena con carboidrati e proteine, doccia calda, a letto entro le 23:30.', focus: 'guarda sopra la spalla prima di ricevere, poi primo tocco in avanti.', exercises: [
     footballWarm, footballMobility,
-    ['A-march e A-skip', '2 × 10 m', { block: PRE, cue: 'Ginocchio alto e piede che spinge il terreno sotto di te. Anche sul posto.' }],
-    ['Pogo e salto in lungo', 'pogo 2 × 10 · salto 2 × 3', { block: PRE, cue: 'Pogo: caviglie rigide, tocco rapido. Salto: atterra fermo e riparti da capo.' }],
-    ['Scatti brevi', '2 da 10 m all’85–90%', { block: PRE, cue: 'Busto inclinato nei primi passi, spinta potente. Torna camminando.' }],
-    ['Scatti lanciati', '3 da 20 m al 95%, 15 m di avvio', { block: PRE, cue: 'Prendi velocità in 15 m, poi 20 m quasi al massimo, busto alto. Torna camminando e aspetta 3 minuti. Se senti tirare dietro la coscia, fermati.' }],
+    ['Pogo e salto in lungo', 'pogo 2 × 10 · salto 1 × 3', { block: PRE, cue: 'Pogo: caviglie rigide, tocco rapido. Salto: atterra fermo e riparti da capo.' }],
+    ['Finta di corpo, scatto e tiro', '3 / lato', { block: PRE, cue: 'Conduci piano verso un cono o una borraccia; a un metro abbassa la spalla e sposta il peso da una parte, poi tocca la palla dall’altra con l’esterno, scatta 5 m e tira di collo col piede forte, al 70–80%: conta la precisione. Niente porta libera? Passaggio forte al muro.' }],
+    // scatti al massimo senza palla: col pallone si va più piano (−13–19% sui primi 5 m) e si allena meno la velocità
+    ['Scatti lanciati', '2 da 20 m al 95%, 10 m di avvio', { block: PRE, cue: 'Prendi velocità in 10 m, poi 20 m quasi al massimo, busto alto, senza palla. Recupero di 2 minuti: torna camminando passando la palla al muro. Se senti tirare dietro la coscia, fermati.' }],
   ] },
   { day: 'Martedì', short: 'Forza A', type: 'strength', duration: '≈ 42 min', detail: 'Parte alta e potenza del pugno. Niente gambe pesanti: ieri hai giocato.', exercises: [
     ['Riscaldamento parte alta', '6 min', { block: WARM, light: true, cue: 'Segui il video, poi 1 serie leggera di piegamenti e 1 di rematore.' }],
@@ -308,7 +308,8 @@ export const trainingDays = [
   { day: 'Giovedì', short: 'Calcio', type: 'football', duration: '≈ 70 min', detail: 'Focus cambio di direzione. Dopo: cammina 3–5 minuti, bevi, cena con carboidrati e proteine, doccia calda, a letto entro le 23:30.', focus: 'frena in 2–3 passi, pianta il piede esterno e riparti; primo controllo semplice col piede debole.', exercises: [
     footballWarm, footballMobility,
     ['Bound laterale e pogo', 'bound 2 × 4 / lato · pogo 1 × 10', { block: PRE, cue: 'Salta di lato e atterra fermo su una gamba, due secondi di equilibrio.' }],
-    ['Frenate e ripartenze', '3 frenate al 70% · 2 ripartenze all’85%', { block: PRE, cue: 'Abbassa il bacino e frena in 2–3 passi, poi riparti di lato.' }],
+    ['Frenate e ripartenze', '3 con palla al 70% · 2 senza all’85%', { block: PRE, cue: 'Con la palla: conduci, fermala con la suola abbassando il bacino in 2–3 passi, gira e riparti dall’altra parte. Senza palla: frena e riparti di lato più veloce che puoi.' }],
+    ['Finta di corpo, scatto e tiro', '2 / lato, col piede debole', { block: PRE, cue: 'Come lunedì, ma tocchi e tiri col piede debole: piede d’appoggio accanto alla palla, punta verso la porta. Con un compagno davanti: fai la finta quando sposta il peso, poi scatta dall’altra parte.' }],
   ] },
   { day: 'Venerdì', short: 'Allenamento', type: 'strength', duration: '≈ 45 min', detail: 'Recupera qui la seduta saltata in settimana: Forza A o B, quella che manca, come scritta nel suo giorno. Se le hai già fatte tutte: tecnica al sacco o mobilità. Creatina a fine seduta.' },
   { day: 'Sabato', short: 'Forza B', type: 'strength', duration: '≈ 40 min', detail: 'Gambe e potenza per colpire forte. Tutto in casa: scatti e corsa li fai lunedì e giovedì, qui contano salti e forza.', exercises: [
@@ -327,7 +328,7 @@ export const trainingDays = [
 ];
 
 export const phases = [
-  { weeks: '1–7', name: 'Ingresso', detail: 'Le sedute nuove partono da qui. 2 giri per superserie e 2–3 ripetizioni di margine: impari gli esercizi. Calcio: 1 scatto breve, 1 lanciato all’85%, pogo 1 × 8, salto 1 × 3, bound 1 × 4.' },
+  { weeks: '1–7', name: 'Ingresso', detail: 'Le sedute nuove partono da qui. 2 giri per superserie e 2–3 ripetizioni di margine: impari gli esercizi. Calcio: 1 lanciato all’85%, pogo 1 × 8, salto 1 × 3, finte 2 per lato, bound 1 × 4.' },
   { weeks: '8–10', name: 'Costruzione', detail: 'Tutti i giri, 1–2 ripetizioni di margine. Quando arrivi in cima alle ripetizioni in ogni serie, aumenta il carico o rallenta la discesa. Calcio: dose piena, 20–25 salti.' },
   { weeks: '11', name: 'Scarico', detail: '2 giri e 3 ripetizioni di margine: una settimana più facile per assorbire il lavoro. Salti e scatti a metà.' },
   { weeks: '12–13', name: 'Spinta', detail: 'Tutti i giri. Sull’ultima serie di ogni esercizio arriva a 0–1 di margine, mai su esplosivi e Nordic. Confronta circonferenze, trazioni e piegamenti.' },

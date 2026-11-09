@@ -11,9 +11,9 @@ export const exerciseVideos = {
   // Calcio (verificati 2026-11-05)
   'Marcia e oscillazioni gambe': [V('RSJIp7e7fyY', 'FIFA 11+', 'Corsa di riscaldamento')],
   'World’s greatest stretch e affondo laterale': [V('-CiWQ2IvY34', 'Squat University', 'Stretch'), V('0jmD_WDBkVs', 'Parisi Speed School', 'Affondo laterale')],
-  'A-march e A-skip': [V('bISzKMBflPM', 'Parisi Speed School')],
   'Pogo e salto in lungo': [pogo, V('Uh4AraiUD64', 'Parisi Speed School', 'Salto in lungo')],
-  'Scatti brevi': [V('u_lE_VMnYfU', 'Parisi Speed School', 'Spinta iniziale')],
+  // verificato via oEmbed il 2026-11-09
+  'Finta di corpo, scatto e tiro': [V('N-HbFSguyjk', 'Unisport', 'Finta di corpo'), V('_f9ZIh8ESn4', 'Unisport', 'Tiro')],
   'Scatti lanciati': [V('kFLwmd0yzOU', 'Matt Tometz', 'Scatti lanciati')],
   'Bound laterale e pogo': [V('QI8ipVFtbHY', 'Parisi Speed School', 'Bound'), pogo],
   'Frenate e ripartenze': [V('1pW4o51MusI', 'Parisi Speed School', 'Frenata')],
