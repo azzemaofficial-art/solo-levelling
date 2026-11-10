@@ -44,14 +44,10 @@ const Line = ({ points, color, w = 300, h = 90, unit }) => {
 };
 
 // Progressi: barre di tutte le 16 settimane (tocca per aprirne una) + forza stimata.
-export function WeeksHistory({ log, progress, start, currentWeek }) {
+export function WeeksHistory({ log, start, currentWeek }) {
   const [open, setOpen] = useState(currentWeek);
   const weeks = Array.from({ length: PLAN_WEEKS }, (_, w) => { const items = doneIn(log, weekDates(w, start)); return { w, items, mins: items.reduce((n, e) => n + (e.minutes || 0), 0) }; });
   const max = Math.max(3, ...weeks.map((x) => x.items.length));
-  let bw = null;
-  const pts = (progress || []).map((e) => { if (e.weight) bw = e.weight; return { date: e.date, ...estimateStrength(e, bw), load: e.load }; });
-  const pull = pts.map((p) => ({ date: p.date, v: p.pull })); const push = pts.map((p) => ({ date: p.date, v: p.push }));
-  const load = pts.map((p) => ({ date: p.date, v: p.load || null }));
   const sel = weeks[open];
   return <section className="cut-section wk-history">
     <div className="cut-section-title"><span>STORICO PER SETTIMANA</span></div>
@@ -59,10 +55,52 @@ export function WeeksHistory({ log, progress, start, currentWeek }) {
       <i style={{ height: `${Math.max(4, (items.length / max) * 100)}%` }} /><small>{w + 1}</small></button>)}</div>
     <p className="cut-fine"><b>Settimana {open + 1}</b> · {weekRangeLabel(open, start)} · {sel.items.length} allenamenti, {sel.mins} min{open === currentWeek ? ' · questa è la settimana in corso' : ''}</p>
     {sel.items.length ? <ul className="wk-list">{sel.items.slice().reverse().map((e) => <li key={e.id} style={{ '--tone': (WORKOUT_KINDS[e.kind] || WORKOUT_KINDS.other).color }}><b>{e.title}</b><small>{new Date(`${e.date}T12:00:00`).toLocaleDateString('it-IT', { weekday: 'short', day: 'numeric', month: 'short' })}{e.minutes ? ` · ${e.minutes} min` : ''}</small></li>)}</ul> : <p className="cut-fine">Nessun allenamento segnato in questa settimana.</p>}
+  </section>;
+}
+
+// Scheda Forza: stima dalle misure (trazioni, piegamenti, peso, carico).
+export function StrengthPanel({ progress, onAddMeasure }) {
+  let bw = null;
+  const pts = (progress || []).map((e) => { if (e.weight) bw = e.weight; return { date: e.date, ...estimateStrength(e, bw), load: e.load }; });
+  const pull = pts.map((p) => ({ date: p.date, v: p.pull })); const push = pts.map((p) => ({ date: p.date, v: p.push }));
+  const load = pts.map((p) => ({ date: p.date, v: p.load || null }));
+  return <section className="cut-section wk-history">
     <div className="cut-section-title"><span>FORZA STIMATA</span></div>
     <p className="cut-fine">Dalle misure che inserisci (trazioni, piegamenti e peso). Formula di Epley: è una stima, non un test del massimale.</p>
     <small className="wk-cap">Trazioni · kg totali stimati</small><Line points={pull} color="#ffd184" unit="kg" />
     <small className="wk-cap">Piegamenti · kg stimati</small><Line points={push} color="#6de2d3" unit="kg" />
     <small className="wk-cap">Carico usato · kg</small><Line points={load} color="#b8a4ff" unit="kg" />
+    <button type="button" className="cut-secondary" onClick={onAddMeasure}>Inserisci una misura</button>
+  </section>;
+}
+
+const MONTHS = ['gen', 'feb', 'mar', 'apr', 'mag', 'giu', 'lug', 'ago', 'set', 'ott', 'nov', 'dic'];
+
+// Scheda Anno: tutto il percorso, dalla settimana 1 a oggi.
+export function YearStats({ log, progress, start, currentWeek }) {
+  const first = localDateKey(start);
+  const mine = log.filter((e) => e.date >= first);
+  const perWeek = Array.from({ length: currentWeek + 1 }, (_, w) => doneIn(mine, weekDates(w, start)).length);
+  const active = perWeek.filter((n) => n >= 3).length;
+  const best = Math.max(0, ...perWeek);
+  let run = 0; let streak = 0;
+  perWeek.forEach((n) => { run = n >= 3 ? run + 1 : 0; streak = Math.max(streak, run); });
+  const hours = Math.round(mine.reduce((n, e) => n + (e.minutes || 0), 0) / 6) / 10;
+  const months = {};
+  mine.forEach((e) => { const k = e.date.slice(0, 7); months[k] = (months[k] || 0) + 1; });
+  const keys = Object.keys(months).sort(); const mMax = Math.max(1, ...Object.values(months));
+  const kinds = Object.entries(WORKOUT_KINDS).map(([id, k]) => ({ ...k, n: mine.filter((e) => e.kind === id).length })).filter((k) => k.n);
+  const weights = (progress || []).filter((e) => e.weight);
+  const rec = (key) => Math.max(0, ...(progress || []).map((e) => e[key] || 0));
+  const stat = (n, label) => <div><b>{n}</b><small>{label}</small></div>;
+  return <section className="cut-section wk-year">
+    <div className="cut-section-title"><span>IL TUO PERCORSO · SETTIMANA {currentWeek + 1} / {PLAN_WEEKS}</span></div>
+    <div className="tlog-stats">{stat(mine.length, 'allenamenti')}{stat(hours, 'ore totali')}{stat(active, 'settimane attive')}</div>
+    <div className="tlog-stats">{stat(best, 'record in una settimana')}{stat(streak, 'settimane attive di fila')}{stat(weights.length > 1 ? `${(weights[weights.length - 1].weight - weights[0].weight > 0 ? '+' : '')}${(weights[weights.length - 1].weight - weights[0].weight).toFixed(1).replace('.', ',')}` : '—', 'kg dal primo peso')}</div>
+    <div className="cut-section-title"><span>ALLENAMENTI PER MESE</span></div>
+    {keys.length ? <div className="wk-months">{keys.map((k) => <div key={k}><i style={{ height: `${(months[k] / mMax) * 100}%` }} /><b>{months[k]}</b><small>{MONTHS[Number(k.slice(5)) - 1]}</small></div>)}</div> : <p className="cut-fine">Ancora nessun allenamento segnato.</p>}
+    {kinds.length > 0 && <><div className="cut-section-title"><span>COSA HAI ALLENATO</span></div><ul className="wk-list">{kinds.map((k) => <li key={k.label} style={{ '--tone': k.color }}><b>{k.label}</b><small>{k.n}</small></li>)}</ul></>}
+    <div className="cut-section-title"><span>RECORD</span></div>
+    <div className="tlog-stats">{stat(rec('pullups') || '—', 'trazioni')}{stat(rec('pushups') || '—', 'piegamenti')}{stat(rec('load') ? `${rec('load')} kg` : '—', 'carico')}</div>
   </section>;
 }
