@@ -2,44 +2,47 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { nudgeLines, morningText, trainingText, mondayIndex, comboOfDay } from '../lib/cutReminders.js';
 
+// l'avviso «Domani…» ha il suo test in planWeeks.test.js
+const nudge = (state, today) => nudgeLines(state, today).filter((l) => !l.includes('Domani'));
+
 test('cut-nudge: nessuno stato → nessun messaggio', () => {
-  assert.deepEqual(nudgeLines(null, '2026-09-27'), []);
+  assert.deepEqual(nudge(null, '2026-09-27'), []);
 });
 
 test('cut-nudge: creatina presa oggi e pesata recente → silenzio', () => {
-  assert.deepEqual(nudgeLines({ creatineDate: '2026-09-27', lastWeighDate: '2026-09-26' }, '2026-09-27'), []);
+  assert.deepEqual(nudge({ creatineDate: '2026-09-27', lastWeighDate: '2026-09-26' }, '2026-09-27'), []);
 });
 
 test('cut-nudge: creatina presa ieri ma non oggi → promemoria', () => {
-  const lines = nudgeLines({ creatineDate: '2026-09-26', lastWeighDate: '2026-09-27' }, '2026-09-27');
+  const lines = nudge({ creatineDate: '2026-09-26', lastWeighDate: '2026-09-27' }, '2026-09-27');
   assert.equal(lines.length, 1);
   assert.match(lines[0], /Creatina/);
 });
 
 test('cut-nudge: creatina abbandonata da più di 7 giorni → non insiste', () => {
-  assert.deepEqual(nudgeLines({ creatineDate: '2026-09-10' }, '2026-09-27'), []);
+  assert.deepEqual(nudge({ creatineDate: '2026-09-10' }, '2026-09-27'), []);
 });
 
 test('cut-nudge: pesata di 3+ giorni fa → promemoria con i giorni', () => {
-  const lines = nudgeLines({ lastWeighDate: '2026-09-23' }, '2026-09-27');
+  const lines = nudge({ lastWeighDate: '2026-09-23' }, '2026-09-27');
   assert.equal(lines.length, 1);
   assert.match(lines[0], /4 giorni fa/);
 });
 
 test('cut-nudge: cambio mese contato correttamente (giovedì = calcio)', () => {
-  const lines = nudgeLines({ creatineDate: '2026-09-30', lastWeighDate: '2026-09-28' }, '2026-10-01');
+  const lines = nudge({ creatineDate: '2026-09-30', lastWeighDate: '2026-09-28' }, '2026-10-01');
   assert.equal(lines.length, 3);
   assert.match(lines[1], /Calcio/);
   assert.match(lines[2], /3 giorni fa/);
 });
 
 test('cut-nudge: sessione già segnata oggi → nessuna riga sessione', () => {
-  const lines = nudgeLines({ sessionDoneDate: '2026-09-29', lastWeighDate: '2026-09-29' }, '2026-09-29');
+  const lines = nudge({ sessionDoneDate: '2026-09-29', lastWeighDate: '2026-09-29' }, '2026-09-29');
   assert.deepEqual(lines, []);
 });
 
 test('cut-nudge: mercoledì opzionale non viene sollecitato', () => {
-  assert.deepEqual(nudgeLines({ lastWeighDate: '2026-09-30' }, '2026-09-30'), []);
+  assert.deepEqual(nudge({ lastWeighDate: '2026-09-30' }, '2026-09-30'), []);
 });
 
 test('mondayIndex: lunedì 0, domenica 6', () => {

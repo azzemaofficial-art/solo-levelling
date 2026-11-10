@@ -3,7 +3,7 @@ import { ArrowRight, BookOpen, Check, ChevronLeft, ChevronRight, PlayCircle, Plu
 import ProtocolIcon from '../components/ProtocolIcon';
 import { dayNames, evidence, mealWeeks, nutritionRules, phases as mainPhases, recipes, swapGroup, swapPools, trainingDays as mainDays } from '../data/cutPlan';
 import { massaDishes, massaWeeks } from '../data/menuMassa';
-import { massaEvidence, massaPhaseOf, massaPhases, massaRules, massaTrainingDays, massaWeekIndex, massaWeeksSince } from '../data/massaPlan';
+import { massaEvidence, massaPhaseOf, massaPhases, massaRules, massaTrainingDays, massaWeekIndex, MASSA_START } from '../data/massaPlan';
 import { alternativesFor, applyMealPrefs, applyMenu16, pickKey, recipeFor, togglePref, weekPrep, weekShopping } from '../utils/mealPrefs';
 import { menu16Dishes, menu16Weeks } from '../data/menu16';
 import MealAlternatives from '../components/MealAlternatives';
@@ -11,7 +11,9 @@ import { videosFor } from '../data/exerciseVideos';
 import { dayTargetFor, formatKg, useCutProfile } from '../utils/cutProfile';
 import { CUT_PLAN_KEY, CUT_SYNC_EVENT, CUT_XP } from '../utils/cutSync';
 import { dateOfWeekday, durationMinutes, kindForSession, logWorkout, unlogWorkout } from '../utils/trainingLog';
-import TrainingLog, { TrainingWeekDots, useTrainingLog } from '../components/TrainingLog';
+import TrainingLog, { useTrainingLog } from '../components/TrainingLog';
+import { ThisWeekCard, WeeksHistory } from '../components/WeeksPanel';
+import { PLAN_START, planWeekIndex, weekMonday } from '../utils/planWeeks';
 import MmaAcademy from '../components/MmaAcademy';
 import FuelTracker from '../components/FuelTracker';
 import { fuelTargets, readFuelGoal, usesFixedMenu, usesMassPlan } from '../utils/fuelPlan';
@@ -91,7 +93,8 @@ export default function CutPlan({ view = 'today', onNavigate, systemLogs = [], o
   const setMealPref = (id, value) => setSaved((prev) => ({ ...prev, mealPrefs: togglePref(prev.mealPrefs, id, value) }));
   const [missingImages, setMissingImages] = useState({});
   const imageMissing = (src) => setMissingImages((prev) => (prev[src] ? prev : { ...prev, [src]: true }));
-  const [trainingWeek, setTrainingWeek] = useState(() => Math.min(TRAINING_WEEKS - 1, massPlan ? massaWeeksSince() : Math.max(0, Number(readSaved().trainingWeek || 0))));
+  const [trainingWeek, setTrainingWeek] = useState(() => planWeekIndex(new Date(), massPlan ? MASSA_START : PLAN_START));
+  const planStart = massPlan ? MASSA_START : PLAN_START;
   const [day, setDay] = useState(getMondayIndex);
   const [light, setLight] = useState(false);
   const [weight, setWeight] = useState('');
@@ -180,7 +183,7 @@ export default function CutPlan({ view = 'today', onNavigate, systemLogs = [], o
     setSaved((prev) => ({ ...prev, completed: { ...(prev.completed || {}), [key]: !prev.completed?.[key] } }));
     // diario: data reale di quel giorno nella settimana in corso
     const session = trainingDays[index];
-    const entry = { date: dateOfWeekday(index), kind: kindForSession(session.type), title: session.short };
+    const entry = { date: dateOfWeekday(index, weekMonday(trainingWeek, planStart)), kind: kindForSession(session.type), title: session.short };
     if (nowDone) logWorkout({ ...entry, minutes: durationMinutes(session.duration) });
     else unlogWorkout(entry);
     if (nowDone) rewardOnce(`session-${key}`, XP.session, `${session.short} completata`);
@@ -253,7 +256,7 @@ export default function CutPlan({ view = 'today', onNavigate, systemLogs = [], o
       </section>
       <section className="cut-section"><div className="cut-section-title"><span>IL TUO SEGNALE</span><button onClick={() => onNavigate('progress')}>Progressi <ArrowRight size={15} /></button></div>
         <div className="cut-metrics"><div><small>PESO RECENTE</small><b>{latestWeight ? <><CountUp value={round1(latestWeight)} decimals={1} /> kg</> : 'Da registrare'}</b></div><div><small>GIROVITA</small><b>{latestWaist ? `${round1(latestWaist)} cm` : profile?.startWaistCm ? `${formatKg(profile.startWaistCm)} cm iniziali` : 'Da registrare'}</b></div></div>
-        <button type="button" className="tlog-summary" onClick={() => onNavigate('progress')}><span><small>ALLENAMENTI QUESTA SETTIMANA</small><b>{trainingLog.filter((e) => e.date >= dateOfWeekday(0)).length}</b></span><TrainingWeekDots log={trainingLog} compact /></button>
+        <ThisWeekCard log={trainingLog} days={trainingDays} week={planWeekIndex(new Date(), planStart)} start={planStart} onOpen={() => onNavigate('progress')} />
         <p className="cut-fine">{todayLog?.consumed ? `Oggi hai registrato circa ${Math.round(todayLog.consumed)} kcal nel diario.` : 'Registra cibo e bevande nel diario, anche con quantità approssimative.'}</p>
       </section>
       <section className={`cut-creatine ${creatineTaken ? 'taken' : ''}`}><div className="cut-creatine-icon"><ProtocolIcon name="creatine" size={24} /></div><div><small>ABITUDINE QUOTIDIANA</small><h2>Creatina monoidrato</h2><p>3–5 g al giorno, se hai scelto di assumerla. Può far salire il peso iniziale per acqua nei muscoli.</p><button onClick={toggleCreatine}>{creatineTaken ? <Check size={15} /> : <Plus size={15} />}{creatineTaken ? 'Presa oggi' : <>Segna come presa <span className="cut-xp">+{XP.creatine} XP</span></>}</button></div></section>
@@ -310,6 +313,7 @@ export default function CutPlan({ view = 'today', onNavigate, systemLogs = [], o
       <section className="cut-page-head"><span className="cut-kicker">MISURA • ADATTA • CONTINUA</span><h1>Vedi il<br /><em>cambiamento.</em></h1><p>Conta la tendenza di più settimane, non il numero di una singola pesata.</p></section>
       {profile && <div className="cut-goal"><div><small>PARTENZA</small><b>{formatKg(profile.startWeightKg)} kg</b></div><div className="cut-goal-track" role="progressbar" aria-label="Avanzamento verso l'obiettivo" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(goalPct)}><span style={{ transform: `scaleX(${goalPct / 100})` }} /></div><div><small>OBIETTIVO</small><b>{formatKg(profile.targetWeightKg)} kg</b></div></div>}
       <WeightTrend progress={progress} startWeight={profile?.startWeightKg} targetWeight={profile?.targetWeightKg} />
+      <WeeksHistory log={trainingLog} progress={progress} start={planStart} currentWeek={planWeekIndex(new Date(), planStart)} />
       <TrainingLog />
       <details className="cut-profile" open={!profile}><summary><span>IL TUO PROFILO</span><b>{profile ? 'Modifica' : 'Da impostare'}</b></summary>
         <form className="cut-form cut-profile-form" onSubmit={submitProfile}>

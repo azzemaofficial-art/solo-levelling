@@ -75,7 +75,7 @@ export const massaRules = [
 ];
 
 // Il suo primo lunedì coincide con la settimana 7 di Emanuele: stessi piatti negli stessi giorni.
-const MASSA_START = new Date(2026, 10, 9);
+export const MASSA_START = new Date(2026, 10, 9);
 export const massaWeeksSince = (now = new Date()) => Math.max(0, Math.floor((now - MASSA_START) / (7 * 864e5)));
 export const massaWeekIndex = (now = new Date(), total = 10) => massaWeeksSince(now) % total;
 
