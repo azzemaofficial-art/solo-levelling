@@ -312,7 +312,7 @@ export default function MmaComboTrainer({ combo, onClose, onLearned }) {
         if (avg >= 80) onLearnedRef.current?.();
         const adv = restAdvice(results, focusRef.current); setRest(adv);
         say(`Fine serie. Media ${avg} su cento. ${avg >= 85 ? 'Combo imparata!' : avg >= 65 ? 'Buon lavoro, ancora qualche ripetizione e ci sei.' : 'Rifalla più lenta, un colpo alla volta.'} ${restSpeech(adv)}`, voice);
-      } else { setPhase('countdown'); setCount(3); say('Ancora. Tre. Due. Uno. Via!', voice); }
+      } else { setPhase('countdown'); setCount(3); say('Tre. Due. Uno. Via!', voice); } // niente «Ancora.»: il Via detto arrivava ~1 s dopo il via vero (clip 8-12/11)
     }, current?.speech ? Math.max(5200, speakMs(current.speech)) : 5200);
     return () => clearTimeout(id);
   }, [phase, paused, replay, results, reps, combo.name, voice, current, torso]);

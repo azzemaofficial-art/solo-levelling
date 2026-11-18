@@ -3,7 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createComboJudge } from '../lib/mmaComboJudge.js';
-import { BAG_DRILLS, unlockedBagDrills, CUES, DRILLS, REFLEX, REFLEX_KEY, addSession, drillStats, emptyHistory, loadHistory, onsetOf, effectorTracks, passed, planTrials, saveHistory, scoreTrial, summarize, unlockedDrills } from '../lib/mmaReflex.js';
+import { BAG_DRILLS, unlockedBagDrills, CUES, DRILLS, REFLEX, REFLEX_KEY, addSession, answerDone, drillStats, emptyHistory, loadHistory, onsetOf, effectorTracks, passed, planTrials, saveHistory, scoreTrial, summarize, unlockedDrills } from '../lib/mmaReflex.js';
 import { synthSequence, calibrateJudge, realistic } from './helpers/synthFighter.js';
 
 const CUE_AT = 1000;
@@ -215,4 +215,18 @@ test('schiva e rispondi: la velocità è del pugno, non della testa', () => {
 test('calcio: nessuna velocità, i km/h e i gradi sono tarati sui pugni', () => {
   const r = trial('lowKick', ['lowKick'], 280);
   if (r.status === 'ok') assert.equal(r.speed, null);
+});
+
+test('riflessi: la prova si chiude appena il colpo chiesto è finito (bip subito), il «fermo» aspetta la finestra', () => {
+  const judge = calibrateJudge(createComboJudge());
+  for (const f of synthSequence(['jab'], { lead: CUE_AT + 250 })) judge.push(f.world, f.t, f.points, 1);
+  const g = judge.gestures();
+  const end = Math.max(...g.map((x) => x.end));
+  assert.ok(end < CUE_AT + REFLEX.windowMs, `jab finito a ${end - CUE_AT} ms dal segnale`);
+  const at = (t) => answerDone({ cue: 'jab', cueAt: CUE_AT, gestures: g, idle: true, t });
+  assert.equal(at(end + 100), false);           // appena rientrato: aspetta un attimo
+  assert.equal(at(end + REFLEX.settleMs + 10), true);
+  assert.equal(answerDone({ cue: 'jab', cueAt: CUE_AT, gestures: g, idle: false, t: end + 500 }), false); // ancora in movimento
+  assert.equal(answerDone({ cue: 'stop', cueAt: CUE_AT, gestures: g, idle: true, t: end + 500 }), false); // nogo: finestra intera
+  assert.equal(answerDone({ cue: 'slipCross', cueAt: CUE_AT, gestures: g, idle: true, t: end + 500 }), false); // mancano colpi
 });

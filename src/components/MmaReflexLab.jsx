@@ -8,7 +8,7 @@ import { createComboJudge } from '../../lib/mmaComboJudge';
 import MmaBagStep, { useMmaBag } from './MmaBag';
 import { rankOf, toKmh } from '../../lib/mmaMetrics';
 import { loadTemplates } from '../../lib/mmaTemplates';
-import { BAG_DRILLS, CUE_TONES, TONE_LABEL, unlockedBagDrills, CUES, DRILLS, REFLEX, addSession, drillAnswers, drillById, drillNeedsFeet, drillStats, loadHistory, passed, planTrials, saveHistory, scoreTrial, summarize, unlockedDrills, windowOf } from '../../lib/mmaReflex';
+import { BAG_DRILLS, CUE_TONES, TONE_LABEL, unlockedBagDrills, CUES, DRILLS, REFLEX, addSession, answerDone, drillAnswers, drillById, drillNeedsFeet, drillStats, loadHistory, passed, planTrials, saveHistory, scoreTrial, summarize, unlockedDrills, windowOf } from '../../lib/mmaReflex';
 import { localDateKey, logWorkout } from '../utils/trainingLog';
 
 // Laboratorio riflessi: lo schermo si colora (colore + segno, si vede a 3 metri), tu rispondi, la camera
@@ -74,6 +74,7 @@ export default function MmaReflexLab({ onClose, initialDrill }) {
     const ctx = audioRef.current;
     if (!ctx) return;
     try {
+      if (ctx.state !== 'running') ctx.resume?.(); // iOS lo sospende (voce, schermo): il bip si perderebbe
       const o = ctx.createOscillator(), g = ctx.createGain();
       o.frequency.value = good ? 880 : 220; o.type = 'sine';
       g.gain.setValueAtTime(0.25, ctx.currentTime); g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.18);
@@ -209,8 +210,11 @@ export default function MmaReflexLab({ onClose, initialDrill }) {
       const c = cueRef.current;
       if (!c) return;
       const win = windowOf(c.cue);
-      // la prova finisce dopo la finestra di risposta, a gesto chiuso (al massimo 1,2 s in più)
-      if (t > c.at + win && (judge.idle() || t > c.at + win + 1200)) finishTrial();
+      // la prova finisce appena hai risposto (colpi chiesti chiusi), altrimenti dopo la finestra a gesto
+      // chiuso (al massimo 1,2 s in più)
+      const idle = judge.idle();
+      if (answerDone({ cue: c.cue, cueAt: c.at, gestures: judge.gestures(), idle, t, answers: drillAnswers(drillRef.current) })
+        || (t > c.at + win && (idle || t > c.at + win + 1200))) finishTrial();
     }
   }, [feet, fireCue, finishTrial]);
   const camera = useMmaCamera(onFrame, { minInterval: 33, canSwap: () => !['cue', 'ready'].includes(phaseRef.current), overlay: drill.bag ? bag.overlay : undefined });
