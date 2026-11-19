@@ -84,9 +84,11 @@ export default function MmaProCoach({ lesson, onClose }) {
       if (read.ok && world?.length) judge.calibrate(world, points, aspect);
       if (readinessRef.current.done && judge.isCalibrated()) {
         observerRef.current.setCalibrated();
-        // guardia di partenza bassa (pugni all'altezza delle spalle o sotto): un consiglio, una volta sola
-        const low = judge.base()?.low2;
-        if (low && !lowGuardTold.current && [low.L, low.R].some((v) => v != null && v > -0.05)) { lowGuardTold.current = true; setTimeout(() => speak('Consiglio: guardia un po\' bassa. Porta i pugni all\'altezza degli zigomi.'), 2600); }
+        // guardia di partenza bassa (pugni più giù del mento, verso le spalle): un consiglio, una volta sola.
+        // Misurata dal naso, non dalla spalla: in guardia la spalla sale e scattava sempre (7 serie su 7).
+        // shortcut: 0,3 busti stimato (polso in guardia di Emanuele 0,15-0,20 sotto il naso, spalle 0,20-0,24); ritarare con clip di guardie basse vere
+        const g2 = judge.base()?.g2;
+        if (g2 && !lowGuardTold.current && [g2.L, g2.R].some((v) => v && v[1] > 0.3)) { lowGuardTold.current = true; setTimeout(() => speak('Consiglio: guardia un po\' bassa. Porta i pugni all\'altezza degli zigomi.'), 2600); }
       }
       const now = performance.now();
       if (!read.ok && read.hint && (read.hint !== hintRef.current.text ? now - hintRef.current.at > 2500 : now - hintRef.current.at > 7000)) { hintRef.current = { text: read.hint, at: now }; speak(read.hint, true); }

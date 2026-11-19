@@ -174,6 +174,21 @@ test('il giudizio della combo rispetta sideOn: stesso colpo, consiglio solo al s
   assert.deepEqual(keys({ ...g, sideOn: true }), ['rotate']);
 });
 
+test('pugno spezzato in due e colpi letti male: niente colpo in più né consigli falsi (clip 8-12/11)', () => {
+  const g = { limb: 'arm', kind: 'straight', side: 'rear', level: 'head', start: 0, end: 300, guardRatio: 1, returnMs: 200, reason: 'again', rotation: 0, reachRatio: null, maxExt: 0.9, peakElbowGap: 0, lean: 0, sideOn: true };
+  const rest = { ...g, start: 300, end: 520, reason: 'return' };
+  const one = judgeSequence(['cross'], [g, rest]);
+  assert.equal(one.extras, 0);                                   // stesso braccio, fine = inizio: un pugno solo
+  assert.deepEqual(one.moves[0].issues, []);                     // pezzo spezzato: niente «ruota» con 0 gradi
+  assert.equal(judgeSequence(['cross'], [g, { ...rest, start: 400 }]).extras, 1); // 100 ms dopo: colpo in più vero
+  assert.equal(judgeSequence(['cross', 'cross'], [g, rest]).moves.filter((mv) => mv.gesture).length, 2); // 2-2 chiesto: li prende tutti e due
+  const keys = (x) => judgeSequence(['cross'], [{ ...g, reason: 'return', ...x }]).moves[0].issues.map((it) => it.key);
+  assert.deepEqual(keys({ rotation: 20, maxExt: 0.3 }), []);     // braccio «al 30%» = letto male, non corto
+  assert.deepEqual(keys({ rotation: 20, maxExt: 0.6, hit: true }), []); // a segno sul sacco: è arrivato
+  assert.deepEqual(keys({ rotation: 9 }), []);                   // 9°: rumore, non si dice «ruota»
+  assert.deepEqual(keys({ reason: 'gap', rotation: 0, guardRatio: 0 }), []); // tagliato dal buco: misure non valide
+});
+
 test('rotazione ignota (telefono di fronte): nessun consiglio inventato', () => {
   const g = { limb: 'arm', kind: 'straight', side: 'rear', level: 'head', guardRatio: 1, returnMs: 200, reason: 'return', rotation: null, reachRatio: null, peakElbowGap: 0, lean: 0 };
   assert.deepEqual(rateGesture(g).issues, []);
