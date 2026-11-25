@@ -335,7 +335,7 @@ const EDGE = BAG_OK.box.x1; // bordo del sacco verso la persona
 // Una sessione: colpi { t, S, to: {x,y}, hit } — il pugno parte dalla guardia, accelera per 5
 // fotogrammi, si ferma di colpo, resta 2 fotogrammi e torna in guardia rallentando. Il punto passa
 // da un filtro leggero (come il One Euro del telefono). Se hit, il sacco riceve il colpo.
-function session({ strikes = [], ms = 3000, A = 0, thumbs = true, kicks = [], extraBag = [] } = {}) {
+function session({ strikes = [], ms = 3000, A = 0, thumbs = true, kicks = [], extraBag = [], footStill = false } = {}) {
   const r = rng(8), rt = rng(13);
   const det = createBagContacts({ bag: BAG_OK, zones: ZONES, roi: ROI });
   const punches = [...strikes.filter((s) => s.hit).map((s) => ({ t: s.t + 165 + 8, dv: s.dv ?? 0.3 })), ...kicks.map((k) => ({ t: k.t, dv: 0.6 })), ...extraBag];
@@ -355,6 +355,7 @@ function session({ strikes = [], ms = 3000, A = 0, thumbs = true, kicks = [], ex
       smooth[S].x += 0.75 * (want[S].x - smooth[S].x); smooth[S].y += 0.75 * (want[S].y - smooth[S].y);
     }
     const pts = person({ lw: { x: smooth.L.x + gauss(r) * 0.0015, y: smooth.L.y + gauss(r) * 0.0015 }, rw: { x: smooth.R.x + gauss(r) * 0.0015, y: smooth.R.y + gauss(r) * 0.0015 } });
+    if (footStill) pts[28] = { x: EDGE + 0.01, y: ZONES.low, z: 0, visibility: 0.9 }; // di lato il ginocchio/piede dietro sta vicino al sacco
     for (const kk of kicks) if (t >= kk.t - 100 && t <= kk.t + 60) { pts[27] = { x: EDGE + 0.01, y: ZONES.low, z: 0, visibility: 0.9 }; pts[31] = { x: EDGE, y: ZONES.low + 0.01, z: 0, visibility: 0.9 }; }
     const thumb = thumbs ? thumbAt(bagPath(t, { A, punches }), { r: rt }) : null;
     found.push(...det.push(pts, t, { thumb, aspect: 0.75 }));
@@ -411,6 +412,16 @@ test('contatto: calcio basso → contatto di gamba in basso', () => {
   assert.equal(c[0].zone, 'low');
 });
 
+test('contatto: sacco visto muoversi tardi (braccio sopra la miniatura) → contatto senza arto; piede fermo vicino non è un calcio', () => {
+  // il pugno arriva al sacco a ~1170 ms, ma il movimento si vede solo 400 ms dopo (clip 12/11)
+  const c = session({ footStill: true, strikes: [{ t: 1000, S: 'R', to: HEAD(), hit: false }], extraBag: [{ t: 1573, dv: 0.3 }] });
+  assert.equal(c.length, 1, JSON.stringify(c));
+  assert.equal(c[0].limb, null);
+  assert.equal(c[0].S, null);
+  // sacco spinto da qualcuno, nessun pugno lì vicino, piede fermo accanto al sacco → niente (prima: «calcio»)
+  assert.equal(session({ footStill: true, extraBag: [{ t: 1500, dv: 0.5 }] }).length, 0);
+});
+
 test('contatto: senza miniature (hook vecchio) solo arrivi netti, segnati come probabili', () => {
   const c = session({ thumbs: false, strikes: [{ t: 800, S: 'L', to: HEAD(0.005), hit: true }, { t: 1800, S: 'L', to: HEAD(0.13), hit: false }] });
   assert.equal(c.length, 1, JSON.stringify(c));
@@ -445,6 +456,16 @@ test('abbinamento: contatto "probabile" non cambia il braccio; contatto lontano 
   const m = matchContacts([G('lead', 1100)], [{ t: 1110, S: 'R', limb: 'arm', sure: false }]);
   assert.equal(m.gestures[0].side, 'lead');
   assert.equal(matchContacts([G('lead', 1100)], [{ t: 1700, S: 'L', limb: 'arm' }]).hits, 0);
+});
+
+test('abbinamento: contatto senza arto vale per il colpo fino a 600 ms prima, senza cambiare il braccio', () => {
+  const gs = [G('lead', 1000), G('rear', 1400)];
+  const late = { t: 1850, S: null, limb: null, sure: true, by: 'bag' };
+  const m = matchContacts(gs, [late]);
+  assert.deepEqual(m.gestures.map((g) => g.hit), [false, true]);
+  assert.equal(m.gestures[1].side, 'rear');
+  assert.equal(matchContacts(gs, [{ ...late, S: 'R', limb: 'arm' }]).hits, 0, 'un contatto di braccio così tardi non vale');
+  assert.equal(matchContacts(gs, [{ ...late, t: 2100 }]).hits, 0, 'oltre 600 ms no');
 });
 
 test('soglie documentate e coerenti', () => {

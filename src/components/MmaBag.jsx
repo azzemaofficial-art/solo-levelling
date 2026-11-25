@@ -77,7 +77,7 @@ export function useMmaBag({ stance, moves, labels }) {
         if (mo && mo.t === t) { st.trace.push([t, mo.pos, mo.vel, mo.e ?? null, mo.usable ? 1 : 0, mo.impulse?.z || 0]); if (st.trace.length > 600) st.trace.shift(); }
         if (phase === 'go' && st.det.state().usable) st.usable = true;
         for (const c of fresh) {
-          st.flashes.push({ x: c.x, y: c.y, S: c.S, t: performance.now() });
+          if (c.x != null) st.flashes.push({ x: c.x, y: c.y, S: c.S, t: performance.now() });
           if (phase === 'go') light(c);
         }
         if (st.flashes.length > 8) st.flashes.splice(0, st.flashes.length - 8);
