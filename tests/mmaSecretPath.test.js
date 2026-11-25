@@ -9,7 +9,7 @@ import { MOVES } from '../src/data/mmaMoves.js';
 // ripetizione finta: il diretto visto, con o senza "l'altra mano è scesa"
 const rep = (guardDown, { cross = true } = {}) => ({ moves: [
   { id: 'jab', gesture: {}, issues: [] },
-  { id: 'cross', gesture: cross ? {} : null, issues: guardDown ? [{ key: 'guard', pts: 12, text: 'l’altra mano è scesa: tienila sulla guancia' }] : [] },
+  { id: 'cross', gesture: cross ? { guardRatio: guardDown ? 0.4 : 1 } : null, issues: guardDown ? [{ key: 'guard', pts: 12, text: 'l’altra mano è scesa: tienila sulla guancia' }] : [] },
 ] });
 const taught = () => startSecret(emptyPath(), masterSecret(rep(true)));
 
@@ -85,7 +85,7 @@ test('percorso: si salvano solo i segreti imparati; un salvataggio rovinato non 
 });
 
 // ripetizione pulita: ogni colpo visto, giusto e senza correzioni
-const cleanRep = (ids, seen = { sideOn: true }) => ({ moves: ids.map((id) => ({ id, status: 'ok', gesture: { id, ...seen }, issues: [], expected: EXPECT[id] })) });
+const cleanRep = (ids, seen = { sideOn: true }) => ({ moves: ids.map((id) => ({ id, status: 'ok', gesture: { id, guardRatio: 1, ...seen }, issues: [], expected: EXPECT[id] })) });
 
 test('percorso: ripetizione pulita → il maestro insegna un segreto nuovo che la camera sa verificare', () => {
   const s = teachNextSecret(cleanRep(['jab', 'cross']));
@@ -118,4 +118,15 @@ test('percorso: chi lavora sempre pulito arriva lo stesso a Campione (10 segreti
     assert.ok(rankOf(path).learned >= 10, `segreti imparati ${rankOf(path).learned}`);
     assert.equal(rankOf(path).name, 'Campione');
   }
+});
+
+test('percorso: un segreto che la camera non ha misurato non conta come applicato (telefono di fronte)', () => {
+  let path = startSecret(emptyPath(), { key: 'rotate', id: 'cross', issue: 'rotate', cue: 'ruota di più anca e spalla' });
+  const front = { moves: [{ id: 'cross', gesture: { sideOn: false, rotation: null, guardRatio: 1 }, issues: [] }] };
+  for (let i = 0; i < 5; i += 1) ({ path } = checkRep(path, front));
+  assert.equal(path.pending.tries, 0);
+  assert.deepEqual(path.learned, {});
+  const side = { moves: [{ id: 'cross', gesture: { sideOn: true, rotation: 20, guardRatio: 1 }, issues: [] }] };
+  ({ path } = checkRep(path, side));
+  assert.equal(path.pending.tries, 1);
 });

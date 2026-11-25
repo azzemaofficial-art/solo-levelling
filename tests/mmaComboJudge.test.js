@@ -181,3 +181,13 @@ test('giudice: MediaPipe che scambia sinistra e destra per qualche fotogramma no
   assert.ok(res.moves.every((m) => m.status === 'ok'), arms(judge).map((g) => g.side).join(', '));
   assert.equal(res.extras, 0);
 });
+
+test('1-2: il jab non prende «ritorno lento» se il diretto parte prima che rientri (tecnica giusta)', () => {
+  const base = { limb: 'arm', kind: 'straight', level: 'head', guardRatio: 1, reason: 'return', rotation: null, reachRatio: null, peakElbowGap: 0, lean: 0 };
+  const jab = { ...base, side: 'lead', start: 0, peakT: 200, end: 1100, returnMs: 900 };
+  const keys = (cross) => judgeSequence(['jab', 'cross'], cross ? [jab, cross] : [jab]).moves[0].issues.map((it) => it.key);
+  assert.ok(!keys({ ...base, side: 'rear', start: 450, peakT: 650, end: 900, returnMs: 250 }).includes('return'));
+  // jab da solo, o diretto partito dopo il rientro: il ritorno lento si dice
+  assert.ok(keys(null).includes('return'));
+  assert.ok(keys({ ...base, side: 'rear', start: 1300, peakT: 1500, end: 1700, returnMs: 200 }).includes('return'));
+});

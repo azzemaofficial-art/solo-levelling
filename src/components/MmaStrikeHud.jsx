@@ -10,7 +10,7 @@ const SCALE = { sacco: 'scala: il tuo sacco', salvata: 'scala: ultima misura col
 // sideOn: telefono di lato (al sacco). Solo allora la rotazione bassa si segna come difetto
 export default function MmaStrikeHud({ hit, source, sideOn = false }) {
   if (!hit) return <div className="mma-hud idle"><span>Al primo colpo leggi velocità, tempo e rotazione</span><small>{SCALE[source]}</small></div>;
-  const weak = sideOn && hit.rear && hit.rotation != null && hit.rotation < THRESH.rotateDeg;
+  const weak = sideOn && hit.rear && hit.rotation != null && hit.rotation < THRESH.rotateLow; // la stessa soglia del consiglio «ruota» del coach
   const name = MOVES[hit.id]?.name || (hit.side ? `Braccio ${hit.side === 'lead' ? 'avanti' : 'dietro'}` : 'Colpo');
   return <div className={`mma-hud rank-${hit.rank}`} role="status" aria-label={`${name}: circa ${hit.kmh} chilometri orari${hit.rank ? `, grado ${hit.rank}` : ''}`}>
     <i key={`b${hit.at}`} className="mma-hud-burst" aria-hidden="true" />
@@ -23,7 +23,7 @@ export default function MmaStrikeHud({ hit, source, sideOn = false }) {
       <div className="mma-hud-ladder" aria-hidden="true">{RANKS.map((r) => <i key={r} className={r === hit.rank ? 'on' : r === hit.avgRank ? 'avg' : ''}>{r}</i>)}</div>
       <dl>
         <div><dt>Tempo</dt><dd>{hit.impactMs ?? '—'}<u>ms</u></dd></div>
-        <div className={weak ? 'weak' : ''}><dt>Rotazione</dt><dd>{hit.rotation != null ? <>{Math.round(hit.rotation)}<u>°</u></> : <u>di lato</u>}</dd></div>
+        <div className={weak ? 'weak' : ''}><dt>Rotazione</dt><dd>{hit.rotation != null ? <>{Math.round(hit.rotation)}<u>°</u></> : <u>telefono di lato</u>}</dd></div>
         <div><dt>Media 5</dt><dd>{hit.avgKmh ?? '—'}</dd></div>
         <div><dt>Record</dt><dd>{hit.bestKmh ?? '—'}</dd></div>
       </dl>
