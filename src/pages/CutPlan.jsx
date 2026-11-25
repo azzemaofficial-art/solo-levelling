@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ArrowRight, BookOpen, Check, ChevronLeft, ChevronRight, PlayCircle, Plus, RotateCcw, Shuffle, ThumbsDown, ThumbsUp, Utensils } from 'lucide-react';
+import { ArrowRight, BookOpen, Check, ChevronLeft, ChevronRight, PlayCircle, Plus, RotateCcw, Shuffle, Star, ThumbsDown, ThumbsUp, Utensils } from 'lucide-react';
 import ProtocolIcon from '../components/ProtocolIcon';
 import { dayNames, evidence, mealWeeks, nutritionRules, phases as mainPhases, recipes, swapGroup, swapPools, trainingDays as mainDays } from '../data/cutPlan';
 import { massaDishes, massaWeeks } from '../data/menuMassa';
@@ -26,6 +26,8 @@ const KEY = CUT_PLAN_KEY;
 // piatti su cui si può mettere 👍 / 👎 (i pasti fissi no): src/utils/mealPrefs.js
 const NEW_DISHES = [...menu16Dishes, ...massaDishes].filter((dish) => dish.family);
 const SWAPPABLE = new Set([...Object.values(swapPools).flat().map((dish) => dish.id), ...NEW_DISHES.map((dish) => dish.id)]);
+// ⭐ super like: stelline che esplodono dal bottone (solo CSS, cut-plan.css)
+const SuperBurst = () => <span className="cut-super-burst" aria-hidden="true">{Array.from({ length: 10 }, (_, i) => <i key={i} style={{ '--a': `${i * 36}deg` }} />)}</span>;
 const DISH_TITLE = { ...Object.fromEntries(Object.values(swapPools).flat().map((dish) => [dish.id, recipeFor(dish.meal)?.title || dish.meal])), ...Object.fromEntries(NEW_DISHES.map((dish) => [dish.id, dish.title])) };
 const OLD_WEEKS = mealWeeks.length;
 const TOTAL_WEEKS = OLD_WEEKS + menu16Weeks.length;
@@ -90,7 +92,12 @@ export default function CutPlan({ view = 'today', onNavigate, systemLogs = [], o
     setSaved((prev) => { const picks = { ...prev.mealPicks }; if (id) picks[key] = id; else delete picks[key]; return { ...prev, mealPicks: picks }; });
     setAltSlot(null);
   };
-  const setMealPref = (id, value) => setSaved((prev) => ({ ...prev, mealPrefs: togglePref(prev.mealPrefs, id, value) }));
+  const [superBurst, setSuperBurst] = useState(null); // { id, n }: l'ultimo super like, per l'animazione
+  const setMealPref = (id, value) => {
+    if (value === 'super' && mealPrefs[id] !== 'super') setSuperBurst({ id, n: Date.now() });
+    setSaved((prev) => ({ ...prev, mealPrefs: togglePref(prev.mealPrefs, id, value) }));
+  };
+  const bursting = (id) => superBurst?.id === id && mealPrefs[id] === 'super';
   const [missingImages, setMissingImages] = useState({});
   const imageMissing = (src) => setMissingImages((prev) => (prev[src] ? prev : { ...prev, [src]: true }));
   const [trainingWeek, setTrainingWeek] = useState(() => planWeekIndex(new Date(), massPlan ? MASSA_START : PLAN_START));
@@ -158,9 +165,11 @@ export default function CutPlan({ view = 'today', onNavigate, systemLogs = [], o
   const thumbs = (id, big = false) => (
     <div className={big ? 'cut-thumbs cut-thumbs-big' : 'cut-thumbs'} role="group" aria-label="Ti piace questo piatto?">
       <button type="button" className={mealPrefs[id] === 'up' ? 'on up' : ''} aria-pressed={mealPrefs[id] === 'up'} aria-label="Mi piace" onClick={() => setMealPref(id, 'up')}><ThumbsUp size={big ? 17 : 15} />{big && ' Mi piace'}</button>
+      <button type="button" className={`${mealPrefs[id] === 'super' ? 'on super' : ''} ${bursting(id) ? 'pop' : ''}`} aria-pressed={mealPrefs[id] === 'super'} aria-label="Super like: me lo mangio sempre volentieri" onClick={() => setMealPref(id, 'super')}><Star size={big ? 17 : 15} />{big && ' Super like'}{bursting(id) && <SuperBurst key={superBurst.n} />}</button>
       <button type="button" className={mealPrefs[id] === 'down' ? 'on down' : ''} aria-pressed={mealPrefs[id] === 'down'} aria-label="Non mi piace: sostituiscilo" onClick={() => setMealPref(id, 'down')}><ThumbsDown size={big ? 17 : 15} />{big && ' Non mi piace'}</button>
     </div>
   );
+  const superIds = Object.keys(mealPrefs).filter((id) => mealPrefs[id] === 'super' && SWAPPABLE.has(id));
   const likedIds = Object.keys(mealPrefs).filter((id) => mealPrefs[id] === 'up' && SWAPPABLE.has(id));
   const dislikedIds = Object.keys(mealPrefs).filter((id) => mealPrefs[id] === 'down' && SWAPPABLE.has(id));
   const todayTraining = trainingDays[today];
@@ -285,7 +294,7 @@ export default function CutPlan({ view = 'today', onNavigate, systemLogs = [], o
       <p className="cut-fine">Le calorie del giorno sono una stima. Quantità e prodotti reali possono cambiare molto il totale: usa il diario per calibrare le porzioni.</p>
       <button className="cut-primary" onClick={() => onNavigate('system')}>Registra ciò che hai mangiato <ArrowRight size={17} /></button>
       {!massPlan && <section className="cut-section"><div className="cut-section-title"><span>FIT PORN / RICETTE</span><BookOpen size={16} /></div><div className="cut-recipes">{recipes.filter((recipe) => mealPrefs[recipe.id] !== 'down').map((recipe) => <button className="cut-recipe" key={recipe.title} onClick={() => setSelectedRecipe(recipe)}>{missingImages[recipe.image] ? <i className="cut-recipe-icon" aria-hidden="true"><ProtocolIcon name="food" size={30} /></i> : <img src={recipe.image} alt="" onError={() => imageMissing(recipe.image)} />}<span><small>{recipe.tag}</small><b>{recipe.title}</b></span><ArrowRight size={17} /></button>)}</div></section>}
-      <section className="cut-section cut-tastes"><div className="cut-section-title"><span>I TUOI GUSTI</span><ThumbsUp size={16} /></div>{likedIds.length || dislikedIds.length ? <><p className="cut-fine">👍 non vengono mai tolti e sono i primi sostituti. 👎 escono da tutte le settimane: al loro posto entra un piatto simile che tiene calorie, proteine, fibre, pesce e legumi in regola. Tocca un piatto per togliere il pollice.</p>{[[likedIds, 'up', '👍 Ti piacciono'], [dislikedIds, 'down', '👎 Non ti piacciono']].map(([ids, value, title]) => ids.length > 0 && <div className="cut-taste-group" key={value}><small>{title} · {ids.length}</small><div>{ids.map((id) => <button type="button" key={id} className={`cut-taste ${value}`} onClick={() => setMealPref(id, value)} aria-label={`Togli il pollice da ${DISH_TITLE[id]}`}>{DISH_TITLE[id]} <span aria-hidden="true">×</span></button>)}</div></div>)}</> : <p className="cut-fine">Metti 👍 o 👎 sui piatti del menu: li ricordo qui. Un 👎 sostituisce quel piatto in tutte le settimane con uno simile, senza uscire dalla dieta.</p>}</section>
+      <section className="cut-section cut-tastes"><div className="cut-section-title"><span>I TUOI GUSTI</span><ThumbsUp size={16} /></div>{superIds.length || likedIds.length || dislikedIds.length ? <><p className="cut-fine">⭐ e 👍 non vengono mai tolti e sono i primi sostituti (prima i ⭐). 👎 escono da tutte le settimane: al loro posto entra un piatto simile che tiene calorie, proteine, fibre, pesce e legumi in regola. Tocca ⭐ accanto a un 👍 per dargli il super like; tocca un piatto per togliere il voto.</p>{[[superIds, 'super', '⭐ Super like'], [likedIds, 'up', '👍 Ti piacciono'], [dislikedIds, 'down', '👎 Non ti piacciono']].map(([ids, value, title]) => ids.length > 0 && <div className="cut-taste-group" key={value}><small>{title} · {ids.length}</small><div>{ids.map((id) => <span key={id} className="cut-taste-item"><button type="button" className={`cut-taste ${value} ${bursting(id) ? 'pop' : ''}`} onClick={() => setMealPref(id, value)} aria-label={`Togli il voto da ${DISH_TITLE[id]}`}>{value === 'super' && '⭐ '}{DISH_TITLE[id]} <span aria-hidden="true">×</span>{bursting(id) && <SuperBurst key={superBurst.n} />}</button>{value === 'up' && <button type="button" className="cut-taste-star" onClick={() => setMealPref(id, 'super')} aria-label={`Super like a ${DISH_TITLE[id]}`}><Star size={14} /></button>}</span>)}</div></div>)}</> : <p className="cut-fine">Metti 👍 o 👎 sui piatti del menu: li ricordo qui. Un 👎 sostituisce quel piatto in tutte le settimane con uno simile, senza uscire dalla dieta.</p>}</section>
       <section className="cut-section"><div className="cut-section-title"><span>COME USARE IL PIANO</span></div>{rules.map((rule) => <p className="cut-rule" key={rule}>{rule}</p>)}</section>
     </>}
 
@@ -341,6 +350,7 @@ export default function CutPlan({ view = 'today', onNavigate, systemLogs = [], o
       </>}
     </>}
     {altSlot && <MealAlternatives slot={altSlot} dishes={alternativesFor(altSlot, mealPrefs)} plannedTitle={recipeFor(altSlot.swappedFrom)?.title} missingImages={missingImages} onImageMissing={imageMissing} onPick={(id) => setMealPick(altSlot, id)} onReset={() => setMealPick(altSlot, null)} onOpen={(dish) => setSelectedRecipe({ ...dish, tag: `${altSlot.label} • ${dish.time}` })} onClose={() => setAltSlot(null)} />}
+    {superBurst && mealPrefs[superBurst.id] === 'super' && <div key={superBurst.n} className="cut-super-toast" role="status"><Star size={42} /><b>SUPER LIKE</b><small>{DISH_TITLE[superBurst.id] || ''}</small></div>}
     {selectedRecipe && <div className="cut-modal-backdrop" onClick={() => setSelectedRecipe(null)}><div className="cut-modal" role="dialog" aria-modal="true" aria-labelledby="cut-recipe-title" onClick={(e) => e.stopPropagation()}><button className="cut-close" onClick={() => setSelectedRecipe(null)}>Chiudi</button>{selectedRecipe.image && !missingImages[selectedRecipe.image] && <img src={selectedRecipe.image} alt="" onError={() => imageMissing(selectedRecipe.image)} />}<small>{selectedRecipe.tag}</small><h2 id="cut-recipe-title">{selectedRecipe.title}</h2>{SWAPPABLE.has(selectedRecipe.id) && <>{thumbs(selectedRecipe.id, true)}{mealPrefs[selectedRecipe.id] === 'down' && <p className="cut-thumbs-note">Fatto: non comparirà più nel piano, al suo posto c’è un piatto simile. Premi di nuovo 👎 per riaverlo.</p>}{mealPrefs[selectedRecipe.id] === 'up' && <p className="cut-thumbs-note">Salvato: non lo tolgo mai, ed è tra i primi sostituti.</p>}</>}{selectedRecipe.kcal && <div className="cut-macro-chips"><span>≈ {selectedRecipe.kcal} kcal</span><span>{selectedRecipe.protein} g proteine</span>{selectedRecipe.fiber != null && <span>{selectedRecipe.fiber} g fibre</span>}{selectedRecipe.cost != null && <span>≈ {selectedRecipe.cost.toFixed(2).replace('.', ',')} € a porzione</span>}{selectedRecipe.tags?.includes('sera prima') && <span>🌙 si prepara la sera prima</span>}</div>}{selectedRecipe.why && <p className="cut-fine">{selectedRecipe.why}</p>}<h3>Ingredienti</h3>{selectedRecipe.dose ? <>{peoplePicker}<ul className="cut-ingredients">{selectedRecipe.dose.map((item) => <li key={item[0]}>{doseLine(item, people)}</li>)}</ul></> : Array.isArray(selectedRecipe.ingredients) ? <ul className="cut-ingredients">{selectedRecipe.ingredients.map((item) => <li key={item}>{item}</li>)}</ul> : <p>{selectedRecipe.ingredients}</p>}<h3>Preparazione</h3>{Array.isArray(selectedRecipe.steps) ? <ol className="cut-steps">{selectedRecipe.steps.map((step) => <li key={step}>{step}</li>)}</ol> : <p>{selectedRecipe.steps}</p>}{selectedRecipe.kcal && <p className="cut-fine">Valori stimati sulle quantità indicate: condimenti e marche li cambiano. Registra nel diario quello che mangi davvero.</p>}</div></div>}
   </main>;
 }

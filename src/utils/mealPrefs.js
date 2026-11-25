@@ -14,6 +14,10 @@ import { massaDishes } from '../data/menuMassa.js';
 // proteine minime del giorno (come i test del piano): 140 col McDonald’s, 135 la domenica
 export const MIN_PROTEIN = [150, 150, 140, 150, 150, 150, 135];
 
+// ⭐ 'super' = un 👍 più forte: mai tolto e davanti a tutti i 👍 quando serve un sostituto
+export const isLiked = (v) => v === 'up' || v === 'super';
+const likeRank = (v) => (v === 'super' ? 2 : v === 'up' ? 1 : 0);
+
 const recipe = (meal) => mealRecipes[meal] || {};
 const has = (meal, tag) => Boolean(recipe(meal).tags?.includes(tag));
 const salmon = (meal) => /salmone/i.test(meal);
@@ -54,6 +58,7 @@ function distance(orig, cand, prefs, usedInWeek) {
   if (has(orig, 'fit porn') && !has(cand.meal, 'fit porn')) d += 1;
   if (usedInWeek.has(cand.id)) d += 3;
   if (prefs[cand.id] === 'up') d -= 3;
+  if (prefs[cand.id] === 'super') d -= 6;
   return d;
 }
 
@@ -96,7 +101,7 @@ export function applyMealPrefs(weeks, prefs = {}) {
       const now = problems(week);
       let best = null;
       week.forEach((d, day) => d.slots.forEach((s, i) => {
-        if (prefs[s.id] === 'up') return;
+        if (isLiked(prefs[s.id])) return;
         for (const m of moves(week, day, i, prefs)) {
           if (m.c.id === s.id) continue;
           const p = problems(apply(week, m));
@@ -134,7 +139,7 @@ export function alternativesFor(slot, prefs = {}) {
   return ALL_DISHES
     .filter((d) => d.family === slot.family && d.phase === slot.phase && d.id !== ref.id && prefs[d.id] !== 'down'
       && Math.abs(d.kcal - ref.kcal) <= 60 && d.protein >= ref.protein - 8)
-    .sort((a, b) => (prefs[b.id] === 'up') - (prefs[a.id] === 'up') || b.protein - a.protein);
+    .sort((a, b) => likeRank(prefs[b.id]) - likeRank(prefs[a.id]) || b.protein - a.protein);
 }
 
 // Settimane 7–16 con le scelte (saved.mealPicks) e i 👎 applicati.

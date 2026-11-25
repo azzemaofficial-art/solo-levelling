@@ -122,6 +122,8 @@
 .cut-thumbs button:active{transform:scale(.92)}
 .cut-thumbs button.on.up{border-color:var(--lime);background:var(--lime);color:#11131f}
 .cut-thumbs button.on.down{border-color:#ff7a8a;background:#ff7a8a;color:#1a0d12}
+.cut-thumbs button.on.super{border-color:#ffe66d;background:#ffe66d;color:#1a1500}
+.cut-taste.super{border-color:#ffe66d;color:#ffe66d}
 .cut-thumbs-big{flex-direction:row;gap:8px;margin:-8px 0 14px}
 .cut-thumbs-big button{display:flex;gap:7px;width:auto;height:38px;padding:0 15px;border-radius:19px;font:600 12px/normal var(--font-label)}
 .cut-thumbs-note{margin:-4px 0 16px;color:var(--t2)!important;font-size:12px!important}
@@ -132,6 +134,26 @@
 .cut-taste.up{border-color:color-mix(in srgb,var(--lime) 55%,transparent)}
 .cut-taste.down{border-color:#ff7a8a80}
 .cut-taste span{margin-left:4px;color:var(--t2)}
+.cut-taste-item{display:inline-flex;align-items:center;gap:4px}
+.cut-taste-star{display:grid;place-items:center;width:30px;height:30px;border:1px solid #ffe66d66;border-radius:50%;background:#ffe66d14;color:#ffe66d;cursor:pointer}
+.cut-taste-star:active{transform:scale(.9)}
+/* ⭐ super like: balzo della stella, pioggia di stelline e scritta al centro */
+.cut-thumbs button,.cut-taste{position:relative}
+.cut-thumbs button.pop svg{animation:cut-star-pop .6s cubic-bezier(.2,1.8,.4,1)}
+.cut-taste.super.pop{animation:cut-chip-glow 1s ease-out}
+.cut-super-burst{position:absolute;left:50%;top:50%;width:0;height:0;pointer-events:none}
+.cut-super-burst i{position:absolute;left:-5px;top:-5px;width:10px;height:10px;background:#ffe66d;clip-path:polygon(50% 0,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%);filter:drop-shadow(0 0 4px #ffe66d);animation:cut-burst .85s cubic-bezier(.15,.7,.3,1) forwards}
+.cut-super-burst i:nth-child(even){width:7px;height:7px;left:-3.5px;top:-3.5px;background:#fff6b0;animation-duration:.7s}
+.cut-super-toast{position:fixed;left:50%;top:42%;z-index:1000;display:grid;justify-items:center;gap:4px;padding:18px 26px;border:1px solid #ffe66d;border-radius:18px;background:#0b0b1ee6;color:#ffe66d;box-shadow:0 0 40px #ffe66d66;pointer-events:none;transform:translate(-50%,-50%);animation:cut-toast 1.5s ease-out forwards}
+.cut-super-toast svg{fill:#ffe66d;filter:drop-shadow(0 0 10px #ffe66d)}
+.cut-super-toast b{font:800 20px var(--font-display);letter-spacing:.14em}
+.cut-super-toast small{max-width:220px;color:#fff6c8;font-size:12px;text-align:center}
+@keyframes cut-star-pop{0%{transform:scale(1)}40%{transform:scale(1.7) rotate(-18deg)}100%{transform:scale(1) rotate(0)}}
+@keyframes cut-chip-glow{0%{box-shadow:0 0 0 #ffe66d}30%{box-shadow:0 0 22px #ffe66d}100%{box-shadow:0 0 0 transparent}}
+@keyframes cut-burst{0%{transform:rotate(var(--a)) translateY(0) scale(.3);opacity:1}100%{transform:rotate(var(--a)) translateY(-40px) scale(1);opacity:0}}
+@keyframes cut-toast{0%{opacity:0;transform:translate(-50%,-50%) scale(.6)}18%{opacity:1;transform:translate(-50%,-50%) scale(1.08)}30%{transform:translate(-50%,-50%) scale(1)}75%{opacity:1}100%{opacity:0;transform:translate(-50%,-56%) scale(1)}}
+@media (prefers-reduced-motion:reduce){.cut-thumbs button.pop svg,.cut-taste.super.pop,.cut-super-burst{animation:none;display:none}.cut-super-toast{animation:cut-toast-calm 1.5s steps(1,end) forwards}}
+@keyframes cut-toast-calm{0%{opacity:1}100%{opacity:0}}
 .cut-meal span{color:var(--lime);font-size:10px;text-transform:uppercase}
 .cut-meal p{margin:7px 0 0;color:#e2e3f3;font-size:13px}
 .cut-meal-copy{flex:1}

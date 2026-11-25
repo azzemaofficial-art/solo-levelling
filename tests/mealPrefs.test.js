@@ -36,14 +36,14 @@ test('gusti: con tanti 👎 insieme quasi sempre tutto in regola, e i 👍 non v
     const prefs = {};
     while (Object.keys(prefs).length < 8) prefs[dishes[Math.floor(rnd() * dishes.length)]] = 'down';
     const liked = dishes.filter((id) => !prefs[id]).slice(k, k + 4);
-    liked.forEach((id) => { prefs[id] = 'up'; });
+    liked.forEach((id, n) => { prefs[id] = n % 2 ? 'super' : 'up'; }); // metà ⭐, metà 👍
     const weeks = applyMealPrefs(mealWeeks, prefs);
     const plan = ids(weeks);
     assert.ok(Object.keys(prefs).filter((id) => prefs[id] === 'down').every((id) => !plan.includes(id)), 'un 👎 è rimasto');
     // un piatto col 👍 che era nel piano resta in ogni suo posto
     weeks.forEach((week, w) => week.forEach((d, day) => d.slots.forEach((s, i) => {
       const before = mealWeeks[w][day].slots[i].id;
-      if (prefs[before] === 'up') assert.equal(s.id, before, `👍 ${before} tolto`);
+      if (prefs[before] === 'up' || prefs[before] === 'super') assert.equal(s.id, before, `👍 ${before} tolto`);
     })));
     if (weeks.every(weekOk)) ok += 1;
   }
@@ -65,4 +65,11 @@ test('gusti: lo stesso pollice premuto due volte toglie la preferenza', () => {
   p = togglePref(p, 'waffle', 'down');
   assert.deepEqual(p, { waffle: 'down' });
   assert.deepEqual(togglePref(p, 'waffle', 'down'), {});
+});
+
+test('super like: sostituisce il 👍 e premuto di nuovo si toglie', () => {
+  let p = togglePref({}, 'waffle', 'up');
+  p = togglePref(p, 'waffle', 'super');
+  assert.deepEqual(p, { waffle: 'super' });
+  assert.deepEqual(togglePref(p, 'waffle', 'super'), {});
 });
