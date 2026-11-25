@@ -290,6 +290,21 @@
 .mma-today-blocks button.done .mma-today-no{background:#2f5a2c;color:#d8ffc0}
 .mma-today-gym{display:flex;gap:8px;align-items:flex-start;margin:12px 0 0!important;font-size:12px!important;color:#b6c9b0!important;line-height:1.45}
 .mma-today-gym svg{flex:none;margin-top:2px;color:#b5d97a}
+.mma-week-goal{margin:-6px 0 12px;font-size:14px;line-height:1.45;color:#dfeecf}
+.mma-week-note{margin:0 0 12px;font-size:13px;line-height:1.45;color:#e9ffc4}
+.mma-week-carry{display:flex;gap:8px;align-items:flex-start;margin:0 0 12px;padding:10px 11px;border:1px solid #ffe66d66;border-radius:8px;background:#2a2714;font-size:13px;line-height:1.45;color:#fff6c8}
+.mma-week-carry svg{flex:none;margin-top:2px;color:#ffe66d}
+.mma-week-video{margin:0 0 12px}
+.mma-week-video iframe{display:block;width:100%;aspect-ratio:16/9;border:0;border-radius:8px;background:#000}
+.mma-week-video small{display:block;margin-top:6px;font-size:11px;color:#9fb7a8}
+.mma-week-video a{color:#c8f56a}
+.mma-week-tabs{display:flex;gap:6px;margin:0 0 8px}
+.mma-week-tabs button{flex:1;min-height:34px;border:1px solid #c8f56a33;border-radius:7px;background:#0f1a14;color:#b8cfa4;font:700 11px var(--font-label)}
+.mma-week-tabs button.active{background:var(--lime);border-color:var(--lime);color:#10180a}
+.mma-week-tips{margin:0 0 4px;padding-left:18px;display:grid;gap:4px;font-size:13px;line-height:1.4;color:#dfeecf}
+.mma-week-go{width:100%;display:flex;align-items:center;gap:12px;min-height:60px;margin:12px 0;padding:12px 14px;border:0;border-radius:9px;background:var(--lime);color:#10180a;text-align:left;font:700 16px var(--font-display);cursor:pointer}
+.mma-week-go span{flex:1;min-width:0}
+.mma-week-go small{display:block;margin-top:2px;font:600 12px var(--font-label);opacity:.8}
 .mma-path{margin:0 0 26px}
 .mma-path-steps{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin:0 0 12px}
 .mma-path-steps span{padding:7px 2px 0;border-top:3px solid #2a3c42;font:700 9px var(--font-label);letter-spacing:.04em;color:#6f8c90;text-align:center;overflow-wrap:anywhere}
@@ -369,3 +384,8 @@
 .mma-train-numbers{display:grid;gap:4px;margin:0;padding:0;list-style:none;font-size:13px;color:#c9dde2}
 .mma-train-numbers b{color:#6de2d3}
 @media (prefers-reduced-motion:reduce){.mma-hud-burst{display:none}.mma-hud-main{animation:none}}
+
+/* Accademia: tutto quello che non è il mercoledì, chiuso finché non lo apri */
+.mma-more{margin:0 0 22px}
+.mma-more>summary{display:flex;align-items:center;min-height:48px;padding:0 14px;border:1px solid #ffffff22;border-radius:9px;background:#121524;color:#dfe6f5;font:700 13px var(--font-label);letter-spacing:.06em;cursor:pointer}
+.mma-more[open]>summary{margin-bottom:16px}

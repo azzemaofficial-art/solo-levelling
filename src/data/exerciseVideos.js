@@ -45,6 +45,14 @@ export const exerciseVideos = {
   'Footwork e guardia': [V('Q3siDY1a6PI', 'Hayabusa')],
   'Jab–cross al sacco, tecnica': [V('RRYNJt9Whv8', 'Joslin’s MMA')],
   'Mobilità anche e caviglie': [V('2aXdnJbX-pM', 'Julia Reppel', 'Routine 10 min')],
+  // MMA del mercoledì, settimane 9–16 (src/data/mmaWeeks.js; verificati via oEmbed il 2026-11-25)
+  'MMA · Jab': [V('71nmi6nGcrY', 'Tony Jeffries', 'Jab · 3 min')],
+  'MMA · Diretto e rotazione': [V('LViFS7EMdi4', 'fightTIPS', 'Rotazione · 3 min')],
+  'MMA · 1-2 col passo': [V('GhKHCOR_Gsw', 'Precision Striking', '1-2 e passi · 13 min')],
+  'MMA · Shadow': [V('J4j3AOVWuHE', 'Tony Jeffries', 'Shadow · 3 min'), V('i12A6G_LiJo', 'Tony Jeffries', 'Perché si fa · 4 min')],
+  'MMA · Parata': [V('YYbGthO40d8', 'Longo’s MMA', 'Parata · 2 min')],
+  'MMA · Schivata': [V('-cfSa-gBxtc', 'FightCamp', 'Schivata · 4 min')],
+  'MMA · Teep': [V('xoxnkg_poU8', 'TAG Muay Thai', 'Teep con Tawanchai · 3 min')],
 };
 
 export const videosFor = (exercise) => exerciseVideos[exercise] || [];

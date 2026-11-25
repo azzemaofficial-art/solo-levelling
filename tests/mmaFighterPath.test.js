@@ -216,3 +216,49 @@ test('salvataggi: voti rovinati o strani non bloccano né il percorso né il sal
   assert.deepEqual(st.reflex.drills, { lati: [{ rt: 300 }] });
   assert.doesNotThrow(() => planToday(st, { now: NOW }));
 });
+
+// ── MMA del mercoledì (src/data/mmaWeeks.js) ──
+test('mercoledì: settimana giusta dalla data, piano finito dopo la 16', async () => {
+  const { weekPlan } = await import('../lib/mmaFighterPath.js');
+  const empty = { sessions: [], comboScores: {}, secret: { learned: {}, pending: null }, reflex: {} };
+  const w9 = weekPlan(empty, Date.parse('2026-11-25T19:00:00'));
+  assert.equal(w9.week, 9);
+  assert.equal(w9.isWednesday, true);
+  assert.equal(weekPlan(empty, Date.parse('2026-11-26T09:00:00')).isWednesday, false);
+  assert.equal(weekPlan(empty, Date.parse('2026-12-02T09:00:00')).week, 10);
+  const last = weekPlan(empty, Date.parse('2027-01-13T09:00:00'));
+  assert.deepEqual([last.week, last.ended], [16, false]);
+  const after = weekPlan(empty, Date.parse('2027-01-25T09:00:00'));
+  assert.deepEqual([after.week, after.ended], [16, true]);
+  // circa 20–25 minuti: il mercoledì è la seduta leggera tra la forza e il calcio
+  for (let k = 0; k < 8; k += 1) {
+    const w = weekPlan(empty, Date.parse('2026-11-25T09:00:00') + k * 7 * DAY);
+    assert.equal(w.week, 9 + k);
+    assert.ok(w.minutes >= 20 && w.minutes <= 25, `settimana ${w.week}: ${w.minutes} min`);
+    assert.deepEqual([w.blocks[0].id, w.blocks.at(-1).id], ['warmup', 'cooldown']);
+  }
+});
+
+test('mercoledì: ogni lezione, combo e video esiste davvero', async () => {
+  const { mmaWeeks } = await import('../src/data/mmaWeeks.js');
+  const { exerciseVideos } = await import('../src/data/exerciseVideos.js');
+  assert.deepEqual(mmaWeeks.map((w) => w.week), [9, 10, 11, 12, 13, 14, 15, 16]);
+  for (const w of mmaWeeks) {
+    assert.ok(COMBOS.some((c) => c.id === w.combo), `combo ${w.combo}`);
+    assert.ok(w.rounds || mmaLessons.some((l) => l.id === w.lesson), `lezione ${w.lesson}`);
+    assert.ok(exerciseVideos[w.video]?.length, `video ${w.video}`);
+    assert.ok(['front', 'side'].includes(w.phone));
+  }
+});
+
+test('mercoledì: fatto mercoledì resta fatto giovedì; la correzione in prova passa al mercoledì dopo', async () => {
+  const { weekPlan } = await import('../lib/mmaFighterPath.js');
+  const wed = Date.parse('2026-11-25T19:00:00');
+  const state = { sessions: [], comboScores: { '1-2': { best: 90, last: 90, n: 1, at: wed } }, secret: { learned: {}, pending: { key: 'return', id: 'jab', issue: 'return', cue: 'richiama la mano più veloce', tries: 1, ok: 0 } }, reflex: {} };
+  const thu = weekPlan(state, wed + DAY);
+  assert.equal(thu.done[thu.blocks.findIndex((b) => b.id === 'combo')], true);
+  assert.equal(thu.carry, 'richiama la mano più veloce');
+  // la settimana dopo la combo è un'altra e non è fatta
+  const next = weekPlan(state, wed + 7 * DAY);
+  assert.equal(next.done[next.blocks.findIndex((b) => b.id === 'combo')], false);
+});

@@ -1,8 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { ArrowRight, BookOpen, Camera, Check, Dumbbell, Flame, Pause, Play, SkipForward, Timer, Volume2, VolumeX, Wind, X, Zap } from 'lucide-react';
+import { ArrowRight, BookOpen, Camera, Check, Dumbbell, ExternalLink, Flame, Pause, Play, ShieldAlert, SkipForward, Smartphone, Target, Timer, Volume2, VolumeX, Wind, X, Zap } from 'lucide-react';
 import { mmaStages } from '../data/mmaPath';
-import { blockDone, pathSummary, planToday } from '../../lib/mmaFighterPath';
+import { MMA_SAFETY, PHONE_TIP } from '../data/mmaWeeks';
+import { videosFor } from '../data/exerciseVideos';
+import { blockDone, pathSummary, planToday, weekPlan } from '../../lib/mmaFighterPath';
 
 // L'allenamento di oggi e il percorso del combattente (lib/mmaFighterPath.js), nella pagina Accademia.
 // Qui solo la vista: lo stato arriva già letto dai salvataggi veri (fighterState).
@@ -43,6 +45,42 @@ export function MmaTodayCard({ state, now, onOpen, onMinutes, onFreeze }) {
       </button></li>;
     })}</ol>
     <p className="mma-today-gym"><Dumbbell size={15} />{plan.gymNote}</p>
+  </section>;
+}
+
+// L'MMA del mercoledì: cosa fai questa settimana, il video, e UN pulsante che apre il prossimo blocco nel coach
+export function MmaWeekCard({ state, now, onOpen }) {
+  const w = weekPlan(state, now);
+  const [video, setVideo] = useState(0);
+  const videos = videosFor(w.video);
+  const current = videos[video] || videos[0];
+  const next = w.done.indexOf(false);
+  const when = next < 0 ? 'FATTO' : w.isWednesday ? 'OGGI, MERCOLEDÌ' : now < w.wednesday ? `MERCOLEDÌ ${new Date(w.wednesday).toLocaleDateString('it-IT', { day: 'numeric', month: 'short' }).toUpperCase()}` : 'DA RECUPERARE ENTRO DOMENICA';
+  return <section className="mma-today mma-week" aria-labelledby="mma-week-title">
+    <div className="mma-today-top"><small>{when} · SETTIMANA {w.week}/{w.total}</small><span>{w.done.filter(Boolean).length}/{w.blocks.length}</span></div>
+    <h2 id="mma-week-title">{w.title}</h2>
+    <p className="mma-week-goal">{w.goal}</p>
+    {w.ended && <p className="mma-week-note">Le 16 settimane sono finite: chiedimi il piano nuovo, partendo dai tuoi allenamenti salvati.</p>}
+    {w.carry && <p className="mma-week-carry"><Target size={15} /><span><b>Dall’ultimo allenamento:</b> {w.carry}</span></p>}
+    {current && <div className="mma-week-video">
+      {videos.length > 1 && <div className="mma-week-tabs">{videos.map((v, i) => <button type="button" key={v.id} className={i === video ? 'active' : ''} aria-pressed={i === video} onClick={() => setVideo(i)}>{v.label}</button>)}</div>}
+      <iframe key={current.id} title={`Video: ${w.title}`} src={`https://www.youtube-nocookie.com/embed/${current.id}?rel=0&modestbranding=1&playsinline=1`} allow="accelerometer; encrypted-media; gyroscope; picture-in-picture; fullscreen" allowFullScreen loading="lazy" />
+      <small>{current.label} · {current.channel}, in inglese · <a href={`https://www.youtube.com/watch?v=${current.id}`} target="_blank" rel="noreferrer">Apri su YouTube <ExternalLink size={11} /></a></small>
+    </div>}
+    <ul className="mma-week-tips">{w.tips.map((t) => <li key={t}>{t}</li>)}</ul>
+    <p className="mma-today-gym"><Smartphone size={15} />{PHONE_TIP[w.phone]}</p>
+    {next >= 0
+      ? <button className="mma-week-go" onClick={() => { unlockVoice(); onOpen(w.blocks[next]); }}><Camera size={19} /><span>Apri il coach<small>{next + 1}/{w.blocks.length} · {w.blocks[next].title}</small></span><ArrowRight size={18} /></button>
+      : <p className="mma-week-note">Fatto per questa settimana. Il coach ha salvato le tue combo: la prossima settimana riparti da qui.</p>}
+    <ol className="mma-today-blocks">{w.blocks.map((b, i) => {
+      const Icon = ICON[b.kind] || Flame;
+      return <li key={b.id}><button className={`${w.done[i] ? 'done' : ''} ${i === next ? 'next' : ''}`} onClick={() => { unlockVoice(); onOpen(b); }}>
+        <span className="mma-today-no">{w.done[i] ? <Check size={15} /> : <Icon size={15} />}</span>
+        <span><b>{b.title}</b><small>{b.minutes} min · {b.why}</small></span>
+        <ArrowRight size={15} />
+      </button></li>;
+    })}</ol>
+    <p className="mma-today-gym"><ShieldAlert size={15} />{MMA_SAFETY}</p>
   </section>;
 }
 

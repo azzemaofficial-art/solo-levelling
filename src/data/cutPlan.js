@@ -302,7 +302,7 @@ export const trainingDays = [
     ['Copenhagen', '1–2 × 6–8 / lato', { block: 'Superserie 4', cue: 'Ginocchio (o piede, più difficile) sul divano, fianco alto. Protegge l’inguine.' }],
     ['Stretching finale parte alta', '5 min', { block: STRETCH, light: true, cue: 'Ti rilassa e tiene la mobilità. Non toglie i dolori: gli studi lo escludono.' }],
   ] },
-  { day: 'Mercoledì', short: 'Bag / recupero', type: 'optional', duration: '15–25 min', detail: 'Opzionale: tecnica al sacco, senza sparring, o mobilità in casa. Se stanco, riposo.', exercises: [
+  { day: 'Mercoledì', short: 'MMA', type: 'optional', duration: '≈ 22 min', detail: 'L’MMA della settimana è già pronta: Accademia → «Questo mercoledì», con il video e il pulsante «Apri il coach». Se sei stanco, solo riscaldamento e combo, o riposo.', exercises: [
     ['Footwork e guardia', '3 × 2 min', { light: true }], ['Jab–cross al sacco, tecnica', '3 × 2 min'], ['Mobilità anche e caviglie', '6 min', { light: true }],
   ] },
   { day: 'Giovedì', short: 'Calcio', type: 'football', duration: '≈ 70 min', detail: 'Focus cambio di direzione. Dopo: cammina 3–5 minuti, bevi, cena con carboidrati e proteine, doccia calda, a letto entro le 23:30.', focus: 'frena in 2–3 passi, pianta il piede esterno e riparti; primo controllo semplice col piede debole.', exercises: [
